@@ -1,6 +1,8 @@
 # Simple RSS
 
-> Work in progress
+> Work in progress. The service boots, migrates its volume, serves the
+> application shell, and survives container replacement — see
+> [deployment](docs/DEPLOYMENT.md). Subscriptions and the Digest come next.
 
 Simple RSS is an opinionated, extremely minimal RSS reader for intentional and calm reading. It is designed as an open-source template that one person can deploy and access from any modern phone or laptop browser.
 
@@ -54,6 +56,17 @@ Railway is the initially supported managed deployment. One always-running servic
 The planned stack is TypeScript, React, Vite, Hono, Base UI, Tailwind CSS, Zod, Drizzle, `better-sqlite3`, SQLite FTS5, and Defuddle. The repository will remain one pnpm package until a real second deployable requires another boundary.
 
 See [the architecture document](docs/ARCHITECTURE.md) for the complete design.
+
+## Running it
+
+```sh
+pnpm install
+pnpm dev          # Vite on :5173, server on :8080
+pnpm test         # server against real temporary SQLite, client in jsdom
+pnpm test:smoke   # builds the image and exercises the container (needs Docker)
+```
+
+[Deployment, configuration, and operational commands](docs/DEPLOYMENT.md).
 
 ## Domain and decisions
 

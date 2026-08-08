@@ -134,6 +134,7 @@ The initial relational model contains:
 | `library_items` | Saved membership and saved time |
 | FTS virtual tables | Rebuildable search indexes |
 | migration metadata | Applied schema versions |
+| `write_probe` | One row rewritten by the readiness check to prove the volume still accepts writes |
 
 There are no account, tenant, role, or registration tables.
 

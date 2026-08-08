@@ -1,0 +1,108 @@
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { beforeAll, describe, expect, it } from 'vitest'
+
+/**
+ * jsdom does not evaluate stylesheets, so the shell tests cannot see the
+ * visual foundation. This reads the stylesheet itself and holds it against the
+ * literal values in `docs/DESIGN.md` — enough to catch a token being edited,
+ * dropped, or drifting from the design, which is what actually goes wrong.
+ *
+ * It is not a substitute for looking at the rendered page; it is a guard on
+ * the numbers, which are the part a reviewer cannot eyeball.
+ */
+let css: string
+
+beforeAll(async () => {
+  // Resolved from the project root: under jsdom, `import.meta.url` is an
+  // http: URL and cannot be handed to the filesystem.
+  css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
+})
+
+/** The stylesheet with everything inside `prefers-color-scheme: dark` removed. */
+function lightOnly(): string {
+  return css.replace(/@media \(prefers-color-scheme: dark\)[^}]*\{[\s\S]*?\n\}/g, '')
+}
+
+function darkBlocks(): string {
+  return (css.match(/@media \(prefers-color-scheme: dark\)[^}]*\{[\s\S]*?\n\}/g) ?? []).join('\n')
+}
+
+describe('the light palette', () => {
+  it.each([
+    ['app background', '#ededea'],
+    ['paper', '#f7f7f5'],
+    ['ink — titles', '#12110f'],
+    ['ink — body prose', '#26251f'],
+    ['grey — metadata', '#8c8b86'],
+    ['grey — quietest', '#a3a29d'],
+    ['grey — muted prose', '#6b6a66'],
+    ['accent', '#2438d8'],
+  ])('binds %s to %s', (_role, value) => {
+    expect(lightOnly()).toContain(value)
+  })
+})
+
+describe('the dark palette', () => {
+  it.each([
+    ['paper', '#12110f'],
+    ['ink — titles', '#f0eee9'],
+    ['ink — wordmark and active tab', '#f7f7f5'],
+    ['grey — metadata', '#8c8b86'],
+    ['grey — quietest', '#6b6a66'],
+    ['accent', '#e3b341'],
+  ])('binds %s to %s', (_role, value) => {
+    expect(darkBlocks()).toContain(value)
+  })
+})
+
+describe('type', () => {
+  it('uses Literata and nothing else', () => {
+    expect(css).toContain("--font-serif: 'Literata'")
+    expect(css).not.toMatch(/Inter|Helvetica|system-ui|sans-serif/)
+  })
+
+  it('loads only the weights the design uses, with italic at 300 only', () => {
+    const imports = css.match(/@fontsource\/literata\/[a-z0-9-]+/g) ?? []
+
+    expect(imports.sort()).toEqual([
+      '@fontsource/literata/latin-200',
+      '@fontsource/literata/latin-300',
+      '@fontsource/literata/latin-300-italic',
+      '@fontsource/literata/latin-500',
+    ])
+  })
+
+  it('sets the desktop wordmark and tab sizes', () => {
+    expect(lightOnly()).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*21px/)
+    expect(lightOnly()).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12\.5px/)
+    expect(lightOnly()).toMatch(/\.tab-bar\s*\{[^}]*gap:\s*24px/)
+  })
+})
+
+describe('the narrow layout', () => {
+  it('steps type and padding down at the single breakpoint', () => {
+    const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+
+    expect(narrow).toMatch(/\.paper\s*\{[^}]*padding:\s*28px 24px 0/)
+    expect(narrow).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*19px/)
+    expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*gap:\s*18px/)
+    expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12px/)
+    expect(narrow).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
+  })
+})
+
+describe('layout', () => {
+  it('holds the paper and the content measure to the design widths', () => {
+    expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*max-width:\s*820px/)
+    expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*620px/)
+    expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
+  })
+
+  it('draws no cards or boxes — separation is whitespace', () => {
+    expect(css).not.toMatch(/box-shadow|border-radius/)
+    // The search field's underline is the one rule in the system, and it is
+    // not built yet; any other visible border would be a card sneaking in.
+    expect(css.match(/border[a-z-]*:\s*[^;]+/g) ?? []).toEqual(['border: 0'])
+  })
+})

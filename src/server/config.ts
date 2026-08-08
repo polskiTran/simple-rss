@@ -1,0 +1,93 @@
+import { isAbsolute, join, resolve } from 'node:path'
+import { z } from 'zod'
+
+export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
+export type LogLevel = (typeof LOG_LEVELS)[number]
+
+/** File name of the single database inside the durable data directory. */
+export const DATABASE_FILE = 'simple-rss.db'
+
+const port = z.coerce.number().int().min(1).max(65_535)
+
+const envSchema = z.object({
+  /**
+   * Supplied by the host platform. Railway injects it; the container must not
+   * hard-code a port.
+   */
+  PORT: port.default(8080),
+  /**
+   * The mounted volume. Everything durable lives below it, so replacing the
+   * container preserves state. The container image sets this explicitly; the
+   * default only serves local development.
+   */
+  DATA_DIR: z.string().trim().min(1).default('./.data'),
+  /** Built client assets. Absent during `vite dev`, where Vite serves them. */
+  CLIENT_DIR: z.string().trim().min(1).optional(),
+  LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+  /** How long in-flight requests may finish after SIGTERM. */
+  SHUTDOWN_GRACE_MS: z.coerce.number().int().min(0).max(120_000).default(10_000),
+})
+
+export interface Config {
+  readonly port: number
+  readonly dataDir: string
+  readonly databasePath: string
+  readonly clientDir: string
+  readonly logLevel: LogLevel
+  readonly shutdownGraceMs: number
+}
+
+/**
+ * Turns the process environment into the settings the service needs, failing
+ * at startup rather than at the first request that trips over a bad value.
+ */
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const parsed = envSchema.safeParse(pickDefined(env))
+  if (!parsed.success) {
+    throw new Error(`Invalid environment: ${formatIssues(parsed.error)}`)
+  }
+
+  const dataDir = resolve(parsed.data.DATA_DIR)
+  const clientDir = parsed.data.CLIENT_DIR
+    ? resolve(parsed.data.CLIENT_DIR)
+    : defaultClientDir()
+
+  return {
+    port: parsed.data.PORT,
+    dataDir,
+    databasePath: join(dataDir, DATABASE_FILE),
+    clientDir,
+    logLevel: parsed.data.LOG_LEVEL,
+    shutdownGraceMs: parsed.data.SHUTDOWN_GRACE_MS,
+  }
+}
+
+/**
+ * Compiled output lives at `dist/server/config.js`, so the sibling client
+ * bundle is one directory up. Resolving from the module keeps the service
+ * working regardless of the working directory it is started from.
+ */
+function defaultClientDir(): string {
+  const here = fileDirname()
+  return isAbsolute(here) ? resolve(here, '..', 'client') : resolve('dist/client')
+}
+
+function fileDirname(): string {
+  return resolve(new URL('.', import.meta.url).pathname)
+}
+
+/**
+ * Zod's `.default()` only applies to absent keys, but an unset platform
+ * variable often arrives as an empty string. Dropping empties lets the
+ * declared defaults win while a genuinely malformed value still fails.
+ */
+function pickDefined(env: NodeJS.ProcessEnv): Record<string, string> {
+  const entries = Object.entries(env).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined && entry[1] !== '',
+  )
+  return Object.fromEntries(entries)
+}
+
+function formatIssues(error: z.ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`).join('; ')
+}
