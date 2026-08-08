@@ -98,7 +98,7 @@ describe('the production image', () => {
     const records = logRecords(await container.logs())
     const migrated = records.find((record) => record.message === 'startup.migrations_applied')
 
-    expect(migrated).toMatchObject({ databasePath: '/app/data/simple-rss.db', applied: [1, 2] })
+    expect(migrated).toMatchObject({ databasePath: '/app/data/simple-rss.db', applied: [1, 2, 3] })
   })
 
   it('reports liveness and readiness', async () => {
