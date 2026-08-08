@@ -30,29 +30,29 @@ function darkBlocks(): string {
 
 describe('the light palette', () => {
   it.each([
-    ['app background', '#ededea'],
-    ['paper', '#f7f7f5'],
-    ['ink — titles', '#12110f'],
-    ['ink — body prose', '#26251f'],
-    ['grey — metadata', '#8c8b86'],
-    ['grey — quietest', '#a3a29d'],
-    ['grey — muted prose', '#6b6a66'],
-    ['accent', '#2438d8'],
-  ])('binds %s to %s', (_role, value) => {
-    expect(lightOnly()).toContain(value)
+    ['app background', '--color-canvas', '#ededea'],
+    ['paper', '--color-paper', '#f7f7f5'],
+    ['ink — titles', '--color-ink', '#12110f'],
+    ['ink — body prose', '--color-body', '#26251f'],
+    ['grey — metadata', '--color-meta', '#8c8b86'],
+    ['grey — quietest', '--color-quiet', '#a3a29d'],
+    ['grey — muted prose', '--color-muted', '#6b6a66'],
+    ['accent', '--color-accent', '#2438d8'],
+  ])('binds %s through %s to %s', (_role, property, value) => {
+    expect(lightOnly()).toContain(`${property}: ${value}`)
   })
 })
 
 describe('the dark palette', () => {
   it.each([
-    ['paper', '#12110f'],
-    ['ink — titles', '#f0eee9'],
-    ['ink — wordmark and active tab', '#f7f7f5'],
-    ['grey — metadata', '#8c8b86'],
-    ['grey — quietest', '#6b6a66'],
-    ['accent', '#e3b341'],
-  ])('binds %s to %s', (_role, value) => {
-    expect(darkBlocks()).toContain(value)
+    ['paper', '--color-paper', '#12110f'],
+    ['ink — titles', '--color-ink', '#f0eee9'],
+    ['ink — wordmark and active tab', '--color-ink-strong', '#f7f7f5'],
+    ['grey — metadata', '--color-meta', '#8c8b86'],
+    ['grey — quietest', '--color-quiet', '#6b6a66'],
+    ['accent', '--color-accent', '#e3b341'],
+  ])('binds %s through %s to %s', (_role, property, value) => {
+    expect(darkBlocks()).toContain(`${property}: ${value}`)
   })
 })
 

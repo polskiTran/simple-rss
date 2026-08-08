@@ -63,4 +63,16 @@ describe('health endpoints', () => {
 
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
   })
+
+  it('returns JSON 404 for an unknown health route instead of the client shell', async () => {
+    const service = await startTestService({ clientDir: 'tests/fixtures/client' })
+
+    const response = await service.fetch('/health/unknown')
+
+    expect(response.status).toBe(404)
+    expect(response.headers.get('content-type')).toMatch(/application\/json/)
+    expect(await response.json()).toEqual({
+      error: { code: 'not_found', message: 'Unknown health route' },
+    })
+  })
 })

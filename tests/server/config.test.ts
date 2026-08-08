@@ -1,5 +1,13 @@
+import { execFile } from 'node:child_process'
+import { copyFile, mkdir, symlink, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../../src/server/config.js'
+import { makeTempDataDir } from '../support/temp-dir.js'
+
+const run = promisify(execFile)
 
 describe('loadConfig', () => {
   it('accepts the platform-provided port', () => {
@@ -31,6 +39,27 @@ describe('loadConfig', () => {
 
   it('rejects an empty data directory rather than writing to the process cwd', () => {
     expect(() => loadConfig({ DATA_DIR: '   ' })).toThrow(/DATA_DIR/)
+  })
+
+  it('decodes the module URL when deriving the built client directory', async () => {
+    const parent = await makeTempDataDir()
+    const checkout = await mkdir(join(parent, 'checkout with spaces', 'dist', 'server'), {
+      recursive: true,
+    }).then(() => join(parent, 'checkout with spaces'))
+    await writeFile(join(checkout, 'package.json'), '{ "type": "module" }\n')
+    const copiedConfig = join(checkout, 'dist', 'server', 'config.ts')
+    await copyFile(resolve('src/server/config.ts'), copiedConfig)
+    await symlink(resolve('node_modules'), join(checkout, 'node_modules'), 'dir')
+
+    const moduleUrl = pathToFileURL(copiedConfig).href
+    const script = `import { loadConfig } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(loadConfig({}).clientDir))`
+    const { stdout } = await run(
+      process.execPath,
+      ['--import', 'tsx', '--input-type=module', '--eval', script],
+      { cwd: checkout },
+    )
+
+    expect(JSON.parse(stdout)).toBe(join(checkout, 'dist', 'client'))
   })
 
   it('defaults the log level to info and accepts an override', () => {

@@ -1,4 +1,5 @@
-import { isAbsolute, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
@@ -91,12 +92,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
  * working regardless of the working directory it is started from.
  */
 function defaultClientDir(): string {
-  const here = fileDirname()
-  return isAbsolute(here) ? resolve(here, '..', 'client') : resolve('dist/client')
-}
-
-function fileDirname(): string {
-  return resolve(new URL('.', import.meta.url).pathname)
+  const serverDir = fileURLToPath(new URL('.', import.meta.url))
+  return resolve(serverDir, '..', 'client')
 }
 
 /**

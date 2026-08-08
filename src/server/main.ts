@@ -15,11 +15,16 @@ async function main(): Promise<void> {
 
   installSignalHandlers(service)
 
-  process.on('uncaughtException', (error) => {
-    logger.error('process.uncaught_exception', { error })
-  })
-  process.on('unhandledRejection', (reason) => {
-    logger.error('process.unhandled_rejection', { error: reason })
+  // Monitor fatal errors without replacing Node's default handler. The
+  // process must still exit non-zero: after an uncaught failure, continuing
+  // to serve with readiness open would claim potentially corrupted state is
+  // healthy.
+  process.on('uncaughtExceptionMonitor', (error, origin) => {
+    const event =
+      origin === 'unhandledRejection'
+        ? 'process.unhandled_rejection'
+        : 'process.uncaught_exception'
+    logger.error(event, { error })
   })
 }
 

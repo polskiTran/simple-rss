@@ -53,6 +53,10 @@ export function createApp(deps: AppDependencies): Hono {
       : c.json<ReadinessBody>({ status: 'ready' })
   })
 
+  app.all('/health/*', (c) =>
+    c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404),
+  )
+
   app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
   app.use(
     '/api/*',
