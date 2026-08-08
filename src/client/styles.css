@@ -9,11 +9,20 @@
 @import '@fontsource/literata/latin-500.css';
 @import '@fontsource/literata/latin-300-italic.css';
 
-/* Every value here is literal, from `docs/DESIGN.md`. */
+/* Every value here is literal, from `docs/DESIGN.md`.
+
+   One surface, not two. `docs/DESIGN.md` §2 lists a light `App background
+   (canvas around cards)` of `#EDEDEA` under the `#F7F7F5` paper, but it is
+   dropped here in light as well as dark. §1's third principle is "no dividers,
+   no cards, no boxes", the reference renders in `docs/references/` are all
+   exported at the paper's own edge so none of them shows a canvas, and the
+   820 x 760 "card" of §4 is the artboard the screens were drawn on rather than
+   an object meant to float. Rendered, the second tone only ever reached the
+   screen as two vertical bands beside a full-height column — it surrounded
+   nothing. The departure is recorded in `docs/DESIGN.md` §2. */
 @theme {
   --font-serif: 'Literata', Georgia, serif;
 
-  --color-canvas: #ededea;
   --color-paper: #f7f7f5;
   --color-ink: #12110f;
   --color-ink-strong: #12110f;
@@ -28,13 +37,11 @@
 /* Dark rebinds the same tokens rather than declaring a second theme, so every
    rule below is written once.
 
-   `docs/DESIGN.md` §2 names six dark roles. The remaining four are derived,
-   not invented: canvas collapses onto paper (dark has no cards to sit on, so
-   the field runs edge to edge), body prose takes the title ink, muted prose
-   takes the metadata grey, and the hairline is the title ink at the same 15%. */
+   `docs/DESIGN.md` §2 names six dark roles. The remaining three are derived,
+   not invented: body prose takes the title ink, muted prose takes the metadata
+   grey, and the hairline is the title ink at the same 15%. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: #12110f;
     --color-paper: #12110f;
     --color-ink: #f0eee9;
     --color-ink-strong: #f7f7f5;
@@ -49,13 +56,15 @@
 
 @layer base {
   html {
-    background: var(--color-canvas);
+    background: var(--color-paper);
     color-scheme: light dark;
   }
 
+  /* The paper is the whole field, in both schemes. Nothing else in the system
+     fills a background, so this is the only surface colour there is. */
   body {
     margin: 0;
-    background: var(--color-canvas);
+    background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-serif);
     font-weight: 300;
@@ -71,12 +80,16 @@
 
 @layer components {
   /* Paper. 820px wide on the desktop reference, full width below the
-     breakpoint. `min-height: 100dvh` turns the reference card into a page. */
+     breakpoint. `min-height: 100dvh` turns the reference card into a page.
+
+     It draws no background of its own: the body already carries the one
+     surface tone, so this element is a measure and a padding, not a sheet laid
+     on top of something else. Reintroducing a fill here is how the two-tone
+     banding would come back. */
   .paper {
     max-width: 820px;
     min-height: 100dvh;
     margin-inline: auto;
-    background: var(--color-paper);
     padding: 32px 56px 0;
   }
 

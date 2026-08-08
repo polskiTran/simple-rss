@@ -30,7 +30,6 @@ function darkBlocks(): string {
 
 describe('the light palette', () => {
   it.each([
-    ['app background', '--color-canvas', '#ededea'],
     ['paper', '--color-paper', '#f7f7f5'],
     ['ink — titles', '--color-ink', '#12110f'],
     ['ink — body prose', '--color-body', '#26251f'],
@@ -53,6 +52,27 @@ describe('the dark palette', () => {
     ['accent', '--color-accent', '#e3b341'],
   ])('binds %s through %s to %s', (_role, property, value) => {
     expect(darkBlocks()).toContain(`${property}: ${value}`)
+  })
+})
+
+describe('the surface', () => {
+  /**
+   * `docs/DESIGN.md` §2 lists a light `App background (canvas around cards)` of
+   * `#EDEDEA` under the paper. It is deliberately not bound — see the note in
+   * that section. Against a fixed-width paper the second tone only ever reached
+   * the screen as two vertical bands beside the column, which is a box by
+   * another name (§1, principle 3). This holds the decision in place, because
+   * re-adding a fill is a one-line change that looks harmless in review.
+   */
+  it('is one tone in both schemes, with no canvas behind the paper', () => {
+    expect(css).not.toContain('--color-canvas')
+    expect(css).not.toContain('#ededea')
+  })
+
+  it('carries that tone on the document rather than on a column', () => {
+    expect(lightOnly()).toMatch(/html\s*\{[^}]*background:\s*var\(--color-paper\)/)
+    expect(lightOnly()).toMatch(/\n\s{2}body\s*\{[^}]*background:\s*var\(--color-paper\)/)
+    expect(lightOnly()).not.toMatch(/\.paper\s*\{[^}]*background/)
   })
 })
 
