@@ -4,7 +4,7 @@ import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import { OwnerAuthStore } from './owner-auth.js'
 import { argon2idHasher, type PasswordHasher } from './password.js'
-import { LoginRateLimiter } from './rate-limit.js'
+import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
 import { SessionStore, type IssuedSession } from './sessions.js'
 import { realSleeper, type Sleeper } from './sleeper.js'
 
@@ -110,27 +110,39 @@ export class Authentication {
 
     if (this.#deps.owner.isClaimed()) return { kind: 'already-claimed' }
 
-    const throttled = await this.#throttle(input.client, 'auth.claim_throttled')
-    if (throttled) return throttled
+    const attempt = await this.#beginAttempt(input.client, 'auth.claim_throttled')
+    if ('kind' in attempt) return attempt
 
-    if (!matches(this.#deps.setupSecret, input.setupSecret)) {
-      await this.#chargeFailure(input.client, 'auth.claim_rejected')
-      return { kind: 'rejected' }
+    try {
+      if (!matches(this.#deps.setupSecret, input.setupSecret)) {
+        await this.#reject(attempt, input.client, 'auth.claim_rejected')
+        return { kind: 'rejected' }
+      }
+
+      const passwordHash = await this.#deps.hasher.hash(input.password)
+      if (!this.#deps.owner.claim(passwordHash, this.#deps.clock.now())) {
+        await this.#delaySuccess(attempt)
+        attempt.recordSuccess()
+        this.#deps.logger.warn('auth.claim_lost_race')
+        return { kind: 'already-claimed' }
+      }
+
+      await this.#delaySuccess(attempt)
+      const session = this.#deps.sessions.issueForPasswordHash(passwordHash, this.#deps.clock.now())
+      attempt.recordSuccess()
+
+      if (!session) {
+        // Recovery rotated the password between the claim and session issue.
+        this.#deps.logger.warn('auth.claim_session_stale')
+        return { kind: 'already-claimed' }
+      }
+
+      this.#deps.logger.info('auth.claimed')
+      return { kind: 'claimed', session }
+    } catch (error) {
+      attempt.cancel()
+      throw error
     }
-
-    const passwordHash = await this.#deps.hasher.hash(input.password)
-    const now = this.#deps.clock.now()
-
-    if (!this.#deps.owner.claim(passwordHash, now)) {
-      // Another request claimed it while this one was hashing. The setup
-      // secret was valid, but it is spent: there is already an Owner.
-      this.#deps.logger.warn('auth.claim_lost_race')
-      return { kind: 'already-claimed' }
-    }
-
-    this.#deps.limiter.recordSuccess(input.client)
-    this.#deps.logger.info('auth.claimed')
-    return { kind: 'claimed', session: this.#deps.sessions.issue(now) }
   }
 
   /**
@@ -138,20 +150,34 @@ export class Authentication {
    * answered identically whether or not the installation has an Owner yet.
    */
   async signIn(input: Attempt & { readonly password: string }): Promise<SignInOutcome> {
-    const throttled = await this.#throttle(input.client, 'auth.sign_in_throttled')
-    if (throttled) return throttled
+    const attempt = await this.#beginAttempt(input.client, 'auth.sign_in_throttled')
+    if ('kind' in attempt) return attempt
 
-    if (!(await this.#accepts(input.password))) {
-      await this.#chargeFailure(input.client, 'auth.sign_in_rejected')
-      return { kind: 'rejected' }
+    try {
+      const passwordHash = await this.#verifiedPasswordHash(input.password)
+      if (!passwordHash) {
+        await this.#reject(attempt, input.client, 'auth.sign_in_rejected')
+        return { kind: 'rejected' }
+      }
+
+      await this.#delaySuccess(attempt)
+      const now = this.#deps.clock.now()
+      this.#deps.sessions.prune(now)
+      const session = this.#deps.sessions.issueForPasswordHash(passwordHash, now)
+
+      if (!session) {
+        attempt.cancel()
+        this.#deps.logger.warn('auth.sign_in_stale', { client: input.client })
+        return { kind: 'rejected' }
+      }
+
+      attempt.recordSuccess()
+      this.#deps.logger.info('auth.signed_in', { client: input.client })
+      return { kind: 'signed-in', session }
+    } catch (error) {
+      attempt.cancel()
+      throw error
     }
-
-    this.#deps.limiter.recordSuccess(input.client)
-    const now = this.#deps.clock.now()
-    this.#deps.sessions.prune(now)
-    this.#deps.logger.info('auth.signed_in', { client: input.client })
-
-    return { kind: 'signed-in', session: this.#deps.sessions.issue(now) }
   }
 
   /** Whether this token is a live session, sliding its idle deadline. */
@@ -168,74 +194,80 @@ export class Authentication {
 
   /**
    * Replaces the password for an Owner who knows the current one, and signs
-   * every device out — including the one asking. A password is changed because
-   * the old one might be known to someone else, and a session issued under it
-   * is exactly as compromised as the password was.
+   * every device out — including the one asking. The compare, replacement, and
+   * revocation are tied to one verifier generation.
    */
   async changePassword(
     input: Attempt & { readonly currentPassword: string; readonly newPassword: string },
   ): Promise<PasswordChangeOutcome> {
-    const throttled = await this.#throttle(input.client, 'auth.password_change_throttled')
-    if (throttled) return throttled
+    const attempt = await this.#beginAttempt(input.client, 'auth.password_change_throttled')
+    if ('kind' in attempt) return attempt
 
-    if (!(await this.#accepts(input.currentPassword))) {
-      await this.#chargeFailure(input.client, 'auth.password_change_rejected')
-      return { kind: 'rejected' }
+    try {
+      const currentHash = await this.#verifiedPasswordHash(input.currentPassword)
+      if (!currentHash) {
+        await this.#reject(attempt, input.client, 'auth.password_change_rejected')
+        return { kind: 'rejected' }
+      }
+
+      const passwordHash = await this.#deps.hasher.hash(input.newPassword)
+      await this.#delaySuccess(attempt)
+      const revoked = this.#deps.owner.changePassword(currentHash, passwordHash, this.#deps.clock.now())
+
+      if (revoked === undefined) {
+        attempt.cancel()
+        this.#deps.logger.warn('auth.password_change_stale', { client: input.client })
+        return { kind: 'rejected' }
+      }
+
+      attempt.recordSuccess()
+      this.#deps.logger.info('auth.password_changed', { sessionsRevoked: revoked })
+      return { kind: 'changed', revoked }
+    } catch (error) {
+      attempt.cancel()
+      throw error
     }
-
-    this.#deps.limiter.recordSuccess(input.client)
-    const revoked = await this.#install(input.newPassword)
-    this.#deps.logger.info('auth.password_changed', { sessionsRevoked: revoked })
-    return { kind: 'changed', revoked }
   }
 
   /**
-   * Emergency recovery, reached only through the platform shell. It answers
-   * the case the rest of this module deliberately cannot: an Owner who has
-   * forgotten the password and has no second Owner, no recovery email, and no
-   * identity provider to fall back on.
-   *
-   * Knowing the current password is not required, because whoever can run this
-   * already has the volume. Returns how many sessions it ended.
+   * Emergency recovery, reached only through the platform shell. Knowing the
+   * current password is not required, because whoever can run this already has
+   * the volume. Returns how many sessions it ended.
    */
   async resetPassword(newPassword: string): Promise<number> {
-    const revoked = await this.#install(newPassword)
+    const passwordHash = await this.#deps.hasher.hash(newPassword)
+    const revoked = this.#deps.owner.resetPassword(passwordHash, this.#deps.clock.now())
     this.#deps.logger.warn('auth.password_reset', { sessionsRevoked: revoked })
     return revoked
   }
 
-  /** Installs a verifier and ends every session that predates it. */
-  async #install(password: string): Promise<number> {
-    const passwordHash = await this.#deps.hasher.hash(password)
-    this.#deps.owner.replacePassword(passwordHash, this.#deps.clock.now())
-    return this.#deps.sessions.revokeAll()
-  }
-
-  /** Whether this is the Owner's current password. False before setup. */
-  async #accepts(password: string): Promise<boolean> {
+  /** The verifier generation this password proved, or nothing on a mismatch. */
+  async #verifiedPasswordHash(password: string): Promise<string | undefined> {
     const record = this.#deps.owner.read()
-    return record ? this.#deps.hasher.verify(record.passwordHash, password) : false
+    if (!record) return undefined
+    return (await this.#deps.hasher.verify(record.passwordHash, password)) ? record.passwordHash : undefined
   }
 
-  /**
-   * The refusal to return when this client has spent its attempts, or
-   * `undefined` when it may go ahead. Every route that checks a secret asks
-   * this first, so the setup secret is no cheaper to guess than the password.
-   */
-  async #throttle(client: string, event: string): Promise<Throttled | undefined> {
-    const verdict = this.#deps.limiter.check(client)
-    if (verdict.allowed) return undefined
+  /** Reserves an attempt, or returns the rate-limit response it must receive. */
+  async #beginAttempt(client: string, event: string): Promise<AllowedAttempt | Throttled> {
+    const verdict = this.#deps.limiter.begin(client)
+    if (verdict.allowed) return verdict
 
     this.#deps.logger.warn(event, { client, retryAfterSeconds: verdict.retryAfterSeconds })
     await this.#deps.sleep(verdict.delayMs)
     return { kind: 'rate-limited', retryAfterSeconds: verdict.retryAfterSeconds }
   }
 
-  /** Records a wrong secret and holds the answer back for what it now costs. */
-  async #chargeFailure(client: string, event: string): Promise<void> {
-    const delayMs = this.#deps.limiter.recordFailure(client)
+  /** Records a wrong secret and holds the answer back for its reserved cost. */
+  async #reject(attempt: AllowedAttempt, client: string, event: string): Promise<void> {
+    const delayMs = attempt.recordFailure()
     this.#deps.logger.warn(event, { client })
-    await this.#deps.sleep(delayMs)
+    if (delayMs > 0) await this.#deps.sleep(delayMs)
+  }
+
+  /** Applies progressive and global pressure to a successful secret check too. */
+  async #delaySuccess(attempt: AllowedAttempt): Promise<void> {
+    if (attempt.successDelayMs > 0) await this.#deps.sleep(attempt.successDelayMs)
   }
 }
 

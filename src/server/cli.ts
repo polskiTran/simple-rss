@@ -1,4 +1,4 @@
-import { MIN_PASSWORD_LENGTH, newPasswordSchema } from '../shared/api.js'
+import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, newPasswordSchema } from '../shared/api.js'
 import { createAuthentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
@@ -100,7 +100,9 @@ async function resetPassword(
   }
 
   if (!newPasswordSchema.safeParse(password).success) {
-    context.out(`The new password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+    context.out(
+      `The new password must be at least ${MIN_PASSWORD_LENGTH} characters and at most ${MAX_PASSWORD_BYTES} UTF-8 bytes`,
+    )
     return 1
   }
 

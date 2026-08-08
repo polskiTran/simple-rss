@@ -261,7 +261,7 @@ The Railway template supplies a required random setup secret. Before setup compl
 
 There is no registration, email recovery, OAuth, role model, or second Owner.
 
-Only `/health/*` and the `/api/auth/*` routes are reachable without a session. Everything else under `/api` is closed by default — see [ADR 0004](./adr/0004-api-closed-by-default.md) — so an unclaimed installation exposes setup and health and nothing more.
+Only `/health/*` and the exact paths `/api/auth/status`, `/api/auth/setup`, and `/api/auth/session` are reachable without a session. Mounting another route under `/api/auth` does not exempt it. Everything else under `/api` is closed by default — see [ADR 0004](./adr/0004-api-closed-by-default.md) — so an unclaimed installation exposes setup and health behavior and nothing more.
 
 ### Sessions
 

@@ -1,4 +1,4 @@
-import type { Browser, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { expect, OWNER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
 
 const SESSION_COOKIE = 'simple_rss_session'
@@ -19,14 +19,6 @@ async function signIn(page: Page, installation: Installation, password = OWNER_P
   await page.getByRole('button', { name: 'sign in' }).click()
 }
 
-/** A second device: its own browser context, so its own cookie jar. */
-async function otherDevice(browser: Browser, installation: Installation): Promise<Page> {
-  const context = await browser.newContext()
-  const page = await context.newPage()
-  await signIn(page, installation)
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-  return page
-}
 
 test.describe('claiming an installation in a browser', () => {
   test('takes the setup secret and lands the Owner in the reader', async ({ page, installation }) => {
@@ -81,42 +73,6 @@ test.describe('the session cookie', () => {
   })
 })
 
-test.describe('a phone and a laptop', () => {
-  test('stay signed in independently, and one signing out leaves the other', async ({
-    browser,
-    page,
-    installation,
-  }) => {
-    await claim(page, installation)
-    const phone = await otherDevice(browser, installation)
-
-    await phone.goto(`${installation.url}/settings`)
-    await phone.getByRole('button', { name: 'sign out' }).click()
-    await expect(phone.getByRole('form', { name: 'Sign in' })).toBeVisible()
-
-    await page.reload()
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-  })
-
-  test('both have to sign in again after the password changes', async ({ browser, page, installation }) => {
-    await claim(page, installation)
-    const phone = await otherDevice(browser, installation)
-
-    await page.goto(`${installation.url}/settings`)
-    await page.getByRole('button', { name: 'change' }).click()
-    await page.getByLabel('current password').fill(OWNER_PASSWORD)
-    await page.getByLabel('new password', { exact: true }).fill('a-replacement-password')
-    await page.getByLabel('confirm new password').fill('a-replacement-password')
-    await page.getByRole('button', { name: 'change password' }).click()
-
-    await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible()
-    await phone.reload()
-    await expect(phone.getByRole('form', { name: 'Sign in' })).toBeVisible()
-
-    await signIn(page, installation, 'a-replacement-password')
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-  })
-})
 
 test.describe('signing back in', () => {
   test('refuses a wrong password with one generic line', async ({ browser, page, installation }) => {

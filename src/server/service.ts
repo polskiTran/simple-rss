@@ -29,7 +29,6 @@ export interface Service {
   /** Undefined only when startup failed to open the database. */
   readonly database: SqliteDatabase | undefined
   readonly settings: InstallationSettingsStore | undefined
-  readonly authentication: Authentication | undefined
   close(): void
 }
 
@@ -95,9 +94,6 @@ export function createService(options: ServiceOptions): Service {
     },
     get settings() {
       return settings
-    },
-    get authentication() {
-      return authentication
     },
     close() {
       database?.close()

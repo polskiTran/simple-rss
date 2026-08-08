@@ -26,52 +26,65 @@ const BASE_DELAY_MS = 250
  */
 const MAX_DELAY_MS = 2_000
 
-export interface AttemptVerdict {
-  /** Whether the password may be checked at all. */
-  readonly allowed: boolean
-  /** How long to hold a rejection before answering. */
+export interface AllowedAttempt {
+  readonly allowed: true
+  /** What a successful secret check costs, based on pressure already present. */
+  readonly successDelayMs: number
+  readonly retryAfterSeconds: 0
+  /** Converts the reservation into a failure and returns this attempt's delay. */
+  recordFailure(): number
+  /** Clears this client's history after it proves it is the Owner. */
+  recordSuccess(): void
+  /** Releases a reservation when the secret check could not finish. */
+  cancel(): void
+}
+
+export interface RefusedAttempt {
+  readonly allowed: false
   readonly delayMs: number
-  /** Seconds until the client may try again. Zero unless blocked. */
   readonly retryAfterSeconds: number
 }
+
+export type AttemptVerdict = AllowedAttempt | RefusedAttempt
+
+interface AttemptRecord {
+  readonly id: number
+  at: number
+}
+
+type AttemptOutcome = 'failure' | 'success' | 'cancelled'
 
 /**
  * Local, in-memory guessing resistance for the routes that check a secret. No
  * Redis, because there is one process by design.
  *
- * The two limits deliberately work differently. Only a client's *own* failures
- * can block it; the installation-wide ceiling slows everyone down but blocks
- * nobody. That asymmetry is the point: a hard global block would let anyone
- * with a handful of addresses keep the Owner out of their own reader by
- * failing twenty sign-ins every quarter of an hour, which is exactly the
- * permanent lockout this is supposed to avoid. Spread-out guessing is answered
- * by capping the rate instead — every attempt costs the maximum delay on top
- * of a memory-hard verify, and each address still gets only five tries.
+ * Pending checks reserve one of the client's five slots before the asynchronous
+ * password verifier starts. A burst therefore cannot send an arbitrary number
+ * of guesses through while every request still sees an empty failure history.
  *
- * State is deliberately not persisted. Losing it costs an attacker nothing
- * they could not get by waiting out the window, and only the Owner can restart
- * the process in the first place.
+ * The two limits deliberately work differently. Only a client's own attempts
+ * can block it; the installation-wide ceiling slows everyone down but blocks
+ * nobody. That asymmetry prevents strangers from locking the Owner out.
  */
 export class LoginRateLimiter {
-  readonly #failures = new Map<string, number[]>()
+  readonly #attempts = new Map<string, AttemptRecord[]>()
   readonly #clock: Clock
+  #nextId = 1
 
   constructor(clock: Clock) {
     this.#clock = clock
   }
 
   /**
-   * Whether this client may attempt now, and what the attempt should cost.
+   * Reserves one attempt before its secret is checked.
    *
-   * The delay is charged against failures already recorded, so the first
-   * attempt after a quiet period is answered at full speed and a run of wrong
-   * guesses gets progressively slower. Once the installation-wide ceiling is
-   * reached, every attempt pays the maximum whatever its own history.
+   * A successful attempt pays for failures and global pressure already
+   * present. A failed attempt also pays for the slot it just consumed.
    */
-  check(client: string): AttemptVerdict {
+  begin(client: string): AttemptVerdict {
     const now = this.#clock.now().getTime()
-    const clientFailures = this.#recent(client, now)
-    const blockedUntil = deadline(clientFailures, PER_CLIENT_FAILURES)
+    const recent = this.#recent(client, now)
+    const blockedUntil = deadline(recent, PER_CLIENT_FAILURES)
 
     if (blockedUntil > now) {
       return {
@@ -81,62 +94,87 @@ export class LoginRateLimiter {
       }
     }
 
+    const successDelayMs = this.#cost(recent.length, now)
+    const id = this.#nextId
+    this.#nextId += 1
+    recent.push({ id, at: now })
+    this.#attempts.set(client, recent)
+    const failureDelayMs = this.#cost(recent.length, now)
+    let open = true
+
+    const finish = (outcome: AttemptOutcome): void => {
+      if (!open) return
+      open = false
+      this.#finish(client, id, outcome)
+    }
+
     return {
       allowed: true,
-      delayMs: this.#cost(clientFailures.length, now),
+      successDelayMs,
       retryAfterSeconds: 0,
+      recordFailure: () => {
+        finish('failure')
+        return failureDelayMs
+      },
+      recordSuccess: () => finish('success'),
+      cancel: () => finish('cancelled'),
     }
   }
 
-  /** Records a wrong secret. Returns what this attempt should now cost. */
-  recordFailure(client: string): number {
+  #finish(client: string, id: number, outcome: AttemptOutcome): void {
+    if (outcome === 'success') {
+      this.#attempts.delete(client)
+      return
+    }
+
     const now = this.#clock.now().getTime()
     const recent = this.#recent(client, now)
-    recent.push(now)
-    this.#failures.set(client, recent)
-    return this.#cost(recent.length, now)
+    const index = recent.findIndex((attempt) => attempt.id === id)
+
+    if (outcome === 'failure') {
+      const failed = index === -1 ? { id, at: now } : recent[index]
+      if (!failed) return
+      failed.at = now
+      if (index === -1) recent.push(failed)
+    } else if (index !== -1) {
+      recent.splice(index, 1)
+    }
+
+    recent.sort((left, right) => left.at - right.at)
+    if (recent.length === 0) this.#attempts.delete(client)
+    else this.#attempts.set(client, recent)
   }
 
-  /** Clears this client's history, because the Owner has just proved itself. */
-  recordSuccess(client: string): void {
-    this.#failures.delete(client)
+  /** What an attempt costs at the current client and installation pressure. */
+  #cost(clientAttempts: number, now: number): number {
+    const pressure = this.#allRecentCount(now) >= GLOBAL_FAILURES ? MAX_DELAY_MS : 0
+    return Math.max(delayFor(clientAttempts), pressure)
   }
 
-  /**
-   * What an attempt costs in delay: whatever this client's own history has
-   * earned, or the maximum once the installation as a whole is past its
-   * ceiling — whichever is worse.
-   */
-  #cost(clientFailures: number, now: number): number {
-    const pressure = this.#allRecent(now).length >= GLOBAL_FAILURES ? MAX_DELAY_MS : 0
-    return Math.max(delayFor(clientFailures), pressure)
-  }
-
-  /** Failures still inside the window for one client, oldest first. */
-  #recent(client: string, now: number): number[] {
-    const kept = (this.#failures.get(client) ?? []).filter((at) => at > now - WINDOW_MS)
-    if (kept.length === 0) this.#failures.delete(client)
-    else this.#failures.set(client, kept)
+  /** Attempts still inside the window for one client, oldest first. */
+  #recent(client: string, now: number): AttemptRecord[] {
+    const kept = (this.#attempts.get(client) ?? []).filter((attempt) => attempt.at > now - WINDOW_MS)
+    if (kept.length === 0) this.#attempts.delete(client)
+    else this.#attempts.set(client, kept)
     return kept
   }
 
-  /** Failures still inside the window across every client, oldest first. */
-  #allRecent(now: number): number[] {
-    return [...this.#failures.keys()].flatMap((client) => this.#recent(client, now)).sort((a, b) => a - b)
+  /** Number of recent failed or pending attempts across every client. */
+  #allRecentCount(now: number): number {
+    let count = 0
+    for (const client of this.#attempts.keys()) count += this.#recent(client, now).length
+    return count
   }
 }
 
-/**
- * When a window holding `limit` or more failures next drops below the limit —
- * that is, when the attempt that pushed it over ages out.
- */
-function deadline(failures: readonly number[], limit: number): number {
-  if (failures.length < limit) return 0
-  const decisive = failures[failures.length - limit]
-  return decisive === undefined ? 0 : decisive + WINDOW_MS
+/** When a full client window next has a free slot. */
+function deadline(attempts: readonly AttemptRecord[], limit: number): number {
+  if (attempts.length < limit) return 0
+  const decisive = attempts[attempts.length - limit]
+  return decisive === undefined ? 0 : decisive.at + WINDOW_MS
 }
 
-function delayFor(failures: number): number {
-  if (failures <= 0) return 0
-  return Math.min(BASE_DELAY_MS * 2 ** (failures - 1), MAX_DELAY_MS)
+function delayFor(attempts: number): number {
+  if (attempts <= 0) return 0
+  return Math.min(BASE_DELAY_MS * 2 ** (attempts - 1), MAX_DELAY_MS)
 }

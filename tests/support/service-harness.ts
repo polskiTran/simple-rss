@@ -1,6 +1,5 @@
 import { join } from 'node:path'
 import { afterEach } from 'vitest'
-import type { Authentication } from '../../src/server/auth/authentication.js'
 import { DATABASE_FILE, loadConfig, type Config } from '../../src/server/config.js'
 import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { SqliteDatabase } from '../../src/server/persistence/database.js'
@@ -34,7 +33,6 @@ export interface TestService {
   readonly clock: ManualClock
   readonly upstream: UpstreamFixtures
   readonly settings: InstallationSettingsStore | undefined
-  readonly authentication: Authentication | undefined
   /** The live connection, for assertions SQL states better than HTTP does. */
   readonly database: SqliteDatabase | undefined
   /** Every structured log record the service wrote. */
@@ -116,9 +114,6 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     upstream,
     get settings() {
       return service.settings
-    },
-    get authentication() {
-      return service.authentication
     },
     get database() {
       return service.database

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq, lte, or } from 'drizzle-orm'
 import type { SqliteDatabase } from '../persistence/database.js'
-import { sessions } from '../persistence/schema.js'
+import { ownerAuth, sessions } from '../persistence/schema.js'
 
 /** A session dies this long after the device last used it. */
 export const IDLE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000
@@ -42,22 +42,35 @@ export class SessionStore {
     this.#db = drizzle(db)
   }
 
-  /** Creates a session for one device and returns the token it must present. */
-  issue(now: Date): IssuedSession {
+  /**
+   * Creates a session only while the verifier that authenticated it is still
+   * current. The comparison and insert share a transaction, so a concurrent
+   * password change or emergency reset cannot leave a stale login alive.
+   */
+  issueForPasswordHash(passwordHash: string, now: Date): IssuedSession | undefined {
     const token = randomBytes(TOKEN_BYTES).toString('base64url')
     const expiresAt = new Date(now.getTime() + ABSOLUTE_TIMEOUT_MS)
 
-    this.#db
-      .insert(sessions)
-      .values({
-        tokenHash: fingerprint(token),
-        createdAt: now.toISOString(),
-        lastSeenAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-      })
-      .run()
+    return this.#db.transaction((tx) => {
+      const [current] = tx
+        .select({ passwordHash: ownerAuth.passwordHash })
+        .from(ownerAuth)
+        .limit(1)
+        .all()
 
-    return { token, expiresAt }
+      if (current?.passwordHash !== passwordHash) return undefined
+
+      tx.insert(sessions)
+        .values({
+          tokenHash: fingerprint(token),
+          createdAt: now.toISOString(),
+          lastSeenAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+        })
+        .run()
+
+      return { token, expiresAt }
+    })
   }
 
   /**
@@ -97,14 +110,6 @@ export class SessionStore {
   /** Ends one device's session. Unknown tokens are already revoked. */
   revoke(token: string): void {
     this.#db.delete(sessions).where(eq(sessions.tokenHash, fingerprint(token))).run()
-  }
-
-  /**
-   * Ends every session and reports how many there were. This is what a
-   * password change and the emergency reset both mean.
-   */
-  revokeAll(): number {
-    return this.#db.delete(sessions).run().changes
   }
 
   /** Removes sessions past either deadline. Returns how many were swept. */

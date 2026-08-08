@@ -147,7 +147,13 @@ describe('runCli reset-password', () => {
 
   it('revokes every session, and says how many it ended', async () => {
     const at = context.clock.now()
-    const issued = inspect(({ sessions }) => [sessions.issue(at), sessions.issue(at)])
+    const issued = inspect(({ owner, sessions }) => {
+      owner.resetPassword('an-existing-verifier', at)
+      return [
+        sessions.issueForPasswordHash('an-existing-verifier', at),
+        sessions.issueForPasswordHash('an-existing-verifier', at),
+      ]
+    })
 
     await runCli(['reset-password', 'a-recovered-password'], context)
 
@@ -196,6 +202,12 @@ describe('runCli reset-password', () => {
     expect(await runCli(['reset-password', 'short'], context)).toBe(1)
 
     expect(output.join('\n')).toMatch(/at least 12 characters/)
+    expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
+  })
+
+  it('rejects a multibyte password beyond the hashing byte limit', async () => {
+    expect(await runCli(['reset-password', '界'.repeat(400)], context)).toBe(1)
+
     expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
   })
 

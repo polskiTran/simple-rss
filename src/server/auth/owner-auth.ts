@@ -1,7 +1,7 @@
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from '../persistence/database.js'
-import { ownerAuth } from '../persistence/schema.js'
+import { ownerAuth, sessions } from '../persistence/schema.js'
 
 /** The one row's fixed identity — an installation has exactly one Owner. */
 const SINGLETON_ID = 1
@@ -65,23 +65,42 @@ export class OwnerAuthStore {
   }
 
   /**
-   * Replaces the verifier, for a password change or the emergency reset.
-   * Claims the installation when it was never claimed, so recovery works on an
-   * installation whose setup secret was lost before it was ever used.
-   *
-   * The original claim time survives, because how long an installation has
-   * existed should not change when its password does.
+   * Replaces a verified current password and revokes every session in the same
+   * transaction. If another request or recovery command rotated the verifier
+   * while Argon2 was running, the stale password cannot overwrite it.
    */
-  replacePassword(passwordHash: string, now: Date): void {
+  changePassword(expectedHash: string, passwordHash: string, now: Date): number | undefined {
     const at = now.toISOString()
 
-    this.#db
-      .insert(ownerAuth)
-      .values({ id: SINGLETON_ID, passwordHash, claimedAt: at, updatedAt: at })
-      .onConflictDoUpdate({
-        target: ownerAuth.id,
-        set: { passwordHash: sql`excluded.password_hash`, updatedAt: sql`excluded.updated_at` },
-      })
-      .run()
+    return this.#db.transaction((tx) => {
+      const changed = tx
+        .update(ownerAuth)
+        .set({ passwordHash, updatedAt: at })
+        .where(and(eq(ownerAuth.id, SINGLETON_ID), eq(ownerAuth.passwordHash, expectedHash)))
+        .run()
+
+      if (changed.changes !== 1) return undefined
+      return tx.delete(sessions).run().changes
+    })
+  }
+
+  /**
+   * Installs an emergency verifier and revokes every session atomically.
+   * Recovery may also claim an installation whose setup secret was lost.
+   */
+  resetPassword(passwordHash: string, now: Date): number {
+    const at = now.toISOString()
+
+    return this.#db.transaction((tx) => {
+      tx.insert(ownerAuth)
+        .values({ id: SINGLETON_ID, passwordHash, claimedAt: at, updatedAt: at })
+        .onConflictDoUpdate({
+          target: ownerAuth.id,
+          set: { passwordHash: sql`excluded.password_hash`, updatedAt: sql`excluded.updated_at` },
+        })
+        .run()
+
+      return tx.delete(sessions).run().changes
+    })
   }
 }

@@ -1,3 +1,4 @@
+import { MAX_PASSWORD_BYTES } from '../../shared/api.js'
 import { hash, verify, type Algorithm } from '@node-rs/argon2'
 
 /**
@@ -37,8 +38,6 @@ export const ARGON2ID_PARAMETERS = {
  * login attempt from becoming a way to spend the installation's CPU. The HTTP
  * boundary rejects these first; this is the backstop for every other caller.
  */
-const MAX_PASSWORD_BYTES = 1024
-
 export function argon2idHasher(): PasswordHasher {
   const options = { ...ARGON2ID_PARAMETERS, algorithm: ARGON2ID }
 

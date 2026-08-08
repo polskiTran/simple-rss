@@ -87,6 +87,21 @@ describe('an installation nobody has claimed', () => {
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
   })
 
+  it('rejects a password beyond the UTF-8 hashing limit before sending it', async () => {
+    const api = stubApi({ claimed: false, authenticated: false })
+    renderApp()
+    await screen.findByLabelText('setup secret')
+    const password = '界'.repeat(400)
+
+    await fill('setup secret', 'a-deployment-setup-secret')
+    await fill('password', password)
+    await fill('confirm password', password)
+    await press('claim')
+
+    expect(await screen.findByText(/password is too long/i)).toBeDefined()
+    expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
+  })
+
   it('says plainly that the setup secret was wrong', async () => {
     stubApi({ claimed: false, authenticated: false }).on('POST /api/auth/setup', {
       status: 401,

@@ -138,6 +138,16 @@ describe('claiming an installation', () => {
     expect(storedVerifier(service)).toBeUndefined()
   })
 
+  it('rejects a multibyte password beyond the hashing byte limit at the boundary', async () => {
+    const service = await startTestService()
+
+    const response = await new Device(service).claim('界'.repeat(400))
+
+    expect(response.status).toBe(400)
+    expect(await errorCode(response)).toBe('invalid_request')
+    expect(storedVerifier(service)).toBeUndefined()
+  })
+
   it('disables setup permanently, so the secret cannot make a second Owner', async () => {
     const service = await startTestService()
     await claimedDevice(service)
@@ -447,6 +457,18 @@ describe('resisting password guessing', () => {
     expect(await errorCode(sixth)).toBe('too_many_attempts')
   })
 
+  it('reserves the five slots before concurrent password checks finish', async () => {
+    const service = await startTestService()
+    await claimedDevice(service)
+    const guesser = new Device(service, { address: '203.0.113.7' })
+
+    const responses = await Promise.all(
+      Array.from({ length: 6 }, () => guesser.signIn('a-wrong-password')),
+    )
+
+    expect(responses.map((response) => response.status).sort()).toEqual([401, 401, 401, 401, 401, 429])
+  })
+
   it('makes each wrong password cost more time than the last', async () => {
     const service = await startTestService()
     await claimedDevice(service)
@@ -498,14 +520,15 @@ describe('resisting password guessing', () => {
     expect(service.sleeps.at(-1)).toBe(2000)
   })
 
-  it('still lets the Owner in from a clean address, so nobody can lock them out', async () => {
+  it('still lets the Owner in from a clean address, after charging the global delay', async () => {
     const service = await startTestService()
     await claimedDevice(service)
     await saturateTheCeiling(service)
-
+    const sleepsBeforeSignIn = service.sleeps.length
     const owner = new Device(service, { address: '198.51.100.9' })
 
     expect((await owner.signIn(OWNER_PASSWORD)).status).toBe(200)
+    expect(service.sleeps.slice(sleepsBeforeSignIn)).toEqual([2000])
   })
 
   it('costs a wrong setup secret the same as a wrong password', async () => {

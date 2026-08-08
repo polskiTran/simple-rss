@@ -1,4 +1,4 @@
-import { MIN_PASSWORD_LENGTH } from '../../shared/api.js'
+import { MIN_PASSWORD_LENGTH, newPasswordSchema } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
 /**
@@ -39,6 +39,7 @@ export function tooShort(): string {
 export function reasonToHold(password: string, confirmation: string): string | undefined {
   if (password !== confirmation) return 'those two passwords are not the same'
   if (password.length < MIN_PASSWORD_LENGTH) return tooShort()
+  if (!newPasswordSchema.safeParse(password).success) return 'that password is too long'
   return undefined
 }
 

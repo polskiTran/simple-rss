@@ -42,17 +42,28 @@ export type ApiError = z.infer<typeof apiErrorSchema>
  */
 export const MIN_PASSWORD_LENGTH = 12
 
-/** Bounded because every candidate is hashed with a memory-hard function. */
+/** Bound the work handed to Argon2 after UTF-8 encoding. */
+export const MAX_PASSWORD_BYTES = 1024
 export const MAX_PASSWORD_LENGTH = 512
 
-export const newPasswordSchema = z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH)
+export const newPasswordSchema = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH)
+  .max(MAX_PASSWORD_LENGTH)
+  .refine((password) => utf8ByteLength(password) <= MAX_PASSWORD_BYTES, {
+    message: `Password must be at most ${MAX_PASSWORD_BYTES} UTF-8 bytes`,
+  })
 
 /**
  * Deliberately looser than `newPasswordSchema`. Validating a presented
- * password against the policy would answer "that is not even the right shape"
- * — a free filter for anyone guessing. Every wrong password gets one answer.
+ * password against the creation policy would reveal more than a generic
+ * credential failure, but the same resource bounds still apply.
  */
-const presentedPasswordSchema = z.string().min(1).max(MAX_PASSWORD_LENGTH)
+const presentedPasswordSchema = z
+  .string()
+  .min(1)
+  .max(MAX_PASSWORD_LENGTH)
+  .refine((password) => utf8ByteLength(password) <= MAX_PASSWORD_BYTES)
 
 /**
  * What the client needs to decide between the setup screen, the login screen,
@@ -80,3 +91,27 @@ export const passwordChangeRequestSchema = z.object({
   newPassword: newPasswordSchema,
 })
 export type PasswordChangeRequest = z.infer<typeof passwordChangeRequestSchema>
+
+/** `Buffer` is unavailable in the browser half of this shared boundary. */
+function utf8ByteLength(value: string): number {
+  let bytes = 0
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index)
+    if (codeUnit <= 0x7f) {
+      bytes += 1
+    } else if (codeUnit <= 0x7ff) {
+      bytes += 2
+    } else if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4
+        index += 1
+      } else {
+        bytes += 3
+      }
+    } else {
+      bytes += 3
+    }
+  }
+  return bytes
+}

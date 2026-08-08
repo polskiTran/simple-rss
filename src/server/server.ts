@@ -49,9 +49,6 @@ export async function startService(options: StartOptions): Promise<RunningServic
     get settings() {
       return service.settings
     },
-    get authentication() {
-      return service.authentication
-    },
     close: () => service.close(),
     port,
     url: `http://127.0.0.1:${port}`,
