@@ -1,6 +1,9 @@
 # agent traces
 agent-traces/
 
+# playwright mcp
+.playwright-mcp
+
 # Logs
 logs
 *.log
