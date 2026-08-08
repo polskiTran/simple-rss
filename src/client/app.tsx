@@ -2,6 +2,8 @@ import { useAccess, type Gate } from './authentication.js'
 import { TabBar } from './components/tab-bar.js'
 import { Wordmark } from './components/wordmark.js'
 import { useNavigation, type Route } from './routing.js'
+import { DigestView } from './views/digest-view.js'
+import { FeedsView } from './views/feeds-view.js'
 import { EmptyView } from './views/empty-view.js'
 import { LoginView } from './views/login-view.js'
 import { SettingsView } from './views/settings-view.js'
@@ -52,9 +54,9 @@ function viewFor(gate: Gate, route: Route) {
 function readerViewFor(route: Route, gate: Gate) {
   switch (route) {
     case 'digest':
-      return <EmptyView note="nothing yet — subscribe to a feed to start your digest" />
+      return <DigestView />
     case 'feeds':
-      return <EmptyView note="no subscriptions yet" />
+      return <FeedsView />
     case 'saved':
       return <EmptyView note="nothing saved yet" />
     case 'settings':

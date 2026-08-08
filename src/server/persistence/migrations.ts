@@ -70,6 +70,70 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX sessions_expires_at ON sessions (expires_at);
     `,
   },
+  {
+    version: 3,
+    name: 'feeds-subscriptions-and-items',
+    sql: `
+      -- A Feed is publisher-owned metadata and retrieval identity. The URL the
+      -- Owner entered and the last validated redirect target are deliberately
+      -- separate: provenance must survive an ordinary Feed migration.
+      CREATE TABLE feeds (
+        id           INTEGER PRIMARY KEY,
+        entered_url  TEXT NOT NULL UNIQUE,
+        resolved_url TEXT NOT NULL UNIQUE,
+        title        TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 512),
+        domain       TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+
+      -- Canonical request and resolved URLs share one uniqueness namespace.
+      -- This closes the gap two independent UNIQUE columns would leave when
+      -- one Feed's entered URL is another Feed's redirect target.
+      CREATE TABLE feed_url_aliases (
+        url     TEXT PRIMARY KEY,
+        feed_id INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE
+      );
+      CREATE INDEX feed_url_aliases_feed_id ON feed_url_aliases (feed_id);
+
+      -- The Owner's choice to include a Feed. It is not folded into feeds:
+      -- future unsubscribe must be able to stop polling without erasing Feed
+      -- attribution held by a Library item.
+      CREATE TABLE subscriptions (
+        feed_id                  INTEGER PRIMARY KEY REFERENCES feeds(id) ON DELETE CASCADE,
+        polling_interval_minutes INTEGER NOT NULL DEFAULT 120
+          CHECK (polling_interval_minutes IN (30, 60, 120, 360, 720, 1440)),
+        created_at               TEXT NOT NULL
+      );
+
+      CREATE TABLE feed_items (
+        id               INTEGER PRIMARY KEY,
+        feed_id          INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
+        dedupe_key       TEXT NOT NULL,
+        identity_kind    TEXT NOT NULL CHECK (identity_kind IN ('guid', 'link', 'content')),
+        title            TEXT,
+        link             TEXT,
+        published_at     TEXT,
+        image_url        TEXT,
+        summary          TEXT,
+        first_seen_at    TEXT NOT NULL,
+        last_observed_at TEXT NOT NULL,
+        UNIQUE (feed_id, dedupe_key)
+      );
+
+      CREATE INDEX feed_items_chronology
+        ON feed_items (published_at DESC, first_seen_at DESC);
+      CREATE INDEX feed_items_last_observed
+        ON feed_items (last_observed_at);
+
+      -- Library membership is separate and intentionally untouched by Feed
+      -- Item metadata upserts.
+      CREATE TABLE library_items (
+        feed_item_id INTEGER PRIMARY KEY REFERENCES feed_items(id) ON DELETE CASCADE,
+        saved_at     TEXT NOT NULL
+      );
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

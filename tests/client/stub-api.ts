@@ -9,7 +9,7 @@ export interface StubbedRequest {
 
 export type Reply = { readonly status?: number; readonly body?: unknown; readonly headers?: Record<string, string> }
 
-export type Route = Reply | ((request: StubbedRequest) => Reply)
+export type Route = Reply | ((request: StubbedRequest) => Reply | Promise<Reply>)
 
 /**
  * The server, as the client sees it: a map from `METHOD /path` to a reply.
@@ -25,6 +25,8 @@ export class StubbedApi {
   constructor(status: AuthStatus = { claimed: true, authenticated: true }) {
     this.authStatus(status)
     this.on('GET /api/meta', { body: { name: 'simple-rss', version: '0.1.0' } })
+    this.on('GET /api/feeds', { body: { subscriptions: [] } })
+    this.on('GET /api/digest', { body: { today: { date: '2026-08-08', volume: 0 }, groups: [] } })
   }
 
   on(route: string, reply: Route): this {
@@ -59,7 +61,8 @@ export class StubbedApi {
         const route = this.#routes.get(`${method} ${path}`)
         if (!route) return new Response(null, { status: 404 })
 
-        const { status = 200, body: replyBody, headers = {} } = typeof route === 'function' ? route(request) : route
+        const reply = typeof route === 'function' ? await route(request) : route
+        const { status = 200, body: replyBody, headers = {} } = reply
         return new Response(replyBody === undefined ? null : JSON.stringify(replyBody), { status, headers })
       }),
     )

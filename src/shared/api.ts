@@ -92,6 +92,79 @@ export const passwordChangeRequestSchema = z.object({
 })
 export type PasswordChangeRequest = z.infer<typeof passwordChangeRequestSchema>
 
+export const feedIdParameterSchema = z
+  .string()
+  .regex(/^[1-9]\d*$/)
+  .transform(Number)
+  .refine(Number.isSafeInteger)
+
+/** Exact Feed endpoint submitted by the Owner; discovery is deliberately absent. */
+export const createSubscriptionRequestSchema = z.object({
+  url: z.string().min(1).max(2_048),
+})
+export type CreateSubscriptionRequest = z.infer<typeof createSubscriptionRequestSchema>
+
+export const feedSummarySchema = z.object({
+  feedId: z.number().int().positive(),
+  title: z.string(),
+  domain: z.string(),
+  enteredUrl: z.string(),
+  resolvedUrl: z.string(),
+})
+export type FeedSummary = z.infer<typeof feedSummarySchema>
+
+export const subscriptionSummarySchema = feedSummarySchema.extend({
+  /** Daily item counts, oldest to newest, in the installation timezone. */
+  cadence: z.array(z.number().int().nonnegative()).length(30),
+})
+export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
+
+export const createSubscriptionResponseSchema = z.object({
+  subscription: subscriptionSummarySchema,
+  importedItems: z.number().int().nonnegative(),
+})
+export type CreateSubscriptionResponse = z.infer<typeof createSubscriptionResponseSchema>
+
+export const subscriptionListSchema = z.object({
+  subscriptions: z.array(subscriptionSummarySchema),
+})
+export type SubscriptionList = z.infer<typeof subscriptionListSchema>
+
+export const refreshFeedResponseSchema = z.object({
+  observedItems: z.number().int().nonnegative(),
+})
+export type RefreshFeedResponse = z.infer<typeof refreshFeedResponseSchema>
+
+export const digestItemSchema = z.object({
+  feedItemId: z.number().int().positive(),
+  title: z.string(),
+  feedId: z.number().int().positive(),
+  feedTitle: z.string(),
+  link: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  displayTime: z.string(),
+  imageUrl: z.string().nullable(),
+  summary: z.string().nullable(),
+  firstSeenAt: z.string(),
+})
+export type DigestItem = z.infer<typeof digestItemSchema>
+
+export const digestGroupSchema = z.object({
+  date: z.string(),
+  label: z.string(),
+  items: z.array(digestItemSchema),
+})
+export type DigestGroup = z.infer<typeof digestGroupSchema>
+
+export const digestSchema = z.object({
+  today: z.object({
+    date: z.string(),
+    volume: z.number().int().nonnegative(),
+  }),
+  groups: z.array(digestGroupSchema),
+})
+export type Digest = z.infer<typeof digestSchema>
+
 /** `Buffer` is unavailable in the browser half of this shared boundary. */
 function utf8ByteLength(value: string): number {
   let bytes = 0

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
  * Typed mirror of the tables the server queries. Migrations remain the source
@@ -38,4 +38,69 @@ export const sessions = sqliteTable('sessions', {
   createdAt: text('created_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
   expiresAt: text('expires_at').notNull(),
+})
+
+/** Publisher-owned Feed metadata and the two intentionally distinct URLs. */
+export const feeds = sqliteTable('feeds', {
+  id: integer('id').primaryKey(),
+  enteredUrl: text('entered_url').notNull().unique(),
+  resolvedUrl: text('resolved_url').notNull().unique(),
+  title: text('title').notNull(),
+  domain: text('domain').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+/** Canonical request and redirect targets, unique across both URL roles. */
+export const feedUrlAliases = sqliteTable(
+  'feed_url_aliases',
+  {
+    url: text('url').primaryKey(),
+    feedId: integer('feed_id')
+      .notNull()
+      .references(() => feeds.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index('feed_url_aliases_feed_id').on(table.feedId)],
+)
+
+/** The Owner's active choice to include a Feed in the Digest. */
+export const subscriptions = sqliteTable('subscriptions', {
+  feedId: integer('feed_id')
+    .primaryKey()
+    .references(() => feeds.id, { onDelete: 'cascade' }),
+  pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
+  createdAt: text('created_at').notNull(),
+})
+
+/** Normalized Feed Window entries, deduplicated only inside their Feed. */
+export const feedItems = sqliteTable(
+  'feed_items',
+  {
+    id: integer('id').primaryKey(),
+    feedId: integer('feed_id')
+      .notNull()
+      .references(() => feeds.id, { onDelete: 'cascade' }),
+    dedupeKey: text('dedupe_key').notNull(),
+    identityKind: text('identity_kind', { enum: ['guid', 'link', 'content'] }).notNull(),
+    title: text('title'),
+    link: text('link'),
+    publishedAt: text('published_at'),
+    imageUrl: text('image_url'),
+    summary: text('summary'),
+    firstSeenAt: text('first_seen_at').notNull(),
+    lastObservedAt: text('last_observed_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('feed_items_feed_dedupe').on(table.feedId, table.dedupeKey),
+    index('feed_items_chronology').on(table.publishedAt, table.firstSeenAt),
+    index('feed_items_last_observed').on(table.lastObservedAt),
+  ],
+)
+
+/** Explicit Library membership; ingestion never rewrites this table. */
+export const libraryItems = sqliteTable('library_items', {
+  feedItemId: integer('feed_item_id')
+    .primaryKey()
+    .references(() => feedItems.id, { onDelete: 'cascade' }),
+  savedAt: text('saved_at').notNull(),
 })

@@ -1,8 +1,14 @@
 import {
   apiErrorSchema,
   authStatusSchema,
+  createSubscriptionResponseSchema,
+  digestSchema,
+  subscriptionListSchema,
   serviceMetaSchema,
   type AuthStatus,
+  type CreateSubscriptionResponse,
+  type Digest,
+  type SubscriptionList,
   type ServiceMeta,
 } from '../shared/api.js'
 
@@ -107,6 +113,21 @@ export async function signOut(): Promise<void> {
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthStatus> {
   return status(await post('/api/auth/password', { currentPassword, newPassword }))
+}
+
+export async function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
+  const response = await post('/api/subscriptions', { url })
+  return createSubscriptionResponseSchema.parse(await response.json())
+}
+
+export async function fetchSubscriptions(): Promise<SubscriptionList> {
+  const response = await request('/api/feeds')
+  return subscriptionListSchema.parse(await response.json())
+}
+
+export async function fetchDigest(): Promise<Digest> {
+  const response = await request('/api/digest')
+  return digestSchema.parse(await response.json())
 }
 
 export async function fetchServiceMeta(): Promise<ServiceMeta> {

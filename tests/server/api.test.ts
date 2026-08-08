@@ -30,7 +30,7 @@ describe('API boundary', () => {
     const service = await startTestService({ clientDir: 'tests/fixtures/client' })
     const owner = await claimedDevice(service)
 
-    const response = await owner.post('/api/subscriptions', {})
+    const response = await owner.post('/api/does-not-exist', {})
 
     expect(response.status).toBe(404)
     expect(response.headers.get('content-type')).toMatch(/application\/json/)

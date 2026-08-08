@@ -4,10 +4,13 @@ import { createAuthentication, type Authentication } from './auth/authentication
 import type { Sleeper } from './auth/sleeper.js'
 import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
+import { DigestService } from './digest/digest-service.js'
 import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
+import { FeedRefresh } from './subscriptions/feed-refresh.js'
+import { SubscriptionService } from './subscriptions/subscription-service.js'
 import { Readiness } from './readiness.js'
 import { createNetworkRetrieval, type Retrieval } from './upstream/retrieval.js'
 
@@ -58,6 +61,9 @@ export function createService(options: ServiceOptions): Service {
   let database: SqliteDatabase | undefined
   let settings: InstallationSettingsStore | undefined
   let authentication: Authentication | undefined
+  let subscriptions: SubscriptionService | undefined
+  let refresh: FeedRefresh | undefined
+  let digest: DigestService | undefined
 
   try {
     database = openDatabase(config.databasePath)
@@ -70,7 +76,10 @@ export function createService(options: ServiceOptions): Service {
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
+    subscriptions = new SubscriptionService({ database, retrieval, clock, settings })
+    refresh = new FeedRefresh({ clock, subscriptions })
 
+    digest = new DigestService({ database, clock, settings })
     readiness.markReady()
     logger.info('startup.migrations_applied', {
       databasePath: config.databasePath,
@@ -86,9 +95,11 @@ export function createService(options: ServiceOptions): Service {
     clock,
     logger,
     readiness,
-    retrieval,
     database: () => database,
     authentication: () => authentication,
+    subscriptions: () => subscriptions,
+    refresh: () => refresh,
+    digest: () => digest,
   })
 
   return {
@@ -109,6 +120,9 @@ export function createService(options: ServiceOptions): Service {
       database = undefined
       settings = undefined
       authentication = undefined
+      subscriptions = undefined
+      refresh = undefined
+      digest = undefined
     },
   }
 }
