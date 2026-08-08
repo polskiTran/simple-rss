@@ -38,8 +38,8 @@ const envSchema = z.object({
   SETUP_SECRET: z.string().trim().min(1).optional(),
   /**
    * The origin the Owner's browser reaches this installation at. The outbound
-   * retrieval boundary refuses it, so a Feed or article that points back at
-   * the reader cannot make it ask itself for its own API.
+   * retrieval boundary refuses it, so a Feed or Feed Item link that points
+   * back at the reader cannot make it ask itself for its own API.
    *
    * Optional because localhost, private, and reserved destinations are already
    * refused without it; it only adds the one origin that looks public.

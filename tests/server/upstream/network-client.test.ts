@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { promisify } from 'node:util'
-import { brotliCompress, gzip } from 'node:zlib'
+import { brotliCompress, createGzip, gzip } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { HttpClient } from '../../../src/server/upstream/http-client.js'
 import { createNetworkHttpClient, guardedLookup } from '../../../src/server/upstream/network-client.js'
@@ -203,6 +203,27 @@ describe('createNetworkHttpClient', () => {
     controller.abort()
 
     await expect(reading).rejects.toThrow()
+    await expect(connectionClosed).resolves.toBeUndefined()
+  })
+
+  it('closes the connection under a compressed body the caller stops reading', async () => {
+    let closed: (() => void) | undefined
+    const connectionClosed = new Promise<void>((resolve) => {
+      closed = resolve
+    })
+    running = await origin((request, response) => {
+      request.on('close', () => closed?.())
+      response.writeHead(200, { 'content-type': 'application/xml', 'content-encoding': 'gzip' })
+      const compressing = createGzip()
+      compressing.pipe(response)
+      compressing.write('<rss>')
+      compressing.flush()
+      // Never finished: cancelling must be what ends this, not the origin.
+    })
+
+    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    await response.body?.cancel()
+
     await expect(connectionClosed).resolves.toBeUndefined()
   })
 

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createLogger, type LogRecord } from '../../../src/server/logger.js'
 import type { ResolveAddresses } from '../../../src/server/upstream/destination.js'
-import { createRetrieval, type Retrieval, type RetrievalRequest } from '../../../src/server/upstream/retrieval.js'
+import {
+  createRetrieval,
+  MAX_BYTES,
+  type Retrieval,
+  type RetrievalRequest,
+} from '../../../src/server/upstream/retrieval.js'
 import { chunkedBody, UpstreamFixtures } from '../../support/upstream-fixtures.js'
 
 interface Harness {
@@ -209,6 +214,18 @@ describe('retrieveBytes', () => {
 
     expect(result.ok).toBe(true)
     expect(result.ok && result.bytes.byteLength).toBe(1000)
+  })
+
+  it('holds a caller to the boundary ceiling, however much it asked for', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml', 'content-length': String(MAX_BYTES + 1) },
+      body: '<rss></rss>',
+    })
+
+    await expect(
+      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: 512 * 1024 * 1024 })),
+    ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
 
   it('reports an upstream error status without treating it as a body', async () => {
@@ -489,6 +506,34 @@ describe('capacity', () => {
     expect(refused).toMatchObject({ ok: false, code: 'busy' })
     expect(elsewhere).toMatchObject({ ok: true })
     await expect(held).resolves.toMatchObject({ ok: true })
+  })
+
+  it('does not let work queued for a scoped budget hold the shared capacity', async () => {
+    const { retrieval, upstream } = harness({ maxConcurrent: 2, maxQueued: 0 })
+    const images = retrieval.scoped({ name: 'image', maxConcurrent: 1, maxQueued: 4 })
+    upstream.stub('https://example.com/photo.jpg', {
+      delayMs: 50,
+      headers: { 'content-type': 'image/jpeg' },
+      body: new Uint8Array([1, 2, 3]),
+    })
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+    })
+    const imageRequest = feedRequest('https://example.com/photo.jpg', {
+      operation: 'image',
+      accept: ['image/jpeg'],
+    })
+
+    // One image runs; the other two wait for the image budget, not for the
+    // boundary as a whole.
+    const images_ = [images.retrieveBytes(imageRequest), images.retrieveBytes(imageRequest)]
+    const queued = images.retrieveBytes(imageRequest)
+
+    await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
+      ok: true,
+    })
+    for (const image of [...images_, queued]) await expect(image).resolves.toMatchObject({ ok: true })
   })
 
   it('releases the slot when a streamed body is abandoned without being read', async () => {

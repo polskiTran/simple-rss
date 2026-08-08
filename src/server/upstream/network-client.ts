@@ -4,7 +4,7 @@ import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
-import { isPublicAddress } from './addresses.js'
+import { isPublicAddress, unbracket } from './addresses.js'
 import type { HttpClient } from './http-client.js'
 
 /** Encodings this client can decode, and therefore the only ones it asks for. */
@@ -19,8 +19,14 @@ export interface NetworkHttpClientOptions {
    * tests relax it so they can talk to a loopback origin.
    */
   readonly isAllowedAddress?: (address: string) => boolean
-  readonly maxSockets?: number
 }
+
+/**
+ * Sockets kept open across every publisher at once. Well above what one
+ * reader's polling needs, and low enough that a slow host cannot accumulate
+ * connections indefinitely.
+ */
+const MAX_SOCKETS = 16
 
 /**
  * The real outside world.
@@ -39,7 +45,7 @@ export interface NetworkHttpClientOptions {
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
   const lookup = guardedLookup(isAllowed)
-  const agentOptions = { keepAlive: true, maxSockets: options.maxSockets ?? 16 }
+  const agentOptions = { keepAlive: true, maxSockets: MAX_SOCKETS }
   const httpAgent = new HttpAgent(agentOptions)
   const httpsAgent = new HttpsAgent(agentOptions)
 
@@ -142,6 +148,13 @@ function toResponse(request: Request, response: IncomingMessage): Response {
   let stream: Readable = response
   if (decoder) {
     response.on('error', (error) => decoder.destroy(error))
+    // A caller that stops reading destroys the decoder, and the socket beneath
+    // it has to go too: otherwise the connection stays busy draining a body
+    // nobody wants — the one way an abandoned retrieval could still cost
+    // something after everything above it has moved on.
+    decoder.on('close', () => {
+      if (!response.readableEnded) response.destroy()
+    })
     stream = response.pipe(decoder)
   }
 
@@ -174,10 +187,6 @@ function decoderFor(encoding: string): Duplex | undefined {
   if (encoding === 'deflate') return createInflate()
   if (encoding === 'br') return createBrotliDecompress()
   return undefined
-}
-
-function unbracket(hostname: string): string {
-  return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 }
 
 function reasonFor(signal: AbortSignal): Error {

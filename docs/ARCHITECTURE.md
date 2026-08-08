@@ -108,7 +108,8 @@ The single package should still expose clear modules rather than mixing concerns
 - **HTTP:** routing, cookies, request validation, rate limiting, and response policy
 - **Authentication:** setup, credentials, sessions, and emergency reset
 - **Subscriptions:** Feed lifecycle and preferences
-- **Ingestion:** safe retrieval, parsing, normalization, identity, and polling state
+- **Retrieval:** the one hardened boundary every outbound request passes through — destination and redirect validation, deadlines, decoded-size ceilings, and retrieval budgets
+- **Ingestion:** parsing, normalization, identity, and polling state
 - **Digest:** chronology and date grouping
 - **Library:** saved membership and retention protection
 - **Reader:** safe page retrieval, Defuddle conversion, sanitization, and retry
@@ -226,7 +227,7 @@ SQLite FTS5 indexes Feed titles, item titles, and normalized summaries. Search c
 Reader View is generated only when requested:
 
 1. The client requests a Feed Item by ID, never an arbitrary URL.
-2. The server retrieves the stored original link through the hardened fetcher.
+2. The server retrieves the stored original link through the hardened retrieval boundary.
 3. The response must be HTML and no larger than five MiB decoded.
 4. Defuddle produces temporary Markdown.
 5. Output is sanitized through an explicit allowlist.

@@ -15,6 +15,16 @@ import type { HttpClient } from './http-client.js'
  */
 export const MAX_REDIRECTS = 5
 
+/**
+ * Ceilings no caller can raise, above the largest any of them needs: the
+ * Reader's five decoded MiB and the ten seconds a Feed is given. A caller
+ * asking for more is clamped rather than refused, exactly as redirects are —
+ * the point is that the boundary, not the caller, owns what this service will
+ * spend on someone else's server.
+ */
+export const MAX_BYTES = 8 * 1024 * 1024
+export const MAX_TIMEOUT_MS = 30_000
+
 const DEFAULT_MAX_CONCURRENT = 6
 const DEFAULT_MAX_QUEUED = 32
 
@@ -33,6 +43,9 @@ const FORWARDABLE_HEADERS = new Set([
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
+/** How this reader identifies itself, so an operator can recognise its traffic. */
+const USER_AGENT = `simple-rss/${VERSION}`
+
 /** Why a retrieval did not produce bytes. One category per thing a caller can do about it. */
 export type RetrievalFailureCode =
   | 'invalid_url'
@@ -49,10 +62,17 @@ export type RetrievalFailureCode =
   | 'busy'
   | 'unavailable'
 
+/**
+ * The three kinds of work this boundary exists for. Naming them keeps logs
+ * comparable across retrievals and keeps the boundary from drifting into a
+ * general-purpose fetcher for anything that fancies one.
+ */
+export type RetrievalOperation = 'feed' | 'reader' | 'image'
+
 export interface RetrievalRequest {
   readonly url: string | URL
-  /** Names the caller in logs: `feed`, `reader`, `image`. */
-  readonly operation: string
+  /** Which kind of work this is, which is also how it is named in logs. */
+  readonly operation: RetrievalOperation
   /** Content types this caller can actually use. A response outside it is refused. */
   readonly accept: readonly string[]
   /** Decoded-byte ceiling. Streaming stops and the connection closes above it. */
@@ -103,7 +123,7 @@ export type RetrievalBytesResult = RetrievalBytes | RetrievalFailure
 
 /** A share of the boundary's capacity, so one kind of work cannot starve another. */
 export interface RetrievalBudget {
-  readonly name: string
+  readonly name: RetrievalOperation
   readonly maxConcurrent: number
   readonly maxQueued?: number
 }
@@ -126,7 +146,6 @@ export interface RetrievalOptions {
   readonly self?: readonly string[]
   readonly maxConcurrent?: number
   readonly maxQueued?: number
-  readonly userAgent?: string
 }
 
 /** Thrown into a body stream when it cannot be finished. Carries the same categories. */
@@ -157,7 +176,6 @@ export class RetrievalError extends Error {
  */
 export function createRetrieval(options: RetrievalOptions): Retrieval {
   const logger = options.logger.child({ component: 'upstream' })
-  const userAgent = options.userAgent ?? `simple-rss/${VERSION}`
   const policy: DestinationPolicy = {
     resolve: options.resolve ?? systemResolver,
     ...(options.self ? { self: options.self } : {}),
@@ -169,14 +187,16 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
 
   function build(gates: readonly ConcurrencyGate[], budget: string | undefined): Retrieval {
     const retrieve = (request: RetrievalRequest): Promise<RetrievalResult> =>
-      run(request, { httpClient: options.httpClient, logger, policy, userAgent, gates, budget })
+      run(request, { httpClient: options.httpClient, logger, policy, gates, budget })
 
     return {
       retrieve,
       retrieveBytes: async (request) => collect(await retrieve(request)),
+      // Narrowest budget first: a request waiting for its own budget must not
+      // be holding a share of the boundary everything else draws on.
       scoped: (nested) =>
         build(
-          [...gates, new ConcurrencyGate(nested.maxConcurrent, nested.maxQueued ?? DEFAULT_MAX_QUEUED)],
+          [new ConcurrencyGate(nested.maxConcurrent, nested.maxQueued ?? DEFAULT_MAX_QUEUED), ...gates],
           nested.name,
         ),
     }
@@ -189,7 +209,6 @@ interface RunContext {
   readonly httpClient: HttpClient
   readonly logger: Logger
   readonly policy: DestinationPolicy
-  readonly userAgent: string
   readonly gates: readonly ConcurrencyGate[]
   readonly budget: string | undefined
 }
@@ -197,7 +216,9 @@ interface RunContext {
 async function run(request: RetrievalRequest, context: RunContext): Promise<RetrievalResult> {
   const startedAt = process.hrtime.bigint()
   const maxRedirects = Math.max(0, Math.min(request.maxRedirects ?? MAX_REDIRECTS, MAX_REDIRECTS))
-  const headers = forwardableHeaders(request.headers, context.userAgent)
+  const maxBytes = Math.max(1, Math.min(request.maxBytes, MAX_BYTES))
+  const timeoutMs = Math.max(1, Math.min(request.timeoutMs, MAX_TIMEOUT_MS))
+  const headers = forwardableHeaders(request.headers)
 
   // One controller ends everything: the deadline, the caller giving up, and a
   // body that grows past its ceiling all abort the same in-flight request.
@@ -208,7 +229,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     controller.abort(new RetrievalError(kind, message))
   }
 
-  const timer = setTimeout(() => abort('timeout', `no answer within ${request.timeoutMs}ms`), request.timeoutMs)
+  const timer = setTimeout(() => abort('timeout', `no answer within ${timeoutMs}ms`), timeoutMs)
   const onCancel = () => abort('cancelled', 'caller abandoned the retrieval')
   request.signal?.addEventListener('abort', onCancel, { once: true })
 
@@ -234,10 +255,15 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     })
   }
 
-  const fail = (code: RetrievalFailureCode, reason: string, extra: Record<string, unknown> = {}): RetrievalFailure => {
+  const fail = (
+    code: RetrievalFailureCode,
+    reason: string,
+    fields: Record<string, unknown> = {},
+    status?: number,
+  ): RetrievalFailure => {
     settle()
-    log('upstream.retrieval_failed', { code, reason, ...extra })
-    return { ok: false, code, reason, ...(typeof extra['status'] === 'number' ? { status: extra['status'] } : {}) }
+    log('upstream.retrieval_failed', { code, reason, ...fields })
+    return { ok: false, code, reason, ...(status === undefined ? {} : { status }) }
   }
 
   if (request.signal?.aborted) return fail('cancelled', 'caller abandoned the retrieval')
@@ -299,12 +325,13 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       continue
     }
 
-    const shape = { host: url.host, path: url.pathname, status: response.status, redirects }
+    // What every log record about this answer says, minus the query string.
+    const answered = { host: url.host, path: url.pathname, status: response.status, redirects }
 
     if (response.status === 304) {
       await discard(response)
       settle()
-      log('upstream.retrieval_completed', { ...shape, bytes: 0, notModified: true })
+      log('upstream.retrieval_completed', { ...answered, bytes: 0, notModified: true })
       return {
         ok: true,
         status: 304,
@@ -320,21 +347,25 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     if (!response.ok) {
       await discard(response)
       controller.abort(new RetrievalError('http_error', `upstream answered ${response.status}`))
-      return fail('http_error', `upstream answered ${response.status}`, shape)
+      return fail('http_error', `upstream answered ${response.status}`, answered, response.status)
     }
 
-    const contentType = essence(response.headers.get('content-type'))
+    const contentType = mediaType(response.headers.get('content-type'))
     if (!accepted(contentType, request.accept)) {
       await discard(response)
       controller.abort(new RetrievalError('unsupported_content_type', 'unusable content type'))
-      return fail('unsupported_content_type', contentType ? `content type ${contentType}` : 'no content type', shape)
+      return fail(
+        'unsupported_content_type',
+        contentType ? `content type ${contentType}` : 'no content type',
+        answered,
+      )
     }
 
     const declared = Number(response.headers.get('content-length'))
-    if (Number.isFinite(declared) && declared > request.maxBytes) {
+    if (Number.isFinite(declared) && declared > maxBytes) {
       await discard(response)
       controller.abort(new RetrievalError('too_large', 'declared length above the ceiling'))
-      return fail('too_large', `declared ${declared} bytes above the ${request.maxBytes} ceiling`, shape)
+      return fail('too_large', `declared ${declared} bytes above the ${maxBytes} ceiling`, answered)
     }
 
     return {
@@ -346,14 +377,14 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       lastModified: response.headers.get('last-modified') ?? undefined,
       notModified: false,
       body: boundedBody(response, {
-        maxBytes: request.maxBytes,
+        maxBytes,
         signal: controller.signal,
         abandonedKind: () => abandoned,
         abort: (error) => controller.abort(error),
         finish: (bytes, error) => {
           settle()
-          if (error) log('upstream.retrieval_failed', { ...shape, code: error.code, reason: error.message, bytes })
-          else log('upstream.retrieval_completed', { ...shape, bytes, notModified: false })
+          if (error) log('upstream.retrieval_failed', { ...answered, code: error.code, reason: error.message, bytes })
+          else log('upstream.retrieval_completed', { ...answered, bytes, notModified: false })
         },
       }),
     }
@@ -482,8 +513,8 @@ async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
  * Keeps only headers a publisher has any business seeing, and always identifies
  * the reader so an operator on the other end can recognise the traffic.
  */
-function forwardableHeaders(supplied: Readonly<Record<string, string>> | undefined, userAgent: string): Headers {
-  const headers = new Headers({ 'user-agent': userAgent })
+function forwardableHeaders(supplied: Readonly<Record<string, string>> | undefined): Headers {
+  const headers = new Headers({ 'user-agent': USER_AGENT })
 
   for (const [name, value] of Object.entries(supplied ?? {})) {
     if (FORWARDABLE_HEADERS.has(name.toLowerCase())) headers.set(name, value)
@@ -492,7 +523,8 @@ function forwardableHeaders(supplied: Readonly<Record<string, string>> | undefin
   return headers
 }
 
-function essence(contentType: string | null): string {
+/** The media type without its parameters: `text/html; charset=utf-8` is `text/html`. */
+function mediaType(contentType: string | null): string {
   return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
 }
 

@@ -41,6 +41,14 @@ export function classifyAddress(address: string): AddressClass {
   return 'invalid'
 }
 
+/**
+ * A URL hostname as an address: `[::1]` is the same destination as `::1`, and
+ * every rule here is written for the unbracketed form.
+ */
+export function unbracket(hostname: string): string {
+  return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
+}
+
 /** Whether a retrieval may open a connection to this address. */
 export function isPublicAddress(address: string): boolean {
   return classifyAddress(address) === 'public'

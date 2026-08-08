@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises'
-import { classifyAddress } from './addresses.js'
+import { classifyAddress, unbracket } from './addresses.js'
 
 /**
  * Turns a hostname into every address it currently answers with. Injected so
@@ -137,8 +137,8 @@ export async function validateDestination(
  * written for `example.com`.
  */
 function normaliseHostname(hostname: string): string {
-  const unbracketed = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
-  return unbracketed.endsWith('.') ? unbracketed.slice(0, -1) : unbracketed
+  const host = unbracket(hostname)
+  return host.endsWith('.') ? host.slice(0, -1) : host
 }
 
 function isBlockedName(hostname: string): boolean {
