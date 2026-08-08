@@ -1,10 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import type { AddressInfo } from 'node:net'
+import type { AddressInfo, LookupFunction } from 'node:net'
 import { promisify } from 'node:util'
 import { brotliCompress, createGzip, gzip } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createLogger } from '../../../src/server/logger.js'
 import type { HttpClient } from '../../../src/server/upstream/http-client.js'
 import { createNetworkHttpClient, guardedLookup } from '../../../src/server/upstream/network-client.js'
+import { createRetrieval } from '../../../src/server/upstream/retrieval.js'
 
 const compressGzip = promisify(gzip)
 const compressBrotli = promisify(brotliCompress)
@@ -41,6 +43,12 @@ async function origin(handler: Handler): Promise<Origin> {
 /** The loopback origins tests talk to are exactly what the real guard refuses. */
 function clientReachingTheTestServer(): HttpClient {
   return createNetworkHttpClient({ isAllowedAddress: () => true })
+}
+
+const testServerLookup: LookupFunction = (_hostname, options, callback) => {
+  const answer = { address: '127.0.0.1', family: 4 as const }
+  if (options.all) callback(null, [answer] as never, 0)
+  else callback(null, answer.address, answer.family)
 }
 
 describe('createNetworkHttpClient', () => {
@@ -100,7 +108,7 @@ describe('createNetworkHttpClient', () => {
     expect(response.headers.get('content-length')).toBeNull()
   })
 
-  it('expands a small compressed body to its real size, which is what the ceiling counts', async () => {
+  it('aborts when a small compressed body expands past the decoded ceiling', async () => {
     const decoded = 'x'.repeat(1024 * 1024)
     const compressed = await compressGzip(Buffer.from(decoded))
     expect(compressed.byteLength).toBeLessThan(decoded.length / 100)
@@ -112,11 +120,24 @@ describe('createNetworkHttpClient', () => {
       })
       response.end(compressed)
     })
+    const port = new URL(running.url).port
+    const retrieval = createRetrieval({
+      httpClient: createNetworkHttpClient({
+        isAllowedAddress: () => true,
+        lookup: testServerLookup,
+      }),
+      logger: createLogger({ level: 'error', sink: () => {} }),
+      resolve: async () => ['93.184.216.34'],
+      self: new URL('https://reader.test'),
+    })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
-
-    // The wire said kilobytes; the boundary above must be given the megabyte.
-    await expect(response.text()).resolves.toHaveLength(decoded.length)
+    await expect(
+      retrieval.retrieveBytes({
+        url: `http://publisher.example:${port}/feed.xml`,
+        operation: 'feed',
+        limits: { maxBytes: 1_000 },
+      }),
+    ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
 
   it('decodes a brotli body', async () => {
@@ -129,6 +150,31 @@ describe('createNetworkHttpClient', () => {
     const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
 
     await expect(response.text()).resolves.toBe('<rss>brotli</rss>')
+  })
+
+  it('decodes a valid stack of content encodings in reverse order', async () => {
+    const decoded = Buffer.from('<rss>stacked</rss>')
+    const compressed = await compressBrotli(await compressGzip(decoded))
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml', 'content-encoding': 'gzip, br' })
+      response.end(compressed)
+    })
+
+    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+
+    await expect(response.text()).resolves.toBe(decoded.toString())
+    expect(response.headers.get('content-encoding')).toBeNull()
+  })
+
+  it('rejects a declared content encoding it cannot decode', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml', 'content-encoding': 'zstd' })
+      response.end('encoded bytes')
+    })
+
+    await expect(
+      clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`)),
+    ).rejects.toMatchObject({ code: 'unsupported_content_encoding' })
   })
 
   it('asks for encodings it can actually decode', async () => {
@@ -244,7 +290,7 @@ describe('guardedLookup', () => {
   it('refuses a name that answers with an address no retrieval may reach', async () => {
     const lookup = guardedLookup()
 
-    await expect(resolveWith(lookup, 'localhost')).rejects.toThrow(/localhost/)
+    await expect(resolveWith(lookup, 'localhost')).rejects.toMatchObject({ code: 'blocked_destination' })
   })
 
   it('passes a name whose addresses are all allowed through to the connection', async () => {

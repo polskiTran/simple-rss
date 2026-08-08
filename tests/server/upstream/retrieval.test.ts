@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createLogger, type LogRecord } from '../../../src/server/logger.js'
 import type { ResolveAddresses } from '../../../src/server/upstream/destination.js'
 import {
   createRetrieval,
-  MAX_BYTES,
+  RETRIEVAL_PROFILES,
   type Retrieval,
+  type RetrievalCapacity,
+  type RetrievalLimits,
+  type RetrievalOperation,
   type RetrievalRequest,
 } from '../../../src/server/upstream/retrieval.js'
 import { chunkedBody, UpstreamFixtures } from '../../support/upstream-fixtures.js'
@@ -18,9 +21,10 @@ interface Harness {
 interface HarnessOptions {
   readonly addresses?: Record<string, readonly string[]>
   readonly resolve?: ResolveAddresses
-  readonly self?: readonly string[]
+  readonly self?: URL
   readonly maxConcurrent?: number
   readonly maxQueued?: number
+  readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
 }
 
 function harness(options: HarnessOptions = {}): Harness {
@@ -32,23 +36,33 @@ function harness(options: HarnessOptions = {}): Harness {
     httpClient: upstream.client,
     logger: createLogger({ level: 'debug', sink: (record) => logs.push(record) }),
     resolve: options.resolve ?? (async (hostname) => addresses[hostname] ?? []),
-    ...(options.self ? { self: options.self } : {}),
-    ...(options.maxConcurrent === undefined ? {} : { maxConcurrent: options.maxConcurrent }),
-    ...(options.maxQueued === undefined ? {} : { maxQueued: options.maxQueued }),
+    self: options.self ?? new URL('https://reader.test'),
+    ...(options.maxConcurrent === undefined
+      ? {}
+      : { capacity: { maxConcurrent: options.maxConcurrent, maxQueued: options.maxQueued ?? 0 } }),
+    ...(options.operationCapacity ? { operationCapacity: options.operationCapacity } : {}),
   })
 
   return { retrieval, upstream, logs }
 }
 
+type RequestOverrides = Partial<Omit<RetrievalRequest, 'url' | 'limits'>> & RetrievalLimits
+
 /** A Feed-shaped retrieval, which every test varies rather than restates. */
-function feedRequest(url: string, overrides: Partial<RetrievalRequest> = {}): RetrievalRequest {
+function feedRequest(url: string, overrides: RequestOverrides = {}): RetrievalRequest {
+  const { maxBytes, timeoutMs, maxRedirects, ...request } = overrides
+  const limits: RetrievalLimits = {
+    ...(maxBytes === undefined ? {} : { maxBytes }),
+    ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(maxRedirects === undefined ? {} : { maxRedirects }),
+  }
+  const hasLimits = Object.keys(limits).length > 0
+
   return {
     url,
     operation: 'feed',
-    accept: ['application/rss+xml', 'application/xml', 'text/xml'],
-    maxBytes: 2 * 1024 * 1024,
-    timeoutMs: 1_000,
-    ...overrides,
+    ...request,
+    ...(hasLimits ? { limits } : {}),
   }
 }
 
@@ -132,6 +146,15 @@ describe('retrieveBytes', () => {
     expect(upstream.requests).toHaveLength(1)
   })
 
+
+  it('rejects non-finite stricter limits instead of disabling the profile', async () => {
+    const { retrieval, upstream } = harness()
+
+    await expect(
+      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: Number.NaN })),
+    ).resolves.toMatchObject({ ok: false, code: 'invalid_request' })
+    expect(upstream.requests).toHaveLength(0)
+  })
   it('refuses a malformed URL', async () => {
     const { retrieval } = harness()
 
@@ -219,12 +242,19 @@ describe('retrieveBytes', () => {
   it('holds a caller to the boundary ceiling, however much it asked for', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/feed.xml', {
-      headers: { 'content-type': 'application/xml', 'content-length': String(MAX_BYTES + 1) },
+      headers: {
+        'content-type': 'application/xml',
+        'content-length': String(RETRIEVAL_PROFILES.feed.maxBytes + 1),
+      },
       body: '<rss></rss>',
     })
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: 512 * 1024 * 1024 })),
+      retrieval.retrieveBytes(
+        feedRequest('https://example.com/feed.xml', {
+          maxBytes: RETRIEVAL_PROFILES.feed.maxBytes * 256,
+        }),
+      ),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
 
@@ -246,6 +276,7 @@ describe('retrieveBytes', () => {
       },
       logger: createLogger({ level: 'error', sink: () => {} }),
       resolve: async () => ['93.184.216.34'],
+      self: new URL('https://reader.test'),
     })
 
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
@@ -390,6 +421,52 @@ describe('giving up', () => {
     expect(upstream.aborted).toContain('https://example.com/feed.xml')
   })
 
+  it('returns at the deadline while a DNS lookup remains stuck and bounds further DNS work', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolutions = 0
+      const { retrieval } = harness({
+        maxConcurrent: 1,
+        maxQueued: 0,
+        resolve: async () => {
+          resolutions += 1
+          return new Promise<readonly string[]>(() => {})
+        },
+      })
+
+      const timedOut = retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 }))
+      await vi.advanceTimersByTimeAsync(20)
+      await expect(timedOut).resolves.toMatchObject({ ok: false, code: 'timeout' })
+      await expect(
+        retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 })),
+      ).resolves.toMatchObject({ ok: false, code: 'busy' })
+      expect(resolutions).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels while DNS resolution is still pending', async () => {
+    let started: (() => void) | undefined
+    const resolving = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const { retrieval } = harness({
+      resolve: async () => {
+        started?.()
+        return new Promise<readonly string[]>(() => {})
+      },
+    })
+    const caller = new AbortController()
+    const pending = retrieval.retrieveBytes(
+      feedRequest('https://example.com/feed.xml', { signal: caller.signal }),
+    )
+    await resolving
+    caller.abort()
+
+    await expect(pending).resolves.toMatchObject({ ok: false, code: 'cancelled' })
+  })
+
   it('stops when the caller no longer wants the answer', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/feed.xml', {
@@ -486,31 +563,12 @@ describe('capacity', () => {
     })
   })
 
-  it('keeps a scoped budget from consuming the whole boundary', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 4, maxQueued: 0 })
-    const images = retrieval.scoped({ name: 'image', maxConcurrent: 1, maxQueued: 0 })
-    upstream.stub('https://example.com/photo.jpg', {
-      delayMs: 50,
-      headers: { 'content-type': 'image/jpeg' },
-      body: new Uint8Array([1, 2, 3]),
+  it('keeps an operation budget from consuming the whole boundary', async () => {
+    const { retrieval, upstream } = harness({
+      maxConcurrent: 4,
+      maxQueued: 0,
+      operationCapacity: { image: { maxConcurrent: 1, maxQueued: 0 } },
     })
-    const imageRequest = feedRequest('https://example.com/photo.jpg', {
-      operation: 'image',
-      accept: ['image/jpeg'],
-    })
-
-    const held = images.retrieveBytes(imageRequest)
-    const refused = await images.retrieveBytes(imageRequest)
-    const elsewhere = await retrieval.retrieveBytes(imageRequest)
-
-    expect(refused).toMatchObject({ ok: false, code: 'busy' })
-    expect(elsewhere).toMatchObject({ ok: true })
-    await expect(held).resolves.toMatchObject({ ok: true })
-  })
-
-  it('does not let work queued for a scoped budget hold the shared capacity', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 2, maxQueued: 0 })
-    const images = retrieval.scoped({ name: 'image', maxConcurrent: 1, maxQueued: 4 })
     upstream.stub('https://example.com/photo.jpg', {
       delayMs: 50,
       headers: { 'content-type': 'image/jpeg' },
@@ -520,20 +578,43 @@ describe('capacity', () => {
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
     })
-    const imageRequest = feedRequest('https://example.com/photo.jpg', {
-      operation: 'image',
-      accept: ['image/jpeg'],
+    const imageRequest = feedRequest('https://example.com/photo.jpg', { operation: 'image' })
+
+    const held = retrieval.retrieveBytes(imageRequest)
+    const refused = await retrieval.retrieveBytes(imageRequest)
+    const elsewhere = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+
+    expect(refused).toMatchObject({ ok: false, code: 'busy' })
+    expect(elsewhere).toMatchObject({ ok: true })
+    await expect(held).resolves.toMatchObject({ ok: true })
+  })
+
+  it('does not let work queued for an operation hold shared capacity', async () => {
+    const { retrieval, upstream } = harness({
+      maxConcurrent: 2,
+      maxQueued: 0,
+      operationCapacity: { image: { maxConcurrent: 1, maxQueued: 4 } },
     })
+    upstream.stub('https://example.com/photo.jpg', {
+      delayMs: 50,
+      headers: { 'content-type': 'image/jpeg' },
+      body: new Uint8Array([1, 2, 3]),
+    })
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+    })
+    const imageRequest = feedRequest('https://example.com/photo.jpg', { operation: 'image' })
 
     // One image runs; the other two wait for the image budget, not for the
     // boundary as a whole.
-    const images_ = [images.retrieveBytes(imageRequest), images.retrieveBytes(imageRequest)]
-    const queued = images.retrieveBytes(imageRequest)
+    const images = [retrieval.retrieveBytes(imageRequest), retrieval.retrieveBytes(imageRequest)]
+    const queued = retrieval.retrieveBytes(imageRequest)
 
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
       ok: true,
     })
-    for (const image of [...images_, queued]) await expect(image).resolves.toMatchObject({ ok: true })
+    for (const image of [...images, queued]) await expect(image).resolves.toMatchObject({ ok: true })
   })
 
   it('releases the slot when a streamed body is abandoned without being read', async () => {
@@ -544,7 +625,6 @@ describe('capacity', () => {
     }))
     const imageRequest = feedRequest('https://example.com/photo.jpg', {
       operation: 'image',
-      accept: ['image/jpeg'],
       timeoutMs: 20,
     })
 
@@ -563,7 +643,6 @@ describe('capacity', () => {
     }))
     const imageRequest = feedRequest('https://example.com/photo.jpg', {
       operation: 'image',
-      accept: ['image/jpeg'],
     })
 
     const streamed = await retrieval.retrieve(imageRequest)
@@ -583,7 +662,7 @@ describe('streaming', () => {
     }))
 
     const result = await retrieval.retrieve(
-      feedRequest('https://example.com/photo.jpg', { operation: 'image', accept: ['image/jpeg'] }),
+      feedRequest('https://example.com/photo.jpg', { operation: 'image' }),
     )
 
     expect(result.ok).toBe(true)
@@ -603,7 +682,6 @@ describe('streaming', () => {
     const result = await retrieval.retrieve(
       feedRequest('https://example.com/photo.jpg', {
         operation: 'image',
-        accept: ['image/jpeg'],
         maxBytes: 100,
       }),
     )

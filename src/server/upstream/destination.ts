@@ -2,20 +2,15 @@ import { lookup } from 'node:dns/promises'
 import { classifyAddress, unbracket } from './addresses.js'
 
 /**
- * Turns a hostname into every address it currently answers with. Injected so
- * tests can describe a resolver's answer, including one that changes between
- * calls, without depending on real DNS.
+ * Turns a hostname into every address it currently answers with. The signal
+ * lets bounded adapters stop waiting when the retrieval deadline expires.
  */
-export type ResolveAddresses = (hostname: string) => Promise<readonly string[]>
+export type ResolveAddresses = (hostname: string, signal?: AbortSignal) => Promise<readonly string[]>
 
 export interface DestinationPolicy {
   readonly resolve: ResolveAddresses
-  /**
-   * This installation's own origins. Retrieving one of them would let an
-   * outside URL steer the reader back into its own API, so they are refused
-   * even though they are perfectly ordinary public addresses.
-   */
-  readonly self?: readonly string[]
+  /** This installation's canonical public origin. */
+  readonly self: URL
 }
 
 /**
@@ -28,7 +23,7 @@ export const systemResolver: ResolveAddresses = async (hostname) => {
   return answers.map((answer) => answer.address)
 }
 
-export type DestinationFailureCode = 'invalid_url' | 'blocked_destination' | 'unresolvable_host'
+export type DestinationFailureCode = 'invalid_url' | 'blocked_destination' | 'unresolvable_host' | 'busy'
 
 export interface AllowedDestination {
   readonly ok: true
@@ -72,6 +67,7 @@ const BLOCKED_SUFFIXES = ['localhost', 'local', 'internal', 'arpa']
 export async function validateDestination(
   candidate: string | URL,
   policy: DestinationPolicy,
+  signal?: AbortSignal,
 ): Promise<DestinationVerdict> {
   let url: URL
   try {
@@ -112,8 +108,11 @@ export async function validateDestination(
 
   let addresses: readonly string[]
   try {
-    addresses = await policy.resolve(hostname)
-  } catch {
+    addresses = signal ? await policy.resolve(hostname, signal) : await policy.resolve(hostname)
+  } catch (error) {
+    if (error instanceof ResolutionCapacityError) {
+      return { ok: false, code: 'busy', reason: 'DNS lookup capacity is full' }
+    }
     return { ok: false, code: 'unresolvable_host', reason: 'host did not resolve' }
   }
 
@@ -146,23 +145,25 @@ function isBlockedName(hostname: string): boolean {
 }
 
 /**
- * Compares host and port but not scheme, because the same installation answers
- * on both behind a TLS-terminating proxy. A different port on the same name is
- * a different service and stays allowed.
+ * Scheme is deliberately ignored because the public proxy may answer HTTPS
+ * outside and HTTP inside. Hostnames are canonicalized before comparison so a
+ * trailing DNS root dot cannot disguise the same installation.
  */
-function isSelf(url: URL, self: readonly string[] | undefined): boolean {
-  if (!self || self.length === 0) return false
-
-  return self.some((entry) => {
-    const host = entry.includes('://') ? safeHost(entry) : entry.trim().toLowerCase()
-    return host !== undefined && host !== '' && host === url.host
-  })
+function isSelf(url: URL, self: URL): boolean {
+  return (
+    normaliseHostname(url.hostname) === normaliseHostname(self.hostname) &&
+    effectivePort(url) === effectivePort(self)
+  )
 }
 
-function safeHost(origin: string): string | undefined {
-  try {
-    return new URL(origin).host
-  } catch {
-    return undefined
+function effectivePort(url: URL): string {
+  if (url.port !== '') return url.port
+  return url.protocol === 'https:' ? '443' : '80'
+}
+
+export class ResolutionCapacityError extends Error {
+  constructor() {
+    super('DNS lookup capacity is full')
+    this.name = 'ResolutionCapacityError'
   }
 }

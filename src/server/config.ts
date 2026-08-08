@@ -10,6 +10,29 @@ export const DATABASE_FILE = 'simple-rss.db'
 
 const port = z.coerce.number().int().min(1).max(65_535)
 
+const publicOrigin = z
+  .string()
+  .trim()
+  .url()
+  .superRefine((value, context) => {
+    let url: URL
+    try {
+      url = new URL(value)
+    } catch {
+      return
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'must use HTTP or HTTPS' })
+    }
+    if (url.username !== '' || url.password !== '') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'must not contain credentials' })
+    }
+    if (url.pathname !== '/' || url.search !== '' || url.hash !== '') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'must be an origin without a path, query, or fragment' })
+    }
+  })
+  .transform((value) => new URL(value).origin)
+
 const envSchema = z.object({
   /**
    * Supplied by the host platform. Railway injects it; the container must not
@@ -37,14 +60,10 @@ const envSchema = z.object({
    */
   SETUP_SECRET: z.string().trim().min(1).optional(),
   /**
-   * The origin the Owner's browser reaches this installation at. The outbound
-   * retrieval boundary refuses it, so a Feed or Feed Item link that points
-   * back at the reader cannot make it ask itself for its own API.
-   *
-   * Optional because localhost, private, and reserved destinations are already
-   * refused without it; it only adds the one origin that looks public.
+   * The canonical origin the Owner uses to reach this installation. Required
+   * so outbound retrieval can always refuse a URL pointing back at the API.
    */
-  PUBLIC_ORIGIN: z.string().trim().url().optional(),
+  PUBLIC_ORIGIN: publicOrigin,
   /**
    * Whether `X-Forwarded-For` may be believed. True for the documented
    * deployment, where the platform's proxy terminates TLS and every socket
@@ -65,7 +84,7 @@ export interface Config {
   readonly logLevel: LogLevel
   readonly shutdownGraceMs: number
   readonly setupSecret: string | undefined
-  readonly publicOrigin: string | undefined
+  readonly publicOrigin: string
   readonly trustProxyHeaders: boolean
 }
 

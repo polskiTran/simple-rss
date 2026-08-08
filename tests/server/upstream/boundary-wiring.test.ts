@@ -16,9 +16,7 @@ describe('the service boundary', () => {
     const result = await service.retrieval.retrieveBytes({
       url: FEED,
       operation: 'feed',
-      accept: ['application/atom+xml'],
-      maxBytes: 2 * 1024 * 1024,
-      timeoutMs: 10_000,
+      limits: { timeoutMs: 1_000 },
     })
 
     expect(result).toMatchObject({ ok: true, status: 200 })
@@ -32,9 +30,7 @@ describe('the service boundary', () => {
     const result = await service.retrieval.retrieveBytes({
       url: 'https://reader.example.com/api/meta',
       operation: 'reader',
-      accept: ['text/html'],
-      maxBytes: 1024,
-      timeoutMs: 1_000,
+      limits: { maxBytes: 1024, timeoutMs: 1_000 },
     })
 
     expect(result).toMatchObject({ ok: false, code: 'blocked_destination' })
@@ -47,9 +43,7 @@ describe('the service boundary', () => {
     const result = await service.retrieval.retrieveBytes({
       url: 'http://169.254.169.254/latest/meta-data/',
       operation: 'feed',
-      accept: ['text/plain'],
-      maxBytes: 1024,
-      timeoutMs: 1_000,
+      limits: { maxBytes: 1024, timeoutMs: 1_000 },
     })
 
     expect(result).toMatchObject({ ok: false, code: 'blocked_destination' })

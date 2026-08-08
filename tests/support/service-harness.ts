@@ -5,7 +5,7 @@ import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { SqliteDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import { startService, type RunningService } from '../../src/server/server.js'
-import type { Retrieval } from '../../src/server/upstream/retrieval.js'
+import { createRetrieval, type Retrieval } from '../../src/server/upstream/retrieval.js'
 import { ManualClock } from './manual-clock.js'
 import { makeTempDataDir } from './temp-dir.js'
 import { UpstreamFixtures } from './upstream-fixtures.js'
@@ -77,6 +77,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     LOG_LEVEL: 'debug',
     SHUTDOWN_GRACE_MS: '2000',
     SETUP_SECRET,
+    PUBLIC_ORIGIN: 'https://reader.test',
     // Test requests arrive on a real loopback socket rather than through a
     // proxy, so the forwarding header is only believed where a test sets it.
     TRUST_PROXY_HEADERS: 'true',
@@ -87,18 +88,24 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
   // Every boot — the first and each restart — is wired identically, so a
   // restart really is the same service on the same volume.
   const boot = async () => {
+    const logger = createLogger({
+      level: config.logLevel,
+      now: () => clock.now(),
+      sink: (record) => void logs.push(record),
+    })
+    const retrieval = createRetrieval({
+      httpClient: upstream.client,
+      resolve: upstream.resolve,
+      logger,
+      self: new URL(config.publicOrigin),
+    })
     const started = await startService({
       config,
       port: 0,
       clock,
-      httpClient: upstream.client,
-      resolveAddresses: upstream.resolve,
+      retrieval,
       sleep: async (milliseconds) => void sleeps.push(milliseconds),
-      logger: createLogger({
-        level: config.logLevel,
-        now: () => clock.now(),
-        sink: (record) => void logs.push(record),
-      }),
+      logger,
     })
     running.push(started)
     return started

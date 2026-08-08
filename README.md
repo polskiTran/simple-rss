@@ -63,6 +63,7 @@ See [the architecture document](docs/ARCHITECTURE.md) for the complete design.
 ```sh
 pnpm install
 export SETUP_SECRET="$(openssl rand -base64 32)"   # claims the installation once
+export PUBLIC_ORIGIN="http://localhost:5173"       # canonical URL this installation answers on
 pnpm dev          # Vite on :5173, server on :8080
 pnpm test         # server against real temporary SQLite, client in jsdom
 pnpm test:browser # real Chromium against the built client

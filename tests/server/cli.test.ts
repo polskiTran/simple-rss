@@ -27,7 +27,7 @@ describe('runCli', () => {
     dataDir = await makeTempDataDir()
     output = []
     context = {
-      config: loadConfig({ DATA_DIR: dataDir }),
+      config: loadConfig({ DATA_DIR: dataDir, PUBLIC_ORIGIN: 'https://reader.test' }),
       clock: new ManualClock('2026-08-08T09:00:00.000Z'),
       out: (line) => output.push(line),
       logger: discardingLogger(),
@@ -125,7 +125,7 @@ describe('runCli reset-password', () => {
     dataDir = await makeTempDataDir()
     output = []
     context = {
-      config: loadConfig({ DATA_DIR: dataDir }),
+      config: loadConfig({ DATA_DIR: dataDir, PUBLIC_ORIGIN: 'https://reader.test' }),
       clock: new ManualClock('2026-08-08T09:00:00.000Z'),
       out: (line) => output.push(line),
       logger: discardingLogger(),

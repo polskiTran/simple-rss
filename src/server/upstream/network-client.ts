@@ -5,7 +5,7 @@ import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { isPublicAddress, unbracket } from './addresses.js'
-import type { HttpClient } from './http-client.js'
+import { HttpClientError, type HttpClient } from './http-client.js'
 
 /** Encodings this client can decode, and therefore the only ones it asks for. */
 const ACCEPT_ENCODING = 'gzip, deflate, br'
@@ -19,14 +19,16 @@ export interface NetworkHttpClientOptions {
    * tests relax it so they can talk to a loopback origin.
    */
   readonly isAllowedAddress?: (address: string) => boolean
+  /** Internal test seam for deterministic socket DNS. */
+  readonly lookup?: LookupFunction
 }
 
 /**
- * Sockets kept open across every publisher at once. Well above what one
- * reader's polling needs, and low enough that a slow host cannot accumulate
- * connections indefinitely.
+ * Each protocol agent has a global eight-socket ceiling, including idle
+ * keep-alive sockets. Together they can retain at most sixteen sockets.
  */
-const MAX_SOCKETS = 16
+const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 8
+const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
 /**
  * The real outside world.
@@ -44,8 +46,13 @@ const MAX_SOCKETS = 16
  */
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
-  const lookup = guardedLookup(isAllowed)
-  const agentOptions = { keepAlive: true, maxSockets: MAX_SOCKETS }
+  const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
+  const agentOptions = {
+    keepAlive: true,
+    maxSockets: MAX_TOTAL_SOCKETS_PER_PROTOCOL,
+    maxTotalSockets: MAX_TOTAL_SOCKETS_PER_PROTOCOL,
+    maxFreeSockets: MAX_FREE_SOCKETS_PER_PROTOCOL,
+  }
   const httpAgent = new HttpAgent(agentOptions)
   const httpsAgent = new HttpsAgent(agentOptions)
 
@@ -60,7 +67,7 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
     // instead. Everything else is judged inside `lookup`, below.
     const host = unbracket(url.hostname)
     if (isIP(host) !== 0 && !isAllowed(host)) {
-      throw new Error(`refusing to connect to the address ${host}`)
+      throw new HttpClientError('blocked_destination', 'socket address is not globally reachable')
     }
 
     const headers: OutgoingHttpHeaders = {}
@@ -106,22 +113,28 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
  * whole name when any of its addresses is unusable stops a name that answers
  * with one public and one private address from being connected to at all.
  */
-export function guardedLookup(isAllowed: (address: string) => boolean = isPublicAddress): LookupFunction {
+export function guardedLookup(
+  isAllowed: (address: string) => boolean = isPublicAddress,
+  lookup: LookupFunction = systemLookup,
+): LookupFunction {
   return (hostname, options, callback) => {
-    systemLookup(hostname, { ...options, all: true }, (error, answers: LookupAddress[]) => {
+    lookup(hostname, { ...options, all: true }, (error, answer, family) => {
       if (error) {
-        callback(error, '', 0)
+        callback(new HttpClientError('unresolvable_host', 'host did not resolve'), '', 0)
         return
       }
 
-      const refused = answers.find((answer) => !isAllowed(answer.address))
+      const answers: LookupAddress[] = Array.isArray(answer)
+        ? answer
+        : [{ address: answer, family: family === 6 ? 6 : 4 }]
+      const refused = answers.find((entry) => !isAllowed(entry.address))
       if (refused) {
-        callback(new Error(`refusing to connect to ${hostname}: it resolves to ${refused.address}`), '', 0)
+        callback(new HttpClientError('blocked_destination', 'host resolves to a non-global address'), '', 0)
         return
       }
       const first = answers[0]
       if (!first) {
-        callback(new Error(`refusing to connect to ${hostname}: it resolves to nothing`), '', 0)
+        callback(new HttpClientError('unresolvable_host', 'host did not resolve'), '', 0)
         return
       }
 
@@ -141,21 +154,33 @@ function toResponse(request: Request, response: IncomingMessage): Response {
     throw new Error(`upstream answered with the unusable status ${status}`)
   }
 
-  const encoding = String(response.headers['content-encoding'] ?? '')
-    .trim()
-    .toLowerCase()
-  const decoder = decoderFor(encoding)
+  const bodiless = BODILESS_STATUSES.has(status) || request.method === 'HEAD'
+  let encodings: readonly string[] = []
+  if (!bodiless) {
+    try {
+      encodings = contentEncodings(response.headers['content-encoding'])
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error('unsupported content encoding')
+      response.destroy(failure)
+      throw failure
+    }
+  }
+
   let stream: Readable = response
-  if (decoder) {
-    response.on('error', (error) => decoder.destroy(error))
-    // A caller that stops reading destroys the decoder, and the socket beneath
-    // it has to go too: otherwise the connection stays busy draining a body
-    // nobody wants — the one way an abandoned retrieval could still cost
-    // something after everything above it has moved on.
+  for (const encoding of [...encodings].reverse()) {
+    const decoder = decoderFor(encoding)
+    if (!decoder) {
+      const failure = new HttpClientError('unsupported_content_encoding', 'unsupported content encoding')
+      response.destroy(failure)
+      throw failure
+    }
+    stream.on('error', (error) => decoder.destroy(error))
+    // Cancelling the final decoded stream must tear down the socket beneath
+    // every decoder rather than draining bytes nobody wants.
     decoder.on('close', () => {
       if (!response.readableEnded) response.destroy()
     })
-    stream = response.pipe(decoder)
+    stream = stream.pipe(decoder)
   }
 
   const headers = new Headers()
@@ -171,15 +196,32 @@ function toResponse(request: Request, response: IncomingMessage): Response {
       }
     }
   }
-  if (decoder) {
+  if (encodings.length > 0) {
     headers.delete('content-encoding')
     headers.delete('content-length')
   }
 
-  const bodiless = BODILESS_STATUSES.has(status) || request.method === 'HEAD'
   if (bodiless) response.resume()
 
   return new Response(bodiless ? null : (Readable.toWeb(stream) as ReadableStream<Uint8Array>), { status, headers })
+}
+
+function contentEncodings(value: string | string[] | undefined): readonly string[] {
+  const raw = Array.isArray(value) ? value.join(',') : value
+  if (raw === undefined || raw.trim() === '') return []
+  const encodings = raw
+    .split(',')
+    .map((entry: string) => entry.trim().toLowerCase())
+
+  if (encodings.some((encoding) => encoding === '') || (encodings.includes('identity') && encodings.length > 1)) {
+    throw new HttpClientError('unsupported_content_encoding', 'malformed content encoding')
+  }
+  for (const encoding of encodings) {
+    if (encoding !== 'identity' && !decoderFor(encoding)) {
+      throw new HttpClientError('unsupported_content_encoding', 'unsupported content encoding')
+    }
+  }
+  return encodings.filter((encoding) => encoding !== 'identity')
 }
 
 function decoderFor(encoding: string): Duplex | undefined {

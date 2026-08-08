@@ -69,9 +69,9 @@ async function start(
 
   const container = await startContainer({
     volume,
-    // The platform template supplies this; every case that is not about its
-    // absence gets a deployment that was configured properly.
-    env: { SETUP_SECRET, ...options.env },
+    // The platform template supplies these; every case not about setup-secret
+    // absence gets a deployment with a canonical public origin.
+    env: { SETUP_SECRET, PUBLIC_ORIGIN: 'https://reader.test', ...options.env },
     ...(options.port ? { port: options.port } : {}),
     ...(options.waitForReadiness === undefined ? {} : { waitForReadiness: options.waitForReadiness }),
   })

@@ -15,7 +15,7 @@ process immediately rather than at the first request that trips over it.
 | `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error`. |
 | `SHUTDOWN_GRACE_MS` | `10000` | How long in-flight requests may finish after `SIGTERM`. |
 | `SETUP_SECRET` | — | The one-time secret that lets the first visitor become the Owner. **Required until the installation is claimed**; ignored afterwards. At least 16 characters. |
-| `PUBLIC_ORIGIN` | — | The origin the Owner reaches this installation at, e.g. `https://reader.up.railway.app`. Optional but worth setting: it lets outbound retrieval refuse a Feed or Feed Item link that points back at the installation itself. Without it, only localhost, private, and reserved destinations are refused. |
+| `PUBLIC_ORIGIN` | — | **Required.** The canonical HTTP or HTTPS origin the Owner uses, e.g. `https://reader.up.railway.app`. Outbound retrieval refuses this origin so a Feed or Feed Item link cannot point the installation back at its own API. |
 | `TRUST_PROXY_HEADERS` | `true` | Whether `X-Forwarded-For` may be believed when identifying a client for rate limiting. Leave it on behind a platform proxy; set `false` if the service is exposed directly. |
 
 Generate the setup secret with something that is not a word:
@@ -62,6 +62,7 @@ docker run -d \
   -p 8080:8080 \
   -v simple-rss-data:/app/data \
   -e SETUP_SECRET="$(openssl rand -base64 32)" \
+  -e PUBLIC_ORIGIN="https://reader.example.com" \
   simple-rss:0.1.0
 ```
 
@@ -132,6 +133,7 @@ what preserves state, and the container smoke tests cover exactly that path.
 ```sh
 pnpm install
 export SETUP_SECRET="$(openssl rand -base64 32)"   # the server stays unready without it
+export PUBLIC_ORIGIN="http://localhost:5173"
 pnpm dev          # Vite on :5173 proxying /api and /health to the server on :8080
 pnpm test         # in-process suite: server on real temporary SQLite, client in jsdom
 pnpm test:browser # real Chromium against the built client (needs `playwright install chromium`)

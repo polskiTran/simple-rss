@@ -38,6 +38,7 @@ describe('fatal process errors', () => {
           FATAL_KIND: kind,
           PORT: String(await freePort()),
           SETUP_SECRET: 'a-long-enough-setup-secret-for-process-tests',
+          PUBLIC_ORIGIN: 'https://reader.test',
         },
         stdio: 'pipe',
       },

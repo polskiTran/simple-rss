@@ -66,9 +66,10 @@ function classifyIpv4(bytes: Uint8Array): AddressClass {
   // Carrier-grade NAT: shared address space that reaches the provider's
   // network rather than the public internet.
   if (a === 100 && b >= 64 && b <= 127) return 'reserved'
-  // IETF protocol assignments and the three documentation ranges, which only
-  // ever appear in a real request by accident or by attack.
-  if (a === 192 && b === 0 && (c === 0 || c === 2)) return 'reserved'
+  // IETF protocol assignments and documentation ranges.
+  if (a === 192 && b === 0 && c === 0) return d === 9 || d === 10 ? 'public' : 'reserved'
+  if (a === 192 && b === 0 && c === 2) return 'reserved'
+  if (a === 192 && b === 88 && c === 99) return 'reserved'
   if (a === 198 && b === 51 && c === 100) return 'reserved'
   if (a === 203 && b === 0 && c === 113) return 'reserved'
   if (a === 198 && (b === 18 || b === 19)) return 'reserved'
@@ -90,27 +91,41 @@ function classifyIpv6(bytes: Uint8Array): AddressClass {
   if (allZero(bytes, 0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) {
     return classifyIpv4(bytes.subarray(12, 16))
   }
-  // 64:ff9b::/96 — NAT64, which forwards to the IPv4 address it embeds.
+  // 64:ff9b::/96 — globally reachable NAT64; judge the IPv4 destination.
   if (bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b && allZero(bytes, 4, 12)) {
     return classifyIpv4(bytes.subarray(12, 16))
   }
-  // 2002::/16 — 6to4, which tunnels to the IPv4 address in its second and
-  // third groups.
+  // 64:ff9b:1::/48 is a local-use translation prefix and is not global.
+  if (
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x64 &&
+    bytes[2] === 0xff &&
+    bytes[3] === 0x9b &&
+    bytes[4] === 0x00 &&
+    bytes[5] === 0x01
+  ) {
+    return 'reserved'
+  }
+  // 2002::/16 — 6to4; judge the public IPv4 endpoint it embeds.
   if (bytes[0] === 0x20 && bytes[1] === 0x02) {
     return classifyIpv4(bytes.subarray(2, 6))
   }
-  // 2001:db8::/32 documentation and 2001::/32 Teredo.
+  // Non-global allocations inside the otherwise global 2000::/3 space.
   if (bytes[0] === 0x20 && bytes[1] === 0x01) {
-    if (bytes[2] === 0x0d && bytes[3] === 0xb8) return 'reserved'
-    if (bytes[2] === 0x00 && bytes[3] === 0x00) return 'reserved'
+    if (bytes[2] === 0x00 && bytes[3] === 0x00) return 'reserved' // Teredo
+    if (bytes[2] === 0x00 && bytes[3] === 0x02 && allZero(bytes, 4, 6)) return 'reserved' // benchmarking
+    if (bytes[2] === 0x00 && ((bytes[3] ?? 0) & 0xf0) === 0x10) return 'reserved' // deprecated ORCHID
+    if (bytes[2] === 0x0d && bytes[3] === 0xb8) return 'reserved' // documentation
   }
-  // 100::/64 discard-only.
+  if (bytes[0] === 0x3f && ((bytes[1] ?? 0) & 0xf0) === 0xf0) return 'reserved' // documentation
+
+  // 100::/64 discard-only and ::/96 IPv4-compatible.
   if (bytes[0] === 0x01 && bytes[1] === 0x00 && allZero(bytes, 2, 8)) return 'reserved'
-  // ::/96 — the deprecated IPv4-compatible form, which no correct client uses
-  // and which some stacks still route to the embedded address.
   if (allZero(bytes, 0, 12)) return 'reserved'
 
-  return 'public'
+  // IANA currently allocates ordinary global unicast from 2000::/3. Anything
+  // else not handled above is non-global and must fail closed.
+  return ((bytes[0] ?? 0) & 0xe0) === 0x20 ? 'public' : 'reserved'
 }
 
 function allZero(bytes: Uint8Array, from: number, to: number): boolean {

@@ -40,6 +40,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
         config: loadConfig({
           DATA_DIR: dataDir,
           SETUP_SECRET,
+          PUBLIC_ORIGIN: 'https://reader.test',
           CLIENT_DIR: 'dist/client',
           LOG_LEVEL: 'warn',
         }),

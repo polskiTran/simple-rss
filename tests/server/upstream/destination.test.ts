@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { validateDestination, type ResolveAddresses } from '../../../src/server/upstream/destination.js'
+import {
+  validateDestination as decideDestination,
+  type DestinationPolicy,
+  type ResolveAddresses,
+} from '../../../src/server/upstream/destination.js'
 
 /** A resolver that answers from a table and refuses anything it has not been told about. */
 function resolver(table: Record<string, readonly string[]>): ResolveAddresses {
@@ -7,6 +11,15 @@ function resolver(table: Record<string, readonly string[]>): ResolveAddresses {
 }
 
 const publicResolver = resolver({ 'example.com': ['93.184.216.34'] })
+
+const TEST_SELF = new URL('https://reader.test')
+
+function validateDestination(
+  candidate: string | URL,
+  policy: Omit<DestinationPolicy, 'self'> & { readonly self?: URL },
+) {
+  return decideDestination(candidate, { ...policy, self: policy.self ?? TEST_SELF })
+}
 
 describe('validateDestination', () => {
   it('accepts a public HTTPS destination and reports what it resolved to', async () => {
@@ -125,7 +138,7 @@ describe('validateDestination', () => {
   it('refuses the installation asking itself for a page', async () => {
     const policy = {
       resolve: resolver({ 'reader.example.com': ['93.184.216.34'] }),
-      self: ['https://reader.example.com'],
+      self: new URL('https://reader.example.com'),
     }
 
     await expect(validateDestination('https://reader.example.com/api/meta', policy)).resolves.toMatchObject({
@@ -137,11 +150,20 @@ describe('validateDestination', () => {
     ).resolves.toMatchObject({ ok: false, code: 'blocked_destination' })
   })
 
+  it('refuses a trailing-dot spelling of the installation hostname', async () => {
+    await expect(
+      validateDestination('https://reader.example.com./api/meta', {
+        resolve: resolver({ 'reader.example.com': ['93.184.216.34'] }),
+        self: new URL('https://reader.example.com'),
+      }),
+    ).resolves.toMatchObject({ ok: false, code: 'blocked_destination' })
+  })
+
   it('lets a different port on the same host through, which is a different service', async () => {
     await expect(
       validateDestination('https://reader.example.com:8443/feed.xml', {
         resolve: resolver({ 'reader.example.com': ['93.184.216.34'] }),
-        self: ['https://reader.example.com'],
+        self: new URL('https://reader.example.com'),
       }),
     ).resolves.toMatchObject({ ok: true })
   })

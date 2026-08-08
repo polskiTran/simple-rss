@@ -4,10 +4,16 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../../src/server/config.js'
+import { loadConfig as parseConfig, type Config } from '../../src/server/config.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
 const run = promisify(execFile)
+
+const TEST_PUBLIC_ORIGIN = 'https://reader.example.com'
+
+function loadConfig(env: NodeJS.ProcessEnv = {}): Config {
+  return parseConfig({ PUBLIC_ORIGIN: TEST_PUBLIC_ORIGIN, ...env })
+}
 
 describe('loadConfig', () => {
   it('accepts the platform-provided port', () => {
@@ -52,7 +58,7 @@ describe('loadConfig', () => {
     await symlink(resolve('node_modules'), join(checkout, 'node_modules'), 'dir')
 
     const moduleUrl = pathToFileURL(copiedConfig).href
-    const script = `import { loadConfig } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(loadConfig({}).clientDir))`
+    const script = `import { loadConfig } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(loadConfig({ PUBLIC_ORIGIN: 'https://reader.example.com' }).clientDir))`
     const { stdout } = await run(
       process.execPath,
       ['--import', 'tsx', '--input-type=module', '--eval', script],
@@ -76,15 +82,21 @@ describe('loadConfig', () => {
     expect(loadConfig({ SHUTDOWN_GRACE_MS: '2500' }).shutdownGraceMs).toBe(2500)
   })
 
-  it('takes the origin the installation answers on, so it can refuse to retrieve itself', () => {
-    expect(loadConfig({}).publicOrigin).toBeUndefined()
-    expect(loadConfig({ PUBLIC_ORIGIN: 'https://reader.example.com' }).publicOrigin).toBe(
+  it('requires and canonicalizes the origin the installation answers on', () => {
+    expect(() => parseConfig({})).toThrow(/PUBLIC_ORIGIN/)
+    expect(loadConfig({ PUBLIC_ORIGIN: 'https://READER.example.com:443' }).publicOrigin).toBe(
       'https://reader.example.com',
     )
   })
 
-  it('rejects a public origin that is not a URL, rather than never matching anything', () => {
-    expect(() => loadConfig({ PUBLIC_ORIGIN: 'reader.example.com' })).toThrow(/PUBLIC_ORIGIN/)
+  it.each([
+    'reader.example.com',
+    'ftp://reader.example.com',
+    'https://owner:secret@reader.example.com',
+    'https://reader.example.com/path',
+    'https://reader.example.com?token=secret',
+  ])('rejects the non-origin PUBLIC_ORIGIN %j', (publicOrigin) => {
+    expect(() => loadConfig({ PUBLIC_ORIGIN: publicOrigin })).toThrow(/PUBLIC_ORIGIN/)
   })
 
   it('carries the setup secret through without judging its strength', () => {

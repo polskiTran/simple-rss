@@ -32,6 +32,15 @@ describe('classifyAddress', () => {
     ['2001:db8::1', 'reserved'],
     ['2001::1', 'reserved'],
     ['100::1', 'reserved'],
+    ['192.88.99.2', 'reserved'],
+    ['64:ff9b:1::1', 'reserved'],
+    ['100:0:0:1::1', 'reserved'],
+    ['2001:2::1', 'reserved'],
+    ['2001:10::1', 'reserved'],
+    ['3fff::1', 'reserved'],
+    ['5f00::1', 'reserved'],
+    ['fec0::1', 'reserved'],
+    ['4000::1', 'reserved'],
   ] as const)('classifies %s as %s', (address, expected) => {
     expect(classifyAddress(address)).toBe(expected)
   })
@@ -44,6 +53,9 @@ describe('classifyAddress', () => {
     expect(classifyAddress('9.255.255.255')).toBe('public')
     expect(classifyAddress('11.0.0.1')).toBe('public')
     expect(classifyAddress('2001:4860:4860::8888')).toBe('public')
+    expect(classifyAddress('192.0.0.9')).toBe('public')
+    expect(classifyAddress('192.0.0.10')).toBe('public')
+    expect(classifyAddress('2001:20::1')).toBe('public')
   })
 
   it('sees through an IPv4-mapped IPv6 address to the address it carries', () => {
