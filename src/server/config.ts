@@ -37,6 +37,15 @@ const envSchema = z.object({
    */
   SETUP_SECRET: z.string().trim().min(1).optional(),
   /**
+   * The origin the Owner's browser reaches this installation at. The outbound
+   * retrieval boundary refuses it, so a Feed or article that points back at
+   * the reader cannot make it ask itself for its own API.
+   *
+   * Optional because localhost, private, and reserved destinations are already
+   * refused without it; it only adds the one origin that looks public.
+   */
+  PUBLIC_ORIGIN: z.string().trim().url().optional(),
+  /**
    * Whether `X-Forwarded-For` may be believed. True for the documented
    * deployment, where the platform's proxy terminates TLS and every socket
    * appears to come from it; false when the service is exposed directly, where
@@ -56,6 +65,7 @@ export interface Config {
   readonly logLevel: LogLevel
   readonly shutdownGraceMs: number
   readonly setupSecret: string | undefined
+  readonly publicOrigin: string | undefined
   readonly trustProxyHeaders: boolean
 }
 
@@ -82,6 +92,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     logLevel: parsed.data.LOG_LEVEL,
     shutdownGraceMs: parsed.data.SHUTDOWN_GRACE_MS,
     setupSecret: parsed.data.SETUP_SECRET,
+    publicOrigin: parsed.data.PUBLIC_ORIGIN,
     trustProxyHeaders: parsed.data.TRUST_PROXY_HEADERS,
   }
 }

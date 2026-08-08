@@ -5,6 +5,7 @@ import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { SqliteDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import { startService, type RunningService } from '../../src/server/server.js'
+import type { Retrieval } from '../../src/server/upstream/retrieval.js'
 import { ManualClock } from './manual-clock.js'
 import { makeTempDataDir } from './temp-dir.js'
 import { UpstreamFixtures } from './upstream-fixtures.js'
@@ -32,6 +33,8 @@ export interface TestService {
   readonly dataDir: string
   readonly clock: ManualClock
   readonly upstream: UpstreamFixtures
+  /** The service's own hardened boundary, wired from its configuration. */
+  readonly retrieval: Retrieval
   readonly settings: InstallationSettingsStore | undefined
   /** The live connection, for assertions SQL states better than HTTP does. */
   readonly database: SqliteDatabase | undefined
@@ -89,6 +92,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       port: 0,
       clock,
       httpClient: upstream.client,
+      resolveAddresses: upstream.resolve,
       sleep: async (milliseconds) => void sleeps.push(milliseconds),
       logger: createLogger({
         level: config.logLevel,
@@ -112,6 +116,9 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     dataDir,
     clock,
     upstream,
+    get retrieval() {
+      return service.retrieval
+    },
     get settings() {
       return service.settings
     },

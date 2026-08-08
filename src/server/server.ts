@@ -43,6 +43,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
     logger: service.logger,
     clock: service.clock,
     readiness: service.readiness,
+    retrieval: service.retrieval,
     get database() {
       return service.database
     },

@@ -12,7 +12,7 @@ import { requireSession } from './http/require-session.js'
 import { sameOrigin } from './http/same-origin.js'
 import { securityHeaders } from './http/security-headers.js'
 import { staticAssets } from './http/static-assets.js'
-import type { HttpClient } from './upstream/http-client.js'
+import type { Retrieval } from './upstream/retrieval.js'
 
 export interface AppDependencies {
   readonly config: Config
@@ -27,7 +27,7 @@ export interface AppDependencies {
   /** Absent for the same reason the database is. */
   readonly authentication: () => Authentication | undefined
   /** Unused until Feed retrieval lands; wired now so the seam exists. */
-  readonly httpClient: HttpClient
+  readonly retrieval: Retrieval
 }
 
 /**

@@ -1,9 +1,14 @@
 /**
- * The single door to the outside world: Feed retrieval, Reader extraction, and
- * the image proxy all go through it. Keeping it a dependency means tests serve
- * fixtures instead of reaching the network, and the hardened fetcher can later
- * wrap it in one place rather than at every call site.
+ * How the hardened retrieval boundary reaches the network.
+ *
+ * Keeping it a dependency means tests serve fixtures instead of reaching the
+ * network, and it keeps transport concerns — connecting, decoding, tearing a
+ * socket down — separate from the policy in `retrieval.ts`. Nothing outside
+ * `upstream/` should hold one of these: retrieving through it directly would
+ * skip every check the boundary exists to apply.
+ *
+ * An implementation must not follow redirects; each hop is validated above it.
+ *
+ * See `network-client.ts` for the real one.
  */
 export type HttpClient = (request: Request) => Promise<Response>
-
-export const networkHttpClient: HttpClient = (request) => fetch(request)

@@ -76,6 +76,17 @@ describe('loadConfig', () => {
     expect(loadConfig({ SHUTDOWN_GRACE_MS: '2500' }).shutdownGraceMs).toBe(2500)
   })
 
+  it('takes the origin the installation answers on, so it can refuse to retrieve itself', () => {
+    expect(loadConfig({}).publicOrigin).toBeUndefined()
+    expect(loadConfig({ PUBLIC_ORIGIN: 'https://reader.example.com' }).publicOrigin).toBe(
+      'https://reader.example.com',
+    )
+  })
+
+  it('rejects a public origin that is not a URL, rather than never matching anything', () => {
+    expect(() => loadConfig({ PUBLIC_ORIGIN: 'reader.example.com' })).toThrow(/PUBLIC_ORIGIN/)
+  })
+
   it('carries the setup secret through without judging its strength', () => {
     expect(loadConfig({ SETUP_SECRET: 'a-deployment-setup-secret' }).setupSecret).toBe('a-deployment-setup-secret')
   })
