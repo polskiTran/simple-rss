@@ -261,28 +261,39 @@ The Railway template supplies a required random setup secret. Before setup compl
 
 There is no registration, email recovery, OAuth, role model, or second Owner.
 
+Only `/health/*` and the `/api/auth/*` routes are reachable without a session. Everything else under `/api` is closed by default — see [ADR 0004](./adr/0004-api-closed-by-default.md) — so an unclaimed installation exposes setup and health and nothing more.
+
 ### Sessions
 
-- Opaque random session tokens
-- Only token hashes stored in SQLite
-- `HttpOnly`, `Secure`, and same-site cookies
-- Seven-day idle timeout
-- Thirty-day absolute timeout
+- Opaque random session tokens, 256 bits from the system CSPRNG
+- Only `sha256(token)` stored in SQLite, so a copy of the volume grants nothing
+- `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/` cookies
+- Seven-day idle timeout, slid at most once a minute rather than per request
+- Thirty-day absolute timeout, fixed at issue and never extended
 - Independent sessions for phone and laptop
 - Logout invalidates the current session
 - Password changes and emergency reset invalidate every session
+- Sessions past either deadline are deleted when encountered, and swept at startup
 
 An authenticated Owner can change the password normally. Emergency recovery uses a CLI command through the Railway shell; it installs a new Argon2id verifier and revokes all sessions.
 
 ### Rate limiting
 
-The single service uses local rate limiting and requires no Redis. Login permits five failed attempts per client IP per 15 minutes, with a global ceiling and progressive delay rather than permanent lockout. Reader extraction, image proxying, manual refresh, and retry have separate authenticated limits. Ordinary authenticated reads receive a generous ceiling.
+The single service uses local rate limiting and requires no Redis. Every route that checks a secret — sign-in, claiming with the setup secret, and changing the password — goes through the same limiter, so the setup secret is no cheaper to guess than the password.
+
+A client is refused after five failed attempts in 15 minutes, and every attempt costs a progressive delay that doubles from 250 ms to a 2 s cap. Both are sliding windows over recorded failures, so waiting is always sufficient and a successful attempt clears that client.
+
+The installation-wide ceiling of twenty failures works differently on purpose: past it, **every** attempt pays the maximum delay, but no client is blocked by failures that were not its own. A hard global block would let anyone with a handful of addresses keep the Owner out of their own reader by failing twenty sign-ins every quarter of an hour — the permanent lockout this is meant to avoid. Spread-out guessing is answered by capping the rate instead, on top of a memory-hard verify and a five-attempt limit per address.
+
+Limiter state is in memory. It is not persisted and not exported: losing it costs an attacker nothing they could not get by waiting out the window, and only the Owner can restart the process.
+
+The client an attempt counts against is the **rightmost** `X-Forwarded-For` entry — the one the nearest proxy appended — falling back to the socket address. Anything further left is caller-supplied, so a forged header can only ever spend the attacker's own budget. `TRUST_PROXY_HEADERS=false` ignores the header entirely for a directly exposed deployment.
 
 ### Web and fetch security
 
 - Same-origin JSON API; no permissive credentialed CORS
 - Server-side Zod validation at every request boundary
-- Origin checks for state-changing requests
+- Origin checks for state-changing requests: the `Origin` host must equal the request `Host`, and a missing or opaque `Origin` is refused
 - Parameterized SQL
 - Restrictive CSP and standard security headers
 - Render-time output escaping and Reader sanitization
@@ -357,6 +368,8 @@ Implementation should include:
 - Migration and backup/restore tests
 - Browser tests for setup, login, Digest, Subscription, Library, search, and Reader fallback
 - Container smoke tests using a mounted persistent directory
+
+Each layer takes only what the one below it cannot prove. The HTTP boundary suite (`pnpm test`) covers behaviour a request can observe; `pnpm test:browser` is reserved for what needs a real browser — cookie attributes, script's inability to read the session, and a foreign origin genuinely failing to act; `pnpm test:smoke` is reserved for what needs the real image and volume.
 
 ## V1 acceptance boundary
 

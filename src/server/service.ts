@@ -1,5 +1,7 @@
 import type { Hono } from 'hono'
 import { createApp } from './app.js'
+import { createAuthentication, type Authentication } from './auth/authentication.js'
+import type { Sleeper } from './auth/sleeper.js'
 import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
 import { createLogger, type Logger } from './logger.js'
@@ -14,6 +16,8 @@ export interface ServiceOptions {
   readonly logger?: Logger
   readonly clock?: Clock
   readonly httpClient?: HttpClient
+  /** Overridden by tests so progressive login delays cost no wall-clock time. */
+  readonly sleep?: Sleeper
 }
 
 export interface Service {
@@ -25,6 +29,7 @@ export interface Service {
   /** Undefined only when startup failed to open the database. */
   readonly database: SqliteDatabase | undefined
   readonly settings: InstallationSettingsStore | undefined
+  readonly authentication: Authentication | undefined
   close(): void
 }
 
@@ -45,11 +50,20 @@ export function createService(options: ServiceOptions): Service {
 
   let database: SqliteDatabase | undefined
   let settings: InstallationSettingsStore | undefined
+  let authentication: Authentication | undefined
 
   try {
     database = openDatabase(config.databasePath)
     const applied = applyMigrations(database, clock)
     settings = new InstallationSettingsStore(database)
+    authentication = createAuthentication({
+      database,
+      clock,
+      logger,
+      setupSecret: config.setupSecret,
+      ...(options.sleep ? { sleep: options.sleep } : {}),
+    })
+
     readiness.markReady()
     logger.info('startup.migrations_applied', {
       databasePath: config.databasePath,
@@ -67,6 +81,7 @@ export function createService(options: ServiceOptions): Service {
     readiness,
     httpClient,
     database: () => database,
+    authentication: () => authentication,
   })
 
   return {
@@ -81,10 +96,14 @@ export function createService(options: ServiceOptions): Service {
     get settings() {
       return settings
     },
+    get authentication() {
+      return authentication
+    },
     close() {
       database?.close()
       database = undefined
       settings = undefined
+      authentication = undefined
     },
   }
 }

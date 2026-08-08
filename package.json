@@ -18,11 +18,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
+    "test:browser": "pnpm build:client && playwright test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "cli": "tsx src/server/cli-main.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
+    "@node-rs/argon2": "^2.0.2",
     "better-sqlite3": "^11.8.1",
     "drizzle-orm": "^0.39.3",
     "hono": "^4.7.2",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@fontsource/literata": "^5.1.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.0.9",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",

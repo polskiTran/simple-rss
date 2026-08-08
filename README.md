@@ -1,7 +1,8 @@
 # Simple RSS
 
 > Work in progress. The service boots, migrates its volume, serves the
-> application shell, and survives container replacement — see
+> application shell, and survives container replacement. One Owner can claim it
+> with its setup secret and sign in from phone and laptop — see
 > [deployment](docs/DEPLOYMENT.md). Subscriptions and the Digest come next.
 
 Simple RSS is an opinionated, extremely minimal RSS reader for intentional and calm reading. It is designed as an open-source template that one person can deploy and access from any modern phone or laptop browser.
@@ -61,8 +62,10 @@ See [the architecture document](docs/ARCHITECTURE.md) for the complete design.
 
 ```sh
 pnpm install
+export SETUP_SECRET="$(openssl rand -base64 32)"   # claims the installation once
 pnpm dev          # Vite on :5173, server on :8080
 pnpm test         # server against real temporary SQLite, client in jsdom
+pnpm test:browser # real Chromium against the built client
 pnpm test:smoke   # builds the image and exercises the container (needs Docker)
 ```
 
@@ -74,4 +77,5 @@ pnpm test:smoke   # builds the image and exercises the container (needs Docker)
 - [ADR 0001: Server-authoritative single-owner model](docs/adr/0001-server-authoritative-single-owner.md)
 - [ADR 0002: Container-first Railway deployment](docs/adr/0002-container-first-railway-deployment.md)
 - [ADR 0003: Application-owned authentication](docs/adr/0003-application-owned-single-owner-authentication.md)
+- [ADR 0004: The API is closed by default](docs/adr/0004-api-closed-by-default.md)
 

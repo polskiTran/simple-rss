@@ -26,6 +26,25 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   /** How long in-flight requests may finish after SIGTERM. */
   SHUTDOWN_GRACE_MS: z.coerce.number().int().min(0).max(120_000).default(10_000),
+  /**
+   * The one-time secret that lets the first visitor become the Owner. Required
+   * until the installation is claimed, after which it does nothing.
+   *
+   * Deliberately optional here: an absent or unusable secret keeps readiness
+   * closed with a reason an operator can read, rather than crash-looping the
+   * container past them. `MIN_SETUP_SECRET_LENGTH` is the usable bar.
+   */
+  SETUP_SECRET: z.string().trim().min(1).optional(),
+  /**
+   * Whether `X-Forwarded-For` may be believed. True for the documented
+   * deployment, where the platform's proxy terminates TLS and every socket
+   * appears to come from it; false when the service is exposed directly, where
+   * the header is attacker-controlled.
+   */
+  TRUST_PROXY_HEADERS: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
 })
 
 export interface Config {
@@ -35,6 +54,8 @@ export interface Config {
   readonly clientDir: string
   readonly logLevel: LogLevel
   readonly shutdownGraceMs: number
+  readonly setupSecret: string | undefined
+  readonly trustProxyHeaders: boolean
 }
 
 /**
@@ -59,6 +80,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     clientDir,
     logLevel: parsed.data.LOG_LEVEL,
     shutdownGraceMs: parsed.data.SHUTDOWN_GRACE_MS,
+    setupSecret: parsed.data.SETUP_SECRET,
+    trustProxyHeaders: parsed.data.TRUST_PROXY_HEADERS,
   }
 }
 

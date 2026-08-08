@@ -1,7 +1,41 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { apiErrorSchema, readinessSchema, serviceMetaSchema } from '../../src/shared/api.js'
+import { authStatusSchema, apiErrorSchema, readinessSchema, serviceMetaSchema } from '../../src/shared/api.js'
 import { VERSION } from '../../src/shared/version.js'
 import { buildImage, docker, logRecords, startContainer, uniqueName, type Container } from './docker.js'
+
+/** The one-time secret this deployment is configured with. */
+const SETUP_SECRET = 'a-deployment-setup-secret'
+const OWNER_PASSWORD = 'a-calm-reading-password'
+
+/**
+ * Claims the installation over HTTP the way the Owner's browser does, and
+ * returns the session cookie the rest of the API needs.
+ */
+async function claim(container: Container, password = OWNER_PASSWORD): Promise<string> {
+  const response = await container.fetch('/api/auth/setup', {
+    method: 'POST',
+    headers: { origin: container.url, 'content-type': 'application/json' },
+    body: JSON.stringify({ setupSecret: SETUP_SECRET, password }),
+  })
+  if (response.status !== 201) {
+    throw new Error(`could not claim the installation: ${response.status} ${await response.text()}`)
+  }
+  return sessionCookie(response)
+}
+
+async function signIn(container: Container, password: string): Promise<Response> {
+  return container.fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { origin: container.url, 'content-type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+}
+
+function sessionCookie(response: Response): string {
+  const raw = response.headers.getSetCookie().find((value) => value.startsWith('simple_rss_session='))
+  if (!raw) throw new Error('no session cookie was set')
+  return raw.split(';')[0]!
+}
 
 /**
  * The production image, exercised the way a platform runs it: an injected
@@ -22,14 +56,24 @@ async function retire(container: Container): Promise<void> {
   if (index >= 0) started.splice(index, 1)
 }
 
-async function start(options: { volume?: string; env?: Record<string, string>; port?: number } = {}) {
+async function start(
+  options: {
+    volume?: string
+    env?: Record<string, string>
+    port?: number
+    waitForReadiness?: boolean
+  } = {},
+) {
   const volume = options.volume ?? uniqueName('simple-rss-data')
   if (!options.volume) volumes.push(volume)
 
   const container = await startContainer({
     volume,
-    ...(options.env ? { env: options.env } : {}),
+    // The platform template supplies this; every case that is not about its
+    // absence gets a deployment that was configured properly.
+    env: { SETUP_SECRET, ...options.env },
     ...(options.port ? { port: options.port } : {}),
+    ...(options.waitForReadiness === undefined ? {} : { waitForReadiness: options.waitForReadiness }),
   })
   started.push(container)
   return { container, volume }
@@ -54,7 +98,7 @@ describe('the production image', () => {
     const records = logRecords(await container.logs())
     const migrated = records.find((record) => record.message === 'startup.migrations_applied')
 
-    expect(migrated).toMatchObject({ databasePath: '/app/data/simple-rss.db', applied: [1] })
+    expect(migrated).toMatchObject({ databasePath: '/app/data/simple-rss.db', applied: [1, 2] })
   })
 
   it('reports liveness and readiness', async () => {
@@ -117,9 +161,10 @@ describe('the production image', () => {
 
   it('answers the API boundary with JSON', async () => {
     const { container } = await start()
+    const cookie = await claim(container)
 
-    const meta = await container.fetch('/api/meta')
-    const unknown = await container.fetch('/api/does-not-exist')
+    const meta = await container.fetch('/api/meta', { headers: { cookie } })
+    const unknown = await container.fetch('/api/does-not-exist', { headers: { cookie } })
 
     expect(serviceMetaSchema.parse(await meta.json())).toEqual({ name: 'simple-rss', version: VERSION })
     expect(unknown.status).toBe(404)
@@ -163,6 +208,80 @@ describe('the production image', () => {
   })
 })
 
+describe('claiming a deployed installation', () => {
+  it('stays unready when the platform supplied no setup secret', async () => {
+    const { container } = await start({ env: { SETUP_SECRET: '' }, waitForReadiness: false })
+
+    const live = await container.fetch('/health/live')
+    const ready = await container.fetch('/health/ready')
+
+    expect(live.status).toBe(200)
+    expect(ready.status).toBe(503)
+    expect(readinessSchema.parse(await ready.json())).toEqual({
+      status: 'unready',
+      reason: 'setup secret is not configured',
+    })
+  })
+
+  it('exposes nothing but setup and health before it is claimed', async () => {
+    const { container } = await start()
+
+    const status = await container.fetch('/api/auth/status')
+    const meta = await container.fetch('/api/meta')
+
+    expect(authStatusSchema.parse(await status.json())).toEqual({ claimed: false, authenticated: false })
+    expect(meta.status).toBe(401)
+  })
+
+  it('lets the Owner claim it with the deployment secret and then read the API', async () => {
+    const { container } = await start()
+
+    const cookie = await claim(container)
+
+    expect((await container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
+  })
+
+  it('closes setup permanently once there is an Owner', async () => {
+    const { container } = await start()
+    await claim(container)
+
+    const second = await container.fetch('/api/auth/setup', {
+      method: 'POST',
+      headers: { origin: container.url, 'content-type': 'application/json' },
+      body: JSON.stringify({ setupSecret: SETUP_SECRET, password: 'a-second-owner-password' }),
+    })
+
+    expect(second.status).toBe(409)
+  })
+})
+
+describe('emergency password reset through the platform shell', () => {
+  it('installs a new password and revokes the sessions issued under the old one', async () => {
+    const { container } = await start()
+    const cookie = await claim(container)
+
+    const reset = await container.exec([
+      'node',
+      'dist/server/cli-main.js',
+      'reset-password',
+      'the-recovered-password',
+    ])
+
+    expect(JSON.parse(reset.stdout)).toEqual({ passwordReset: true, sessionsRevoked: 1 })
+    expect((await container.fetch('/api/meta', { headers: { cookie } })).status).toBe(401)
+    expect((await signIn(container, OWNER_PASSWORD)).status).toBe(401)
+    expect((await signIn(container, 'the-recovered-password')).status).toBe(200)
+  })
+
+  it('recovers an installation whose setup secret was never used', async () => {
+    const { container } = await start()
+
+    await container.exec(['node', 'dist/server/cli-main.js', 'reset-password', 'the-recovered-password'])
+
+    expect((await signIn(container, 'the-recovered-password')).status).toBe(200)
+  })
+})
+
 describe('replacing the container', () => {
   it('preserves a seeded installation setting on the retained volume', async () => {
     const first = await start()
@@ -202,5 +321,26 @@ describe('replacing the container', () => {
     const shown = await container.exec(['node', 'dist/server/cli-main.js', 'show'])
 
     expect(shown.stdout.trim()).toBe('null')
+  })
+
+  it('keeps the Owner signed in, because the session is on the volume', async () => {
+    const first = await start()
+    const cookie = await claim(first.container)
+    await retire(first.container)
+
+    const second = await start({ volume: first.volume })
+
+    expect((await second.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
+  })
+
+  it('does not ask the Owner to claim it again', async () => {
+    const first = await start()
+    await claim(first.container)
+    await retire(first.container)
+
+    const second = await start({ volume: first.volume })
+
+    const status = await second.container.fetch('/api/auth/status')
+    expect(authStatusSchema.parse(await status.json())).toEqual({ claimed: true, authenticated: false })
   })
 })

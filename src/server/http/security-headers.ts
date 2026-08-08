@@ -21,10 +21,21 @@ const CONTENT_SECURITY_POLICY = [
   "form-action 'self'",
 ].join('; ')
 
+/**
+ * One year, and safe to send unconditionally: browsers ignore the header on
+ * plain HTTP, so local development is unaffected while the deployed
+ * installation stops being reachable over a downgradable connection.
+ *
+ * No `preload` — that is a submission to a browser-vendor list, which is not
+ * this service's decision to make on an Owner's domain.
+ */
+const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
+
 export function securityHeaders(): MiddlewareHandler {
   return async (c, next) => {
     await next()
     c.header('Content-Security-Policy', CONTENT_SECURITY_POLICY)
+    c.header('Strict-Transport-Security', STRICT_TRANSPORT_SECURITY)
     c.header('X-Content-Type-Options', 'nosniff')
     c.header('Referrer-Policy', 'no-referrer')
     c.header('Cross-Origin-Opener-Policy', 'same-origin')

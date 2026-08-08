@@ -8,6 +8,14 @@ The domain of a calm, single-owner RSS reader that collects recent entries witho
 The single person who controls an installation and accesses it from their devices.
 _Avoid_: User, account, tenant
 
+**Setup Secret**:
+The random value the deployment is configured with, which lets the first visitor become the Owner. It is spent once: claiming the installation disables setup permanently.
+_Avoid_: Invite code, admin token, registration key
+
+**Session**:
+One of the Owner's signed-in devices, held as an opaque token whose hash alone is stored. Sessions are independent, so a phone and a laptop do not displace each other.
+_Avoid_: Login, token, credential
+
 **Feed**:
 An external RSS or Atom source that publishes entries.
 _Avoid_: Channel, source

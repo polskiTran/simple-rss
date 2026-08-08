@@ -1,9 +1,22 @@
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { runCli, type CliContext } from '../../src/server/cli.js'
+import { OwnerAuthStore } from '../../src/server/auth/owner-auth.js'
+import { argon2idHasher } from '../../src/server/auth/password.js'
+import { SessionStore } from '../../src/server/auth/sessions.js'
+import { runCli, NEW_PASSWORD_VARIABLE, type CliContext } from '../../src/server/cli.js'
 import { loadConfig } from '../../src/server/config.js'
+import { createLogger, type Logger } from '../../src/server/logger.js'
+import { openDatabase } from '../../src/server/persistence/database.js'
+import { applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
+
+const ALL_VERSIONS = migrations.map((migration) => migration.version)
+
+/** Keeps the audit records the reset writes out of the test runner's output. */
+function discardingLogger(): Logger {
+  return createLogger({ level: 'error', sink: () => {} })
+}
 
 describe('runCli', () => {
   let context: CliContext
@@ -17,34 +30,35 @@ describe('runCli', () => {
       config: loadConfig({ DATA_DIR: dataDir }),
       clock: new ManualClock('2026-08-08T09:00:00.000Z'),
       out: (line) => output.push(line),
+      logger: discardingLogger(),
     }
   })
 
-  it('migrates a fresh volume', () => {
-    expect(runCli(['migrate'], context)).toBe(0)
+  it('migrates a fresh volume', async () => {
+    expect(await runCli(['migrate'], context)).toBe(0)
 
-    expect(JSON.parse(output[0]!)).toEqual({ applied: [1], versions: [1] })
+    expect(JSON.parse(output[0]!)).toEqual({ applied: ALL_VERSIONS, versions: ALL_VERSIONS })
   })
 
-  it('applies nothing on a volume that is already migrated', () => {
-    runCli(['migrate'], context)
+  it('applies nothing on a volume that is already migrated', async () => {
+    await runCli(['migrate'], context)
     output.length = 0
 
-    runCli(['migrate'], context)
+    await runCli(['migrate'], context)
 
-    expect(JSON.parse(output[0]!)).toEqual({ applied: [], versions: [1] })
+    expect(JSON.parse(output[0]!)).toEqual({ applied: [], versions: ALL_VERSIONS })
   })
 
-  it('reports an unseeded installation as null rather than failing', () => {
-    runCli(['migrate'], context)
+  it('reports an unseeded installation as null rather than failing', async () => {
+    await runCli(['migrate'], context)
     output.length = 0
 
-    expect(runCli(['show'], context)).toBe(0)
+    expect(await runCli(['show'], context)).toBe(0)
     expect(JSON.parse(output[0]!)).toBeNull()
   })
 
-  it('seeds the installation timezone', () => {
-    expect(runCli(['set-timezone', 'Europe/Berlin'], context)).toBe(0)
+  it('seeds the installation timezone', async () => {
+    expect(await runCli(['set-timezone', 'Europe/Berlin'], context)).toBe(0)
 
     expect(JSON.parse(output[0]!)).toEqual({
       timezone: 'Europe/Berlin',
@@ -53,36 +67,141 @@ describe('runCli', () => {
     })
   })
 
-  it('reads back a seeded timezone from the same volume', () => {
-    runCli(['set-timezone', 'Europe/Berlin'], context)
+  it('reads back a seeded timezone from the same volume', async () => {
+    await runCli(['set-timezone', 'Europe/Berlin'], context)
     output.length = 0
 
-    runCli(['show'], context)
+    await runCli(['show'], context)
 
     expect(JSON.parse(output[0]!).timezone).toBe('Europe/Berlin')
   })
 
-  it('writes to the database inside the configured data directory', () => {
-    runCli(['set-timezone', 'Europe/Berlin'], context)
+  it('writes to the database inside the configured data directory', async () => {
+    await runCli(['set-timezone', 'Europe/Berlin'], context)
 
     expect(context.config.databasePath).toBe(join(dataDir, 'simple-rss.db'))
   })
 
-  it('rejects set-timezone without an argument', () => {
-    expect(runCli(['set-timezone'], context)).toBe(1)
+  it('rejects set-timezone without an argument', async () => {
+    expect(await runCli(['set-timezone'], context)).toBe(1)
   })
 
-  it('rejects a timezone the platform cannot resolve', () => {
-    expect(() => runCli(['set-timezone', 'Mars/Olympus_Mons'], context)).toThrow(/timezone/i)
+  it('rejects a timezone the platform cannot resolve', async () => {
+    await expect(runCli(['set-timezone', 'Mars/Olympus_Mons'], context)).rejects.toThrow(/timezone/i)
   })
 
-  it('reports an unknown command with usage', () => {
-    expect(runCli(['frobnicate'], context)).toBe(1)
+  it('reports an unknown command with usage', async () => {
+    expect(await runCli(['frobnicate'], context)).toBe(1)
     expect(output.join('\n')).toContain('set-timezone')
   })
 
-  it('prints usage and fails when given no command', () => {
-    expect(runCli([], context)).toBe(1)
+  it('prints usage and fails when given no command', async () => {
+    expect(await runCli([], context)).toBe(1)
     expect(output.join('\n')).toContain('migrate')
+  })
+})
+
+/**
+ * Emergency recovery, which by design needs no email, no OAuth, no security
+ * question, and no second Owner — only the mounted volume and a shell.
+ */
+describe('runCli reset-password', () => {
+  let context: CliContext
+  let output: string[]
+  let dataDir: string
+
+  /** Reads the volume the way the running service would, after the CLI exits. */
+  function inspect<T>(read: (stores: { owner: OwnerAuthStore; sessions: SessionStore }) => T): T {
+    const db = openDatabase(join(dataDir, 'simple-rss.db'))
+    try {
+      applyMigrations(db)
+      return read({ owner: new OwnerAuthStore(db), sessions: new SessionStore(db) })
+    } finally {
+      db.close()
+    }
+  }
+
+  beforeEach(async () => {
+    dataDir = await makeTempDataDir()
+    output = []
+    context = {
+      config: loadConfig({ DATA_DIR: dataDir }),
+      clock: new ManualClock('2026-08-08T09:00:00.000Z'),
+      out: (line) => output.push(line),
+      logger: discardingLogger(),
+    }
+  })
+
+  it('installs a verifier that accepts the new password', async () => {
+    expect(await runCli(['reset-password', 'a-recovered-password'], context)).toBe(0)
+
+    const record = inspect(({ owner }) => owner.read())
+    expect(await argon2idHasher().verify(record!.passwordHash, 'a-recovered-password')).toBe(true)
+  })
+
+  it('claims an installation whose setup secret was never used', async () => {
+    await runCli(['reset-password', 'a-recovered-password'], context)
+
+    expect(inspect(({ owner }) => owner.isClaimed())).toBe(true)
+  })
+
+  it('revokes every session, and says how many it ended', async () => {
+    const at = context.clock.now()
+    const issued = inspect(({ sessions }) => [sessions.issue(at), sessions.issue(at)])
+
+    await runCli(['reset-password', 'a-recovered-password'], context)
+
+    expect(JSON.parse(output[0]!)).toEqual({ passwordReset: true, sessionsRevoked: 2 })
+    expect(inspect(({ sessions }) => sessions.touch(issued[0]!.token, at))).toBe(false)
+    expect(inspect(({ sessions }) => sessions.touch(issued[1]!.token, at))).toBe(false)
+  })
+
+  it('replaces a password the Owner has forgotten, without being told it', async () => {
+    await runCli(['reset-password', 'the-original-password'], context)
+    output.length = 0
+
+    await runCli(['reset-password', 'the-recovered-password'], context)
+
+    const record = inspect(({ owner }) => owner.read())
+    expect(await argon2idHasher().verify(record!.passwordHash, 'the-recovered-password')).toBe(true)
+    expect(await argon2idHasher().verify(record!.passwordHash, 'the-original-password')).toBe(false)
+  })
+
+  it('takes the password from the environment, to keep it out of shell history', async () => {
+    const withEnv: CliContext = { ...context, env: { [NEW_PASSWORD_VARIABLE]: 'a-recovered-password' } }
+
+    expect(await runCli(['reset-password'], withEnv)).toBe(0)
+
+    const record = inspect(({ owner }) => owner.read())
+    expect(await argon2idHasher().verify(record!.passwordHash, 'a-recovered-password')).toBe(true)
+  })
+
+  it('prefers the argument over the environment when both are given', async () => {
+    const withEnv: CliContext = { ...context, env: { [NEW_PASSWORD_VARIABLE]: 'the-environment-one' } }
+
+    await runCli(['reset-password', 'the-argument-one'], withEnv)
+
+    const record = inspect(({ owner }) => owner.read())
+    expect(await argon2idHasher().verify(record!.passwordHash, 'the-argument-one')).toBe(true)
+  })
+
+  it('explains itself rather than resetting to nothing', async () => {
+    expect(await runCli(['reset-password'], context)).toBe(1)
+
+    expect(output.join('\n')).toContain(NEW_PASSWORD_VARIABLE)
+    expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
+  })
+
+  it('holds a recovered password to the same length rule as a chosen one', async () => {
+    expect(await runCli(['reset-password', 'short'], context)).toBe(1)
+
+    expect(output.join('\n')).toMatch(/at least 12 characters/)
+    expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
+  })
+
+  it('is listed in the usage an operator sees', async () => {
+    await runCli([], context)
+
+    expect(output.join('\n')).toContain('reset-password')
   })
 })

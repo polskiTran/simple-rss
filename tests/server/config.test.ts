@@ -46,4 +46,22 @@ describe('loadConfig', () => {
     expect(loadConfig({}).shutdownGraceMs).toBe(10_000)
     expect(loadConfig({ SHUTDOWN_GRACE_MS: '2500' }).shutdownGraceMs).toBe(2500)
   })
+
+  it('carries the setup secret through without judging its strength', () => {
+    expect(loadConfig({ SETUP_SECRET: 'a-deployment-setup-secret' }).setupSecret).toBe('a-deployment-setup-secret')
+  })
+
+  it('starts without a setup secret, because readiness reports that better than a crash loop', () => {
+    expect(loadConfig({}).setupSecret).toBeUndefined()
+    expect(loadConfig({ SETUP_SECRET: '' }).setupSecret).toBeUndefined()
+  })
+
+  it('believes forwarding headers by default, since the documented deployment is behind a proxy', () => {
+    expect(loadConfig({}).trustProxyHeaders).toBe(true)
+    expect(loadConfig({ TRUST_PROXY_HEADERS: 'false' }).trustProxyHeaders).toBe(false)
+  })
+
+  it('rejects an unrecognised forwarding setting rather than guessing which way it meant', () => {
+    expect(() => loadConfig({ TRUST_PROXY_HEADERS: 'yes' })).toThrow(/TRUST_PROXY_HEADERS/)
+  })
 })

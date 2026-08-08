@@ -88,7 +88,9 @@ describe('the narrow layout', () => {
     expect(narrow).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*19px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*gap:\s*18px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12px/)
-    expect(narrow).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
+    // Both columns are released together: below the breakpoint the content
+    // measure and the authentication forms are the full width of the paper.
+    expect(narrow).toMatch(/\.measure,\s*\n\s*\.gate\s*\{[^}]*max-width:\s*none/)
   })
 })
 
@@ -99,10 +101,47 @@ describe('layout', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
   })
 
-  it('draws no cards or boxes — separation is whitespace', () => {
+  it('draws no cards or boxes — every rule in the system is an underline', () => {
     expect(css).not.toMatch(/box-shadow|border-radius/)
-    // The search field's underline is the one rule in the system, and it is
-    // not built yet; any other visible border would be a card sneaking in.
-    expect(css.match(/border[a-z-]*:\s*[^;]+/g) ?? []).toEqual(['border: 0'])
+
+    // An underline is the one rule `docs/DESIGN.md` allows, taken from the
+    // search field. A border on any other edge would be a card sneaking in.
+    const borders = css.match(/border[a-z-]*:\s*[^;]+/g) ?? []
+    const boxes = borders.filter((rule) => rule !== 'border: 0' && !rule.startsWith('border-bottom:'))
+
+    expect(boxes).toEqual([])
+  })
+
+  it('binds the hairline to the documented 15% ink', () => {
+    expect(lightOnly()).toContain('--color-hairline: rgb(18 17 15 / 0.15)')
+  })
+
+  it('replaces the browser focus ring rather than removing it', () => {
+    const suppressions = css.match(/outline:\s*none/g) ?? []
+    const focusRules = css.match(/:focus-visible[^{]*\{[^}]*\}/g) ?? []
+
+    // Every `outline: none` must sit inside a `:focus-visible` block that
+    // draws something in its place — minimalism is not a reason to make the
+    // keyboard invisible.
+    expect(focusRules).toHaveLength(2)
+    expect(suppressions).toHaveLength(2)
+    expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-ink\)/)
+    expect(focusRules.join('\n')).toMatch(/text-decoration: underline/)
+  })
+})
+
+describe('the authentication screens', () => {
+  it('leaves the reading scale for the sheet scale, as Settings does', () => {
+    expect(lightOnly()).toMatch(/\.field-input\s*\{[^}]*font-size:\s*14px/)
+    expect(lightOnly()).toMatch(/\.field-label\s*\{[^}]*font-size:\s*13px/)
+    expect(lightOnly()).toMatch(/\.text-button\s*\{[^}]*font-size:\s*13px/)
+  })
+
+  it('draws the text cursor in the accent, which is one of its two uses', () => {
+    expect(lightOnly()).toMatch(/\.field-input\s*\{[^}]*caret-color:\s*var\(--color-accent\)/)
+  })
+
+  it('keeps affordances as words rather than filled controls', () => {
+    expect(lightOnly()).toMatch(/\.text-button\s*\{[^}]*background:\s*none/)
   })
 })

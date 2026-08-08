@@ -59,6 +59,11 @@ export interface StartOptions {
   readonly env?: Record<string, string>
   /** Container port to publish; matches PORT when that is overridden. */
   readonly port?: number
+  /**
+   * Whether to wait for readiness before returning. False for the cases that
+   * are *about* readiness staying closed, which would otherwise time out.
+   */
+  readonly waitForReadiness?: boolean
 }
 
 /**
@@ -111,25 +116,40 @@ export async function startContainer(options: StartOptions): Promise<Container> 
     },
   }
 
-  await waitForReady(container)
+  if (options.waitForReadiness ?? true) await waitForReady(container)
+  else await waitForLiveness(container)
+
   return container
+}
+
+/** Waits until the process answers at all, whatever readiness says. */
+export async function waitForLiveness(container: Container, timeoutMs = 60_000): Promise<void> {
+  await waitFor(container, timeoutMs, '/health/live', (response) => response.ok)
 }
 
 /** Polls readiness the way a platform health check does. */
 export async function waitForReady(container: Container, timeoutMs = 60_000): Promise<void> {
+  await waitFor(container, timeoutMs, '/health/ready', (response) => response.ok)
+}
+
+async function waitFor(
+  container: Container,
+  timeoutMs: number,
+  path: string,
+  accept: (response: Response) => boolean,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs
 
   while (Date.now() < deadline) {
     try {
-      const response = await container.fetch('/health/ready')
-      if (response.ok) return
+      if (accept(await container.fetch(path))) return
     } catch {
       // Container is still binding its port.
     }
     await new Promise((resolve) => setTimeout(resolve, 200))
   }
 
-  throw new Error(`container ${container.name} never became ready:\n${await container.logs()}`)
+  throw new Error(`container ${container.name} never answered ${path}:\n${await container.logs()}`)
 }
 
 /** Parses the container's structured stdout into records. */

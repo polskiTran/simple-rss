@@ -38,6 +38,38 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    name: 'owner-authentication',
+    sql: `
+      -- The Owner's single password verifier. One row, like the installation
+      -- it belongs to: its presence is what "claimed" means, so the CHECK is
+      -- what makes a second Owner unrepresentable rather than merely refused.
+      CREATE TABLE owner_auth (
+        id            INTEGER PRIMARY KEY CHECK (id = 1),
+        password_hash TEXT    NOT NULL,
+        claimed_at    TEXT    NOT NULL,
+        updated_at    TEXT    NOT NULL
+      );
+
+      -- One row per signed-in device. The token itself is never stored: the
+      -- primary key is its SHA-256, so a copy of the volume does not hand
+      -- anyone a working cookie.
+      --
+      -- Two deadlines, both absolute instants: last_seen_at moves forward as
+      -- the device is used and drives the idle timeout, while expires_at is
+      -- fixed at issue and cannot be extended by using the session.
+      CREATE TABLE sessions (
+        token_hash   TEXT PRIMARY KEY,
+        created_at   TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        expires_at   TEXT NOT NULL
+      );
+
+      -- Pruning sweeps by deadline, so it must not scan every row.
+      CREATE INDEX sessions_expires_at ON sessions (expires_at);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

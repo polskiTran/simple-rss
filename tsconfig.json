@@ -18,5 +18,12 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "vitest.smoke.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.smoke.config.ts",
+    "playwright.config.ts"
+  ]
 }

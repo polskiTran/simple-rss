@@ -19,3 +19,23 @@ export const installationSettings = sqliteTable(
   },
   (table) => [check('installation_settings_singleton', sql`${table.id} = 1`)],
 )
+
+/** The Owner's Argon2id verifier. Its existence is what "claimed" means. */
+export const ownerAuth = sqliteTable(
+  'owner_auth',
+  {
+    id: integer('id').primaryKey(),
+    passwordHash: text('password_hash').notNull(),
+    claimedAt: text('claimed_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [check('owner_auth_singleton', sql`${table.id} = 1`)],
+)
+
+/** One signed-in device, keyed by the hash of the token it presents. */
+export const sessions = sqliteTable('sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  createdAt: text('created_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+})

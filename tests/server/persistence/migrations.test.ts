@@ -109,4 +109,37 @@ describe('migrations', () => {
     ).toThrow()
     db.close()
   })
+
+  it('creates the owner_auth singleton table', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(db)
+
+    const columns = (db.pragma('table_info(owner_auth)') as Array<{ name: string }>).map((column) => column.name)
+
+    expect(columns).toEqual(expect.arrayContaining(['id', 'password_hash', 'claimed_at', 'updated_at']))
+    db.close()
+  })
+
+  it('makes a second Owner unrepresentable rather than merely refused', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(db)
+    const insert = db.prepare('INSERT INTO owner_auth (id, password_hash, claimed_at, updated_at) VALUES (?, ?, ?, ?)')
+
+    insert.run(1, '$argon2id$first', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+
+    expect(() => insert.run(2, '$argon2id$second', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')).toThrow()
+    db.close()
+  })
+
+  it('creates the sessions table with an index the expiry sweep can use', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(db)
+
+    const columns = (db.pragma('table_info(sessions)') as Array<{ name: string }>).map((column) => column.name)
+    const indexes = (db.pragma('index_list(sessions)') as Array<{ name: string }>).map((index) => index.name)
+
+    expect(columns).toEqual(['token_hash', 'created_at', 'last_seen_at', 'expires_at'])
+    expect(indexes).toContain('sessions_expires_at')
+    db.close()
+  })
 })

@@ -1,11 +1,15 @@
 import { Hono } from 'hono'
 import type { Liveness, Readiness as ReadinessBody, ServiceMeta } from '../shared/api.js'
 import { VERSION } from '../shared/version.js'
+import type { Authentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
 import type { Logger } from './logger.js'
 import { assertWritable, type SqliteDatabase } from './persistence/database.js'
 import type { Readiness } from './readiness.js'
+import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
+import { requireSession } from './http/require-session.js'
+import { sameOrigin } from './http/same-origin.js'
 import { securityHeaders } from './http/security-headers.js'
 import { staticAssets } from './http/static-assets.js'
 import type { HttpClient } from './upstream/http-client.js'
@@ -20,6 +24,8 @@ export interface AppDependencies {
    * rather than the process crash-looping past the operator.
    */
   readonly database: () => SqliteDatabase | undefined
+  /** Absent for the same reason the database is. */
+  readonly authentication: () => Authentication | undefined
   /** Unused until Feed retrieval lands; wired now so the seam exists. */
   readonly httpClient: HttpClient
 }
@@ -27,7 +33,8 @@ export interface AppDependencies {
 /**
  * The whole HTTP surface: health, the JSON API, and the built client, in one
  * process. Route order is the contract — `/health` and `/api` are matched
- * before the client fallback, so they can never return HTML.
+ * before the client fallback, so they can never return HTML, and the two
+ * `/api` guards are registered before any route they protect.
  */
 export function createApp(deps: AppDependencies): Hono {
   const app = new Hono()
@@ -35,6 +42,8 @@ export function createApp(deps: AppDependencies): Hono {
   app.use('*', securityHeaders())
   app.use('*', requestLogging(deps.logger))
 
+  // Health answers before the guards, because a platform probe holds no
+  // session and must still be able to see why an installation is unready.
   app.get('/health/live', (c) => c.json<Liveness>({ status: 'live' }))
 
   app.get('/health/ready', (c) => {
@@ -43,6 +52,24 @@ export function createApp(deps: AppDependencies): Hono {
       ? c.json<ReadinessBody>({ status: 'unready', reason: failure }, 503)
       : c.json<ReadinessBody>({ status: 'ready' })
   })
+
+  app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
+  app.use(
+    '/api/*',
+    requireSession({
+      authentication: deps.authentication,
+      isPublic: (path) => PUBLIC_API_PATHS.has(path),
+    }),
+  )
+
+  app.route(
+    '/api/auth',
+    authRoutes({
+      authentication: deps.authentication,
+      clock: deps.clock,
+      trustProxyHeaders: deps.config.trustProxyHeaders,
+    }),
+  )
 
   app.get('/api/meta', (c) => c.json<ServiceMeta>({ name: 'simple-rss', version: VERSION }))
 
@@ -66,6 +93,10 @@ export function createApp(deps: AppDependencies): Hono {
  * The reason readiness is closed, or `undefined` when the service can take
  * traffic. Startup state is checked first, then the volume, because a
  * mounted-but-full disk only reveals itself on a real write.
+ *
+ * The setup secret is checked last because it needs the database to know
+ * whether it is still required, and it is checked at all because an unclaimed
+ * installation with no way to claim it can serve nothing but a dead end.
  */
 function readinessFailure(deps: AppDependencies): string | undefined {
   const state = deps.readiness.state
@@ -81,7 +112,11 @@ function readinessFailure(deps: AppDependencies): string | undefined {
     deps.logger.error('readiness.write_probe_failed', { error })
     return 'database is not writable'
   }
-  return undefined
+
+  const authentication = deps.authentication()
+  if (!authentication) return 'authentication is not available'
+
+  return authentication.setupBlocker()
 }
 
 /**

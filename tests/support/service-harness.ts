@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { afterEach } from 'vitest'
+import type { Authentication } from '../../src/server/auth/authentication.js'
 import { DATABASE_FILE, loadConfig, type Config } from '../../src/server/config.js'
 import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { SqliteDatabase } from '../../src/server/persistence/database.js'
@@ -8,6 +9,12 @@ import { startService, type RunningService } from '../../src/server/server.js'
 import { ManualClock } from './manual-clock.js'
 import { makeTempDataDir } from './temp-dir.js'
 import { UpstreamFixtures } from './upstream-fixtures.js'
+
+/** The setup secret a test installation is deployed with. */
+export const SETUP_SECRET = 'a-deployment-setup-secret'
+
+/** The password the Owner picks when a test claims an installation. */
+export const OWNER_PASSWORD = 'a-calm-reading-password'
 
 export interface HarnessOptions {
   /** Reuse an existing data directory, e.g. to model a container replacement. */
@@ -27,10 +34,16 @@ export interface TestService {
   readonly clock: ManualClock
   readonly upstream: UpstreamFixtures
   readonly settings: InstallationSettingsStore | undefined
+  readonly authentication: Authentication | undefined
   /** The live connection, for assertions SQL states better than HTTP does. */
   readonly database: SqliteDatabase | undefined
   /** Every structured log record the service wrote. */
   readonly logs: readonly LogRecord[]
+  /**
+   * Every progressive login delay the service asked for, in order. Nothing
+   * actually waited, so rate-limit tests assert on this instead of the clock.
+   */
+  readonly sleeps: readonly number[]
   /** Same-origin request against the running service; `path` starts with `/`. */
   fetch(path: string, init?: RequestInit): Promise<Response>
   /**
@@ -56,11 +69,16 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
   const clock = options.clock ?? new ManualClock()
   const upstream = options.upstream ?? new UpstreamFixtures()
   const logs: LogRecord[] = []
+  const sleeps: number[] = []
 
   const config = loadConfig({
     DATA_DIR: dataDir,
     LOG_LEVEL: 'debug',
     SHUTDOWN_GRACE_MS: '2000',
+    SETUP_SECRET,
+    // Test requests arrive on a real loopback socket rather than through a
+    // proxy, so the forwarding header is only believed where a test sets it.
+    TRUST_PROXY_HEADERS: 'true',
     ...(options.clientDir ? { CLIENT_DIR: options.clientDir } : {}),
     ...options.env,
   })
@@ -73,6 +91,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       port: 0,
       clock,
       httpClient: upstream.client,
+      sleep: async (milliseconds) => void sleeps.push(milliseconds),
       logger: createLogger({
         level: config.logLevel,
         now: () => clock.now(),
@@ -98,10 +117,14 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     get settings() {
       return service.settings
     },
+    get authentication() {
+      return service.authentication
+    },
     get database() {
       return service.database
     },
     logs,
+    sleeps,
     fetch: (path, init) => fetch(new URL(path, service.url), init),
     async restart() {
       await service.stop()

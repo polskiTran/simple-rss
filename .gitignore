@@ -4,6 +4,12 @@ agent-traces/
 # playwright mcp
 .playwright-mcp
 
+# playwright test output
+test-results
+playwright-report
+blob-report
+.playwright/.cache
+
 # Logs
 logs
 *.log

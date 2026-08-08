@@ -178,6 +178,107 @@
     font-size: 14px;
     color: var(--color-body);
   }
+
+  /* Setup, sign-in, and the password change. They share the sheet's 13/14px
+     scale rather than the 21px item shape, for the same reason Settings does:
+     these are not something to read. */
+  /* `docs/DESIGN.md` does not draw these screens, so the two values it does
+     not give are taken from ones it does: the gap is the sheet's 24px column
+     gap, and the width is half the 620px measure — a password is not prose and
+     should not run the width of an article. */
+  .gate {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 310px;
+  }
+
+  .gate .empty-note {
+    margin: 0;
+  }
+
+  /* Whitespace is the only separator the system has, so the password form
+     needs enough of it not to read as another row of the sheet. */
+  .sheet + .gate {
+    margin-top: 32px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .field-label {
+    font-size: 13px;
+    line-height: 1;
+    color: var(--color-meta);
+  }
+
+  /* The underline is `docs/DESIGN.md`'s one rule in the system, borrowed from
+     the search field. Nothing else here draws an edge. */
+  .field-input {
+    border: 0;
+    border-bottom: 1px solid var(--color-hairline);
+    background: none;
+    padding: 0 0 6px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--color-ink);
+    caret-color: var(--color-accent);
+  }
+
+  /* The browser's default ring is a box, and this system has none. Focus is
+     drawn in the language the field already speaks: the underline goes from
+     the 15% hairline to full ink and doubles in weight. Padding absorbs the
+     extra pixel so nothing below it moves. */
+  .field-input:focus-visible {
+    outline: none;
+    border-bottom: 2px solid var(--color-ink);
+    padding-bottom: 5px;
+  }
+
+  .gate-actions {
+    margin: 0;
+  }
+
+  /* Affordances are words, like `save` in the item row — never a filled box. */
+  .text-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--color-ink-strong);
+    cursor: pointer;
+  }
+
+  .text-button:disabled {
+    color: var(--color-quiet);
+    cursor: default;
+  }
+
+  /* A word cannot take an underline the way a field can, so it takes one of
+     its own — still a rule under text rather than a box around it. */
+  .text-button:focus-visible,
+  .tab:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  /* What went wrong, in the quietest grey the system has. An empty notice
+     still occupies its line, so answering a form does not shift it. */
+  .notice {
+    margin: 0;
+    min-height: 1.6em;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--color-quiet);
+  }
 }
 
 /* The single breakpoint. `docs/DESIGN.md` designs the narrow layout at 390px;
@@ -188,7 +289,9 @@
     padding: 28px 24px 0;
   }
 
-  .measure {
+  /* Both released together: below the breakpoint every column is the paper. */
+  .measure,
+  .gate {
     max-width: none;
   }
 
@@ -206,6 +309,10 @@
   }
 
   .empty-note {
+    font-size: 12px;
+  }
+
+  .notice {
     font-size: 12px;
   }
 }
