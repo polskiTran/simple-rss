@@ -139,7 +139,9 @@ describe('the resting state', () => {
   ])('gives %s a single calm line', async (path, note) => {
     await renderAt(path)
 
-    expect(screen.getByText(note)).toBeDefined()
+    // The note appears once the section's own fetch settles, which the
+    // navigation landmark `renderAt` waits for does not guarantee.
+    expect(await screen.findByText(note)).toBeDefined()
   })
 
   it('has no unread counter anywhere in the shell', async () => {
