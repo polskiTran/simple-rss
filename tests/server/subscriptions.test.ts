@@ -50,6 +50,13 @@ describe('Subscriptions', () => {
       },
       importedItems: 1,
     })
+    expect(service.logs).toContainEqual(
+      expect.objectContaining({
+        message: 'subscriptions.subscription_created',
+        enteredUrl: ENTERED_URL,
+        resolvedUrl: RESOLVED_URL,
+      }),
+    )
 
     const feeds = await owner.get('/api/feeds')
     expect(feeds.status).toBe(200)
@@ -128,6 +135,10 @@ describe('Subscriptions', () => {
     const unreachable = await owner.post('/api/subscriptions', { url: 'https://missing.example/feed' })
     expect(unreachable.status).toBe(502)
     expect(await unreachable.json()).toMatchObject({ error: { code: 'feed_unreachable' } })
+
+    const unresolvable = await owner.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })
+    expect(unresolvable.status).toBe(502)
+    expect(await unresolvable.json()).toMatchObject({ error: { code: 'feed_unreachable' } })
 
     service.upstream.stub('https://wrong.example/feed', {
       headers: { 'content-type': 'text/html' },
@@ -217,7 +228,7 @@ describe('Subscriptions', () => {
         <rss version="2.0"><channel><title>Corrections, revised</title>
           <item><guid>stable</guid><title>corrected GUID title</title><pubDate>Fri, 08 Aug 2026 06:30:00 GMT</pubDate></item>
           <item><title>corrected link title</title><link>https://journal.example/shared#new</link><pubDate>Fri, 08 Aug 2026 05:30:00 GMT</pubDate></item>
-          <item><title>fingerprint</title><description>same body</description><pubDate>Fri, 08 Aug 2026 04:00:00 GMT</pubDate></item>
+          <item><title>fingerprint</title><description>corrected body</description><pubDate>Fri, 08 Aug 2026 04:00:00 GMT</pubDate></item>
         </channel></rss>`,
     })
 
@@ -237,6 +248,9 @@ describe('Subscriptions', () => {
       'corrected link title',
       'fingerprint',
     ])
+    // A corrected summary must update the fingerprint-identified item in
+    // place, never mint a second Feed Item under a new identity.
+    expect(digest.groups[0].items[2]).toMatchObject({ title: 'fingerprint', summary: 'corrected body' })
     const persisted = service.database
       ?.prepare('SELECT first_seen_at FROM feed_items ORDER BY id')
       .all() as Array<{ first_seen_at: string }>

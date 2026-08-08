@@ -91,12 +91,12 @@ export function FeedsView() {
 }
 
 function SubscriptionList({ state }: { state: SubscriptionState }) {
-  if (state.kind === 'loading') return <p className="empty-note feed-list-state">loading feeds</p>
-  if (state.kind === 'unavailable') return <p className="empty-note feed-list-state">feeds are unavailable</p>
-  if (state.subscriptions.length === 0) return <p className="empty-note feed-list-state">no subscriptions yet</p>
+  if (state.kind === 'loading') return <p className="empty-note subscription-list-state">loading feeds</p>
+  if (state.kind === 'unavailable') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
+  if (state.subscriptions.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
 
   return (
-    <div className="content-list feed-list" aria-label="Subscriptions">
+    <div className="content-list subscription-list" aria-label="Subscriptions">
       {state.subscriptions.map((subscription) => (
         <article className="content-item feed-row" key={subscription.feedId}>
           <div className="feed-row-main">
@@ -131,24 +131,17 @@ function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
+const SUBSCRIPTION_FAILURE_COPY: Readonly<Record<string, string>> = {
+  duplicate_subscription: 'already subscribed',
+  invalid_feed_url: 'enter an exact RSS or Atom URL',
+  feed_too_large: 'that Feed is larger than 2 MiB',
+  unsupported_feed: 'that URL does not return supported RSS or Atom',
+  malformed_feed: 'that Feed contains malformed XML',
+  feed_timeout: 'that Feed took too long to respond',
+  feed_unreachable: 'that Feed could not be reached',
+}
+
 function subscriptionFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return 'the Feed could not be reached'
-  switch (error.code) {
-    case 'duplicate_subscription':
-      return 'already subscribed'
-    case 'invalid_feed_url':
-      return 'enter an exact, reachable RSS or Atom URL'
-    case 'feed_too_large':
-      return 'that Feed is larger than 2 MiB'
-    case 'unsupported_feed':
-      return 'that URL does not return supported RSS or Atom'
-    case 'malformed_feed':
-      return 'that Feed contains malformed XML'
-    case 'feed_timeout':
-      return 'that Feed took too long to respond'
-    case 'feed_unreachable':
-      return 'that Feed could not be reached'
-    default:
-      return 'that Feed could not be added'
-  }
+  return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
 }

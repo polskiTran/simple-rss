@@ -76,7 +76,7 @@ export function createService(options: ServiceOptions): Service {
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    subscriptions = new SubscriptionService({ database, retrieval, clock, settings })
+    subscriptions = new SubscriptionService({ database, retrieval, clock, settings, logger })
     refresh = new FeedRefresh({ clock, subscriptions })
 
     digest = new DigestService({ database, clock, settings })

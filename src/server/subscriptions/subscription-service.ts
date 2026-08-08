@@ -1,25 +1,18 @@
-import { eq, type ExtractTablesWithRelations } from 'drizzle-orm'
-import {
-  drizzle,
-  type BetterSQLite3Database,
-  type BetterSQLiteTransaction,
-} from 'drizzle-orm/better-sqlite3'
+import { eq } from 'drizzle-orm'
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { SubscriptionSummary } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey } from '../digest/digest-service.js'
+import { chronologyTime, dateKey } from '../digest/chronology.js'
 import {
   FeedDocumentError,
   parseFeedDocument,
-  type NormalizedFeedItem,
-  type ParsedFeedDocument,
 } from '../ingestion/feed-document.js'
+import { persistFeedWindow, upsertFeedItem } from '../ingestion/feed-window.js'
+import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
-
-type EmptySchema = Record<string, never>
-type DatabaseTransaction = BetterSQLiteTransaction<EmptySchema, ExtractTablesWithRelations<EmptySchema>>
 
 export type CreateSubscriptionOutcome =
   | { readonly kind: 'created'; readonly subscription: SubscriptionSummary; readonly importedItems: number }
@@ -42,22 +35,34 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
+/** The one shape every Feed lookup selects, mirrored by `FeedRecord`. */
+const FEED_RECORD_COLUMNS = {
+  feedId: feeds.id,
+  title: feeds.title,
+  domain: feeds.domain,
+  enteredUrl: feeds.enteredUrl,
+  resolvedUrl: feeds.resolvedUrl,
+}
+
 export class SubscriptionService {
   readonly #db: BetterSQLite3Database
   readonly #retrieval: Retrieval
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
+  readonly #logger: Logger
 
   constructor(options: {
     database: SqliteDatabase
     retrieval: Retrieval
     clock: Clock
     settings: InstallationSettingsStore
+    logger: Logger
   }) {
     this.#db = drizzle(options.database)
     this.#retrieval = options.retrieval
     this.#clock = options.clock
     this.#settings = options.settings
+    this.#logger = options.logger.child({ component: 'subscriptions' })
   }
 
   async create(enteredUrl: string): Promise<CreateSubscriptionOutcome> {
@@ -105,7 +110,7 @@ export class SubscriptionService {
           .values({ feedId, pollingIntervalMinutes: 120, createdAt: now })
           .run()
 
-        for (const item of parsed.items) this.#upsertItem(tx, feedId, item, now)
+        for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)
         return { feedId, title: parsed.title, domain, enteredUrl, resolvedUrl: retrieved.url }
       })
     } catch (error) {
@@ -114,11 +119,14 @@ export class SubscriptionService {
       throw error
     }
 
-    return {
-      kind: 'created',
-      subscription: this.#withCadence(created),
-      importedItems: new Set(parsed.items.map((item) => item.dedupeKey)).size,
-    }
+    const importedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
+    this.#logger.info('subscriptions.subscription_created', {
+      feedId: created.feedId,
+      enteredUrl: loggableUrl(enteredUrl),
+      resolvedUrl: loggableUrl(retrieved.url),
+      importedItems,
+    })
+    return { kind: 'created', subscription: this.#withCadence(created), importedItems }
   }
 
   async ingest(feedId: number): Promise<IngestFeedOutcome> {
@@ -136,40 +144,25 @@ export class SubscriptionService {
       throw error
     }
 
-    this.#persistWindow(feedId, parsed, retrieved.url, this.#clock.now().toISOString())
-    return { kind: 'updated', observedItems: new Set(parsed.items.map((item) => item.dedupeKey)).size }
-  }
-
-
-  #persistWindow(feedId: number, parsed: ParsedFeedDocument, resolvedUrl: string, now: string): void {
-    const domain = new URL(resolvedUrl).hostname
-    this.#db.transaction((tx) => {
-      const alias = tx
-        .select({ feedId: feedUrlAliases.feedId })
-        .from(feedUrlAliases)
-        .where(eq(feedUrlAliases.url, resolvedUrl))
-        .limit(1)
-        .all()[0]
-      if (alias && alias.feedId !== feedId) throw new Error('Resolved Feed URL belongs to another Feed')
-
-      tx.insert(feedUrlAliases).values({ url: resolvedUrl, feedId }).onConflictDoNothing().run()
-      tx.update(feeds)
-        .set({ title: parsed.title, domain, resolvedUrl, updatedAt: now })
-        .where(eq(feeds.id, feedId))
-        .run()
-      for (const item of parsed.items) this.#upsertItem(tx, feedId, item, now)
+    persistFeedWindow(this.#db, {
+      feedId,
+      parsed,
+      resolvedUrl: retrieved.url,
+      now: this.#clock.now().toISOString(),
     })
+    const observedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
+    this.#logger.info('subscriptions.feed_window_ingested', {
+      feedId,
+      enteredUrl: loggableUrl(feed.enteredUrl),
+      resolvedUrl: loggableUrl(retrieved.url),
+      observedItems,
+    })
+    return { kind: 'updated', observedItems }
   }
 
   list(): readonly SubscriptionSummary[] {
     const records = this.#db
-      .select({
-        feedId: feeds.id,
-        title: feeds.title,
-        domain: feeds.domain,
-        enteredUrl: feeds.enteredUrl,
-        resolvedUrl: feeds.resolvedUrl,
-      })
+      .select(FEED_RECORD_COLUMNS)
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .orderBy(feeds.title)
@@ -184,13 +177,7 @@ export class SubscriptionService {
 
   #feedByCanonicalUrl(url: string): FeedRecord | undefined {
     return this.#db
-      .select({
-        feedId: feeds.id,
-        title: feeds.title,
-        domain: feeds.domain,
-        enteredUrl: feeds.enteredUrl,
-        resolvedUrl: feeds.resolvedUrl,
-      })
+      .select(FEED_RECORD_COLUMNS)
       .from(feedUrlAliases)
       .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
@@ -201,13 +188,7 @@ export class SubscriptionService {
 
   #feedById(feedId: number): FeedRecord | undefined {
     return this.#db
-      .select({
-        feedId: feeds.id,
-        title: feeds.title,
-        domain: feeds.domain,
-        enteredUrl: feeds.enteredUrl,
-        resolvedUrl: feeds.resolvedUrl,
-      })
+      .select(FEED_RECORD_COLUMNS)
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .where(eq(feeds.id, feedId))
@@ -228,14 +209,12 @@ export class SubscriptionService {
     }
 
     const cadence = new Map<number, number[]>()
-    const futureLimit = now.getTime() + 24 * 60 * 60 * 1_000
     const rows = this.#db
       .select({ feedId: feedItems.feedId, publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
       .from(feedItems)
       .all()
     for (const row of rows) {
-      const published = row.publishedAt ? Date.parse(row.publishedAt) : Number.NaN
-      const time = Number.isFinite(published) && published <= futureLimit ? published : Date.parse(row.firstSeenAt)
+      const time = chronologyTime(row.publishedAt, row.firstSeenAt, now)
       const index = indexByDate.get(dateKey(new Date(time), timezone))
       if (index === undefined) continue
       let counts = cadence.get(row.feedId)
@@ -247,34 +226,6 @@ export class SubscriptionService {
     }
     return cadence
   }
-
-  #upsertItem(tx: DatabaseTransaction, feedId: number, item: NormalizedFeedItem, now: string): void {
-    tx.insert(feedItems)
-      .values({
-        feedId,
-        dedupeKey: item.dedupeKey,
-        identityKind: item.identityKind,
-        title: item.title,
-        link: item.link,
-        publishedAt: item.publishedAt,
-        imageUrl: item.imageUrl,
-        summary: item.summary,
-        firstSeenAt: now,
-        lastObservedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [feedItems.feedId, feedItems.dedupeKey],
-        set: {
-          title: item.title,
-          link: item.link,
-          publishedAt: item.publishedAt,
-          imageUrl: item.imageUrl,
-          summary: item.summary,
-          lastObservedAt: now,
-        },
-      })
-      .run()
-  }
 }
 
 function canonicalFeedUrl(value: string): string | undefined {
@@ -285,6 +236,16 @@ function canonicalFeedUrl(value: string): string | undefined {
     return url.href
   } catch {
     return undefined
+  }
+}
+
+/** Diagnostics keep entered and resolved URLs apart, minus any query string. */
+function loggableUrl(value: string): string {
+  try {
+    const url = new URL(value)
+    return `${url.origin}${url.pathname}`
+  } catch {
+    return ''
   }
 }
 

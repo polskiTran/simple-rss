@@ -336,8 +336,8 @@
     margin-top: 8px;
   }
 
-  .feed-list,
-  .feed-list-state {
+  .subscription-list,
+  .subscription-list-state {
     margin-top: 32px;
   }
 
@@ -432,6 +432,9 @@
     padding-top: 34px;
   }
 
+  /* One band, one height. The field inside is drawn at the full 620px
+     measure; this container clips it, so the band's length follows the
+     viewport while its 64px height never changes. */
   .daily-band {
     height: 64px;
     margin-bottom: 40px;
@@ -443,10 +446,6 @@
     width: 4px;
     height: 4px;
     background: var(--band-0);
-  }
-
-  .daily-band-phone {
-    display: none;
   }
 }
 
@@ -536,18 +535,6 @@
 
   .cadence-day:nth-child(-n + 16) {
     display: none;
-  }
-
-  .daily-band {
-    height: 54px;
-  }
-
-  .daily-band-desktop {
-    display: none;
-  }
-
-  .daily-band-phone {
-    display: block;
   }
 
   .day-group + .day-group {

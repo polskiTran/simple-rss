@@ -6,17 +6,15 @@ const BAYER_4 = [
   [15, 7, 13, 5],
 ] as const
 
+/**
+ * One band at one height. The field is drawn once at the full 620px measure
+ * and the container clips it, so narrower viewports shorten the band without
+ * a second element or a second height.
+ */
 export function DailyBand({ date, volume }: { date: string; volume: number }) {
   return (
     <div className="daily-band" aria-hidden="true">
-      <span
-        className="daily-band-field daily-band-desktop"
-        style={{ boxShadow: dailyShadows(date, volume, 620, 64) }}
-      />
-      <span
-        className="daily-band-field daily-band-phone"
-        style={{ boxShadow: dailyShadows(date, volume, 340, 54) }}
-      />
+      <span className="daily-band-field" style={{ boxShadow: dailyShadows(date, volume, 620, 64) }} />
     </div>
   )
 }

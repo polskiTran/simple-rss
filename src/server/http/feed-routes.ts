@@ -8,6 +8,7 @@ import {
   type SubscriptionList,
 } from '../../shared/api.js'
 import type { DigestService } from '../digest/digest-service.js'
+import type { FeedDocumentFailureCode } from '../ingestion/feed-document.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
 import type { RetrievalFailureCode } from '../upstream/retrieval.js'
@@ -20,7 +21,7 @@ export interface FeedRouteDependencies {
   readonly digest: () => DigestService | undefined
 }
 
-/** Subscription creation, the Feed list, and the chronological Digest. */
+/** Subscription creation, the Owner's Subscriptions, and the chronological Digest. */
 export function feedRoutes(deps: FeedRouteDependencies): Hono {
   const app = new Hono()
 
@@ -88,19 +89,7 @@ function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, {
         NO_STORE,
       )
     case 'invalid-feed':
-      return c.json(
-        {
-          error: {
-            code: outcome.code,
-            message:
-              outcome.code === 'malformed_feed'
-                ? 'The Feed returned malformed XML'
-                : 'The URL did not return a supported RSS or Atom Feed',
-          },
-        },
-        422,
-        NO_STORE,
-      )
+      return invalidFeed(c, outcome.code)
     case 'retrieval-failed':
       return retrievalFailure(c, outcome.failure.code)
   }
@@ -117,36 +106,38 @@ function refreshFailure(c: Context, outcome: Exclude<RefreshFeedOutcome, { kind:
         { ...NO_STORE, 'Retry-After': String(outcome.retryAfterSeconds) },
       )
     case 'invalid-feed':
-      return c.json(
-        {
-          error: {
-            code: outcome.code,
-            message:
-              outcome.code === 'malformed_feed'
-                ? 'The Feed returned malformed XML'
-                : 'The URL did not return a supported RSS or Atom Feed',
-          },
-        },
-        422,
-        NO_STORE,
-      )
+      return invalidFeed(c, outcome.code)
     case 'retrieval-failed':
       return retrievalFailure(c, outcome.failure.code)
   }
 }
 
+function invalidFeed(c: Context, code: FeedDocumentFailureCode) {
+  return c.json(
+    {
+      error: {
+        code,
+        message:
+          code === 'malformed_feed'
+            ? 'The Feed returned malformed XML'
+            : 'The URL did not return a supported RSS or Atom Feed',
+      },
+    },
+    422,
+    NO_STORE,
+  )
+}
 
 function retrievalFailure(c: Context, code: RetrievalFailureCode) {
   switch (code) {
     case 'invalid_request':
     case 'invalid_url':
     case 'blocked_destination':
-    case 'unresolvable_host':
     case 'invalid_redirect':
     case 'too_many_redirects':
     case 'redirect_loop':
       return c.json(
-        { error: { code: 'invalid_feed_url', message: 'The Feed URL could not be reached safely' } },
+        { error: { code: 'invalid_feed_url', message: 'The Feed URL is not a safe retrieval destination' } },
         400,
         NO_STORE,
       )
@@ -169,6 +160,9 @@ function retrievalFailure(c: Context, code: RetrievalFailureCode) {
         504,
         NO_STORE,
       )
+    // A host that does not resolve is an unreachable Feed, not a badly formed
+    // URL: the address was acceptable, the network simply had no answer.
+    case 'unresolvable_host':
     case 'http_error':
     case 'cancelled':
     case 'busy':

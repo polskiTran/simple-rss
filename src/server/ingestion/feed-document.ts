@@ -130,6 +130,9 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
   const imageUrl = normalizeHttpUrl(imageOf(record, atom), baseUrl)
   const guid = plainValue(recordField(record, atom ? ['id', 'atom:id'] : ['guid']))
 
+  // The content fingerprint deliberately leaves the summary out: it is the
+  // field publishers correct most, and hashing it would turn every correction
+  // into a new identity instead of an update to the existing Feed Item.
   const identity = guid
     ? { kind: 'guid' as const, key: `guid:${guid}` }
     : link
@@ -137,7 +140,7 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
       : {
           kind: 'content' as const,
           key: `content:${createHash('sha256')
-            .update(JSON.stringify([title, summary, publishedAt]))
+            .update(JSON.stringify([title, publishedAt]))
             .digest('hex')}`,
         }
 

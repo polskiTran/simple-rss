@@ -1,10 +1,11 @@
 import { desc, eq } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
-import type { Digest, DigestGroup, DigestItem } from '../../shared/api.js'
+import type { Digest, DigestItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, subscriptions } from '../persistence/schema.js'
+import { chronologyTime, dateKey } from './chronology.js'
 
 /** Chronology and installation-timezone date grouping for the Owner's Digest. */
 export class DigestService {
@@ -21,7 +22,6 @@ export class DigestService {
   read(): Digest {
     const timezone = this.#settings.read()?.timezone ?? 'UTC'
     const now = this.#clock.now()
-    const futureLimit = now.getTime() + 24 * 60 * 60 * 1_000
     const rows = this.#db
       .select({
         feedItemId: feedItems.id,
@@ -39,19 +39,14 @@ export class DigestService {
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .orderBy(desc(feedItems.firstSeenAt))
       .all()
-      .map((row) => {
-        const publishedTime = row.publishedAt ? Date.parse(row.publishedAt) : Number.NaN
-        const chronology =
-          Number.isFinite(publishedTime) && publishedTime <= futureLimit ? publishedTime : Date.parse(row.firstSeenAt)
-        return { row, chronology }
-      })
+      .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
       .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
 
     const today = dateKey(now, timezone)
     const yesterday = new Date(Date.parse(`${today}T00:00:00.000Z`) - 24 * 60 * 60 * 1_000)
       .toISOString()
       .slice(0, 10)
-    const groups = new Map<string, DigestGroup>()
+    const groups = new Map<string, { date: string; label: string; items: DigestItem[] }>()
 
     for (const { row, chronology } of rows) {
       const instant = new Date(chronology)
@@ -66,7 +61,7 @@ export class DigestService {
         groups.set(date, group)
       }
 
-      ;(group.items as DigestItem[]).push({
+      group.items.push({
         feedItemId: row.feedItemId,
         title: row.title ?? 'untitled',
         feedId: row.feedId,
@@ -85,17 +80,6 @@ export class DigestService {
       groups: [...groups.values()],
     }
   }
-}
-
-export function dateKey(date: Date, timezone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date)
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  return `${values.year}-${values.month}-${values.day}`
 }
 
 function timeLabel(date: Date, timezone: string): string {

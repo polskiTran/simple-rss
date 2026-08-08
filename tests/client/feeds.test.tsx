@@ -123,7 +123,7 @@ describe('Digest', () => {
     expect(await screen.findByRole('heading', { name: 'today' })).toBeDefined()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
-    expect(container.querySelectorAll('.daily-band-field')).toHaveLength(2)
+    expect(container.querySelectorAll('.daily-band-field')).toHaveLength(1)
     expect(screen.getByText('07:15')).toBeDefined()
     expect((screen.getByRole('button', { name: /save first light/i }) as HTMLButtonElement).disabled).toBe(true)
     await waitFor(() => expect(container.textContent).not.toMatch(/unread/i))
