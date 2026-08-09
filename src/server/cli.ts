@@ -13,7 +13,7 @@ const USAGE = `simple-rss <command>
   migrate                 Apply pending schema migrations and exit
   show                    Print the installation settings as JSON
   set-timezone <iana>     Set the installation timezone, e.g. Europe/Berlin
-  rebuild-search          Rebuild the derived search index from retained records
+  rebuild-search          Rebuild the derived search index from retained Feed Items
   reset-password [new]    Replace the Owner password and revoke every session.
                           Reads SIMPLE_RSS_NEW_PASSWORD when given no argument,
                           which keeps the password out of the shell history.
@@ -72,11 +72,8 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       }
       case 'rebuild-search': {
         applyMigrations(db, context.clock)
-        rebuildSearchIndex(db)
-        const indexed = db.prepare('SELECT count(*) AS indexed FROM feed_item_search').get() as {
-          indexed: number
-        }
-        context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems: indexed.indexed }))
+        const indexedItems = rebuildSearchIndex(db)
+        context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems }))
         return 0
       }
       case 'reset-password': {

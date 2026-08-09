@@ -43,6 +43,17 @@ export function reasonToHold(password: string, confirmation: string): string | u
   return undefined
 }
 
+/**
+ * Which side a failed fetch fell on. A rejected fetch is the network staying
+ * silent — `unreachable`; anything else — a refusal, a body that fails its
+ * schema — is the reader's problem, `unavailable`. Shared so every view tells
+ * the Owner the same thing about the same silence, and the way back it
+ * implies: check the connection, or wait for the reader.
+ */
+export function failureKind(error: unknown): 'unreachable' | 'unavailable' {
+  return error instanceof TypeError ? 'unreachable' : 'unavailable'
+}
+
 /** Rounded up, because a wait reported as shorter than it is invites a retry. */
 function describeWait(seconds: number | undefined): string {
   if (!seconds) return 'a little while'

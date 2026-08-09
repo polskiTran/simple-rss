@@ -235,6 +235,31 @@ describe('searching retained reading metadata', () => {
     expect(results.at(-1)?.title).toBe('Numbered entry 5')
   })
 
+  it('does not let a broken publisher clock crowd the bound from the future', async () => {
+    const service = await startTestService()
+    const owner = await claimedDevice(service)
+    const futureItem = item('z', 'Numbered entry future', { pubDate: '2999-01-01T00:00:00.000Z' })
+    await subscribed(owner, service, rss('Field Notes', futureItem))
+
+    // Two hours on, the Feed exposes a full page of plausibly dated items.
+    service.clock.advance(2 * HOUR_MS)
+    const many = Array.from({ length: SEARCH_RESULT_LIMIT + 5 }, (_, index) =>
+      item(`n${index}`, `Numbered entry ${index}`, {
+        pubDate: new Date(Date.UTC(2026, 7, 8, 10, index)).toISOString(),
+      }),
+    )
+    stubFeed(service, rss('Field Notes', futureItem, ...many))
+    expect((await owner.post('/api/feeds/1/refresh')).status).toBe(200)
+
+    // The year-2999 item orders by when it was first seen — the oldest match
+    // here — so it cannot hold a bound slot the newest matches deserve.
+    const { results } = await search(owner, 'numbered')
+    expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
+    expect(results.map((entry) => entry.title)).not.toContain('Numbered entry future')
+    expect(results[0]?.title).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
+    expect(results.at(-1)?.title).toBe('Numbered entry 5')
+  })
+
   it('refuses a missing, empty, or oversized query as a bad request', async () => {
     const service = await startTestService()
     const owner = await claimedDevice(service)

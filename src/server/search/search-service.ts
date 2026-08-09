@@ -1,6 +1,6 @@
 import type { SearchResults } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
+import { dateKey, inDigestOrder, metaRowDate, plausibleHorizon } from '../digest/chronology.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 
@@ -46,8 +46,14 @@ export class SearchService {
     const match = matchExpressionOf(query)
     if (!match) return { results: [] }
 
+    const timezone = this.#settings.effectiveTimezone()
+    const now = this.#clock.now()
+    const today = dateKey(now, timezone)
+
     // The FTS table decides what matches; the joins decide what may be shown.
-    // The LIMIT is taken newest-first so a broad query keeps recent history.
+    // The LIMIT is taken newest-first under the same chronology rule the rows
+    // are later displayed in — an implausibly future-dated item falls back to
+    // first-seen here too, so it cannot hold a bound slot it will not rank at.
     const rows = this.#db
       .prepare(
         `SELECT
@@ -66,31 +72,30 @@ export class SearchService {
          LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id
          WHERE feed_item_search MATCH ?
            AND (subscriptions.feed_id IS NOT NULL OR library_items.feed_item_id IS NOT NULL)
-         ORDER BY COALESCE(feed_items.published_at, feed_items.first_seen_at) DESC, feed_items.id DESC
+         ORDER BY
+           CASE
+             WHEN feed_items.published_at IS NOT NULL AND feed_items.published_at <= ?
+             THEN feed_items.published_at
+             ELSE feed_items.first_seen_at
+           END DESC,
+           feed_items.id DESC
          LIMIT ?`,
       )
-      .all(match, SEARCH_RESULT_LIMIT) as MatchRow[]
+      .all(match, plausibleHorizon(now), SEARCH_RESULT_LIMIT) as MatchRow[]
 
-    const timezone = this.#settings.effectiveTimezone()
-    const now = this.#clock.now()
-    const today = dateKey(now, timezone)
-
-    const results = rows
-      .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
-      .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
-      .map(({ row, chronology }) => {
-        const instant = new Date(chronology)
-        return {
-          feedItemId: row.feedItemId,
-          title: row.title ?? 'untitled',
-          feedId: row.feedId,
-          feedTitle: row.feedTitle,
-          publishedAt: row.publishedAt,
-          firstSeenAt: row.firstSeenAt,
-          displayDate: metaRowDate(instant, dateKey(instant, timezone), today, timezone),
-          saved: row.savedAt !== null,
-        }
-      })
+    const results = inDigestOrder(rows, now).map(({ row, chronology }) => {
+      const instant = new Date(chronology)
+      return {
+        feedItemId: row.feedItemId,
+        title: row.title ?? 'untitled',
+        feedId: row.feedId,
+        feedTitle: row.feedTitle,
+        publishedAt: row.publishedAt,
+        firstSeenAt: row.firstSeenAt,
+        displayDate: metaRowDate(instant, dateKey(instant, timezone), today, timezone),
+        saved: row.savedAt !== null,
+      }
+    })
 
     return { results }
   }
@@ -106,7 +111,7 @@ export class SearchService {
  * `undefined` when nothing tokenizable remains, which callers answer with the
  * empty result rather than asking the index about nothing.
  */
-export function matchExpressionOf(query: string): string | undefined {
+function matchExpressionOf(query: string): string | undefined {
   const words = query
     .split(/\s+/)
     .map((word) => word.replaceAll('"', ''))
@@ -122,15 +127,17 @@ export function matchExpressionOf(query: string): string | undefined {
  * Drops the derived index's contents and rebuilds them from the canonical
  * tables — the recovery the FTS table's design promises. Run through the CLI
  * against the mounted volume; the triggers keep the rebuilt index current
- * from then on.
+ * from then on. Returns how many Feed Items are now indexed.
  */
-export function rebuildSearchIndex(db: SqliteDatabase): void {
-  db.transaction(() => {
+export function rebuildSearchIndex(db: SqliteDatabase): number {
+  return db.transaction(() => {
     db.exec('DELETE FROM feed_item_search')
-    db.exec(`
-      INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
-      SELECT feed_items.id, feed_items.title, feed_items.summary, feeds.title
-      FROM feed_items JOIN feeds ON feeds.id = feed_items.feed_id
-    `)
+    return db
+      .prepare(
+        `INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+         SELECT feed_items.id, feed_items.title, feed_items.summary, feeds.title
+         FROM feed_items JOIN feeds ON feeds.id = feed_items.feed_id`,
+      )
+      .run().changes
   })()
 }

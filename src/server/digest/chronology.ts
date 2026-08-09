@@ -14,6 +14,30 @@ export function chronologyTime(publishedAt: string | null, firstSeenAt: string, 
     : Date.parse(firstSeenAt)
 }
 
+/**
+ * The newest publication instant chronology will believe, as the ISO string
+ * a SQL comparison against stored `published_at` needs — for queries that
+ * must apply this file's fallback rule before a LIMIT, where sorting in
+ * JavaScript would come too late.
+ */
+export function plausibleHorizon(now: Date): string {
+  return new Date(now.getTime() + FUTURE_TOLERANCE_MS).toISOString()
+}
+
+/**
+ * Rows in Digest order — newest chronology first, ties to the newer row —
+ * carrying each row's resolved chronology alongside it for date rendering.
+ * The one ordering the Digest, the Library, and search all speak.
+ */
+export function inDigestOrder<Row extends { feedItemId: number; publishedAt: string | null; firstSeenAt: string }>(
+  rows: readonly Row[],
+  now: Date,
+): Array<{ row: Row; chronology: number }> {
+  return rows
+    .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
+    .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
+}
+
 export function dateKey(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,

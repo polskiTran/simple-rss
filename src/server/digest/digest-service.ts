@@ -5,7 +5,7 @@ import type { Clock } from '../clock.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import { chronologyTime, dateKey, dayBefore, timeLabel } from './chronology.js'
+import { dateKey, dayBefore, inDigestOrder, timeLabel } from './chronology.js'
 
 /** Chronology and installation-timezone date grouping for the Owner's Digest. */
 export class DigestService {
@@ -22,27 +22,28 @@ export class DigestService {
   read(): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
-    const rows = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        feedId: feeds.id,
-        feedTitle: feeds.title,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        imageUrl: feedItems.imageUrl,
-        summary: feedItems.summary,
-        firstSeenAt: feedItems.firstSeenAt,
-        savedAt: libraryItems.savedAt,
-      })
-      .from(feedItems)
-      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
-      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
-      .orderBy(desc(feedItems.firstSeenAt))
-      .all()
-      .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
-      .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
+    const rows = inDigestOrder(
+      this.#db
+        .select({
+          feedItemId: feedItems.id,
+          title: feedItems.title,
+          feedId: feeds.id,
+          feedTitle: feeds.title,
+          link: feedItems.link,
+          publishedAt: feedItems.publishedAt,
+          imageUrl: feedItems.imageUrl,
+          summary: feedItems.summary,
+          firstSeenAt: feedItems.firstSeenAt,
+          savedAt: libraryItems.savedAt,
+        })
+        .from(feedItems)
+        .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+        .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+        .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+        .orderBy(desc(feedItems.firstSeenAt))
+        .all(),
+      now,
+    )
 
     const today = dateKey(now, timezone)
     const yesterday = dayBefore(today)

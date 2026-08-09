@@ -6,6 +6,7 @@ import { ItemTitleLink } from '../components/item-title-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { pathOf } from '../routing.js'
+import { failureKind } from './failure.js'
 
 type ItemState =
   | { readonly kind: 'loading' }
@@ -54,7 +55,7 @@ export function ReaderView({ feedItemId, onBack, onOpenItem }: ReaderViewProps) 
         if (active) setItemState({ kind: 'loaded', item })
       })
       .catch((error: unknown) => {
-        if (active) setItemState({ kind: error instanceof TypeError ? 'unreachable' : 'unavailable' })
+        if (active) setItemState({ kind: failureKind(error) })
       })
     return () => {
       active = false

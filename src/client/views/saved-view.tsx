@@ -3,6 +3,7 @@ import type { Library } from '../../shared/api.js'
 import { fetchLibrary } from '../api.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
+import { failureKind } from './failure.js'
 
 export interface SavedViewProps {
   /** Opens one saved Feed Item in the Reader. */
@@ -35,9 +36,7 @@ export function SavedView({ onOpenItem }: SavedViewProps) {
         if (active) setState({ kind: 'loaded', library })
       })
       .catch((error: unknown) => {
-        // A rejected fetch is the network staying silent; anything else — a
-        // refusal, a body that fails the schema — is the reader's problem.
-        if (active) setState({ kind: error instanceof TypeError ? 'unreachable' : 'unavailable' })
+        if (active) setState({ kind: failureKind(error) })
       })
     return () => {
       active = false

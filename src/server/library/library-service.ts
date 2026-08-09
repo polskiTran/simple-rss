@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Library, LibraryItem, LibraryMembership } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
+import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -60,25 +60,26 @@ export class LibraryService {
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
-    const rows = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        feedId: feeds.id,
-        feedTitle: feeds.title,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        firstSeenAt: feedItems.firstSeenAt,
-        savedAt: libraryItems.savedAt,
-        subscribedFeedId: subscriptions.feedId,
-      })
-      .from(libraryItems)
-      .innerJoin(feedItems, eq(feedItems.id, libraryItems.feedItemId))
-      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
-      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .all()
-      .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
-      .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
+    const rows = inDigestOrder(
+      this.#db
+        .select({
+          feedItemId: feedItems.id,
+          title: feedItems.title,
+          feedId: feeds.id,
+          feedTitle: feeds.title,
+          link: feedItems.link,
+          publishedAt: feedItems.publishedAt,
+          firstSeenAt: feedItems.firstSeenAt,
+          savedAt: libraryItems.savedAt,
+          subscribedFeedId: subscriptions.feedId,
+        })
+        .from(libraryItems)
+        .innerJoin(feedItems, eq(feedItems.id, libraryItems.feedItemId))
+        .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+        .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+        .all(),
+      now,
+    )
 
     const items: LibraryItem[] = rows.map(({ row, chronology }) => {
       const instant = new Date(chronology)

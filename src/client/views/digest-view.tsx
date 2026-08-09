@@ -4,6 +4,7 @@ import { fetchDigest, fetchSearchResults } from '../api.js'
 import { DailyBand } from '../components/daily-band.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
+import { failureKind } from './failure.js'
 
 export interface DigestViewProps {
   /** Opens one Feed Item in the Reader. */
@@ -43,11 +44,7 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
         if (active) setState({ kind: 'loaded', digest })
       })
       .catch((error: unknown) => {
-        // A rejected fetch is the network staying silent; anything else — a
-        // refusal, a body that fails the schema — is the reader's problem.
-        // The Owner is told which, because the way back differs: check the
-        // connection, or wait for the reader.
-        if (active) setState({ kind: error instanceof TypeError ? 'unreachable' : 'unavailable' })
+        if (active) setState({ kind: failureKind(error) })
       })
     return () => {
       active = false
@@ -73,7 +70,7 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
           if (active) setSearch({ kind: 'found', results: found.results })
         })
         .catch((error: unknown) => {
-          if (active) setSearch({ kind: error instanceof TypeError ? 'unreachable' : 'unavailable' })
+          if (active) setSearch({ kind: failureKind(error) })
         })
     }, SEARCH_SETTLE_MS)
     return () => {
