@@ -76,6 +76,25 @@ describe('runCli', () => {
     expect(JSON.parse(output[0]!).timezone).toBe('Europe/Berlin')
   })
 
+  it('rebuilds the search index from the canonical tables', async () => {
+    await runCli(['migrate'], context)
+    const db = openDatabase(context.config.databasePath)
+    db.exec(`
+      INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
+      VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes',
+              'journal.example', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z');
+      INSERT INTO feed_items (id, feed_id, dedupe_key, identity_kind, title, first_seen_at, last_observed_at)
+      VALUES (1, 1, 'a', 'guid', 'Morning chronology', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z');
+      -- The derived index is lost; the canonical rows are not.
+      DELETE FROM feed_item_search;
+    `)
+    db.close()
+    output.length = 0
+
+    expect(await runCli(['rebuild-search'], context)).toBe(0)
+    expect(JSON.parse(output[0]!)).toEqual({ searchIndexRebuilt: true, indexedItems: 1 })
+  })
+
   it('writes to the database inside the configured data directory', async () => {
     await runCli(['set-timezone', 'Europe/Berlin'], context)
 

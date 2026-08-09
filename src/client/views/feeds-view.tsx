@@ -128,9 +128,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
 
   return (
     <div className="view measure feeds-view">
-      <form className="feed-search" onSubmit={submit}>
+      <form className="search-form" onSubmit={submit}>
         <input
-          className="field-input feed-search-input"
+          className="field-input search-input"
           type="text"
           inputMode="url"
           autoComplete="off"

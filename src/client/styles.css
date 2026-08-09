@@ -395,9 +395,10 @@
     color: var(--color-quiet);
   }
 
-  /* One control searches and adds. Sticky with the paper's own tone behind
-     it, so the list scrolls away underneath while the field holds still. */
-  .feed-search {
+  /* The one search treatment, shared by the Feeds control and the Digest's
+     history search. Sticky with the paper's own tone behind it, so the list
+     scrolls away underneath while the field holds still. */
+  .search-form {
     position: sticky;
     top: 0;
     z-index: 1;
@@ -406,13 +407,21 @@
     background: var(--color-paper);
   }
 
-  .feed-search-input {
+  .search-input {
     width: 100%;
   }
 
-  .feed-search-input::placeholder {
+  .search-input::placeholder {
     color: var(--color-meta);
     opacity: 1;
+  }
+
+  /* `type=search` carries the searchbox semantics; the browser ornaments it
+     brings along — the cancel cross, the decoration — are not drawn here. */
+  .search-input::-webkit-search-cancel-button,
+  .search-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   .feed-notice {

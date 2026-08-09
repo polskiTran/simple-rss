@@ -12,6 +12,7 @@ import type { Logger } from './logger.js'
 import { assertWritable, type SqliteDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderService } from './reader/reader-service.js'
+import type { SearchService } from './search/search-service.js'
 import type { Readiness } from './readiness.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
@@ -20,6 +21,7 @@ import { feedRoutes } from './http/feed-routes.js'
 import { imageRoutes } from './http/image-routes.js'
 import { libraryRoutes } from './http/library-routes.js'
 import { readerRoutes } from './http/reader-routes.js'
+import { searchRoutes } from './http/search-routes.js'
 import { settingsRoutes } from './http/settings-routes.js'
 import { requireSession } from './http/require-session.js'
 import { sameOrigin } from './http/same-origin.js'
@@ -45,6 +47,7 @@ export interface AppDependencies {
   readonly digest: () => DigestService | undefined
   readonly library: () => LibraryService | undefined
   readonly reader: () => ReaderService | undefined
+  readonly search: () => SearchService | undefined
   readonly images: () => ImageService | undefined
   /** Mints and checks the signed URLs Reader images travel behind. */
   readonly imageSignature: () => ImageUrlSignature | undefined
@@ -110,6 +113,8 @@ export function createApp(deps: AppDependencies): Hono {
   app.route('/api', libraryRoutes({ library: deps.library }))
 
   app.route('/api', readerRoutes({ reader: deps.reader }))
+
+  app.route('/api', searchRoutes({ search: deps.search }))
 
   app.route(
     '/api',

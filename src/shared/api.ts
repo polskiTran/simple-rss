@@ -352,6 +352,34 @@ export const librarySchema = z.object({
 })
 export type Library = z.infer<typeof librarySchema>
 
+/** The longest search line one request carries; typing never nears it. */
+export const MAX_SEARCH_QUERY_LENGTH = 256
+
+export const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)
+
+/**
+ * One Feed Item a search found: enough to recognize it — title, Feed, date,
+ * saved state — and to open it through the normal Reader navigation. There is
+ * deliberately no rank or score; matches sit in Digest chronology.
+ */
+export const searchResultSchema = z.object({
+  feedItemId: z.number().int().positive(),
+  title: z.string(),
+  feedId: z.number().int().positive(),
+  feedTitle: z.string(),
+  publishedAt: z.string().nullable(),
+  firstSeenAt: z.string(),
+  /** The day said the way the meta row says it, like Library items. */
+  displayDate: z.string(),
+  saved: z.boolean(),
+})
+export type SearchResult = z.infer<typeof searchResultSchema>
+
+export const searchResultsSchema = z.object({
+  results: z.array(searchResultSchema),
+})
+export type SearchResults = z.infer<typeof searchResultsSchema>
+
 /** How long a browser may keep a successful Reader extraction, privately. */
 export const READER_CACHE_SECONDS = 86_400
 

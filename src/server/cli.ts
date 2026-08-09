@@ -6,12 +6,14 @@ import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations, appliedVersions } from './persistence/migrations.js'
+import { rebuildSearchIndex } from './search/search-service.js'
 
 const USAGE = `simple-rss <command>
 
   migrate                 Apply pending schema migrations and exit
   show                    Print the installation settings as JSON
   set-timezone <iana>     Set the installation timezone, e.g. Europe/Berlin
+  rebuild-search          Rebuild the derived search index from retained records
   reset-password [new]    Replace the Owner password and revoke every session.
                           Reads SIMPLE_RSS_NEW_PASSWORD when given no argument,
                           which keeps the password out of the shell history.
@@ -66,6 +68,15 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
         const store = new InstallationSettingsStore(db)
         store.setTimezone(timezone, context.clock.now())
         context.out(JSON.stringify(store.read()))
+        return 0
+      }
+      case 'rebuild-search': {
+        applyMigrations(db, context.clock)
+        rebuildSearchIndex(db)
+        const indexed = db.prepare('SELECT count(*) AS indexed FROM feed_item_search').get() as {
+          indexed: number
+        }
+        context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems: indexed.indexed }))
         return 0
       }
       case 'reset-password': {

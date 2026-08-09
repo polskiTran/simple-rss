@@ -157,10 +157,10 @@ describe('layout', () => {
 })
 
 describe('the Feeds tab', () => {
-  it('keeps the search/add control sticky on the paper with the documented rhythm', () => {
-    expect(lightOnly()).toMatch(/\.feed-search\s*\{[^}]*position:\s*sticky/)
-    expect(lightOnly()).toMatch(/\.feed-search\s*\{[^}]*padding:\s*8px 0 32px/)
-    expect(lightOnly()).toMatch(/\.feed-search\s*\{[^}]*background:\s*var\(--color-paper\)/)
+  it('keeps the one search treatment sticky on the paper with the documented rhythm', () => {
+    expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*position:\s*sticky/)
+    expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*padding:\s*8px 0 32px/)
+    expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*background:\s*var\(--color-paper\)/)
   })
 
   it('draws the cadence grid at 11px cells on a 3px gap, one step smaller when narrow', () => {

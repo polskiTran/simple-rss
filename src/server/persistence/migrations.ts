@@ -177,6 +177,59 @@ export const migrations: readonly Migration[] = [
           ('unreachable', 'timeout', 'too_large', 'unsupported_content', 'http_error', 'invalid_feed'));
     `,
   },
+  {
+    version: 6,
+    name: 'feed-item-search',
+    sql: `
+      -- The search index over retained reading metadata: each retained Feed
+      -- Item's title, its normalized plain-text summary, and the title of the
+      -- Feed that published it. Article bodies are never stored, so they can
+      -- never be indexed. The table is derived state — rebuildable from the
+      -- canonical tables at any time and excluded from portable export.
+      CREATE VIRTUAL TABLE feed_item_search USING fts5(
+        item_title,
+        summary,
+        feed_title,
+        tokenize = 'unicode61 remove_diacritics 2'
+      );
+
+      -- Maintenance is triggers rather than application code, so every way a
+      -- Feed Item row changes — ingestion upserts, retention pruning,
+      -- unsubscribe cleanup, cascading Feed deletion, a future restore — keeps
+      -- the index current without each caller remembering to. A pruned item
+      -- leaves the index in the same transaction that removes its row, which
+      -- is what stops a derived index from outliving retention.
+      CREATE TRIGGER feed_item_search_after_insert AFTER INSERT ON feed_items BEGIN
+        INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+        VALUES (new.id, new.title, new.summary, (SELECT title FROM feeds WHERE id = new.feed_id));
+      END;
+
+      -- Re-observation touches every item each poll; only a real metadata
+      -- correction is worth rewriting the indexed row for.
+      CREATE TRIGGER feed_item_search_after_update AFTER UPDATE ON feed_items
+      WHEN old.title IS NOT new.title OR old.summary IS NOT new.summary BEGIN
+        DELETE FROM feed_item_search WHERE rowid = old.id;
+        INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+        VALUES (new.id, new.title, new.summary, (SELECT title FROM feeds WHERE id = new.feed_id));
+      END;
+
+      CREATE TRIGGER feed_item_search_after_delete AFTER DELETE ON feed_items BEGIN
+        DELETE FROM feed_item_search WHERE rowid = old.id;
+      END;
+
+      -- A corrected Feed title reaches every indexed item it attributes.
+      CREATE TRIGGER feed_item_search_after_feed_rename AFTER UPDATE OF title ON feeds
+      WHEN old.title IS NOT new.title BEGIN
+        UPDATE feed_item_search SET feed_title = new.title
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = new.id);
+      END;
+
+      -- Items retained from before this migration are indexed once, here.
+      INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+      SELECT feed_items.id, feed_items.title, feed_items.summary, feeds.title
+      FROM feed_items JOIN feeds ON feeds.id = feed_items.feed_id;
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

@@ -15,6 +15,7 @@ import { InstallationSettingsStore } from './persistence/installation-settings.j
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
+import { SearchService } from './search/search-service.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
@@ -79,6 +80,7 @@ export function createService(options: ServiceOptions): Service {
   let digest: DigestService | undefined
   let library: LibraryService | undefined
   let reader: ReaderService | undefined
+  let search: SearchService | undefined
   let images: ImageService | undefined
   let imageSignature: ImageUrlSignature | undefined
   let scheduler: PollScheduler | undefined
@@ -111,6 +113,7 @@ export function createService(options: ServiceOptions): Service {
       digest,
       signImageUrl: imageSignature.sign,
     })
+    search = new SearchService({ database, clock, settings })
     const retention = new RetentionService({ database, clock, logger, ...options.retention })
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
     scheduler.start()
@@ -137,6 +140,7 @@ export function createService(options: ServiceOptions): Service {
     digest: () => digest,
     library: () => library,
     reader: () => reader,
+    search: () => search,
     images: () => images,
     imageSignature: () => imageSignature,
   })
@@ -171,6 +175,7 @@ export function createService(options: ServiceOptions): Service {
       digest = undefined
       library = undefined
       reader = undefined
+      search = undefined
       images = undefined
       imageSignature = undefined
     },

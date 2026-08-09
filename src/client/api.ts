@@ -12,6 +12,7 @@ import {
   readerArticleSchema,
   readerItemSchema,
   refreshFeedResponseSchema,
+  searchResultsSchema,
   subscriptionListSchema,
   serviceMetaSchema,
   type AuthStatus,
@@ -27,6 +28,7 @@ import {
   type ReaderArticle,
   type ReaderItem,
   type RefreshFeedResponse,
+  type SearchResults,
   type SubscriptionList,
   type ServiceMeta,
 } from '../shared/api.js'
@@ -196,6 +198,12 @@ export async function unsubscribeFromFeed(feedId: number): Promise<void> {
 export async function fetchDigest(): Promise<Digest> {
   const response = await request('/api/digest')
   return digestSchema.parse(await response.json())
+}
+
+/** Retained reading metadata matching the Owner's words, newest first. */
+export async function fetchSearchResults(query: string): Promise<SearchResults> {
+  const response = await request(`/api/search?q=${encodeURIComponent(query)}`)
+  return searchResultsSchema.parse(await response.json())
 }
 
 export async function fetchLibrary(): Promise<Library> {
