@@ -8,16 +8,16 @@ import { dailyShadows } from '../../src/client/components/daily-band.js'
  */
 describe('the daily band field', () => {
   it('draws one date and volume identically every time', () => {
-    expect(dailyShadows('2026-08-08', 14, 620, 64)).toBe(dailyShadows('2026-08-08', 14, 620, 64))
+    expect(dailyShadows('2026-08-08', 14, 708, 114)).toBe(dailyShadows('2026-08-08', 14, 708, 114))
   })
 
   it('is seeded by the date, so two mornings never repeat', () => {
-    expect(dailyShadows('2026-08-08', 14, 620, 64)).not.toBe(dailyShadows('2026-08-09', 14, 620, 64))
+    expect(dailyShadows('2026-08-08', 14, 708, 114)).not.toBe(dailyShadows('2026-08-09', 14, 708, 114))
   })
 
   it('derives its ink from the day volume, bounded rather than unbounded', () => {
     const inkDots = (volume: number) =>
-      dailyShadows('2026-08-08', volume, 620, 64)
+      dailyShadows('2026-08-08', volume, 708, 114)
         .split(',')
         .filter((shadow) => !shadow.endsWith('var(--band-0)')).length
 
@@ -28,22 +28,22 @@ describe('the daily band field', () => {
     expect(quiet).toBeLessThan(ordinary)
     expect(ordinary).toBeLessThan(torrent)
     // The ink term saturates, so a torrent of posts cannot black the band
-    // out: of the 124 × 13 dots, some must still rest at the quietest level.
-    expect(torrent).toBeLessThan(124 * 13)
+    // out: of the 142 × 23 dots, some must still rest at the quietest level.
+    expect(torrent).toBeLessThan(142 * 23)
   })
 
   it('keeps every dot on the 5px pitch, inside the field, at four ink levels', () => {
-    const shadows = dailyShadows('2026-08-08', 14, 620, 64).split(',')
+    const shadows = dailyShadows('2026-08-08', 14, 708, 114).split(',')
 
-    // 124 columns by 13 rows: the full 620px measure, clipped by the container.
-    expect(shadows).toHaveLength(124 * 13)
+    // 142 columns by 23 rows: the paper's full 708px content width, clipped by the container.
+    expect(shadows).toHaveLength(142 * 23)
     for (const shadow of shadows) {
       const match = /^(\d+)px (\d+)px 0 var\(--band-([0-3])\)$/.exec(shadow)
       expect(match, shadow).not.toBeNull()
       expect(Number(match?.[1]) % 5).toBe(0)
-      expect(Number(match?.[1])).toBeLessThan(620)
+      expect(Number(match?.[1])).toBeLessThan(708)
       expect(Number(match?.[2]) % 5).toBe(0)
-      expect(Number(match?.[2])).toBeLessThan(64)
+      expect(Number(match?.[2])).toBeLessThan(114)
     }
   })
 })

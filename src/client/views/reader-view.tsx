@@ -100,7 +100,7 @@ export function ReaderView({ feedItemId, onBack, onOpenItem }: ReaderViewProps) 
   const setSaved = (saved: boolean) => setItemState({ kind: 'loaded', item: { ...item, saved } })
 
   return (
-    <article className="view reader-view">
+    <article className="view measure reader-view">
       <div className="reader-topline">
         <a className="reader-back" href={pathOf('digest')} onClick={routedClick(onBack)}>
           ← digest

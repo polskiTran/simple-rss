@@ -87,9 +87,11 @@ Literata only. Weights 200 / 300 (default) / 500. Italic used for the wordmark, 
 | Gap between day groups | 44px above the date, 24px below | 32 / 20 |
 | Header → content | 48px (feeds), 34px (band), 40px (feed header) | 32 / 26 |
 
-**Reader** is the one screen that breaks the card: 720px wide, `padding:32px 84px 64px`, no fixed height. Measure is 552px (720 − 168). Metadata sits *under* the title, not above. It ends in "next in the digest" — never a dead stop.
+**Departure — the measure.** The table's 620px content measure is not bound: rendered, a column narrower than the masthead left every screen ragged against its own header on the right edge. Content — lists, the reader, the daily band — runs the paper's own content width (820 − 2×56 = 708px on desktop), so it aligns with the header at both edges. The `.gate` forms keep their own 310px; a password is not prose.
 
-**Search** is sticky (`position:sticky;top:0`) with paper background, `padding:8px 0 32px`, `max-width:620px`, underline `1px solid rgba(18,17,15,.15)`, and a 1px × 14px accent caret.
+**Reader** was drawn as the one screen that breaks the card — its own 720px paper, `padding:32px 84px 64px`, the 552px measure — but the departure is recorded here: rendered, swapping papers resized the masthead between screens, and §5 holds that the tabs never move or change. The Reader sits on the same 820px paper and the same measure as every other screen, keeping only its own inner rhythm — title scale, the 40px header gap, no fixed height. Metadata sits *under* the title, not above. It ends in "next in the digest" — never a dead stop.
+
+**Search** was drawn sticky (`position:sticky;top:0`) on a paper background; the departure is recorded here: the field scrolls with the page like everything else — nothing floats over the paper — and the occluding background goes with it. `padding:8px 0 32px`, the measure of its screen (see the measure departure above), underline `1px solid rgba(18,17,15,.15)`, and a 1px × 14px accent caret.
 
 ## 5. Components
 
@@ -150,7 +152,7 @@ above do not state, fixed here so the stylesheet has a source:
   reference's `february · april · june · august`.
 
 ### Daily band (digest)
-A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. 64px tall at every width — the field is drawn at the full 620px measure and the container clips it, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
+A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. Originally 64px tall on the 620px measure; with the measure released to the paper (§4 departure) it is drawn at the full 708px content width and deepened by ten rows to 114px — 23 rows of dots on the 5px pitch. The height holds at every width: the container clips the field, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
 
 Generation: value noise → ordered (Bayer) dither → four ink levels. Seeded by the date, so no two mornings repeat. Light levels `.07 / .16 / .30`; dark levels `.07 / .17 / .32 / .56`. It is decoration with a source — the day's own volume — not ornament.
 
@@ -195,6 +197,29 @@ reserved for the saved state, so its hover steps through the greys, quietest
 to muted. Never a background, never a motion, and none of it on touch, where
 the platform's grey tap flash is suppressed and the word's own state change
 answers instead.
+
+### Motion
+
+The word the Owner presses answers instantly — the flip is the feedback:
+hovers, the active tab, the save word, and every dismissal never ease.
+Motion belongs to arrivals. What a press summons, and what the machine
+answers on its own clock, enters on a breath — opacity or height, ease-out,
+never a show:
+
+- A summoned view — a tab's screen, an opened Feed, the Reader — fades in
+  over 150ms, opacity only: brief enough that the hundredth tab change
+  still feels instant, present enough that the page never teleports.
+  Entrance-only; nothing the Owner does ever waits on an exit.
+- An article arriving from extraction (or its fallback) fades in over
+  200ms, opacity only. The paper and the prose hold still.
+- The unsubscribe confirmation unfolds its height over the same 200ms, so
+  the items below it arrive rather than teleport. Dismissing it is the
+  Owner's act and stays instant.
+- A selected cadence day scrolls its items into view smoothly, so the jump
+  reads as travel down the same list.
+
+Under `prefers-reduced-motion` the unfold and the scroll go instant and the
+fades remain — gentler, not zero. Nothing else animates.
 
 ## 6. Density rules
 

@@ -161,9 +161,13 @@
     padding: 32px 56px 0;
   }
 
-  /* Content measure — prose never runs wider than this, whatever the paper. */
+  /* Content measure. `docs/DESIGN.md` §4 drew it at 620px, but rendered, a
+     column narrower than the masthead left every screen ragged against its
+     own header on the right. The departure is recorded there: the measure is
+     the paper's content width, so lists, the reader, and the band all align
+     with the header at both edges. */
   .measure {
-    max-width: 620px;
+    max-width: none;
   }
 
   .masthead {
@@ -248,6 +252,18 @@
   .view {
     padding-top: 48px;
     padding-bottom: 64px;
+    /* The pressed tab flips instantly — the flip is the feedback — and the
+       view it summons fades in. 150ms and opacity only: brief enough that
+       the hundredth change still feels instant, and entrance-only, so
+       nothing the Owner does ever waits on an exit
+       (`docs/DESIGN.md` §5, Motion). */
+    transition: opacity 150ms ease-out;
+  }
+
+  @starting-style {
+    .view {
+      opacity: 0;
+    }
   }
 
   /* The calm empty state: one quiet line, no illustration, no call to action
@@ -445,15 +461,13 @@
   }
 
   /* The one search treatment, shared by the Feeds control and the Digest's
-     history search. Sticky with the paper's own tone behind it, so the list
-     scrolls away underneath while the field holds still. */
+     history search. `docs/DESIGN.md` §4 drew it sticky with the paper's tone
+     behind it; the departure is recorded there — the field scrolls away with
+     the list it searches, so nothing ever floats over the paper, and the
+     background that existed only to occlude the scroll goes with it. */
   .search-form {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     margin: 0;
     padding: 8px 0 32px;
-    background: var(--color-paper);
   }
 
   .search-input {
@@ -623,9 +637,30 @@
   }
 
   /* Leaving a Feed unfolds right under the controls, not a warning dialog.
-     The consequence sentence carries the weight; the buttons stay quiet. */
-  .unsubscribe-controls {
+     The consequence sentence carries the weight; the buttons stay quiet.
+     The unfold is literal — the reveal's grid row opens from nothing over one
+     breath, so the notice and the items below arrive rather than teleport.
+     Dismissal unmounts instantly: the Owner acted, and the flip is the
+     feedback (`docs/DESIGN.md` §5, Motion). */
+  .unsubscribe-reveal {
+    display: grid;
+    grid-template-rows: 1fr;
     margin-top: 14px;
+    transition:
+      grid-template-rows 200ms ease-out,
+      opacity 200ms ease-out;
+  }
+
+  @starting-style {
+    .unsubscribe-reveal {
+      grid-template-rows: 0fr;
+      opacity: 0;
+    }
+  }
+
+  .unsubscribe-controls {
+    min-height: 0;
+    overflow: hidden;
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
@@ -831,11 +866,11 @@
     padding-top: 34px;
   }
 
-  /* One band, one height. The field inside is drawn at the full 620px
-     measure; this container clips it, so the band's length follows the
-     viewport while its 64px height never changes. */
+  /* One band, one height. The field inside is drawn at the paper's full
+     708px content width; this container clips it, so the band's length
+     follows the viewport while its 114px height never changes. */
   .daily-band {
-    height: 64px;
+    height: 114px;
     margin-bottom: 40px;
     overflow: hidden;
   }
@@ -847,15 +882,11 @@
     background: var(--band-0);
   }
 
-  /* Reader. The one screen that breaks the card (`docs/DESIGN.md` §4): its
-     own 720px paper with `32px 84px 64px` padding and no fixed height, which
-     leaves the 552px measure. The shell carries the class so the masthead
-     narrows with the article. */
-  .paper-reader {
-    max-width: 720px;
-    padding: 32px 84px 0;
-  }
-
+  /* Reader. `docs/DESIGN.md` §4 drew it as its own narrower 720px paper, but
+     rendered, the swap resized the masthead between screens — and §5 holds
+     that the tabs never move or change. The departure is recorded in §4: the
+     Reader sits on the same 820px paper and the same measure as every other
+     screen, keeping only its own inner rhythm. */
   .reader-view {
     padding-top: 40px;
     padding-bottom: 64px;
@@ -901,6 +932,22 @@
   .reader-fallback,
   .article-body {
     margin-top: 48px;
+  }
+
+  /* Extraction answers on the network's clock, not the Owner's, so its
+     arrival — the article, or the fallback — enters on a breath: a 200ms
+     fade, opacity only, the paper and the prose holding still. The Owner's
+     own flips stay instant (`docs/DESIGN.md` §5, Motion). */
+  .article-body,
+  .reader-fallback {
+    transition: opacity 200ms ease-out;
+  }
+
+  @starting-style {
+    .article-body,
+    .reader-fallback {
+      opacity: 0;
+    }
   }
 
   /* Article body: `300 18.5px/1.74` on the body ink. Spacing between blocks
@@ -1195,11 +1242,7 @@
   }
 
   /* The reader keeps its structure and steps its type down with everything
-     else; the 720px paper simply becomes the phone's width. */
-  .paper-reader {
-    padding: 28px 24px 0;
-  }
-
+     else on the one paper. */
   .reader-view {
     padding-top: 32px;
   }
@@ -1311,6 +1354,15 @@
   .day-heading {
     margin-bottom: 20px;
     font-size: 12px;
+  }
+}
+
+/* Reduced motion: gentler, not zero. The fades stay — opacity alone unsettles
+   nothing — while the one height change goes instant, so nothing on the page
+   travels. */
+@media (prefers-reduced-motion: reduce) {
+  .unsubscribe-reveal {
+    transition-property: opacity;
   }
 }
 
