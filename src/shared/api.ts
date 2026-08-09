@@ -224,6 +224,46 @@ export const refreshFeedResponseSchema = z.object({
 })
 export type RefreshFeedResponse = z.infer<typeof refreshFeedResponseSchema>
 
+/** How much history the opened Feed's cadence grid draws, in week columns. */
+export const CADENCE_GRID_WEEKS = 26
+
+/** One observed day of a Feed's publishing rhythm, in the installation timezone. */
+export const cadenceObservationSchema = z.object({
+  date: z.string(),
+  count: z.number().int().nonnegative(),
+})
+export type CadenceObservation = z.infer<typeof cadenceObservationSchema>
+
+/**
+ * One retained Feed Item inside its own Feed, where the source label would be
+ * redundant. `date` is the installation-timezone day the cadence grid jumps
+ * to; `displayDate` is the same day said the way the meta row says it.
+ */
+export const feedItemRowSchema = z.object({
+  feedItemId: z.number().int().positive(),
+  title: z.string(),
+  link: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  firstSeenAt: z.string(),
+  date: z.string(),
+  displayDate: z.string(),
+})
+export type FeedItemRow = z.infer<typeof feedItemRowSchema>
+
+/**
+ * One opened Feed: identity, retained Feed Items, the cadence observations
+ * behind the grid, and the polling behaviour the Owner manages there.
+ * `cadence` runs oldest to newest from the first day of the grid window
+ * through today, so a fixed dataset always draws the same grid.
+ */
+export const feedDetailSchema = feedSummarySchema.extend({
+  availability: feedAvailabilitySchema,
+  schedule: pollingScheduleSchema,
+  cadence: z.array(cadenceObservationSchema),
+  items: z.array(feedItemRowSchema),
+})
+export type FeedDetail = z.infer<typeof feedDetailSchema>
+
 export const digestItemSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),

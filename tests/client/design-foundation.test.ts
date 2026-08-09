@@ -146,10 +146,34 @@ describe('layout', () => {
     // Every `outline: none` must sit inside a `:focus-visible` block that
     // draws something in its place — minimalism is not a reason to make the
     // keyboard invisible.
-    expect(focusRules).toHaveLength(2)
-    expect(suppressions).toHaveLength(2)
+    expect(focusRules).toHaveLength(3)
+    expect(suppressions).toHaveLength(3)
     expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-ink\)/)
     expect(focusRules.join('\n')).toMatch(/text-decoration: underline/)
+    // A cadence cell cannot take an underline, so its focus is the accent
+    // drawn as a rule beneath the square.
+    expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-accent\)/)
+  })
+})
+
+describe('the Feeds tab', () => {
+  it('keeps the search/add control sticky on the paper with the documented rhythm', () => {
+    expect(lightOnly()).toMatch(/\.feed-search\s*\{[^}]*position:\s*sticky/)
+    expect(lightOnly()).toMatch(/\.feed-search\s*\{[^}]*padding:\s*8px 0 32px/)
+    expect(lightOnly()).toMatch(/\.feed-search\s*\{[^}]*background:\s*var\(--color-paper\)/)
+  })
+
+  it('draws the cadence grid at 11px cells on a 3px gap, one step smaller when narrow', () => {
+    expect(lightOnly()).toMatch(/\.cadence-figure\s*\{[^}]*--cadence-cell:\s*11px/)
+    expect(lightOnly()).toMatch(/\.cadence-figure\s*\{[^}]*--cadence-gap:\s*3px/)
+
+    const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+    expect(narrow).toMatch(/\.cadence-figure\s*\{[^}]*--cadence-cell:\s*9px/)
+  })
+
+  it('keeps the month labels and stat line on the documented axis scale', () => {
+    expect(lightOnly()).toMatch(/\.cadence-month\s*\{[^}]*font-size:\s*11\.5px/)
+    expect(lightOnly()).toMatch(/\.cadence-stats\s*\{[^}]*font-size:\s*12\.5px/)
   })
 })
 

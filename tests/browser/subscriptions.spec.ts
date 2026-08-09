@@ -8,8 +8,9 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await page.getByLabel('confirm password').fill(OWNER_PASSWORD)
   await page.getByRole('button', { name: 'claim' }).click()
   await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'exact RSS or Atom URL' }).fill(installation.feedUrl)
-  await page.getByRole('button', { name: 'subscribe' }).click()
+  // One sticky control searches and adds: an exact URL subscribes on enter.
+  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
+  await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
 
@@ -38,12 +39,55 @@ async function expectFeedAndDigest(page: Page, installation: Installation): Prom
   )
 }
 
+/** Opens the subscribed Feed and walks the cadence-focused management flow. */
+async function expectOpenFeed(page: Page): Promise<void> {
+  const narrow = (page.viewportSize()?.width ?? 0) <= 640
+
+  await page.getByRole('link', { name: 'Field Notes' }).click()
+  await expect(page.getByRole('group', { name: /26 weeks of publishing cadence for Field Notes/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: '← feeds' })).toBeVisible()
+  await expect(page.getByText('publisher.example')).toBeVisible()
+
+  // The grid keeps its 26 × 7 structure at both widths; only the cell steps down.
+  await expect(page.locator('.cadence-cell').first()).toHaveCSS('width', narrow ? '9px' : '11px')
+  expect(await page.locator('.cadence-cell').count()).toBeGreaterThanOrEqual(176)
+  expect(await page.locator('.cadence-month').count()).toBeGreaterThanOrEqual(3)
+  await expect(page.getByText(/1 post in 26 weeks/)).toBeVisible()
+
+  // The one represented day is selectable, by keyboard, and moves focus to
+  // that day's Feed Items.
+  const day = page.locator('button.cadence-cell')
+  await expect(day).toHaveCount(1)
+  await day.press('Enter')
+  expect(await page.evaluate(() => document.activeElement?.textContent)).toContain('First light')
+  await expect(page.getByText('today, 07:15')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'save First light' })).toBeDisabled()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => window.innerWidth),
+  )
+
+  // Managing polling behaviour: the interval presets and the manual refresh.
+  await expect(page.getByRole('button', { name: 'check every 2 hours' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'check every 6 hours' }).click()
+  await expect(page.getByText('now checked every 6 hours')).toBeVisible()
+  await page.getByRole('button', { name: 'refresh now' }).click()
+  await expect(page.getByText(/refreshed — the feed shows 1 item/)).toBeVisible()
+
+  await page.getByRole('link', { name: '← feeds' }).click()
+  await expect(page.getByRole('textbox', { name: 'search or add feeds' })).toBeVisible()
+}
+
 test.describe('desktop Feed and Digest rendering', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
   test('keeps the accepted 820px paper and complete content shape', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
     await expect(page.locator('.paper')).toHaveCSS('width', '820px')
+  })
+
+  test('opens one Feed into its cadence grid and manages it there', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await expectOpenFeed(page)
   })
 })
 
@@ -54,5 +98,10 @@ test.describe('phone Feed and Digest rendering', () => {
     await expectFeedAndDigest(page, installation)
     await expect(page.locator('.paper')).toHaveCSS('width', '390px')
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+  })
+
+  test('keeps the whole cadence grid selectable inside the narrow paper', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await expectOpenFeed(page)
   })
 })

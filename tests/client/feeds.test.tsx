@@ -39,7 +39,7 @@ afterEach(() => {
 })
 
 describe('Feeds', () => {
-  it('accepts an exact Feed URL and shows the accepted Feed shape immediately', async () => {
+  it('accepts an exact Feed URL in the search/add control and shows the accepted Feed shape immediately', async () => {
     const api = stubApi()
       .on('GET /api/feeds', { body: { subscriptions: [] } })
       .on('POST /api/subscriptions', {
@@ -50,8 +50,8 @@ describe('Feeds', () => {
     const { container } = render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /exact rss or atom url/i }), FEED.enteredUrl)
-    await user.click(screen.getByRole('button', { name: 'subscribe' }))
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.keyboard('{Enter}')
 
     expect(await screen.findByText('Field Notes')).toBeDefined()
     expect(screen.getByText('feeds.example')).toBeDefined()
@@ -60,6 +60,36 @@ describe('Feeds', () => {
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
   })
 
+  it('treats a line that is not a URL as a search, never as something to submit', async () => {
+    const api = stubApi().on('GET /api/feeds', {
+      body: { subscriptions: [FEED, { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example' }] },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Other Wire')).toBeDefined()
+    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'field{Enter}')
+
+    expect(screen.getByText('Field Notes')).toBeDefined()
+    expect(screen.queryByText('Other Wire')).toBeNull()
+    expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
+
+    await user.clear(screen.getByRole('textbox', { name: /search or add feeds/i }))
+    expect(await screen.findByText('Other Wire')).toBeDefined()
+  })
+
+  it('says calmly when no Feed matches the search', async () => {
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Field Notes')).toBeDefined()
+    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'nothing like this')
+
+    expect(await screen.findByText('no feeds match')).toBeDefined()
+  })
 
   it('does not let a stale initial list replace a Subscription that just completed', async () => {
     let release: ((reply: Reply) => void) | undefined
@@ -76,8 +106,8 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /exact rss or atom url/i }), FEED.enteredUrl)
-    await user.click(screen.getByRole('button', { name: 'subscribe' }))
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.keyboard('{Enter}')
     expect(await screen.findByText('Field Notes')).toBeDefined()
 
     release?.({ body: { subscriptions: [] } })
@@ -94,8 +124,8 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /exact rss or atom url/i }), FEED.enteredUrl)
-    await user.click(screen.getByRole('button', { name: 'subscribe' }))
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.keyboard('{Enter}')
 
     expect(await screen.findByText('already subscribed')).toBeDefined()
     expect(screen.getAllByText('Field Notes')).toHaveLength(1)
@@ -221,9 +251,9 @@ describe('OPML portability', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('textbox', { name: /exact rss or atom url/i }))
-    // The subscribe button is disabled while the field is empty, so the next
-    // stops are the import input and the export link.
+    await user.click(await screen.findByRole('textbox', { name: /search or add feeds/i }))
+    // The search/add control submits itself, so the next stops are the import
+    // input and the export link.
     await user.tab()
     expect(document.activeElement).toBe(screen.getByLabelText(/import opml/i))
     await user.tab()

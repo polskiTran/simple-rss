@@ -3,8 +3,11 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   FEED_UNAVAILABLE_AFTER_FAILURES,
+  pollingIntervalMinutesSchema,
   type FeedAvailability,
   type FeedAvailabilityCategory,
+  type FeedDetail,
+  type FeedItemRow,
   type PollingIntervalMinutes,
   type PollingSchedule,
   type SubscriptionSummary,
@@ -21,6 +24,7 @@ import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
+import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
 import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 
@@ -444,6 +448,76 @@ export class SubscriptionService {
     return this.#subscribedFeeds().map((record) => summaryOf(record, cadence))
   }
 
+  /**
+   * One opened Feed: its retained Feed Items newest first, the day-by-day
+   * cadence observations behind the 26-week grid, and the polling behaviour
+   * the Owner manages from there. Days and labels use the installation
+   * timezone, so the grid reads in the Owner's own calendar.
+   */
+  detail(feedId: number): FeedDetail | undefined {
+    const record = this.#db
+      .select({
+        ...SUBSCRIBED_FEED_COLUMNS,
+        pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
+        nextPollAt: subscriptions.nextPollAt,
+      })
+      .from(feeds)
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .where(eq(feeds.id, feedId))
+      .limit(1)
+      .all()[0]
+    if (!record) return undefined
+
+    const timezone = this.#settings.read()?.timezone ?? 'UTC'
+    const now = this.#clock.now()
+    const today = dateKey(now, timezone)
+
+    const rows = this.#db
+      .select({
+        feedItemId: feedItems.id,
+        title: feedItems.title,
+        link: feedItems.link,
+        publishedAt: feedItems.publishedAt,
+        firstSeenAt: feedItems.firstSeenAt,
+      })
+      .from(feedItems)
+      .where(eq(feedItems.feedId, feedId))
+      .all()
+      .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
+      .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
+
+    const counts = new Map<string, number>()
+    const items: FeedItemRow[] = rows.map(({ row, chronology }) => {
+      const instant = new Date(chronology)
+      const date = dateKey(instant, timezone)
+      counts.set(date, (counts.get(date) ?? 0) + 1)
+      return {
+        feedItemId: row.feedItemId,
+        title: row.title ?? 'untitled',
+        link: row.link,
+        publishedAt: row.publishedAt,
+        firstSeenAt: row.firstSeenAt,
+        date,
+        displayDate: displayDate(instant, date, today, timezone),
+      }
+    })
+
+    return {
+      feedId: record.feedId,
+      title: record.title,
+      domain: record.domain,
+      enteredUrl: record.enteredUrl,
+      resolvedUrl: record.resolvedUrl,
+      availability: availabilityOf(record),
+      schedule: {
+        pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(record.pollingIntervalMinutes),
+        nextPollAt: record.nextPollAt,
+      },
+      cadence: gridDayKeys(today).map((date) => ({ date, count: counts.get(date) ?? 0 })),
+      items,
+    }
+  }
+
   #subscribedFeeds(): readonly SubscribedFeedRecord[] {
     return this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)
@@ -472,13 +546,7 @@ export class SubscriptionService {
     const timezone = this.#settings.read()?.timezone ?? 'UTC'
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
-    const indexByDate = new Map<string, number>()
-    for (let index = 0; index < 30; index += 1) {
-      const key = new Date(Date.parse(`${today}T00:00:00.000Z`) - (29 - index) * 24 * 60 * 60 * 1_000)
-        .toISOString()
-        .slice(0, 10)
-      indexByDate.set(key, index)
-    }
+    const indexByDate = new Map(trailingDayKeys(today, 30).map((key, index) => [key, index]))
 
     const cadence = new Map<number, number[]>()
     const rows = this.#db
@@ -593,4 +661,34 @@ function loggableUrl(value: string): string {
 
 function emptyCadence(): number[] {
   return Array.from({ length: 30 }, () => 0)
+}
+
+/**
+ * The meta-row date inside one Feed, where the day carries the meaning the
+ * Digest's grouping would otherwise give: `today, 07:15`, `yesterday, 09:31`,
+ * then `3 august`, with the year only once it stops being this one.
+ */
+function displayDate(instant: Date, itemDate: string, today: string, timezone: string): string {
+  if (itemDate === today) return `today, ${timeLabel(instant, timezone)}`
+  const yesterday = trailingDayKeys(today, 2)[0]
+  if (itemDate === yesterday) return `yesterday, ${timeLabel(instant, timezone)}`
+
+  const sameYear = itemDate.slice(0, 4) === today.slice(0, 4)
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    day: 'numeric',
+    month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  })
+    .format(instant)
+    .toLowerCase()
+}
+
+function timeLabel(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date)
 }

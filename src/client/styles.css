@@ -297,7 +297,9 @@
      its own — still a rule under text rather than a box around it. */
   .text-button:focus-visible,
   .tab:focus-visible,
-  .opml-export:focus-visible {
+  .opml-export:focus-visible,
+  .feed-open:focus-visible,
+  .feed-back:focus-visible {
     outline: none;
     text-decoration: underline;
     text-underline-offset: 4px;
@@ -313,28 +315,169 @@
     color: var(--color-quiet);
   }
 
-  .feed-form {
-    display: flex;
-    align-items: end;
-    gap: 24px;
+  /* One control searches and adds. Sticky with the paper's own tone behind
+     it, so the list scrolls away underneath while the field holds still. */
+  .feed-search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 8px 0 32px;
+    background: var(--color-paper);
   }
 
-  .feed-url-field {
-    flex: 1;
+  .feed-search-input {
+    width: 100%;
   }
 
-  .subscribe-button {
-    padding-bottom: 8px;
-    transform: scale(1);
-    transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
-  }
-
-  .subscribe-button:active:not(:disabled) {
-    transform: scale(0.97);
+  .feed-search-input::placeholder {
+    color: var(--color-meta);
+    opacity: 1;
   }
 
   .feed-notice {
     margin-top: 8px;
+  }
+
+  /* The opened Feed's header: the way back, the name, and the domain on one
+     quiet line. Header to content is 40px, per the layout table. */
+  .feed-header {
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    margin: 0 0 40px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--color-meta);
+  }
+
+  .feed-back {
+    flex: none;
+  }
+
+  .feed-header-title {
+    color: var(--color-ink-strong);
+  }
+
+  /* The 26-week cadence grid: 7 rows of 11px squares, gap 3, columns oldest
+     to newest. The pitch (cell + gap) places the month labels under their
+     columns. */
+  .cadence-figure {
+    --cadence-cell: 11px;
+    --cadence-gap: 3px;
+    --cadence-pitch: calc(var(--cadence-cell) + var(--cadence-gap));
+  }
+
+  .cadence-grid {
+    display: grid;
+    grid-template-rows: repeat(7, var(--cadence-cell));
+    grid-auto-flow: column;
+    grid-auto-columns: var(--cadence-cell);
+    gap: var(--cadence-gap);
+  }
+
+  .cadence-cell {
+    width: var(--cadence-cell);
+    height: var(--cadence-cell);
+    border: 0;
+    padding: 0;
+    background: var(--cadence-0);
+  }
+
+  .cadence-cell[data-level='1'] {
+    background: var(--cadence-1);
+  }
+
+  .cadence-cell[data-level='2'] {
+    background: var(--cadence-2);
+  }
+
+  .cadence-cell[data-level='3'] {
+    background: var(--cadence-3);
+  }
+
+  .cadence-cell[data-level='4'] {
+    background: var(--color-ink);
+  }
+
+  button.cadence-cell {
+    cursor: pointer;
+  }
+
+  /* A square cannot take a text underline, so keyboard focus is the accent
+     drawn as a rule beneath it — the cursor of keyboard navigation, which is
+     one of the accent's two uses. The height gives the border's pixels back,
+     so the grid never shifts. */
+  .cadence-cell:focus-visible {
+    outline: none;
+    height: calc(var(--cadence-cell) - 2px);
+    border-bottom: 2px solid var(--color-accent);
+  }
+
+  .cadence-months {
+    position: relative;
+    height: 12px;
+    margin-top: 10px;
+  }
+
+  .cadence-month {
+    position: absolute;
+    top: 0;
+    left: calc(var(--column) * var(--cadence-pitch));
+    font-size: 11.5px;
+    line-height: 1;
+    color: var(--color-quiet);
+    white-space: nowrap;
+  }
+
+  .cadence-stats {
+    margin: 18px 0 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--color-muted);
+  }
+
+  /* Feed actions are words: the interval presets read like the tab bar, with
+     the chosen one in ink, and the manual refresh sits at the other end. */
+  .feed-controls {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 18px;
+  }
+
+  .interval-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+  }
+
+  .interval-caption {
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--color-quiet);
+    white-space: nowrap;
+  }
+
+  .interval-option {
+    font-size: 12.5px;
+    color: var(--color-quiet);
+    white-space: nowrap;
+  }
+
+  .interval-option[aria-pressed='true'] {
+    color: var(--color-ink-strong);
+  }
+
+  .feed-refresh {
+    flex: none;
+  }
+
+  .feed-items,
+  .feed-items-state {
+    margin-top: 44px;
   }
 
   /* Import and export are words too, sitting quietly under the form. */
@@ -557,10 +700,6 @@
     font-size: 12px;
   }
 
-  .feed-form {
-    gap: 16px;
-  }
-
   .opml-controls {
     gap: 18px;
     font-size: 12px;
@@ -584,9 +723,12 @@
     font-size: 12px;
   }
 
+  /* Under the name, per the 390px reference: the strip sits at the left
+     margin with the domain beside it. */
   .feed-row {
     display: grid;
     grid-template-columns: auto 1fr;
+    column-gap: 24px;
     align-items: end;
   }
 
@@ -599,15 +741,15 @@
   }
 
   .feed-row .content-meta {
-    grid-column: 1;
+    grid-column: 2;
     grid-row: 2;
   }
 
   .cadence-strip {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 2;
     grid-template-columns: repeat(14, 6px);
-    justify-self: end;
+    justify-self: start;
     padding-bottom: 0;
   }
 
@@ -621,6 +763,40 @@
     font-size: 12px;
   }
 
+  .feed-header {
+    gap: 16px;
+    font-size: 13px;
+  }
+
+  /* The grid keeps all 26 columns and 7 rows — nothing reflows or hides —
+     with the cells one step smaller so the columns fit the narrow paper. */
+  .cadence-figure {
+    --cadence-cell: 9px;
+    --cadence-gap: 2px;
+  }
+
+  .cadence-month {
+    font-size: 11px;
+  }
+
+  .cadence-stats {
+    font-size: 12px;
+  }
+
+  .interval-option,
+  .interval-caption {
+    font-size: 12px;
+  }
+
+  .feed-controls {
+    flex-wrap: wrap;
+  }
+
+  .feed-items,
+  .feed-items-state {
+    margin-top: 32px;
+  }
+
   .day-group + .day-group {
     margin-top: 32px;
   }
@@ -628,12 +804,6 @@
   .day-heading {
     margin-bottom: 20px;
     font-size: 12px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .subscribe-button {
-    transition: none;
   }
 }
 

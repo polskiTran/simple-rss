@@ -1,8 +1,9 @@
 import { useAccess, type Gate } from './authentication.js'
 import { TabBar } from './components/tab-bar.js'
 import { Wordmark } from './components/wordmark.js'
-import { useNavigation, type Route } from './routing.js'
+import { useNavigation, type Navigation } from './routing.js'
 import { DigestView } from './views/digest-view.js'
+import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
 import { EmptyView } from './views/empty-view.js'
 import { LoginView } from './views/login-view.js'
@@ -20,21 +21,21 @@ import { SetupView } from './views/setup-view.js'
  * would be furniture pretending to be a way through.
  */
 export function App() {
-  const { route, navigate } = useNavigation()
+  const navigation = useNavigation()
   const gate = useAccess()
 
   return (
     <div className="paper">
       <header className="masthead">
         <Wordmark />
-        {gate.access.kind === 'open' ? <TabBar active={route} onNavigate={navigate} /> : null}
+        {gate.access.kind === 'open' ? <TabBar active={navigation.route} onNavigate={navigation.navigate} /> : null}
       </header>
-      <main>{viewFor(gate, route)}</main>
+      <main>{viewFor(gate, navigation)}</main>
     </div>
   )
 }
 
-function viewFor(gate: Gate, route: Route) {
+function viewFor(gate: Gate, navigation: Navigation) {
   switch (gate.access.kind) {
     // Nothing, deliberately: the first answer arrives in a moment, and a flash
     // of the wrong screen is worse than a blank one.
@@ -47,16 +48,20 @@ function viewFor(gate: Gate, route: Route) {
     case 'locked':
       return <LoginView onSignedIn={gate.adopt} />
     case 'open':
-      return readerViewFor(route, gate)
+      return readerViewFor(navigation, gate)
   }
 }
 
-function readerViewFor(route: Route, gate: Gate) {
-  switch (route) {
+function readerViewFor(navigation: Navigation, gate: Gate) {
+  switch (navigation.route) {
     case 'digest':
       return <DigestView />
     case 'feeds':
-      return <FeedsView />
+      return navigation.feedId === undefined ? (
+        <FeedsView onOpenFeed={navigation.openFeed} />
+      ) : (
+        <FeedView feedId={navigation.feedId} onBack={() => navigation.navigate('feeds')} />
+      )
     case 'saved':
       return <EmptyView note="nothing saved yet" />
     case 'settings':

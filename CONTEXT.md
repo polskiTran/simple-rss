@@ -40,6 +40,10 @@ _Avoid_: Post, article
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch
 
+**Cadence**:
+A Feed's publishing rhythm, drawn from retained Feed Items as per-day counts in the installation timezone and rendered at four ink levels — a strip on the Feeds list, a 26-week grid on an opened Feed.
+_Avoid_: Activity graph, contribution graph, frequency chart
+
 **Digest**:
 The time-grouped collection of Feed Items from the Owner's Subscriptions.
 _Avoid_: Inbox, reading list

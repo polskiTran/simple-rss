@@ -23,30 +23,62 @@ export function routeOf(pathname: string): Route {
   return ROUTES.find((route) => route === first) ?? DEFAULT_ROUTE
 }
 
+/** The one nested place: `/feeds/7` is the Feeds tab with one Feed open. */
+export function feedPathOf(feedId: number): string {
+  return `/feeds/${feedId}`
+}
+
+export function feedIdOf(pathname: string): number | undefined {
+  const [first, second] = pathname.split('/').filter(Boolean)
+  if (first !== 'feeds' || !second || !/^[1-9]\d*$/.test(second)) return undefined
+  const feedId = Number(second)
+  return Number.isSafeInteger(feedId) ? feedId : undefined
+}
+
 export interface Navigation {
   readonly route: Route
+  /** Set while one Feed is open inside the Feeds tab. */
+  readonly feedId: number | undefined
   navigate(route: Route): void
+  openFeed(feedId: number): void
+}
+
+interface Location {
+  readonly route: Route
+  readonly feedId: number | undefined
 }
 
 /**
  * A history-backed router in place of a routing library. Four sibling views
- * with no nesting, params, or loaders do not justify the dependency.
+ * with one nested Feed do not justify the dependency.
  */
 export function useNavigation(): Navigation {
-  const [route, setRoute] = useState<Route>(() => routeOf(window.location.pathname))
+  const [location, setLocation] = useState<Location>(() => locationOf(window.location.pathname))
 
   useEffect(() => {
-    const onPopState = () => setRoute(routeOf(window.location.pathname))
+    const onPopState = () => setLocation(locationOf(window.location.pathname))
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   const navigate = useCallback((next: Route) => {
-    if (routeOf(window.location.pathname) !== next) {
+    if (window.location.pathname !== pathOf(next)) {
       window.history.pushState(null, '', pathOf(next))
     }
-    setRoute(next)
+    setLocation({ route: next, feedId: undefined })
   }, [])
 
-  return { route, navigate }
+  const openFeed = useCallback((feedId: number) => {
+    if (window.location.pathname !== feedPathOf(feedId)) {
+      window.history.pushState(null, '', feedPathOf(feedId))
+    }
+    setLocation({ route: 'feeds', feedId })
+  }, [])
+
+  return { ...location, navigate, openFeed }
+}
+
+function locationOf(pathname: string): Location {
+  const route = routeOf(pathname)
+  return { route, feedId: route === 'feeds' ? feedIdOf(pathname) : undefined }
 }

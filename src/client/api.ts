@@ -3,14 +3,19 @@ import {
   authStatusSchema,
   createSubscriptionResponseSchema,
   digestSchema,
+  feedDetailSchema,
   opmlImportReportSchema,
+  pollingScheduleSchema,
   refreshFeedResponseSchema,
   subscriptionListSchema,
   serviceMetaSchema,
   type AuthStatus,
   type CreateSubscriptionResponse,
   type Digest,
+  type FeedDetail,
   type OpmlImportReport,
+  type PollingIntervalMinutes,
+  type PollingSchedule,
   type RefreshFeedResponse,
   type SubscriptionList,
   type ServiceMeta,
@@ -138,6 +143,23 @@ export async function refreshFeed(feedId: number): Promise<RefreshFeedResponse> 
 export async function fetchSubscriptions(): Promise<SubscriptionList> {
   const response = await request('/api/feeds')
   return subscriptionListSchema.parse(await response.json())
+}
+
+export async function fetchFeedDetail(feedId: number): Promise<FeedDetail> {
+  const response = await request(`/api/feeds/${feedId}`)
+  return feedDetailSchema.parse(await response.json())
+}
+
+export async function updatePollingInterval(
+  feedId: number,
+  pollingIntervalMinutes: PollingIntervalMinutes,
+): Promise<PollingSchedule> {
+  const response = await request(`/api/feeds/${feedId}/interval`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ pollingIntervalMinutes }),
+  })
+  return pollingScheduleSchema.parse(await response.json())
 }
 
 export async function fetchDigest(): Promise<Digest> {

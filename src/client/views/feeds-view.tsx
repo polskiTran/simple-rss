@@ -1,20 +1,23 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import type {
-  FeedAvailabilityCategory,
-  OpmlImportFeed,
-  OpmlImportReport,
-  SubscriptionSummary,
-} from '../../shared/api.js'
+import type { OpmlImportFeed, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
+import { cadenceLevel } from '../cadence.js'
+import { feedPathOf } from '../routing.js'
+import { AVAILABILITY_COPY, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
 
 type SubscriptionState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly subscriptions: readonly SubscriptionSummary[] }
   | { readonly kind: 'unavailable' }
 
-export function FeedsView() {
+export interface FeedsViewProps {
+  /** Told when the Owner opens one Feed from the list. */
+  onOpenFeed(feedId: number): void
+}
+
+export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [state, setState] = useState<SubscriptionState>({ kind: 'loading' })
-  const [url, setUrl] = useState('')
+  const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
   const [subscribing, setSubscribing] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -43,8 +46,14 @@ export function FeedsView() {
     }
   }, [])
 
-  async function subscribe(event: FormEvent<HTMLFormElement>) {
+  /**
+   * One control searches and adds. Typing narrows the list; a line that is an
+   * exact Feed URL subscribes on enter, which is the only thing a URL can
+   * usefully mean here.
+   */
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const url = feedUrlOf(query)
     if (!url || subscribing) return
 
     setSubscribing(true)
@@ -58,7 +67,7 @@ export function FeedsView() {
         }
         return { kind: 'loaded', subscriptions: [...current.subscriptions, created.subscription] }
       })
-      setUrl('')
+      setQuery('')
       setNotice(
         created.importedItems === 1
           ? 'subscribed — 1 item added to the digest'
@@ -118,22 +127,18 @@ export function FeedsView() {
 
   return (
     <div className="view measure feeds-view">
-      <form className="feed-form" onSubmit={subscribe}>
-        <label className="field feed-url-field">
-          <span className="field-label">exact RSS or Atom URL</span>
-          <input
-            className="field-input"
-            type="url"
-            inputMode="url"
-            autoComplete="url"
-            spellCheck={false}
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-          />
-        </label>
-        <button className="text-button subscribe-button" type="submit" disabled={subscribing || !url}>
-          {subscribing ? 'subscribing…' : 'subscribe'}
-        </button>
+      <form className="feed-search" onSubmit={submit}>
+        <input
+          className="field-input feed-search-input"
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          aria-label="search or add feeds"
+          placeholder="search or add feeds"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
       </form>
       <div className="opml-controls">
         <label className="opml-import">
@@ -151,12 +156,24 @@ export function FeedsView() {
         </a>
       </div>
       <p className="notice feed-notice" aria-live="polite">
-        {notice}
+        {subscribing ? 'subscribing…' : notice}
       </p>
       <ImportReport report={report} />
-      <SubscriptionList state={state} retryingFeedId={retryingFeedId} onRetry={retry} />
+      <SubscriptionList
+        state={state}
+        query={query}
+        retryingFeedId={retryingFeedId}
+        onRetry={retry}
+        onOpen={onOpenFeed}
+      />
     </div>
   )
+}
+
+/** The entered line, when it is an exact Feed URL rather than a search. */
+function feedUrlOf(query: string): string | undefined {
+  const line = query.trim()
+  return /^https?:\/\/\S+$/i.test(line) ? line : undefined
 }
 
 function readFileText(file: File): Promise<string> {
@@ -202,23 +219,45 @@ function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
 
 function SubscriptionList({
   state,
+  query,
   retryingFeedId,
   onRetry,
+  onOpen,
 }: {
   state: SubscriptionState
+  query: string
   retryingFeedId: number | undefined
   onRetry: (feedId: number) => void
+  onOpen: (feedId: number) => void
 }) {
   if (state.kind === 'loading') return <p className="empty-note subscription-list-state">loading feeds</p>
   if (state.kind === 'unavailable') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
   if (state.subscriptions.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
 
+  const shown = state.subscriptions.filter((subscription) => matches(subscription, query))
+  if (shown.length === 0) return <p className="empty-note subscription-list-state">no feeds match</p>
+
   return (
     <div className="content-list subscription-list" aria-label="Subscriptions">
-      {state.subscriptions.map((subscription) => (
+      {shown.map((subscription) => (
         <article className="content-item feed-row" key={subscription.feedId}>
           <div className="feed-row-main">
-            <h2 className="content-item-title">{subscription.title}</h2>
+            <h2 className="content-item-title">
+              <a
+                className="feed-open"
+                href={feedPathOf(subscription.feedId)}
+                onClick={(event) => {
+                  // Let the browser handle anything that is not a plain left click.
+                  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+                    return
+                  }
+                  event.preventDefault()
+                  onOpen(subscription.feedId)
+                }}
+              >
+                {subscription.title}
+              </a>
+            </h2>
             <CadenceStrip counts={subscription.cadence} title={subscription.title} />
           </div>
           <div className="content-meta">
@@ -232,6 +271,15 @@ function SubscriptionList({
         </article>
       ))}
     </div>
+  )
+}
+
+/** A search narrows by what the row shows: the Feed's name and its domain. */
+function matches(subscription: SubscriptionSummary, query: string): boolean {
+  const line = query.trim().toLowerCase()
+  if (!line || line.startsWith('http://') || line.startsWith('https://')) return true
+  return (
+    subscription.title.toLowerCase().includes(line) || subscription.domain.toLowerCase().includes(line)
   )
 }
 
@@ -274,20 +322,6 @@ function AvailabilityNote({
   )
 }
 
-/** One calm phrase per safe failure category the server records. */
-const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
-  unreachable: 'the feed cannot be reached',
-  timeout: 'the feed is taking too long to respond',
-  too_large: 'the feed has grown past the 2 MiB limit',
-  unsupported_content: 'the URL no longer returns feed content',
-  http_error: 'the publisher is answering with an error',
-  invalid_feed: 'the feed is returning unusable XML',
-}
-
-function noteDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
 function CadenceStrip({ counts, title }: { counts: readonly number[]; title: string }) {
   const total = counts.reduce((sum, count) => sum + count, 0)
   return (
@@ -297,38 +331,6 @@ function CadenceStrip({ counts, title }: { counts: readonly number[]; title: str
       ))}
     </span>
   )
-}
-
-function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
-  if (count === 0) return 0
-  if (count === 1) return 1
-  if (count <= 3) return 2
-  if (count <= 7) return 3
-  return 4
-}
-
-const SUBSCRIPTION_FAILURE_COPY: Readonly<Record<string, string>> = {
-  duplicate_subscription: 'already subscribed',
-  invalid_feed_url: 'enter an exact RSS or Atom URL',
-  feed_too_large: 'that Feed is larger than 2 MiB',
-  unsupported_feed: 'that URL does not return supported RSS or Atom',
-  malformed_feed: 'that Feed contains malformed XML',
-  feed_timeout: 'that Feed took too long to respond',
-  feed_unreachable: 'that Feed could not be reached',
-}
-
-function subscriptionFailure(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'the Feed could not be reached'
-  return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
-}
-
-/** A retry that did not work explains itself as quietly as any other failure. */
-function retryFailure(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'still unavailable — the feed could not be retrieved'
-  if (error.code === 'refresh_rate_limited') return 'checked a moment ago — wait a little before retrying'
-
-  const reason = SUBSCRIPTION_FAILURE_COPY[error.code]
-  return reason ? `still unavailable — ${reason}` : 'still unavailable — the feed could not be retrieved'
 }
 
 const IMPORT_FAILURE_COPY: Readonly<Record<string, string>> = {

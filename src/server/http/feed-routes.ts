@@ -6,6 +6,7 @@ import {
   updatePollingIntervalRequestSchema,
   type CreateSubscriptionResponse,
   type Digest,
+  type FeedDetail,
   type OpmlImportFeed,
   type OpmlImportReport,
   type PollingSchedule,
@@ -80,6 +81,17 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const service = deps.subscriptions()
     if (!service) return unavailable(c)
     return c.json<SubscriptionList>({ subscriptions: [...service.list()] }, 200, NO_STORE)
+  })
+
+  app.get('/feeds/:feedId', (c) => {
+    const service = deps.subscriptions()
+    if (!service) return unavailable(c)
+    const feedId = feedIdParameterSchema.safeParse(c.req.param('feedId'))
+    if (!feedId.success) return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
+
+    const detail = service.detail(feedId.data)
+    if (!detail) return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
+    return c.json<FeedDetail>(detail, 200, NO_STORE)
   })
 
   app.post('/feeds/:feedId/refresh', async (c) => {
