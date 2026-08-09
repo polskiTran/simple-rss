@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Digest, DigestGroup } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { DailyBand } from '../components/daily-band.js'
+import { SaveToggle } from '../components/save-toggle.js'
 
 type DigestState =
   | { readonly kind: 'loading' }
@@ -37,6 +38,23 @@ export function DigestView() {
   }, [attempt])
 
   const retry = () => setAttempt((current) => current + 1)
+
+  /** The server confirmed a membership change; the word flips in place. */
+  const setSaved = (feedItemId: number, saved: boolean) =>
+    setState((current) =>
+      current.kind === 'loaded'
+        ? {
+            kind: 'loaded',
+            digest: {
+              ...current.digest,
+              groups: current.digest.groups.map((group) => ({
+                ...group,
+                items: group.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
+              })),
+            },
+          }
+        : current,
+    )
 
   if (state.kind === 'loading') {
     return <p className="view measure empty-note">loading the digest</p>
@@ -86,14 +104,12 @@ export function DigestView() {
                 <div className="content-meta">
                   <span>{item.feedTitle}</span>
                   <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayTime}</time>
-                  <button
-                    className="save-placeholder"
-                    type="button"
-                    aria-label={`save ${item.title}`}
-                    disabled
-                  >
-                    save
-                  </button>
+                  <SaveToggle
+                    feedItemId={item.feedItemId}
+                    title={item.title}
+                    saved={item.saved}
+                    onSaved={(saved) => setSaved(item.feedItemId, saved)}
+                  />
                 </div>
               </article>
             ))}

@@ -280,7 +280,7 @@ describe('daily Digest band', () => {
 })
 describe('Digest', () => {
 
-  it('renders chronological date groups with the Feed, time, and save placeholder', async () => {
+  it('renders chronological date groups with the Feed, time, and save affordance', async () => {
     stubApi().on('GET /api/digest', {
       body: {
         today: { date: '2026-08-08', volume: 1 },
@@ -300,6 +300,7 @@ describe('Digest', () => {
                 imageUrl: null,
                 summary: 'A clear morning.',
                 firstSeenAt: '2026-08-08T09:00:00.000Z',
+                saved: false,
               },
             ],
           },
@@ -314,7 +315,7 @@ describe('Digest', () => {
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.daily-band-field')).toHaveLength(1)
     expect(screen.getByText('07:15')).toBeDefined()
-    expect((screen.getByRole('button', { name: /save first light/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: /save first light/i }).textContent).toBe('save')
     await waitFor(() => expect(container.textContent).not.toMatch(/unread/i))
   })
 
@@ -338,6 +339,7 @@ describe('Digest', () => {
                 imageUrl: null,
                 summary: null,
                 firstSeenAt: '2026-08-07T09:00:00.000Z',
+                saved: false,
               },
             ],
           },

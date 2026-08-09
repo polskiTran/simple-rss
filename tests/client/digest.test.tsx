@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -15,6 +15,7 @@ const item = (feedItemId: number, title: string, displayTime: string) => ({
   imageUrl: null,
   summary: null,
   firstSeenAt: '2026-08-08T09:00:00.000Z',
+  saved: false,
 })
 
 const DIGEST = {
@@ -49,8 +50,49 @@ describe('the chronological Digest', () => {
     expect(field?.style.boxShadow).toContain('var(--band-')
 
     // Meta is source · time · save — and nothing resembling inbox state.
-    expect(screen.getByRole('button', { name: 'save First light' })).toHaveProperty('disabled', true)
+    const save = screen.getByRole('button', { name: 'save First light' })
+    expect(save.textContent).toBe('save')
+    expect(save.getAttribute('aria-pressed')).toBe('false')
     expect(container.textContent).not.toMatch(/unread|mark|archive/i)
+  })
+
+  it('flips save to saved in place once the server confirms, and back', async () => {
+    const api = stubApi()
+      .on('GET /api/digest', { body: DIGEST })
+      .on('PUT /api/library/3', { body: { feedItemId: 3, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } })
+      .on('DELETE /api/library/3', { body: { feedItemId: 3, saved: false, savedAt: null } })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    await user.click(toggle)
+
+    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
+
+    await user.click(toggle)
+
+    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(api.requestsTo('DELETE /api/library/3')).toHaveLength(1)
+  })
+
+  it('keeps saying save when the server refuses the save', async () => {
+    stubApi()
+      .on('GET /api/digest', { body: DIGEST })
+      .on('PUT /api/library/3', { status: 503, body: { error: { code: 'unavailable', message: 'Unavailable' } } })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    await user.click(toggle)
+
+    // The word reports only what the server has confirmed.
+    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
 
   it('says today · 1 post, in the singular, when one post is all there is', async () => {

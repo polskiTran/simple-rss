@@ -6,6 +6,7 @@ import {
 } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, refreshFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
+import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
 
@@ -90,6 +91,23 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
     }
   }
 
+  /** The server confirmed a membership change; the word flips in place. */
+  function setSaved(feedItemId: number, saved: boolean) {
+    setState((current) =>
+      current.kind === 'loaded'
+        ? {
+            kind: 'loaded',
+            detail: {
+              ...current.detail,
+              items: current.detail.items.map((item) =>
+                item.feedItemId === feedItemId ? { ...item, saved } : item,
+              ),
+            },
+          }
+        : current,
+    )
+  }
+
   /** A selected day moves focus and view to that day's Feed Items. */
   function showDay(date: string) {
     const day = document.getElementById(dayAnchor(feedId, date))
@@ -124,6 +142,7 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
           onRefresh={refresh}
           onChangeInterval={changeInterval}
           onShowDay={showDay}
+          onSaved={setSaved}
         />
       ) : null}
     </div>
@@ -137,6 +156,7 @@ function OpenFeed({
   onRefresh,
   onChangeInterval,
   onShowDay,
+  onSaved,
 }: {
   detail: FeedDetail
   notice: string
@@ -144,6 +164,7 @@ function OpenFeed({
   onRefresh: () => void
   onChangeInterval: (minutes: PollingIntervalMinutes) => void
   onShowDay: (date: string) => void
+  onSaved: (feedItemId: number, saved: boolean) => void
 }) {
   const grid = cadenceGrid(detail.cadence)
   return (
@@ -174,7 +195,7 @@ function OpenFeed({
       <p className="notice feed-notice" aria-live="polite">
         {notice}
       </p>
-      <Items detail={detail} />
+      <Items detail={detail} onSaved={onSaved} />
     </>
   )
 }
@@ -243,7 +264,13 @@ function AvailabilityNote({ detail }: { detail: FeedDetail }) {
   )
 }
 
-function Items({ detail }: { detail: FeedDetail }) {
+function Items({
+  detail,
+  onSaved,
+}: {
+  detail: FeedDetail
+  onSaved: (feedItemId: number, saved: boolean) => void
+}) {
   if (detail.items.length === 0) {
     return <p className="empty-note feed-items-state">nothing retained from this feed yet</p>
   }
@@ -265,9 +292,12 @@ function Items({ detail }: { detail: FeedDetail }) {
             <h2 className="content-item-title">{item.title}</h2>
             <div className="content-meta">
               <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>
-              <button className="save-placeholder" type="button" aria-label={`save ${item.title}`} disabled>
-                save
-              </button>
+              <SaveToggle
+                feedItemId={item.feedItemId}
+                title={item.title}
+                saved={item.saved}
+                onSaved={(saved) => onSaved(item.feedItemId, saved)}
+              />
             </div>
           </article>
         )

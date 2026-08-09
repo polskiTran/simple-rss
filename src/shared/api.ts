@@ -149,11 +149,14 @@ export const pollingScheduleSchema = z.object({
 })
 export type PollingSchedule = z.infer<typeof pollingScheduleSchema>
 
-export const feedIdParameterSchema = z
+const positiveIdParameterSchema = z
   .string()
   .regex(/^[1-9]\d*$/)
   .transform(Number)
   .refine(Number.isSafeInteger)
+
+export const feedIdParameterSchema = positiveIdParameterSchema
+export const feedItemIdParameterSchema = positiveIdParameterSchema
 
 /** Exact Feed endpoint submitted by the Owner; discovery is deliberately absent. */
 export const createSubscriptionRequestSchema = z.object({
@@ -274,6 +277,7 @@ export const feedItemRowSchema = z.object({
   firstSeenAt: z.string(),
   date: z.string(),
   displayDate: z.string(),
+  saved: z.boolean(),
 })
 export type FeedItemRow = z.infer<typeof feedItemRowSchema>
 
@@ -302,6 +306,7 @@ export const digestItemSchema = z.object({
   imageUrl: z.string().nullable(),
   summary: z.string().nullable(),
   firstSeenAt: z.string(),
+  saved: z.boolean(),
 })
 export type DigestItem = z.infer<typeof digestItemSchema>
 
@@ -320,6 +325,41 @@ export const digestSchema = z.object({
   groups: z.array(digestGroupSchema),
 })
 export type Digest = z.infer<typeof digestSchema>
+
+/**
+ * One Feed Item the Owner explicitly saved, carrying its Feed attribution so
+ * a save outlives the Digest and, later, the Subscription itself. `displayDate`
+ * is the day said the way the meta row says it, like an opened Feed's items.
+ */
+export const libraryItemSchema = z.object({
+  feedItemId: z.number().int().positive(),
+  title: z.string(),
+  feedId: z.number().int().positive(),
+  feedTitle: z.string(),
+  link: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  firstSeenAt: z.string(),
+  savedAt: z.string(),
+  displayDate: z.string(),
+})
+export type LibraryItem = z.infer<typeof libraryItemSchema>
+
+export const librarySchema = z.object({
+  items: z.array(libraryItemSchema),
+})
+export type Library = z.infer<typeof librarySchema>
+
+/**
+ * Whether one Feed Item is in the Library — what both mutations answer, so a
+ * repeated save and an unsave of the already-unsaved describe the same state
+ * instead of an error.
+ */
+export const libraryMembershipSchema = z.object({
+  feedItemId: z.number().int().positive(),
+  saved: z.boolean(),
+  savedAt: z.string().nullable(),
+})
+export type LibraryMembership = z.infer<typeof libraryMembershipSchema>
 
 /** `Buffer` is unavailable in the browser half of this shared boundary. */
 function utf8ByteLength(value: string): number {

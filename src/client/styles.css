@@ -374,6 +374,7 @@
   /* A word cannot take an underline the way a field can, so it takes one of
      its own — still a rule under text rather than a box around it. */
   .text-button:focus-visible,
+  .save-toggle:focus-visible,
   .tab:focus-visible,
   .appearance-option:focus-visible,
   .opml-export:focus-visible,
@@ -693,7 +694,9 @@
     line-height: 1;
   }
 
-  .save-placeholder {
+  /* The word toggles inside one width class, so `save` becoming `saved`
+     moves nothing around it. No transition: the flip is the feedback. */
+  .save-toggle {
     min-width: 3.5em;
     border: 0;
     background: none;
@@ -701,6 +704,12 @@
     color: var(--color-quiet);
     font: inherit;
     text-align: left;
+    cursor: pointer;
+  }
+
+  /* The one place in a list the accent may appear. */
+  .save-toggle[aria-pressed='true'] {
+    color: var(--color-accent);
   }
 
   .day-group + .day-group {

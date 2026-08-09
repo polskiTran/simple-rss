@@ -5,6 +5,7 @@ import type { Sleeper } from './auth/sleeper.js'
 import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
 import { DigestService } from './digest/digest-service.js'
+import { LibraryService } from './library/library-service.js'
 import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
@@ -69,6 +70,7 @@ export function createService(options: ServiceOptions): Service {
   let subscriptions: SubscriptionService | undefined
   let refresh: FeedRefresh | undefined
   let digest: DigestService | undefined
+  let library: LibraryService | undefined
   let scheduler: PollScheduler | undefined
 
   try {
@@ -86,6 +88,7 @@ export function createService(options: ServiceOptions): Service {
     refresh = new FeedRefresh({ clock, subscriptions })
 
     digest = new DigestService({ database, clock, settings })
+    library = new LibraryService({ database, clock, settings })
     scheduler = new PollScheduler({ subscriptions, refresh, logger, ...options.scheduling })
     scheduler.start()
     readiness.markReady()
@@ -109,6 +112,7 @@ export function createService(options: ServiceOptions): Service {
     subscriptions: () => subscriptions,
     refresh: () => refresh,
     digest: () => digest,
+    library: () => library,
   })
 
   return {
@@ -139,6 +143,7 @@ export function createService(options: ServiceOptions): Service {
       subscriptions = undefined
       refresh = undefined
       digest = undefined
+      library = undefined
     },
   }
 }

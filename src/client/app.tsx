@@ -7,6 +7,7 @@ import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
 import { EmptyView } from './views/empty-view.js'
 import { LoginView } from './views/login-view.js'
+import { SavedView } from './views/saved-view.js'
 import { SettingsView } from './views/settings-view.js'
 import { SetupView } from './views/setup-view.js'
 
@@ -63,7 +64,7 @@ function readerViewFor(navigation: Navigation, gate: Gate) {
         <FeedView feedId={navigation.feedId} onBack={() => navigation.navigate('feeds')} />
       )
     case 'saved':
-      return <EmptyView note="nothing saved yet" />
+      return <SavedView />
     case 'settings':
       return <SettingsView onAccessChanged={gate.adopt} />
   }

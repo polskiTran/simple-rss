@@ -32,7 +32,7 @@ async function expectFeedAndDigest(page: Page, installation: Installation): Prom
   await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
   await expect(page.getByText('Field Notes')).toBeVisible()
   await expect(page.getByText('07:15')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'save First light' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('save')
   await expect(page.locator('main')).not.toContainText(/unread/i)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => window.innerWidth),
@@ -61,7 +61,7 @@ async function expectOpenFeed(page: Page): Promise<void> {
   await day.press('Enter')
   expect(await page.evaluate(() => document.activeElement?.textContent)).toContain('First light')
   await expect(page.getByText('today, 07:15')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'save First light' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('save')
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => window.innerWidth),
   )

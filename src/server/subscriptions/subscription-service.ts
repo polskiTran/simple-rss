@@ -13,7 +13,7 @@ import {
   type SubscriptionSummary,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey } from '../digest/chronology.js'
+import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import {
   FeedDocumentError,
   parseFeedDocument,
@@ -22,7 +22,7 @@ import { persistFeedWindow, upsertFeedItem } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { feedItems, feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
+import { feedItems, feeds, feedUrlAliases, libraryItems, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
@@ -479,8 +479,10 @@ export class SubscriptionService {
         link: feedItems.link,
         publishedAt: feedItems.publishedAt,
         firstSeenAt: feedItems.firstSeenAt,
+        savedAt: libraryItems.savedAt,
       })
       .from(feedItems)
+      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(eq(feedItems.feedId, feedId))
       .all()
       .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
@@ -498,7 +500,8 @@ export class SubscriptionService {
         publishedAt: row.publishedAt,
         firstSeenAt: row.firstSeenAt,
         date,
-        displayDate: displayDate(instant, date, today, timezone),
+        displayDate: metaRowDate(instant, date, today, timezone),
+        saved: row.savedAt !== null,
       }
     })
 
@@ -663,32 +666,3 @@ function emptyCadence(): number[] {
   return Array.from({ length: 30 }, () => 0)
 }
 
-/**
- * The meta-row date inside one Feed, where the day carries the meaning the
- * Digest's grouping would otherwise give: `today, 07:15`, `yesterday, 09:31`,
- * then `3 august`, with the year only once it stops being this one.
- */
-function displayDate(instant: Date, itemDate: string, today: string, timezone: string): string {
-  if (itemDate === today) return `today, ${timeLabel(instant, timezone)}`
-  const yesterday = trailingDayKeys(today, 2)[0]
-  if (itemDate === yesterday) return `yesterday, ${timeLabel(instant, timezone)}`
-
-  const sameYear = itemDate.slice(0, 4) === today.slice(0, 4)
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    day: 'numeric',
-    month: 'long',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  })
-    .format(instant)
-    .toLowerCase()
-}
-
-function timeLabel(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(date)
-}

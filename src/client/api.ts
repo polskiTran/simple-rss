@@ -5,6 +5,8 @@ import {
   digestSchema,
   feedDetailSchema,
   installationPreferencesSchema,
+  libraryMembershipSchema,
+  librarySchema,
   opmlImportReportSchema,
   pollingScheduleSchema,
   refreshFeedResponseSchema,
@@ -15,6 +17,8 @@ import {
   type Digest,
   type FeedDetail,
   type InstallationPreferences,
+  type Library,
+  type LibraryMembership,
   type OpmlImportReport,
   type PollingIntervalMinutes,
   type PollingSchedule,
@@ -180,6 +184,25 @@ export async function updatePollingInterval(
 export async function fetchDigest(): Promise<Digest> {
   const response = await request('/api/digest')
   return digestSchema.parse(await response.json())
+}
+
+export async function fetchLibrary(): Promise<Library> {
+  const response = await request('/api/library')
+  return librarySchema.parse(await response.json())
+}
+
+/**
+ * Both membership mutations are idempotent on the server, so a repeated tap
+ * confirms the state rather than fighting over it.
+ */
+export async function saveToLibrary(feedItemId: number): Promise<LibraryMembership> {
+  const response = await request(`/api/library/${feedItemId}`, { method: 'PUT' })
+  return libraryMembershipSchema.parse(await response.json())
+}
+
+export async function unsaveFromLibrary(feedItemId: number): Promise<LibraryMembership> {
+  const response = await request(`/api/library/${feedItemId}`, { method: 'DELETE' })
+  return libraryMembershipSchema.parse(await response.json())
 }
 
 export async function fetchInstallationPreferences(): Promise<InstallationPreferences> {

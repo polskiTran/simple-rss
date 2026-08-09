@@ -31,6 +31,7 @@ const DETAIL = {
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       date: '2026-08-08',
       displayDate: 'today, 07:15',
+      saved: false,
     },
     {
       feedItemId: 11,
@@ -40,6 +41,7 @@ const DETAIL = {
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       date: '2026-06-03',
       displayDate: '3 june',
+      saved: true,
     },
   ],
 }
@@ -86,10 +88,34 @@ describe('opening one Feed', () => {
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByText('today, 07:15')).toBeDefined()
     expect(screen.getByText('3 june')).toBeDefined()
-    expect((screen.getByRole('button', { name: /save First light/i }) as HTMLButtonElement).disabled).toBe(true)
+    // Saved state arrives with the detail: the affordance is the word itself.
+    expect(screen.getByRole('button', { name: /save First light/i }).textContent).toBe('save')
+    expect(screen.getByRole('button', { name: /save A June letter/i }).textContent).toBe('saved')
     for (const meta of container.querySelectorAll('.feed-items .content-meta')) {
       expect(meta.textContent).not.toContain('Field Notes')
     }
+  })
+
+  it('saves and unsaves a retained item in place, from this Feed', async () => {
+    const api = stubApi()
+      .on('GET /api/feeds/1', { body: DETAIL })
+      .on('PUT /api/library/12', { body: { feedItemId: 12, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } })
+      .on('DELETE /api/library/12', { body: { feedItemId: 12, saved: false, savedAt: null } })
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const toggle = await screen.findByRole('button', { name: /save First light/i })
+    await user.click(toggle)
+
+    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(api.requestsTo('PUT /api/library/12')).toHaveLength(1)
+
+    await user.click(toggle)
+
+    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    expect(api.requestsTo('DELETE /api/library/12')).toHaveLength(1)
   })
 
   it('opens directly from its own address', async () => {

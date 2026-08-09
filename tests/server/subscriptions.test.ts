@@ -107,6 +107,7 @@ describe('Subscriptions', () => {
               imageUrl: 'https://images.example/first-light.jpg',
               summary: 'A clear morning.',
               firstSeenAt: '2026-08-08T09:00:00.000Z',
+              saved: false,
             },
           ],
         },

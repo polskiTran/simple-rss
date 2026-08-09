@@ -5,6 +5,7 @@ import type { Authentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
 import type { DigestService } from './digest/digest-service.js'
+import type { LibraryService } from './library/library-service.js'
 import type { Logger } from './logger.js'
 import { assertWritable, type SqliteDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
@@ -13,6 +14,7 @@ import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
 import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
 import { feedRoutes } from './http/feed-routes.js'
+import { libraryRoutes } from './http/library-routes.js'
 import { settingsRoutes } from './http/settings-routes.js'
 import { requireSession } from './http/require-session.js'
 import { sameOrigin } from './http/same-origin.js'
@@ -36,6 +38,7 @@ export interface AppDependencies {
   readonly subscriptions: () => SubscriptionService | undefined
   readonly refresh: () => FeedRefresh | undefined
   readonly digest: () => DigestService | undefined
+  readonly library: () => LibraryService | undefined
 }
 
 /**
@@ -94,6 +97,8 @@ export function createApp(deps: AppDependencies): Hono {
       digest: deps.digest,
     }),
   )
+
+  app.route('/api', libraryRoutes({ library: deps.library }))
 
   app.get('/api/meta', (c) => c.json<ServiceMeta>({ name: 'simple-rss', version: VERSION }))
 
