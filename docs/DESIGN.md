@@ -52,6 +52,11 @@ a stylesheet fix.
 | Grey — quietest | `#6B6A66` |
 | Accent (saved) | `#E3B341` |
 
+**Selection.** Selected text is the text cursor's range, so it shares the
+caret's accent rather than the platform's blue: the accent at `.12` over light
+paper, `.2` over dark. This is the cursor role §1 already grants the accent,
+not a third use.
+
 ## 3. Type
 
 Literata only. Weights 200 / 300 (default) / 500. Italic used for the wordmark, the secondary date heading, and pull quotes.
@@ -149,6 +154,19 @@ A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `b
 
 Generation: value noise → ordered (Bayer) dither → four ink levels. Seeded by the date, so no two mornings repeat. Light levels `.07 / .16 / .30`; dark levels `.07 / .17 / .32 / .56`. It is decoration with a source — the day's own volume — not ornament.
 
+**Implementation notes.** What the accepted render fixes but the recipe above
+does not state:
+
+- The day's volume sets *coverage*, not brightness. It lowers the bar the
+  noise must clear to ink a cell, and the bar never drops so far that the
+  paper stops showing through: the reference is currents of ink in open
+  paper, and adding volume to every cell instead fills the band into a slab.
+- The noise is two octaves — a long drift whose horizontal wavelength is far
+  longer than its vertical one, which is what makes the field flow along the
+  band, and a short grain that frays the currents' edges. Both are sampled
+  skew to the pixel grid, so the noise lattice never lines up with a row of
+  cells and prints it as a stripe.
+
 In the reader it thins to a four-row strip above the article.
 
 ### Reader body
@@ -166,6 +184,17 @@ In the reader it thins to a four-row strip above the article.
 - Article links and `open original` mark their departure with ↗ and leave
   with `noopener noreferrer`; supported math stays TeX source in v1, italic,
   never executed.
+
+### Pointer response
+
+Hover is answered in the system's own vocabulary, instantly — the flip is the
+feedback here as everywhere: grey words step to ink the way the active tab
+sits in ink; words already set in ink take the hairline underline, the one
+rule the system allows. The save word is the exception — its colour is
+reserved for the saved state, so its hover steps through the greys, quietest
+to muted. Never a background, never a motion, and none of it on touch, where
+the platform's grey tap flash is suppressed and the word's own state change
+answers instead.
 
 ## 6. Density rules
 
