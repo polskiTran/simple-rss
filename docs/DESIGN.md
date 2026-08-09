@@ -89,7 +89,20 @@ Literata only. Weights 200 / 300 (default) / 500. Italic used for the wordmark, 
 ## 5. Components
 
 ### Wordmark
-A 3×3 grid of 3px squares, `gap:3px`, alternating ink / transparent starting ink (5 on, 4 off), then `simple` in italic at 10px gap.
+A 4×4 tile of 3px squares, `gap:2px`, then `simple` in italic at 10px gap. Accepted render: `docs/references/brand.png`.
+
+The tile is drawn in the cadence ramp's five ink levels — `.06 / .20 / .38 / .60 / peak ink` — not in a second set of greys, so the mark is the cadence figure at mark size and §6's four-levels rule holds. Levels by row, `0`–`4` as the cadence grid numbers them:
+
+```
+4 1 3 0
+2 4 0 2
+3 0 4 1
+0 2 1 3
+```
+
+The peak runs down the leading diagonal and then steps back to `.60` in the last cell, so the tile reads as a matrix with a direction rather than a rule drawn corner to corner. Peak ink here is the wordmark's own ink (§2: `#12110F`, dark `#F7F7F5`), the tone the name beside it is set in; the four tints are the ramp's.
+
+The tile sits centred on the name's line box, which is what puts its bottom edge on the baseline at both type sizes.
 
 ### Tab bar
 Four words, always in order: `digest · feeds · saved · settings`. Active is ink, rest are grey. The tabs never move or change between screens or breakpoints.
