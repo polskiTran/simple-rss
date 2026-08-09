@@ -136,7 +136,11 @@ export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
     const day = document.getElementById(dayAnchor(feedId, date))
     if (!day) return
     day.focus({ preventScroll: true })
-    day.scrollIntoView?.({ block: 'start' })
+    // Smooth, so the jump reads as travel down the same list rather than a
+    // teleport — and quieted by hand, because browsers do not quiet their
+    // own smooth scrolling under `prefers-reduced-motion`.
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    day.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
   }
 
   return (
@@ -268,18 +272,22 @@ function Unsubscribe({
   onUnsubscribe: () => void
 }) {
   return (
-    <div className="unsubscribe-controls" id="unsubscribe-confirmation">
-      <p className="unsubscribe-consequences">
-        this stops checking the feed and its items leave the digest — anything saved stays in your library
-      </p>
-      <p className="unsubscribe-choice">
-        <button className="text-button" type="button" disabled={working} onClick={onUnsubscribe}>
-          {working ? 'unsubscribing…' : 'unsubscribe'}
-        </button>
-        <button className="text-button" type="button" disabled={working} onClick={() => onConfirm(false)}>
-          keep subscribed
-        </button>
-      </p>
+    // The reveal carries the unfold: its grid row opens from nothing on
+    // mount, so the notice and items below arrive rather than teleport.
+    <div className="unsubscribe-reveal">
+      <div className="unsubscribe-controls" id="unsubscribe-confirmation">
+        <p className="unsubscribe-consequences">
+          this stops checking the feed and its items leave the digest — anything saved stays in your library
+        </p>
+        <p className="unsubscribe-choice">
+          <button className="text-button" type="button" disabled={working} onClick={onUnsubscribe}>
+            {working ? 'unsubscribing…' : 'unsubscribe'}
+          </button>
+          <button className="text-button" type="button" disabled={working} onClick={() => onConfirm(false)}>
+            keep subscribed
+          </button>
+        </p>
+      </div>
     </div>
   )
 }

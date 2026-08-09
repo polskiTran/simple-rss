@@ -26,10 +26,8 @@ export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
 
-  const reading = gate.access.kind === 'open' && navigation.readerItemId !== undefined
-
   return (
-    <div className={reading ? 'paper paper-reader' : 'paper'}>
+    <div className="paper">
       <header className="masthead">
         <Wordmark />
         {gate.access.kind === 'open' ? <TabBar active={navigation.route} onNavigate={navigation.navigate} /> : null}

@@ -7,14 +7,15 @@ const BAYER_4 = [
 ] as const
 
 /**
- * One band at one height. The field is drawn once at the full 620px measure
- * and the container clips it, so narrower viewports shorten the band without
- * a second element or a second height.
+ * One band at one height. The field is drawn once at the paper's full 708px
+ * content width — the masthead's own width, so the band meets the header at
+ * both edges — and the container clips it, so narrower viewports shorten the
+ * band without a second element or a second height.
  */
 export function DailyBand({ date, volume }: { date: string; volume: number }) {
   return (
     <div className="daily-band" aria-hidden="true">
-      <span className="daily-band-field" style={{ boxShadow: dailyShadows(date, volume, 620, 64) }} />
+      <span className="daily-band-field" style={{ boxShadow: dailyShadows(date, volume, 708, 114) }} />
     </div>
   )
 }

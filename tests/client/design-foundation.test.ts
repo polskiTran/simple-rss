@@ -136,9 +136,13 @@ describe('the narrow layout', () => {
 })
 
 describe('layout', () => {
-  it('holds the paper and the content measure to the design widths', () => {
+  it('holds the paper to the design width, with the measure released to it', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*max-width:\s*820px/)
-    expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*620px/)
+    // `docs/DESIGN.md` §4 drew a 620px measure; rendered, a column narrower
+    // than the masthead left every screen ragged against its own header. The
+    // departure is recorded in §4: content runs the paper's width, so
+    // re-tightening the measure is a decision, not a cleanup.
+    expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
   })
 
@@ -175,10 +179,12 @@ describe('layout', () => {
 })
 
 describe('the Feeds tab', () => {
-  it('keeps the one search treatment sticky on the paper with the documented rhythm', () => {
-    expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*position:\s*sticky/)
+  it('lets the search treatment scroll with the page, on the documented rhythm', () => {
+    // `docs/DESIGN.md` §4 drew the field sticky on a paper background; the
+    // departure is recorded there. Nothing floats over the paper, so no rule
+    // may pin itself — this holds the whole stylesheet, not just the form.
+    expect(css).not.toMatch(/position:\s*(sticky|fixed)/)
     expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*padding:\s*8px 0 32px/)
-    expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*background:\s*var\(--color-paper\)/)
   })
 
   it('draws the cadence grid at 11px cells on a 3px gap, one step smaller when narrow', () => {
@@ -214,8 +220,8 @@ describe('the Digest', () => {
     expect(lightOnly()).toMatch(/\.day-heading-count\s*\{[^}]*color:\s*var\(--color-quiet\)/)
   })
 
-  it('draws the band 64px tall, 34px under the header, the date line 40px below', () => {
-    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*height:\s*64px/)
+  it('draws the band 114px tall, 34px under the header, the date line 40px below', () => {
+    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*height:\s*114px/)
     expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*margin-bottom:\s*40px/)
     expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*overflow:\s*hidden/)
     expect(lightOnly()).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*34px/)
@@ -239,11 +245,12 @@ describe('the Digest', () => {
 })
 
 describe('the Reader', () => {
-  it('breaks the card to its own 720px paper with the 552px measure', () => {
-    // 720 wide minus 84px either side is the 552px measure; the reader-view
-    // needs no width of its own.
-    expect(lightOnly()).toMatch(/\.paper-reader\s*\{[^}]*max-width:\s*720px/)
-    expect(lightOnly()).toMatch(/\.paper-reader\s*\{[^}]*padding:\s*32px 84px 0/)
+  it('shares the one paper — no second, narrower card for the article', () => {
+    // `docs/DESIGN.md` §4 drew a 720px reader paper, but rendered, the swap
+    // resized the masthead between screens — the one thing §5 says never
+    // moves. The departure is recorded in §4; this holds the narrower card
+    // from sneaking back, because it looks like a faithful revert in review.
+    expect(css).not.toContain('paper-reader')
   })
 
   it('sets the article title and body to the §3 type table', () => {
@@ -292,7 +299,6 @@ describe('the Reader', () => {
 
   it('steps the reader down with everything else at the breakpoint', () => {
     const narrow = css.split('@media (max-width: 640px)')[1] ?? ''
-    expect(narrow).toMatch(/\.paper-reader\s*\{[^}]*padding:\s*28px 24px 0/)
     expect(narrow).toMatch(/\.reader-title\s*\{[^}]*font-size:\s*29px/)
   })
 })
