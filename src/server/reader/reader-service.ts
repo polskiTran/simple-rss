@@ -5,6 +5,7 @@ import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { SqliteDatabase } from '../persistence/database.js'
+import type { SignImageUrl } from '../images/image-url-signature.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
@@ -48,7 +49,7 @@ export class ReaderService {
   readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
-  readonly #signImageUrl: (url: string) => string
+  readonly #signImageUrl: SignImageUrl
   readonly #inFlight = new Map<number, Promise<ReaderArticleOutcome>>()
   readonly #failures = new Map<number, FailureEpisode>()
 
@@ -58,8 +59,7 @@ export class ReaderService {
     settings: InstallationSettingsStore
     retrieval: Retrieval
     digest: DigestService
-    /** Mints the signed proxy path an embedded article image travels behind. */
-    signImageUrl: (url: string) => string
+    signImageUrl: SignImageUrl
   }) {
     this.#db = drizzle(options.database)
     this.#clock = options.clock

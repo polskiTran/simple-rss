@@ -1,5 +1,6 @@
 import { Defuddle } from 'defuddle/node'
 import { parseHTML } from 'linkedom'
+import type { SignImageUrl } from '../images/image-url-signature.js'
 import { articleMarkdown } from './article-markdown.js'
 
 /**
@@ -22,7 +23,7 @@ export interface ExtractArticleInput {
   /** The address the bytes actually came from, for resolving links. */
   readonly url: string
   /** Rewrites an approved embedded image to its signed proxy path. */
-  readonly signImageUrl?: (url: string) => string
+  readonly signImageUrl?: SignImageUrl
 }
 
 /**

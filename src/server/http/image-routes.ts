@@ -21,8 +21,10 @@ export interface ImageRouteDependencies {
  * itself signed — an arbitrary target is never accepted, so the proxy cannot
  * be pointed anywhere the installation did not already decide to look.
  *
- * Every failure is the same calm 404 with `no-store`; the client draws the
- * fallback. Only a success may be kept, privately, for seven days.
+ * Refusals that name a wait keep their own status — 429 for the rate window,
+ * 503 while the boundary is at capacity — and every other failure is the same
+ * calm 404. All of them carry `no-store`, and the client draws the fallback;
+ * only a success may be kept, privately, for seven days.
  */
 export function imageRoutes(deps: ImageRouteDependencies): Hono {
   const app = new Hono()
@@ -38,14 +40,18 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
     )
   }
 
+  // On both routes the rate window is spent before any per-request work —
+  // parsing, signature checks, lookups — so a flood costs the same whether or
+  // not its requests are well-formed.
   app.get('/items/:feedItemId/image', async (c) => {
     const images = deps.images()
     if (!images) return unavailable(c)
-    const feedItemId = feedItemIdParameterSchema.safeParse(c.req.param('feedItemId'))
-    if (!feedItemId.success) return imageUnavailable(c)
 
     const refused = limited(c)
     if (refused) return refused
+
+    const feedItemId = feedItemIdParameterSchema.safeParse(c.req.param('feedItemId'))
+    if (!feedItemId.success) return imageUnavailable(c)
 
     return answer(c, await images.itemImage(feedItemId.data, c.req.raw.signal))
   })

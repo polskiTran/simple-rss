@@ -11,6 +11,12 @@ export const IMAGE_WINDOW_MS = 60_000
  */
 export const IMAGE_REQUESTS_PER_WINDOW = 240
 
+/**
+ * Map size at which expired windows are swept. Far above what one Owner's
+ * devices produce, so the sweep only ever runs under address-spoofing noise.
+ */
+const SWEEP_THRESHOLD = 256
+
 export type ImageRateVerdict = { readonly allowed: true } | { readonly allowed: false; readonly retryAfterSeconds: number }
 
 /**
@@ -49,7 +55,7 @@ export class ImageRateLimiter {
 
   /** Expired windows are dropped so strangers cannot grow the map forever. */
   #sweep(now: number): void {
-    if (this.#windows.size < 256) return
+    if (this.#windows.size < SWEEP_THRESHOLD) return
     for (const [client, window] of this.#windows) {
       if (now - window.startedAt >= IMAGE_WINDOW_MS) this.#windows.delete(client)
     }

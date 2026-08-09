@@ -81,6 +81,10 @@ describe('the Feed Item image route', () => {
     expect(response.headers.get('cache-control')).toBe(`private, max-age=${IMAGE_CACHE_SECONDS}`)
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(pngBytes())
+
+    // The proxy is what lets the image policy stay this narrow: same-origin
+    // proxied images need no publisher origins in the CSP.
+    expect(response.headers.get('content-security-policy')).toContain("img-src 'self' data:")
   })
 
   it('forwards no cookies or credentials to the publisher', async () => {

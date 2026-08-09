@@ -9,13 +9,16 @@ import type { Clock } from '../clock.js'
  */
 export const READER_IMAGE_URL_LIFETIME_SECONDS = 2 * 86_400
 
+/** Mints the signed proxy path one approved image target travels behind. */
+export type SignImageUrl = (url: string) => string
+
 export type VerifiedImageUrl =
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly reason: 'unsigned' | 'expired' | 'tampered' }
 
 export interface ImageUrlSignature {
   /** A same-origin signed path for one approved target, minted to expire. */
-  sign(url: string): string
+  readonly sign: SignImageUrl
   verify(query: URLSearchParams): VerifiedImageUrl
 }
 

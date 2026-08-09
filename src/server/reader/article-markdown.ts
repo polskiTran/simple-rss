@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { JSDOM } from 'jsdom'
+import type { SignImageUrl } from '../images/image-url-signature.js'
 
 export interface ArticleMarkdownOptions {
   /**
@@ -7,7 +8,7 @@ export interface ArticleMarkdownOptions {
    * markdown will carry. Absent — as in tests of pure structure — images are
    * simply dropped, never emitted with their publisher URL.
    */
-  readonly signImageUrl?: (url: string) => string
+  readonly signImageUrl?: SignImageUrl
 }
 
 /** What every renderer below needs to know about the article being rebuilt. */
