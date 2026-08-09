@@ -841,6 +841,7 @@
     line-height: 1.18;
     letter-spacing: -0.024em;
     text-wrap: balance;
+    overflow-wrap: break-word;
     color: var(--color-ink-strong);
   }
 
@@ -849,9 +850,10 @@
   }
 
   /* `open original` leaves the installation; the arrow says so before the
-     browser does. */
+     browser does. U+FE0E holds it to its text form — asked for the glyph
+     alone, a phone answers with the colour emoji. */
   .reader-original::after {
-    content: ' ↗';
+    content: ' \2197\FE0E';
   }
 
   .reader-extracting,
@@ -867,6 +869,10 @@
     font-size: 18.5px;
     line-height: 1.74;
     color: var(--color-body);
+    /* Articles quote addresses, hashes, and identifiers no space will break.
+       On the narrow measure one of those is wider than the paper, and without
+       this it pushes the whole column sideways rather than wrapping. */
+    overflow-wrap: break-word;
   }
 
   .article-body p,
@@ -1004,9 +1010,22 @@
   }
 
   .article-link::after {
-    content: '\2009\2197';
+    content: '\2009\2197\FE0E';
     font-size: 0.75em;
     color: var(--color-meta);
+  }
+
+  /* A publisher's figure often links to the full-size image. That link is the
+     picture, not a phrase: it keeps the image's own block and says nothing —
+     an underline and an arrow hung off a photograph read as damage. If the
+     image fails, its words take the anchor back and the marks return with them. */
+  .article-body .article-link:has(.article-image) {
+    display: block;
+    text-decoration: none;
+  }
+
+  .article-body .article-link:has(.article-image)::after {
+    content: none;
   }
 
   .reader-summary {
@@ -1014,6 +1033,7 @@
     font-size: 18.5px;
     line-height: 1.74;
     color: var(--color-body);
+    overflow-wrap: break-word;
   }
 
   .reader-fallback-actions {

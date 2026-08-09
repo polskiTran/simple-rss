@@ -56,6 +56,15 @@ test.describe('Reader View', () => {
     await expect(noteLink).toHaveAttribute('href', 'https://publisher.example/notes')
     await expect(noteLink).toHaveAttribute('rel', 'noopener noreferrer')
 
+    // The article's figure arrives through the signed same-origin proxy and
+    // actually paints — one that failed would leave its alt text behind.
+    const figureImage = page.locator('.article-body img.article-image')
+    await expect(figureImage).toHaveAttribute('src', /^\/api\/reader\/image\?/)
+    await expect(figureImage).toHaveAttribute('alt', 'the valley at dawn')
+    await expect(figureImage).toHaveJSProperty('naturalWidth', 1)
+    // Its publisher address stays out of the prose, as an address or as text.
+    await expect(page.locator('.article-body')).not.toContainText('fl_progressive')
+
     // A reload lands straight back in the article — the route is real.
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
@@ -143,7 +152,10 @@ test.describe('Reader View at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('next in the digest')).toHaveCount(0)
 
-    // Nothing forces the page wider than the phone: reading needs no panning.
+    // The article quotes an address with no space in it, longer than the
+    // paper is wide. Nothing forces the page wider than the phone: reading
+    // needs no panning.
+    await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )

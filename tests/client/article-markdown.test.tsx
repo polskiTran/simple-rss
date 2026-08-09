@@ -134,6 +134,27 @@ describe('article images', () => {
     expect(body.querySelector('.article-image-fallback')?.textContent).toContain('First light')
   })
 
+  it('renders an image a publisher linked as one linked image', () => {
+    // A figure wrapped in a link to its full-size self — Substack and most
+    // newsletter platforms emit this. Reading the link text to the first `]`
+    // ended it inside the image and spilled the rest of the destination into
+    // the article as a long unbreakable line of literal text.
+    const body = bodyOf(`[![Zero-Mem](${SIGNED})](https://press.example/full/a.jpg)`)
+
+    const link = body.querySelector('a')
+    expect(link?.getAttribute('href')).toBe('https://press.example/full/a.jpg')
+    expect(link?.querySelector('img')?.getAttribute('src')).toBe(SIGNED)
+    expect(link?.querySelector('img')?.getAttribute('alt')).toBe('Zero-Mem')
+    expect(body.textContent).toBe('')
+  })
+
+  it('keeps a linked image out of the page when only the destination is safe', () => {
+    const body = bodyOf('[![leak](https://tracker.example/pixel.png)](https://press.example/a)')
+
+    expect(body.querySelector('img')).toBeNull()
+    expect(body.querySelector('a')?.textContent).toBe('leak')
+  })
+
   it('falls back calmly even without alt text', () => {
     const body = bodyOf(`![](${SIGNED})`)
     const image = body.querySelector('img')

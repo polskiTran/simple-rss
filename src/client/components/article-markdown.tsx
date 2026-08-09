@@ -390,7 +390,7 @@ interface ParsedLink {
 }
 
 function parseLink(text: string, start: number): ParsedLink | undefined {
-  const closeBracket = indexOfUnescaped(text, ']', start + 1)
+  const closeBracket = closingBracket(text, start)
   if (closeBracket === -1 || text[closeBracket + 1] !== '(') return undefined
   const closeParen = text.indexOf(')', closeBracket + 2)
   if (closeParen === -1) return undefined
@@ -400,6 +400,30 @@ function parseLink(text: string, start: number): ParsedLink | undefined {
     destination: text.slice(closeBracket + 2, closeParen),
     end: closeParen + 1,
   }
+}
+
+/**
+ * The `]` that closes the `[` at `start`, counted rather than found: link text
+ * may hold brackets of its own — `[![alt](src)](href)`, the linked image a
+ * publisher wraps around a figure — and stopping at the first `]` would end
+ * the link early and spill the rest of it into the page as literal text.
+ */
+function closingBracket(text: string, start: number): number {
+  let depth = 0
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '\\') {
+      index += 1
+      continue
+    }
+    if (char === '[') {
+      depth += 1
+    } else if (char === ']') {
+      depth -= 1
+      if (depth === 0) return index
+    }
+  }
+  return -1
 }
 
 /** The server only writes http(s) destinations; the client refuses anything else anyway. */
