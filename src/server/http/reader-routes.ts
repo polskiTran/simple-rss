@@ -112,6 +112,11 @@ const ARTICLE_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> = {
   unsupported_content_encoding: UNSUPPORTED,
   too_large: { status: 413, code: 'article_too_large', message: 'The original page is larger than the 5 MiB limit' },
   timeout: { status: 504, code: 'article_timeout', message: 'The original page did not respond within 10 seconds' },
+  body_timeout: {
+    status: 504,
+    code: 'article_body_timeout',
+    message: 'The original page did not finish downloading within 30 seconds',
+  },
   unresolvable_host: UNREACHABLE,
   http_error: UNREACHABLE,
   cancelled: UNREACHABLE,

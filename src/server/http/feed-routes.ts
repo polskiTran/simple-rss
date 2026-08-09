@@ -3,6 +3,7 @@ import {
   createSubscriptionRequestSchema,
   feedIdParameterSchema,
   importOpmlRequestSchema,
+  MAX_FEED_SIZE_MIB,
   updatePollingIntervalRequestSchema,
   type CreateSubscriptionResponse,
   type Digest,
@@ -18,7 +19,7 @@ import type { FeedDocumentFailureCode } from '../ingestion/feed-document.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
-import type { RetrievalFailureCode } from '../upstream/retrieval.js'
+import { RETRIEVAL_PROFILES, type RetrievalFailureCode } from '../upstream/retrieval.js'
 import { readJsonBody } from './json-body.js'
 import { NO_STORE, unavailable } from './responses.js'
 
@@ -228,6 +229,12 @@ const UNREACHABLE: FailureAnswer = {
   message: 'The Feed could not be reached',
 }
 
+/**
+ * The Owner is told the actual ceilings rather than a number copied from them,
+ * so raising a limit cannot leave the explanation behind.
+ */
+const FEED_PROFILE = RETRIEVAL_PROFILES.feed
+
 /** One answer per retrieval failure, shared by direct creation and OPML import. */
 const RETRIEVAL_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> = {
   invalid_request: UNSAFE_URL,
@@ -238,13 +245,31 @@ const RETRIEVAL_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> =
   redirect_loop: UNSAFE_URL,
   unsupported_content_type: UNSUPPORTED_CONTENT,
   unsupported_content_encoding: UNSUPPORTED_CONTENT,
-  too_large: { status: 413, code: 'feed_too_large', message: 'The Feed is larger than the 2 MiB limit' },
-  timeout: { status: 504, code: 'feed_timeout', message: 'The Feed did not respond within 10 seconds' },
+  too_large: {
+    status: 413,
+    code: 'feed_too_large',
+    message: `The Feed is larger than the ${MAX_FEED_SIZE_MIB} MiB limit`,
+  },
+  timeout: {
+    status: 504,
+    code: 'feed_timeout',
+    message: `The Feed did not respond within ${seconds(FEED_PROFILE.timeoutMs)} seconds`,
+  },
+  body_timeout: {
+    status: 504,
+    code: 'feed_body_timeout',
+    message: `The Feed did not finish downloading within ${seconds(FEED_PROFILE.bodyTimeoutMs)} seconds`,
+  },
   unresolvable_host: UNREACHABLE,
   http_error: UNREACHABLE,
   cancelled: UNREACHABLE,
   busy: UNREACHABLE,
   unavailable: UNREACHABLE,
+}
+
+/** Milliseconds as the whole seconds the Owner is told about. */
+function seconds(ms: number): number {
+  return Math.round(ms / 1_000)
 }
 
 function retrievalFailure(c: Context, code: RetrievalFailureCode) {

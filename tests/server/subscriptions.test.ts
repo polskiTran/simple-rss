@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_FEED_SIZE_MIB } from '../../src/shared/api.js'
 import { claimedDevice } from '../support/device.js'
 import { startTestService } from '../support/service-harness.js'
 
@@ -175,7 +176,7 @@ describe('Subscriptions', () => {
 
     service.upstream.stub('https://huge.example/feed', {
       headers: { 'content-type': 'application/rss+xml' },
-      body: new Uint8Array(2 * 1024 * 1024 + 1),
+      body: new Uint8Array(MAX_FEED_SIZE_MIB * 1024 * 1024 + 1),
     })
     const oversized = await owner.post('/api/subscriptions', { url: 'https://huge.example/feed' })
     expect(oversized.status).toBe(413)

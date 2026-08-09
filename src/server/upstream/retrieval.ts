@@ -1,3 +1,4 @@
+import { MAX_FEED_SIZE_MIB } from '../../shared/api.js'
 import { VERSION } from '../../shared/version.js'
 import type { Logger } from '../logger.js'
 import {
@@ -27,7 +28,18 @@ export interface RetrievalCapacity {
 export interface RetrievalProfile {
   readonly accept: readonly string[]
   readonly maxBytes: number
+  /**
+   * How long the publisher has to answer at all: resolution, connection, every
+   * redirect hop, and the response headers of the last one.
+   */
   readonly timeoutMs: number
+  /**
+   * How long the answer then has to finish arriving. Separate from the wait
+   * for the answer because the two failures are different: a publisher that
+   * never replies is unreachable, while one sending a large body slowly is
+   * working exactly as intended and only needs to be given the time.
+   */
+  readonly bodyTimeoutMs: number
   readonly maxRedirects: number
   readonly capacity: RetrievalCapacity
 }
@@ -39,8 +51,12 @@ export interface RetrievalProfile {
 export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
   feed: {
     accept: ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml'],
-    maxBytes: 2 * 1024 * 1024,
+    // Full-text Feeds are ordinary now: a busy Substack or a complete archive
+    // runs to several MiB, and refusing them would refuse the Feeds whose
+    // publishers put the most into them.
+    maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
     timeoutMs: 10_000,
+    bodyTimeoutMs: 60_000,
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 24 },
   },
@@ -48,6 +64,7 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
     accept: ['text/html', 'application/xhtml+xml'],
     maxBytes: 5 * 1024 * 1024,
     timeoutMs: 10_000,
+    bodyTimeoutMs: 30_000,
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 2, maxQueued: 8 },
   },
@@ -55,6 +72,7 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
     accept: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'],
     maxBytes: 5 * 1024 * 1024,
     timeoutMs: 10_000,
+    bodyTimeoutMs: 30_000,
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
@@ -67,6 +85,7 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
 export interface RetrievalLimits {
   readonly maxBytes?: number
   readonly timeoutMs?: number
+  readonly bodyTimeoutMs?: number
   readonly maxRedirects?: number
 }
 
@@ -99,7 +118,10 @@ export type RetrievalFailureCode =
   | 'unsupported_content_encoding'
   | 'too_large'
   | 'http_error'
+  /** The publisher never answered. */
   | 'timeout'
+  /** The publisher answered, then did not finish sending what it promised. */
+  | 'body_timeout'
   | 'cancelled'
   | 'busy'
   | 'unavailable'
@@ -225,6 +247,16 @@ export function createNetworkRetrieval(options: { readonly logger: Logger; reado
   })
 }
 
+/** Why a retrieval stopped without an answer of its own. */
+type Abandonment = 'timeout' | 'body_timeout' | 'cancelled'
+
+/** The safe sentence each abandonment is logged and reported as. */
+function abandonmentReason(kind: Abandonment): string {
+  if (kind === 'timeout') return 'no answer in time'
+  if (kind === 'body_timeout') return 'the answer did not finish arriving in time'
+  return 'caller abandoned the retrieval'
+}
+
 interface RunContext {
   readonly httpClient: HttpClient
   readonly logger: Logger
@@ -239,18 +271,32 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const maxRedirects = limits?.maxRedirects ?? profile.maxRedirects
   const maxBytes = limits?.maxBytes ?? profile.maxBytes
   const timeoutMs = limits?.timeoutMs ?? profile.timeoutMs
+  const bodyTimeoutMs = limits?.bodyTimeoutMs ?? profile.bodyTimeoutMs
   const headers = forwardableHeaders(request.headers, profile.accept)
 
-  // One controller ends everything: the deadline, the caller giving up, and a
-  // body that grows past its ceiling all abort the same in-flight request.
+  // One controller ends everything: either deadline, the caller giving up, and
+  // a body that grows past its ceiling all abort the same in-flight request.
   const controller = new AbortController()
-  let abandoned: 'timeout' | 'cancelled' | undefined
-  const abort = (kind: 'timeout' | 'cancelled', message: string) => {
+  let abandoned: Abandonment | undefined
+  const abort = (kind: Abandonment, message: string) => {
     abandoned ??= kind
     controller.abort(new RetrievalError(kind, message))
   }
 
-  const timer = setTimeout(() => abort('timeout', `no answer within ${timeoutMs}ms`), timeoutMs)
+  let timer = setTimeout(() => abort('timeout', `no answer within ${timeoutMs}ms`), timeoutMs)
+
+  /**
+   * Once the answer is in hand the question changes, and so does the clock.
+   * Waiting for a publisher to say anything at all and waiting for a large
+   * body to finish arriving are different amounts of patience, and running
+   * them off one timer meant a Feed too slow to download reported itself as a
+   * Feed that never answered.
+   */
+  const startBodyDeadline = (): void => {
+    clearTimeout(timer)
+    timer = setTimeout(() => abort('body_timeout', `body unfinished after ${bodyTimeoutMs}ms`), bodyTimeoutMs)
+  }
+
   const onCancel = () => abort('cancelled', 'caller abandoned the retrieval')
   request.signal?.addEventListener('abort', onCancel, { once: true })
 
@@ -304,9 +350,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
   for (let redirects = 0; ; redirects += 1) {
     const destination = await validateDestination(target, context.policy, controller.signal)
-    if (abandoned) {
-      return fail(abandoned, abandoned === 'timeout' ? 'no answer in time' : 'caller abandoned the retrieval')
-    }
+    if (abandoned) return fail(abandoned, abandonmentReason(abandoned))
     if (!destination.ok) {
       return fail(destination.code, destination.reason, { redirects })
     }
@@ -323,11 +367,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
         new Request(url, { method: 'GET', headers, redirect: 'manual', signal: controller.signal }),
       )
     } catch (error) {
-      if (abandoned) {
-        return fail(abandoned, abandoned === 'timeout' ? 'no answer in time' : 'caller abandoned the retrieval', {
-          host: url.host,
-        })
-      }
+      if (abandoned) return fail(abandoned, abandonmentReason(abandoned), { host: url.host })
       if (error instanceof HttpClientError) return fail(error.code, error.message, { host: url.host })
       return fail('unavailable', describe(error), { host: url.host })
     }
@@ -395,6 +435,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       return fail('too_large', `declared ${declared} bytes above the ${maxBytes} ceiling`, answered)
     }
 
+    startBodyDeadline()
     return {
       ok: true,
       status: response.status,
@@ -421,9 +462,9 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
 interface BoundedBodyOptions {
   readonly maxBytes: number
-  /** Aborted by the deadline, the caller, or the ceiling. */
+  /** Aborted by either deadline, the caller, or the ceiling. */
   readonly signal: AbortSignal
-  readonly abandonedKind: () => 'timeout' | 'cancelled' | undefined
+  readonly abandonedKind: () => Abandonment | undefined
   readonly abort: (error: RetrievalError) => void
   readonly finish: (bytes: number, error: RetrievalError | undefined) => void
 }
@@ -444,31 +485,29 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
   const reader = source.getReader()
   let seen = 0
   let done = false
+  let sink: ReadableStreamDefaultController<Uint8Array> | undefined
 
+  /**
+   * Ends the read once, and errors the stream when it ended badly.
+   *
+   * Erroring rather than closing is what keeps a partial body from passing for
+   * a whole one: cancelling the source resolves the read already in flight as
+   * though the publisher had finished, so a caller left to infer the outcome
+   * from the stream alone would parse a truncated Feed as a complete one.
+   */
   const stop = (error: RetrievalError | undefined): void => {
     if (done) return
     done = true
     if (error) options.abort(error)
     void reader.cancel(error).catch(() => {})
+    if (error) sink?.error(error)
     options.finish(seen, error)
   }
 
-  // The deadline can pass while nobody is reading, and a stream that is never
-  // pulled would otherwise hold its slot until someone remembered it.
-  options.signal.addEventListener(
-    'abort',
-    () => {
-      const reason = options.signal.reason
-      stop(
-        reason instanceof RetrievalError
-          ? reason
-          : new RetrievalError(options.abandonedKind() ?? 'cancelled', 'the retrieval was abandoned'),
-      )
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      sink = controller
     },
-    { once: true },
-  )
-
-  return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const chunk = await reader.read()
@@ -483,27 +522,41 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
 
         seen += chunk.value.byteLength
         if (seen > options.maxBytes) {
-          const error = new RetrievalError('too_large', `body passed the ${options.maxBytes} byte ceiling`)
-          stop(error)
-          controller.error(error)
+          stop(new RetrievalError('too_large', `body passed the ${options.maxBytes} byte ceiling`))
           return
         }
 
         controller.enqueue(chunk.value)
       } catch (cause) {
         const abandoned = options.abandonedKind()
-        const error =
+        stop(
           cause instanceof RetrievalError
             ? cause
-            : new RetrievalError(abandoned ?? 'unavailable', describe(cause))
-        stop(error)
-        controller.error(error)
+            : new RetrievalError(abandoned ?? 'unavailable', describe(cause)),
+        )
       }
     },
     cancel(reason) {
       stop(reason instanceof RetrievalError ? reason : new RetrievalError('cancelled', 'body was cancelled'))
     },
   })
+
+  // The body deadline can pass while nobody is reading, and a stream that is
+  // never pulled would otherwise hold its slot until someone remembered it.
+  // Watched only once the sink exists, so a deadline that has already gone
+  // has somewhere to put the failure.
+  const abandon = (): void => {
+    const reason = options.signal.reason
+    stop(
+      reason instanceof RetrievalError
+        ? reason
+        : new RetrievalError(options.abandonedKind() ?? 'cancelled', 'the retrieval was abandoned'),
+    )
+  }
+  if (options.signal.aborted) abandon()
+  else options.signal.addEventListener('abort', abandon, { once: true })
+
+  return stream
 }
 
 /** Buffers a streamed success, turning a stream failure back into a category. */
@@ -648,6 +701,7 @@ class ConcurrencyGate {
 interface ResolvedLimits {
   readonly maxBytes: number
   readonly timeoutMs: number
+  readonly bodyTimeoutMs: number
   readonly maxRedirects: number
 }
 
@@ -655,12 +709,16 @@ function stricterLimits(
   profile: RetrievalProfile,
   requested: RetrievalLimits | undefined,
 ): ResolvedLimits | undefined {
-  const values = [requested?.maxBytes, requested?.timeoutMs, requested?.maxRedirects]
+  const values = [requested?.maxBytes, requested?.timeoutMs, requested?.bodyTimeoutMs, requested?.maxRedirects]
   if (values.some((value) => value !== undefined && !Number.isFinite(value))) return undefined
 
   return {
     maxBytes: Math.max(1, Math.min(Math.floor(requested?.maxBytes ?? profile.maxBytes), profile.maxBytes)),
     timeoutMs: Math.max(1, Math.min(Math.floor(requested?.timeoutMs ?? profile.timeoutMs), profile.timeoutMs)),
+    bodyTimeoutMs: Math.max(
+      1,
+      Math.min(Math.floor(requested?.bodyTimeoutMs ?? profile.bodyTimeoutMs), profile.bodyTimeoutMs),
+    ),
     maxRedirects: Math.max(
       0,
       Math.min(Math.floor(requested?.maxRedirects ?? profile.maxRedirects), profile.maxRedirects),

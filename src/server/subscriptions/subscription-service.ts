@@ -667,7 +667,11 @@ export function availabilityCategoryOf(
 ): FeedAvailabilityCategory {
   if (outcome.kind === 'invalid-feed') return 'invalid_feed'
   switch (outcome.failure.code) {
+    // The stored vocabulary stays coarse on purpose: whether the publisher
+    // never answered or answered too slowly, the Feed is taking too long, and
+    // that is the whole of what the Owner can act on.
     case 'timeout':
+    case 'body_timeout':
       return 'timeout'
     case 'too_large':
       return 'too_large'

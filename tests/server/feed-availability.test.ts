@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { FeedAvailability } from '../../src/shared/api.js'
+import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../src/shared/api.js'
 import { createLogger } from '../../src/server/logger.js'
 import { openDatabase, type SqliteDatabase } from '../../src/server/persistence/database.js'
 import { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
@@ -284,7 +284,7 @@ describe('Feed Availability', () => {
       {
         url: 'https://size.example/feed',
         respond: () => ({
-          headers: { ...FEED_HEADERS, 'content-length': String(3 * 1024 * 1024) },
+          headers: { ...FEED_HEADERS, 'content-length': String((MAX_FEED_SIZE_MIB + 1) * 1024 * 1024) },
           body: '',
         }),
         category: 'too_large',
@@ -430,6 +430,9 @@ describe('availability categories', () => {
       availabilityCategoryOf({ kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } })
 
     expect(failure('timeout')).toBe('timeout')
+    // Both ways of taking too long are one category to the Owner: the stored
+    // vocabulary says what they can act on, not which clock ran out.
+    expect(failure('body_timeout')).toBe('timeout')
     expect(failure('too_large')).toBe('too_large')
     expect(failure('unsupported_content_type')).toBe('unsupported_content')
     expect(failure('unsupported_content_encoding')).toBe('unsupported_content')

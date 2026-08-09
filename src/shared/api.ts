@@ -164,6 +164,13 @@ export const createSubscriptionRequestSchema = z.object({
 })
 export type CreateSubscriptionRequest = z.infer<typeof createSubscriptionRequestSchema>
 
+/**
+ * The largest decoded Feed document a retrieval will accept, in MiB. It lives
+ * in the shared contract because both sides say it out loud: the server owns
+ * the ceiling, and the client tells the Owner the number they just exceeded.
+ */
+export const MAX_FEED_SIZE_MIB = 20
+
 /** The largest OPML upload one import accepts, in UTF-16 code units. */
 export const MAX_OPML_LENGTH = 1_048_576
 
