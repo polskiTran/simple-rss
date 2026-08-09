@@ -220,52 +220,49 @@ function OpenFeed({
             </button>
           ))}
         </span>
-        <button className="text-button feed-refresh" type="button" disabled={refreshing} onClick={onRefresh}>
-          {refreshing ? 'refreshing…' : 'refresh now'}
-        </button>
+        <span className="feed-actions">
+          <button className="text-button feed-refresh" type="button" disabled={refreshing} onClick={onRefresh}>
+            {refreshing ? 'refreshing…' : 'refresh now'}
+          </button>
+          <button
+            className="text-button unsubscribe-open"
+            type="button"
+            aria-expanded={confirmingUnsubscribe}
+            aria-controls="unsubscribe-confirmation"
+            onClick={() => onConfirmUnsubscribe(!confirmingUnsubscribe)}
+          >
+            unsubscribe…
+          </button>
+        </span>
       </div>
+      {confirmingUnsubscribe ? (
+        <Unsubscribe working={unsubscribing} onConfirm={onConfirmUnsubscribe} onUnsubscribe={onUnsubscribe} />
+      ) : null}
       <p className="notice feed-notice" aria-live="polite">
         {notice}
       </p>
       <Items detail={detail} onSaved={onSaved} />
-      <Unsubscribe
-        confirming={confirmingUnsubscribe}
-        working={unsubscribing}
-        onConfirm={onConfirmUnsubscribe}
-        onUnsubscribe={onUnsubscribe}
-      />
     </>
   )
 }
 
 /**
  * Leaving a Feed, said plainly before it happens: checking stops and the
- * Digest lets go, while everything saved stays in the Library. Two quiet
- * words rather than a warning dialog — the consequence sentence is the
- * confirmation step.
+ * Digest lets go, while everything saved stays in the Library. It unfolds
+ * right under the controls that opened it — quiet words rather than a
+ * warning dialog, with the consequence sentence as the confirmation step.
  */
 function Unsubscribe({
-  confirming,
   working,
   onConfirm,
   onUnsubscribe,
 }: {
-  confirming: boolean
   working: boolean
   onConfirm: (confirming: boolean) => void
   onUnsubscribe: () => void
 }) {
-  if (!confirming) {
-    return (
-      <p className="unsubscribe-controls">
-        <button className="text-button unsubscribe-open" type="button" onClick={() => onConfirm(true)}>
-          unsubscribe from this feed
-        </button>
-      </p>
-    )
-  }
   return (
-    <div className="unsubscribe-controls">
+    <div className="unsubscribe-controls" id="unsubscribe-confirmation">
       <p className="unsubscribe-consequences">
         this stops checking the feed and its items leave the digest — anything saved stays in your library
       </p>

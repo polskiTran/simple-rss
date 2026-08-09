@@ -551,8 +551,12 @@
     color: var(--color-ink-strong);
   }
 
-  .feed-refresh {
+  /* The two whole-Feed actions sit together at the row's end. */
+  .feed-actions {
+    display: flex;
     flex: none;
+    align-items: baseline;
+    gap: 20px;
   }
 
   .feed-items,
@@ -560,10 +564,10 @@
     margin-top: 44px;
   }
 
-  /* Leaving a Feed is words at the end of the page, not a warning dialog.
+  /* Leaving a Feed unfolds right under the controls, not a warning dialog.
      The consequence sentence carries the weight; the buttons stay quiet. */
   .unsubscribe-controls {
-    margin-top: 44px;
+    margin-top: 14px;
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);

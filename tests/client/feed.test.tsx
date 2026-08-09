@@ -251,7 +251,7 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe from this feed' }))
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
 
     // The consequences appear as words; nothing has been asked of the server.
     expect(
@@ -261,7 +261,7 @@ describe('managing one Feed', () => {
 
     await user.click(screen.getByRole('button', { name: 'keep subscribed' }))
 
-    expect(screen.getByRole('button', { name: 'unsubscribe from this feed' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'unsubscribe…' })).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
   })
 
@@ -273,7 +273,7 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe from this feed' }))
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
     await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
 
     expect(await screen.findByRole('textbox', { name: /search or add feeds/i })).toBeDefined()
@@ -292,12 +292,12 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe from this feed' }))
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
     await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
 
     expect(await screen.findByText('the feed could not be unsubscribed')).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
-    expect(screen.getByRole('button', { name: 'unsubscribe from this feed' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'unsubscribe…' })).toBeDefined()
   })
 })
 
