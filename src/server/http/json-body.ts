@@ -1,0 +1,35 @@
+import type { Context } from 'hono'
+import type { z } from 'zod'
+
+export type BodyResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly response: Response }
+
+/**
+ * Reads and validates a JSON request body, answering `400` itself when the
+ * body is not what the route agreed to accept.
+ *
+ * The failure message names fields and constraints and never the values that
+ * failed them — one of the routes using this carries the Owner's password.
+ */
+export async function readJsonBody<T>(c: Context, schema: z.ZodType<T>): Promise<BodyResult<T>> {
+  let raw: unknown
+  try {
+    raw = await c.req.json()
+  } catch {
+    return { ok: false, response: invalid(c, 'Body must be JSON') }
+  }
+
+  const parsed = schema.safeParse(raw)
+  if (!parsed.success) {
+    return { ok: false, response: invalid(c, describe(parsed.error)) }
+  }
+
+  return { ok: true, value: parsed.data }
+}
+
+function invalid(c: Context, message: string): Response {
+  return c.json({ error: { code: 'invalid_request', message } }, 400, { 'Cache-Control': 'no-store' })
+}
+
+function describe(error: z.ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join('.') || '(body)'}: ${issue.message}`).join('; ')
+}

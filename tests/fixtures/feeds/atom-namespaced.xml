@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<atom:feed xmlns:atom="http://www.w3.org/2005/Atom">
+  <atom:title>Prefixed Letters</atom:title>
+  <atom:entry>
+    <atom:id>tag:prefixed.example,2026:one</atom:id>
+    <atom:title>Prefixed entry</atom:title>
+    <atom:published>2026-08-08T06:00:00Z</atom:published>
+    <atom:link rel="alternate" href="https://prefixed.example/one"/>
+    <atom:summary>Namespace prefixes change nothing.</atom:summary>
+  </atom:entry>
+</atom:feed>
