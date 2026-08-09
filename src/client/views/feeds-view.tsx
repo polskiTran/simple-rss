@@ -152,7 +152,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
             onChange={importFile}
           />
         </label>
-        <a className="opml-export" href="/api/subscriptions/export" download="subscriptions.opml">
+        <a className="export-link" href="/api/subscriptions/export" download="subscriptions.opml">
           export OPML
         </a>
       </div>

@@ -72,10 +72,10 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
         <dt className="sheet-label">export</dt>
         <dd className="sheet-value">
           <span className="export-links">
-            <a className="opml-export" href="/api/subscriptions/export" download="subscriptions.opml">
+            <a className="export-link" href="/api/subscriptions/export" download="subscriptions.opml">
               subscriptions (OPML)
             </a>
-            <a className="opml-export" href="/api/export" download="simple-rss-export.json">
+            <a className="export-link" href="/api/export" download="simple-rss-export.json">
               everything (JSON)
             </a>
           </span>

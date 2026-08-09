@@ -171,9 +171,14 @@ installation:
 # 1. Provision a service with an empty volume (or empty the data directory).
 # 2. From the platform shell:
 node dist/server/cli-main.js restore /path/to/simple-rss-2026-08-09.db
-# 3. Start (or restart) the service and verify readiness before using it:
+# 3. Start (or restart) the service and confirm readiness before using it:
 curl -fsS "$PUBLIC_ORIGIN/health/ready"
 ```
+
+Readiness is the gate, not just a check: with the platform's readiness probe
+pointed at `/health/ready` (see [Health checks](#health-checks)), traffic is
+held back until the restored volume passes startup migrations and the write
+probe. The `curl` is the operator's own confirmation of the same answer.
 
 The command verifies the snapshot's integrity, applies any migrations a newer
 build ships, rebuilds the derived search index from the restored Feed Items,

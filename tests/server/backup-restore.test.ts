@@ -139,6 +139,22 @@ describe('the restore command', () => {
     expect(output.join('\n')).toContain('already')
   })
 
+  it('refuses a directory holding a stray WAL sidecar, which a restored database would adopt', async () => {
+    const dataDir = await makeTempDataDir()
+    const { context: seed } = cliOn(dataDir)
+    await runCli(['migrate'], seed)
+    await runCli(['backup', backupPath], seed)
+
+    const fresh = await makeTempDataDir()
+    const { context, output } = cliOn(fresh)
+    writeFileSync(`${context.config.databasePath}-wal`, 'left behind by an earlier database')
+
+    expect(await runCli(['restore', backupPath], context)).toBe(1)
+
+    expect(output.join('\n')).toContain('fresh data directory')
+    expect(existsSync(context.config.databasePath)).toBe(false)
+  })
+
   it('rejects a backup that is not a database, leaving the data directory uninitialized', async () => {
     writeFileSync(backupPath, 'not a sqlite database')
     const dataDir = await makeTempDataDir()

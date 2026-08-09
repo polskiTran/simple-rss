@@ -274,10 +274,12 @@
     gap: 12px;
   }
 
-  /* The two downloads sit side by side, words like every other affordance. */
+  /* The two downloads sit side by side, words like every other affordance —
+     wrapping onto a second line where the sheet's value column runs out. */
   .export-links {
     display: inline-flex;
-    gap: 24px;
+    flex-wrap: wrap;
+    gap: 8px 24px;
   }
 
   .appearance-option {
@@ -383,7 +385,7 @@
   .save-toggle:focus-visible,
   .tab:focus-visible,
   .appearance-option:focus-visible,
-  .opml-export:focus-visible,
+  .export-link:focus-visible,
   .feed-open:focus-visible,
   .feed-back:focus-visible {
     outline: none;
@@ -635,7 +637,8 @@
     text-underline-offset: 4px;
   }
 
-  .opml-export {
+  /* A download is a word too, whatever format it hands over. */
+  .export-link {
     color: var(--color-ink-strong);
     text-decoration: none;
   }
