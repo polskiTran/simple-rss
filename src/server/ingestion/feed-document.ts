@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { convert } from 'html-to-text'
+import { arrayOf, asRecord, declaresXmlEntities } from './xml.js'
 
 const MAX_TITLE_LENGTH = 512
 const MAX_SUMMARY_LENGTH = 20_000
-const FORBIDDEN_XML_DECLARATION = /<!\s*(?:DOCTYPE|ENTITY)\b/i
 
 export type FeedItemIdentityKind = 'guid' | 'link' | 'content'
 
@@ -42,8 +42,8 @@ export class FeedDocumentError extends Error {
  */
 export function parseFeedDocument(bytes: Uint8Array, resolvedUrl: string): ParsedFeedDocument {
   const xml = decodeXml(bytes)
-  if (FORBIDDEN_XML_DECLARATION.test(xml)) {
-    throw new FeedDocumentError('unsupported_feed', 'Feed XML declarations are unsupported')
+  if (declaresXmlEntities(xml)) {
+    throw new FeedDocumentError('unsupported_feed', 'Feed DOCTYPE and ENTITY declarations are unsupported')
   }
 
   const validation = XMLValidator.validate(xml)
@@ -297,17 +297,6 @@ function recordField(record: Record<string, unknown>, names: readonly string[]):
     if (record[name] !== undefined) return record[name]
   }
   return undefined
-}
-
-function arrayOf(value: unknown): readonly unknown[] {
-  if (value === undefined || value === null) return []
-  return Array.isArray(value) ? value : [value]
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
 }
 
 function decodeXml(bytes: Uint8Array): string {

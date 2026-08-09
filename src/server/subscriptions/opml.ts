@@ -1,4 +1,5 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
+import { arrayOf, asRecord, declaresXmlEntities } from '../ingestion/xml.js'
 
 /**
  * The most Feeds one OPML import will process. Each Feed costs one bounded
@@ -7,7 +8,6 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser'
  */
 export const MAX_OPML_FEEDS = 200
 
-const FORBIDDEN_XML_DECLARATION = /<!\s*(?:DOCTYPE|ENTITY)\b/i
 const MAX_TITLE_LENGTH = 512
 
 /** One Feed another reader listed: the URL to retrieve and the name it gave. */
@@ -37,8 +37,8 @@ export class OpmlError extends Error {
  * goes through the normal Subscription creation path, which owns validation.
  */
 export function parseOpml(text: string): readonly OpmlFeedOutline[] {
-  if (FORBIDDEN_XML_DECLARATION.test(text)) {
-    throw new OpmlError('unsupported_opml', 'OPML XML declarations are unsupported')
+  if (declaresXmlEntities(text)) {
+    throw new OpmlError('unsupported_opml', 'OPML DOCTYPE and ENTITY declarations are unsupported')
   }
   if (XMLValidator.validate(text) !== true) {
     throw new OpmlError('malformed_opml', 'OPML XML is malformed')
@@ -133,15 +133,4 @@ function escapeAttribute(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
-}
-
-function arrayOf(value: unknown): readonly unknown[] {
-  if (value === undefined || value === null) return []
-  return Array.isArray(value) ? value : [value]
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
 }

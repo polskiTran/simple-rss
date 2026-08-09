@@ -57,7 +57,7 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const outcome = await service.importOpml(body.value.opml)
     if (outcome.kind === 'invalid-opml') return opmlFailure(c, outcome.code)
     return c.json<OpmlImportReport>(
-      { feeds: outcome.entries.map((entry) => importedFeed(entry.url, entry.outcome)) },
+      { feeds: outcome.entries.map((entry) => importReportLine(entry.url, entry.outcome)) },
       200,
       NO_STORE,
     )
@@ -206,7 +206,7 @@ function retrievalFailure(c: Context, code: RetrievalFailureCode) {
  * single-subscription route answers with, so the two paths cannot describe
  * one failure two ways.
  */
-function importedFeed(url: string, outcome: CreateSubscriptionOutcome): OpmlImportFeed {
+function importReportLine(url: string, outcome: CreateSubscriptionOutcome): OpmlImportFeed {
   switch (outcome.kind) {
     case 'created':
       return { url, outcome: 'added', title: outcome.subscription.title, reason: null }

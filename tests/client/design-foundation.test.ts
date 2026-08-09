@@ -111,6 +111,9 @@ describe('the narrow layout', () => {
     // Both columns are released together: below the breakpoint the content
     // measure and the authentication forms are the full width of the paper.
     expect(narrow).toMatch(/\.measure,\s*\n\s*\.gate\s*\{[^}]*max-width:\s*none/)
+    // The OPML words tighten with the rest of the sheet scale.
+    expect(narrow).toMatch(/\.opml-controls\s*\{[^}]*gap:\s*18px/)
+    expect(narrow).toMatch(/\.opml-controls\s*\{[^}]*font-size:\s*12px/)
   })
 })
 

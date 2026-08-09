@@ -134,6 +134,21 @@ describe('OPML portability', () => {
     expect(await screen.findByText('that file is not an OPML subscription list')).toBeDefined()
   })
 
+  it('keeps both controls reachable by keyboard', async () => {
+    stubApi()
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('textbox', { name: /exact rss or atom url/i }))
+    // The subscribe button is disabled while the field is empty, so the next
+    // stops are the import input and the export link.
+    await user.tab()
+    expect(document.activeElement).toBe(screen.getByLabelText(/import opml/i))
+    await user.tab()
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: /export opml/i }))
+  })
+
   it('offers the export as a plain same-origin download link', async () => {
     stubApi()
     window.history.replaceState(null, '', '/feeds')
