@@ -154,6 +154,29 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX subscriptions_next_poll_at ON subscriptions (next_poll_at);
     `,
   },
+  {
+    version: 5,
+    name: 'feed-availability',
+    sql: `
+      -- Feed Availability state, kept with the Subscription it describes.
+      -- last_polled_at already records the most recent completed attempt;
+      -- these columns say how it went and how the run of failures stands.
+      --
+      -- Nothing is backfilled: pre-migration polls never recorded outcomes,
+      -- so last_success_at starts honest at NULL and fills in on the next
+      -- successful poll rather than claiming a success nobody observed.
+      ALTER TABLE subscriptions ADD COLUMN last_success_at TEXT;
+      ALTER TABLE subscriptions ADD COLUMN last_failure_at TEXT;
+      ALTER TABLE subscriptions ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0
+        CHECK (consecutive_failures >= 0);
+
+      -- The safe failure vocabulary, constrained here so no code path can
+      -- persist a raw error message where a category belongs.
+      ALTER TABLE subscriptions ADD COLUMN last_failure_category TEXT
+        CHECK (last_failure_category IN
+          ('unreachable', 'timeout', 'too_large', 'unsupported_content', 'http_error', 'invalid_feed'));
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

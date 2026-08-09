@@ -400,6 +400,23 @@
     gap: 24px;
   }
 
+  /* Feed Availability, in the same quiet grey as every other notice: a fact
+     about checking, not an alarm about the Subscription. */
+  .availability-note {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--color-quiet);
+  }
+
+  .availability-retry {
+    flex: none;
+  }
+
   .cadence-strip {
     display: grid;
     flex: none;
@@ -596,6 +613,12 @@
 
   .cadence-day:nth-child(-n + 16) {
     display: none;
+  }
+
+  .availability-note {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    font-size: 12px;
   }
 
   .day-group + .day-group {

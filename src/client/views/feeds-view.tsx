@@ -1,6 +1,11 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { OpmlImportFeed, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
-import { ApiError, fetchSubscriptions, importOpml, subscribeToFeed } from '../api.js'
+import type {
+  FeedAvailabilityCategory,
+  OpmlImportFeed,
+  OpmlImportReport,
+  SubscriptionSummary,
+} from '../../shared/api.js'
+import { ApiError, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
 
 type SubscriptionState =
   | { readonly kind: 'loading' }
@@ -14,6 +19,7 @@ export function FeedsView() {
   const [subscribing, setSubscribing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
+  const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     let active = true
@@ -86,6 +92,30 @@ export function FeedsView() {
     }
   }
 
+  /**
+   * The manual retry behind an unavailable Feed's note. Whatever the attempt
+   * finds, the list is refetched so the row reports the newest state.
+   */
+  async function retry(feedId: number) {
+    if (retryingFeedId !== undefined) return
+    setRetryingFeedId(feedId)
+    setNotice('')
+    try {
+      await refreshFeed(feedId)
+      setNotice('the feed answered — availability restored')
+    } catch (error) {
+      setNotice(retryFailure(error))
+    } finally {
+      setRetryingFeedId(undefined)
+    }
+    try {
+      const { subscriptions } = await fetchSubscriptions()
+      setState({ kind: 'loaded', subscriptions })
+    } catch {
+      // The retry outcome is already on screen; a failed refetch changes nothing.
+    }
+  }
+
   return (
     <div className="view measure feeds-view">
       <form className="feed-form" onSubmit={subscribe}>
@@ -124,7 +154,7 @@ export function FeedsView() {
         {notice}
       </p>
       <ImportReport report={report} />
-      <SubscriptionList state={state} />
+      <SubscriptionList state={state} retryingFeedId={retryingFeedId} onRetry={retry} />
     </div>
   )
 }
@@ -170,7 +200,15 @@ function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
   )
 }
 
-function SubscriptionList({ state }: { state: SubscriptionState }) {
+function SubscriptionList({
+  state,
+  retryingFeedId,
+  onRetry,
+}: {
+  state: SubscriptionState
+  retryingFeedId: number | undefined
+  onRetry: (feedId: number) => void
+}) {
   if (state.kind === 'loading') return <p className="empty-note subscription-list-state">loading feeds</p>
   if (state.kind === 'unavailable') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
   if (state.subscriptions.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
@@ -186,10 +224,68 @@ function SubscriptionList({ state }: { state: SubscriptionState }) {
           <div className="content-meta">
             <span>{subscription.domain}</span>
           </div>
+          <AvailabilityNote
+            subscription={subscription}
+            retrying={retryingFeedId === subscription.feedId}
+            onRetry={onRetry}
+          />
         </article>
       ))}
     </div>
   )
+}
+
+/**
+ * The calm face of a failing Feed. It appears only once checking has failed
+ * three times in a row, states what is known — never the raw error — and
+ * offers a retry rather than suggesting the Subscription be removed.
+ */
+function AvailabilityNote({
+  subscription,
+  retrying,
+  onRetry,
+}: {
+  subscription: SubscriptionSummary
+  retrying: boolean
+  onRetry: (feedId: number) => void
+}) {
+  const { availability } = subscription
+  if (availability.state !== 'unavailable') return null
+
+  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'checking is not working'
+  const lastSuccess = availability.lastSuccessAt
+    ? `last reached ${noteDate(availability.lastSuccessAt)}`
+    : 'not reached since subscribing'
+
+  return (
+    <p className="availability-note">
+      <span>
+        {reason} — {lastSuccess}. its items stay in your digest.
+      </span>
+      <button
+        className="text-button availability-retry"
+        type="button"
+        disabled={retrying}
+        onClick={() => onRetry(subscription.feedId)}
+      >
+        {retrying ? 'retrying…' : 'retry now'}
+      </button>
+    </p>
+  )
+}
+
+/** One calm phrase per safe failure category the server records. */
+const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
+  unreachable: 'the feed cannot be reached',
+  timeout: 'the feed is taking too long to respond',
+  too_large: 'the feed has grown past the 2 MiB limit',
+  unsupported_content: 'the URL no longer returns feed content',
+  http_error: 'the publisher is answering with an error',
+  invalid_feed: 'the feed is returning unusable XML',
+}
+
+function noteDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 function CadenceStrip({ counts, title }: { counts: readonly number[]; title: string }) {
@@ -224,6 +320,15 @@ const SUBSCRIPTION_FAILURE_COPY: Readonly<Record<string, string>> = {
 function subscriptionFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return 'the Feed could not be reached'
   return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
+}
+
+/** A retry that did not work explains itself as quietly as any other failure. */
+function retryFailure(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'still unavailable — the feed could not be retrieved'
+  if (error.code === 'refresh_rate_limited') return 'checked a moment ago — wait a little before retrying'
+
+  const reason = SUBSCRIPTION_FAILURE_COPY[error.code]
+  return reason ? `still unavailable — ${reason}` : 'still unavailable — the feed could not be retrieved'
 }
 
 const IMPORT_FAILURE_COPY: Readonly<Record<string, string>> = {

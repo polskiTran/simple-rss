@@ -2,6 +2,9 @@ import { eq, lte } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
+  FEED_UNAVAILABLE_AFTER_FAILURES,
+  type FeedAvailability,
+  type FeedAvailabilityCategory,
   type PollingIntervalMinutes,
   type PollingSchedule,
   type SubscriptionSummary,
@@ -19,7 +22,7 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { feedItems, feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
-import { nextPollTime } from './polling-schedule.js'
+import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 
 export type CreateSubscriptionOutcome =
   | { readonly kind: 'created'; readonly subscription: SubscriptionSummary; readonly importedItems: number }
@@ -54,11 +57,20 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
-/** What one poll needs: where to ask, how to ask conditionally, and the interval. */
+/** A Feed the Owner is subscribed to, with its recorded Feed Availability. */
+interface SubscribedFeedRecord extends FeedRecord {
+  readonly lastPolledAt: string | null
+  readonly lastSuccessAt: string | null
+  readonly consecutiveFailures: number
+  readonly lastFailureCategory: FeedAvailabilityCategory | null
+}
+
+/** What one poll needs: where to ask, how to ask conditionally, and the schedule. */
 interface PollableFeed extends FeedRecord {
   readonly etag: string | null
   readonly lastModified: string | null
   readonly pollingIntervalMinutes: number
+  readonly consecutiveFailures: number
 }
 
 /** The one shape every Feed lookup selects, mirrored by `FeedRecord`. */
@@ -68,6 +80,15 @@ const FEED_RECORD_COLUMNS = {
   domain: feeds.domain,
   enteredUrl: feeds.enteredUrl,
   resolvedUrl: feeds.resolvedUrl,
+}
+
+/** `FEED_RECORD_COLUMNS` plus the Feed Availability state, as `SubscribedFeedRecord`. */
+const SUBSCRIBED_FEED_COLUMNS = {
+  ...FEED_RECORD_COLUMNS,
+  lastPolledAt: subscriptions.lastPolledAt,
+  lastSuccessAt: subscriptions.lastSuccessAt,
+  consecutiveFailures: subscriptions.consecutiveFailures,
+  lastFailureCategory: subscriptions.lastFailureCategory,
 }
 
 export class SubscriptionService {
@@ -114,7 +135,7 @@ export class SubscriptionService {
     if (duplicate) return { kind: 'duplicate', subscription: this.#withCadence(duplicate) }
 
     const domain = new URL(retrieved.url).hostname
-    let created: FeedRecord
+    let created: SubscribedFeedRecord
     try {
       created = this.#db.transaction((tx) => {
         const inserted = tx
@@ -133,20 +154,32 @@ export class SubscriptionService {
 
         const aliases = [...new Set([requestedUrl, retrieved.url])].map((url) => ({ url, feedId }))
         tx.insert(feedUrlAliases).values(aliases).run()
-        // The initial import counts as a poll, so the first background check
-        // lands one full interval plus this Feed's jitter from now.
+        // The initial import counts as a successful poll, so the first
+        // background check lands one full interval plus this Feed's jitter
+        // from now, and Feed Availability starts from an observed success.
         tx.insert(subscriptions)
           .values({
             feedId,
             pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES,
             nextPollAt: nextPollTime(feedId, DEFAULT_POLLING_INTERVAL_MINUTES, new Date(now)),
             lastPolledAt: now,
+            lastSuccessAt: now,
             createdAt: now,
           })
           .run()
 
         for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)
-        return { feedId, title: parsed.title, domain, enteredUrl, resolvedUrl: retrieved.url }
+        return {
+          feedId,
+          title: parsed.title,
+          domain,
+          enteredUrl,
+          resolvedUrl: retrieved.url,
+          lastPolledAt: now,
+          lastSuccessAt: now,
+          consecutiveFailures: 0,
+          lastFailureCategory: null,
+        }
       })
     } catch (error) {
       const raced = this.#feedByCanonicalUrl(requestedUrl) ?? this.#feedByCanonicalUrl(retrieved.url)
@@ -209,10 +242,12 @@ export class SubscriptionService {
     if (!feed) return { kind: 'missing' }
 
     const outcome = await this.#poll(feed)
-    // Every completed attempt advances the schedule by one Polling Interval,
-    // failures included: a Feed that is struggling is simply tried again next
-    // interval rather than every minute.
-    this.#advanceSchedule(feedId, feed.pollingIntervalMinutes)
+    // Every completed attempt is recorded and advances the schedule: a
+    // success by one Polling Interval, a failure by an exponential backoff,
+    // so a struggling Feed is retried patiently rather than every minute.
+    if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.#recordSuccess(feed)
+    else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
+    else this.#recordFailure(feed, availabilityCategoryOf(outcome))
     return outcome
   }
 
@@ -316,16 +351,76 @@ export class SubscriptionService {
       .map((row) => row.feedId)
   }
 
-  #advanceSchedule(feedId: number, pollingIntervalMinutes: number): void {
+  /** A success clears the whole failure run; the Feed is simply available. */
+  #recordSuccess(feed: PollableFeed): void {
     const now = this.#clock.now()
     this.#db
       .update(subscriptions)
       .set({
-        nextPollAt: nextPollTime(feedId, pollingIntervalMinutes, now),
+        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
+        lastPolledAt: now.toISOString(),
+        lastSuccessAt: now.toISOString(),
+        lastFailureAt: null,
+        consecutiveFailures: 0,
+        lastFailureCategory: null,
+      })
+      .where(eq(subscriptions.feedId, feed.feedId))
+      .run()
+  }
+
+  /**
+   * A failure lengthens the wait before the next attempt instead of shortening
+   * it: hammering a Feed that is struggling helps nobody, and the Owner can
+   * always retry by hand. The Subscription itself is never touched — a failing
+   * Feed stays subscribed and its retained Feed Items stay in the Digest.
+   */
+  #recordFailure(feed: PollableFeed, category: FeedAvailabilityCategory): void {
+    const now = this.#clock.now()
+    const consecutiveFailures = feed.consecutiveFailures + 1
+    const nextPollAt = nextRetryTime(feed.feedId, feed.pollingIntervalMinutes, consecutiveFailures, now)
+    this.#db
+      .update(subscriptions)
+      .set({
+        nextPollAt,
+        lastPolledAt: now.toISOString(),
+        lastFailureAt: now.toISOString(),
+        consecutiveFailures,
+        lastFailureCategory: category,
+      })
+      .where(eq(subscriptions.feedId, feed.feedId))
+      .run()
+
+    this.#logger.warn('subscriptions.feed_poll_failed', {
+      feedId: feed.feedId,
+      resolvedUrl: loggableUrl(feed.resolvedUrl),
+      category,
+      consecutiveFailures,
+      nextPollAt,
+    })
+  }
+
+  /**
+   * The retrieval never asked the publisher anything — the installation's own
+   * boundary was saturated, or the caller gave up. That is not the Feed's
+   * failure, so its Feed Availability is left exactly as it stands and the
+   * attempt simply moves one ordinary Polling Interval on.
+   */
+  #recordDeferral(feed: PollableFeed, code: RetrievalFailure['code']): void {
+    const now = this.#clock.now()
+    this.#db
+      .update(subscriptions)
+      .set({
+        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
         lastPolledAt: now.toISOString(),
       })
-      .where(eq(subscriptions.feedId, feedId))
+      .where(eq(subscriptions.feedId, feed.feedId))
       .run()
+
+    this.#logger.info('subscriptions.feed_poll_deferred', {
+      feedId: feed.feedId,
+      resolvedUrl: loggableUrl(feed.resolvedUrl),
+      code,
+    })
   }
 
   #pollableFeed(feedId: number): PollableFeed | undefined {
@@ -335,6 +430,7 @@ export class SubscriptionService {
         etag: feeds.etag,
         lastModified: feeds.lastModified,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
+        consecutiveFailures: subscriptions.consecutiveFailures,
       })
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
@@ -345,28 +441,25 @@ export class SubscriptionService {
 
   list(): readonly SubscriptionSummary[] {
     const cadence = this.#cadenceByFeed()
-    return this.#subscribedFeeds().map((record) => ({
-      ...record,
-      cadence: cadence.get(record.feedId) ?? emptyCadence(),
-    }))
+    return this.#subscribedFeeds().map((record) => summaryOf(record, cadence))
   }
 
-  #subscribedFeeds(): readonly FeedRecord[] {
+  #subscribedFeeds(): readonly SubscribedFeedRecord[] {
     return this.#db
-      .select(FEED_RECORD_COLUMNS)
+      .select(SUBSCRIBED_FEED_COLUMNS)
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .orderBy(feeds.title)
       .all()
   }
 
-  #withCadence(feed: FeedRecord): SubscriptionSummary {
-    return { ...feed, cadence: this.#cadenceByFeed().get(feed.feedId) ?? emptyCadence() }
+  #withCadence(feed: SubscribedFeedRecord): SubscriptionSummary {
+    return summaryOf(feed, this.#cadenceByFeed())
   }
 
-  #feedByCanonicalUrl(url: string): FeedRecord | undefined {
+  #feedByCanonicalUrl(url: string): SubscribedFeedRecord | undefined {
     return this.#db
-      .select(FEED_RECORD_COLUMNS)
+      .select(SUBSCRIBED_FEED_COLUMNS)
       .from(feedUrlAliases)
       .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
@@ -404,6 +497,68 @@ export class SubscriptionService {
       counts[index] = (counts[index] ?? 0) + 1
     }
     return cadence
+  }
+}
+
+/**
+ * True when this attempt never reached the publisher at all: the boundary was
+ * saturated or the caller gave up. Such an attempt says nothing about the Feed.
+ */
+function wasNeverAsked(
+  outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
+): outcome is Extract<IngestFeedOutcome, { kind: 'retrieval-failed' }> {
+  return (
+    outcome.kind === 'retrieval-failed' &&
+    (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
+  )
+}
+
+/**
+ * The safe category one failed poll is remembered as. Retrieval, parse,
+ * timeout, size, and content-type failures stay distinguishable; everything
+ * the network refused to answer collapses into `unreachable`, because the
+ * distinctions below that are transport detail the Owner cannot act on.
+ */
+export function availabilityCategoryOf(
+  outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
+): FeedAvailabilityCategory {
+  if (outcome.kind === 'invalid-feed') return 'invalid_feed'
+  switch (outcome.failure.code) {
+    case 'timeout':
+      return 'timeout'
+    case 'too_large':
+      return 'too_large'
+    case 'unsupported_content_type':
+    case 'unsupported_content_encoding':
+      return 'unsupported_content'
+    case 'http_error':
+      return 'http_error'
+    default:
+      return 'unreachable'
+  }
+}
+
+/** The one place a stored Subscription becomes the summary the API answers with. */
+function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>): SubscriptionSummary {
+  return {
+    feedId: record.feedId,
+    title: record.title,
+    domain: record.domain,
+    enteredUrl: record.enteredUrl,
+    resolvedUrl: record.resolvedUrl,
+    cadence: cadence.get(record.feedId) ?? emptyCadence(),
+    availability: availabilityOf(record),
+  }
+}
+
+/** How a Subscription's recorded state reads as calm Feed Availability. */
+function availabilityOf(record: SubscribedFeedRecord): FeedAvailability {
+  return {
+    state: record.consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES ? 'unavailable' : 'available',
+    lastCheckedAt: record.lastPolledAt,
+    lastSuccessAt: record.lastSuccessAt,
+    consecutiveFailures: record.consecutiveFailures,
+    category: record.lastFailureCategory,
   }
 }
 

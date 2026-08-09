@@ -47,6 +47,13 @@ describe('Subscriptions', () => {
         enteredUrl: ENTERED_URL,
         resolvedUrl: RESOLVED_URL,
         cadence: [...Array.from({ length: 29 }, () => 0), 1],
+        availability: {
+          state: 'available',
+          lastCheckedAt: '2026-08-08T09:00:00.000Z',
+          lastSuccessAt: '2026-08-08T09:00:00.000Z',
+          consecutiveFailures: 0,
+          category: null,
+        },
       },
       importedItems: 1,
     })
@@ -69,6 +76,13 @@ describe('Subscriptions', () => {
           enteredUrl: ENTERED_URL,
           resolvedUrl: RESOLVED_URL,
           cadence: [...Array.from({ length: 29 }, () => 0), 1],
+          availability: {
+            state: 'available',
+            lastCheckedAt: '2026-08-08T09:00:00.000Z',
+            lastSuccessAt: '2026-08-08T09:00:00.000Z',
+            consecutiveFailures: 0,
+            category: null,
+          },
         },
       ],
     })

@@ -4,12 +4,14 @@ import {
   createSubscriptionResponseSchema,
   digestSchema,
   opmlImportReportSchema,
+  refreshFeedResponseSchema,
   subscriptionListSchema,
   serviceMetaSchema,
   type AuthStatus,
   type CreateSubscriptionResponse,
   type Digest,
   type OpmlImportReport,
+  type RefreshFeedResponse,
   type SubscriptionList,
   type ServiceMeta,
 } from '../shared/api.js'
@@ -125,6 +127,12 @@ export async function subscribeToFeed(url: string): Promise<CreateSubscriptionRe
 export async function importOpml(opml: string): Promise<OpmlImportReport> {
   const response = await post('/api/subscriptions/import', { opml })
   return opmlImportReportSchema.parse(await response.json())
+}
+
+/** One deliberate repeat retrieval of a Feed — the manual retry action. */
+export async function refreshFeed(feedId: number): Promise<RefreshFeedResponse> {
+  const response = await post(`/api/feeds/${feedId}/refresh`, undefined)
+  return refreshFeedResponseSchema.parse(await response.json())
 }
 
 export async function fetchSubscriptions(): Promise<SubscriptionList> {

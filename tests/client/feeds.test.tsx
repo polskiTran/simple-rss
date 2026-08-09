@@ -5,6 +5,14 @@ import { App } from '../../src/client/app.js'
 import { dailyShadows } from '../../src/client/components/daily-band.js'
 import { stubApi, type Reply } from './stub-api.js'
 
+const AVAILABLE = {
+  state: 'available',
+  lastCheckedAt: '2026-08-08T09:00:00.000Z',
+  lastSuccessAt: '2026-08-08T09:00:00.000Z',
+  consecutiveFailures: 0,
+  category: null,
+}
+
 const FEED = {
   feedId: 1,
   title: 'Field Notes',
@@ -12,6 +20,18 @@ const FEED = {
   enteredUrl: 'https://journal.example/feed',
   resolvedUrl: 'https://feeds.example/journal.xml',
   cadence: Array.from({ length: 30 }, () => 0),
+  availability: AVAILABLE,
+}
+
+const UNAVAILABLE_FEED = {
+  ...FEED,
+  availability: {
+    state: 'unavailable',
+    lastCheckedAt: '2026-08-08T09:00:00.000Z',
+    lastSuccessAt: '2026-08-05T09:00:00.000Z',
+    consecutiveFailures: 3,
+    category: 'http_error',
+  },
 }
 
 afterEach(() => {
@@ -79,6 +99,67 @@ describe('Feeds', () => {
 
     expect(await screen.findByText('already subscribed')).toBeDefined()
     expect(screen.getAllByText('Field Notes')).toHaveLength(1)
+  })
+})
+
+describe('Feed Availability', () => {
+  it('says nothing about a Subscription whose checking works', async () => {
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    expect(await screen.findByText('Field Notes')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull()
+  })
+
+  it('surfaces a calm note with the failure category, last success, and a retry action', async () => {
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    expect(await screen.findByText(/the publisher is answering with an error/i)).toBeDefined()
+    expect(screen.getByText(/last reached/i)).toBeDefined()
+    expect(screen.getByText(/items stay in your digest/i)).toBeDefined()
+    expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
+    // The Subscription itself is presented as usual, not as a problem row.
+    expect(screen.getByText('Field Notes')).toBeDefined()
+  })
+
+  it('retries by hand and shows the restored Subscription at once', async () => {
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
+    api.on('POST /api/feeds/1/refresh', () => {
+      // The successful retry is what makes the next list read available again.
+      api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+      return { body: { observedItems: 2 } }
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /retry now/i }))
+
+    expect(await screen.findByText('the feed answered — availability restored')).toBeDefined()
+    await waitFor(() => expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull())
+    expect(api.requestsTo('POST /api/feeds/1/refresh')).toHaveLength(1)
+  })
+
+  it('explains a retry the server asked to wait on', async () => {
+    stubApi()
+      .on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
+      .on('POST /api/feeds/1/refresh', {
+        status: 429,
+        headers: { 'retry-after': '42' },
+        body: { error: { code: 'refresh_rate_limited', message: 'Wait before refreshing this Feed again' } },
+      })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /retry now/i }))
+
+    expect(await screen.findByText('checked a moment ago — wait a little before retrying')).toBeDefined()
+    // The note stays, because nothing about the Feed changed.
+    expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
   })
 })
 

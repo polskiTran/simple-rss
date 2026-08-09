@@ -169,9 +169,42 @@ export const feedSummarySchema = z.object({
 })
 export type FeedSummary = z.infer<typeof feedSummarySchema>
 
+/** Consecutive failures before Feed Availability is surfaced to the Owner. */
+export const FEED_UNAVAILABLE_AFTER_FAILURES = 3
+
+/**
+ * The safe vocabulary for why a poll failed. Categories are deliberately
+ * coarse: enough to tell a timeout from an oversized Feed from a publisher
+ * error, never enough to carry a URL, a header, or response content.
+ */
+export const feedAvailabilityCategorySchema = z.enum([
+  'unreachable',
+  'timeout',
+  'too_large',
+  'unsupported_content',
+  'http_error',
+  'invalid_feed',
+])
+export type FeedAvailabilityCategory = z.infer<typeof feedAvailabilityCategorySchema>
+
+/**
+ * A calm summary of a Subscription's recent retrieval outcome. `unavailable`
+ * begins at `FEED_UNAVAILABLE_AFTER_FAILURES` failures in a row; a quiet Feed
+ * that simply publishes nothing stays `available`.
+ */
+export const feedAvailabilitySchema = z.object({
+  state: z.enum(['available', 'unavailable']),
+  lastCheckedAt: z.string().nullable(),
+  lastSuccessAt: z.string().nullable(),
+  consecutiveFailures: z.number().int().nonnegative(),
+  category: feedAvailabilityCategorySchema.nullable(),
+})
+export type FeedAvailability = z.infer<typeof feedAvailabilitySchema>
+
 export const subscriptionSummarySchema = feedSummarySchema.extend({
   /** Daily item counts, oldest to newest, in the installation timezone. */
   cadence: z.array(z.number().int().nonnegative()).length(30),
+  availability: feedAvailabilitySchema,
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
 
