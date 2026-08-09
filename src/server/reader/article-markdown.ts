@@ -1,20 +1,34 @@
 /// <reference lib="dom" />
 import { JSDOM } from 'jsdom'
 
+export interface ArticleMarkdownOptions {
+  /**
+   * Turns an approved image source into the same-origin signed path the
+   * markdown will carry. Absent — as in tests of pure structure — images are
+   * simply dropped, never emitted with their publisher URL.
+   */
+  readonly signImageUrl?: (url: string) => string
+}
+
+/** What every renderer below needs to know about the article being rebuilt. */
+interface Rendering extends ArticleMarkdownOptions {
+  readonly baseUrl: string
+}
+
 /**
  * Turns extracted article HTML into Markdown through an explicit allowlist.
  *
- * Structure the Reader keeps — headings, paragraphs, lists, links, block
- * quotes, tables, code, and supported math — is rebuilt as Markdown syntax;
- * everything else either unwraps to its text or, for active and embedded
- * content, disappears with its children. No attribute and no raw HTML ever
- * reaches the output: text is escaped, so a hostile document can only ever
- * say something, never do something.
+ * Structure the Reader keeps — headings, paragraphs, lists, links, images,
+ * block quotes, tables, code, and supported math — is rebuilt as Markdown
+ * syntax; everything else either unwraps to its text or, for active and
+ * embedded content, disappears with its children. No attribute and no raw
+ * HTML ever reaches the output: text is escaped, so a hostile document can
+ * only ever say something, never do something.
  */
-export function articleMarkdown(html: string, baseUrl: string): string {
+export function articleMarkdown(html: string, baseUrl: string, options: ArticleMarkdownOptions = {}): string {
   const dom = new JSDOM(html)
   try {
-    return blocks(dom.window.document.body, baseUrl).join('\n\n')
+    return blocks(dom.window.document.body, { baseUrl, ...options }).join('\n\n')
   } finally {
     dom.window.close()
   }
@@ -22,8 +36,10 @@ export function articleMarkdown(html: string, baseUrl: string): string {
 
 /**
  * Elements whose content must vanish with them: running one of these in a
- * reading surface is exactly what Reader View exists to prevent. Images stay
- * out too until they can be proxied behind signed URLs.
+ * reading surface is exactly what Reader View exists to prevent. `img` and
+ * `picture` are absent because approved images survive — rewritten to signed
+ * proxy paths — while `source` stays dropped so only the fallback `img` of a
+ * `picture` speaks.
  */
 const DROPPED = new Set([
   'script',
@@ -40,8 +56,6 @@ const DROPPED = new Set([
   'audio',
   'source',
   'track',
-  'picture',
-  'img',
   'svg',
   'canvas',
   'map',
@@ -82,9 +96,11 @@ const INLINE = new Set([
   'dfn',
   'em',
   'i',
+  'img',
   'ins',
   'kbd',
   'mark',
+  'picture',
   'q',
   's',
   'samp',
@@ -102,13 +118,13 @@ const INLINE = new Set([
 const HEADINGS: Readonly<Record<string, number>> = { h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6 }
 
 /** Serializes one container's children as a sequence of Markdown blocks. */
-function blocks(container: ParentNode, baseUrl: string): string[] {
+function blocks(container: ParentNode, context: Rendering): string[] {
   const out: string[] = []
   /** Consecutive phrasing nodes waiting to become one paragraph. */
   let run: Node[] = []
 
   const flush = (): void => {
-    const paragraph = paragraphOf(run, baseUrl)
+    const paragraph = paragraphOf(run, context)
     if (paragraph) out.push(paragraph)
     run = []
   }
@@ -133,16 +149,16 @@ function blocks(container: ParentNode, baseUrl: string): string[] {
 
     const level = HEADINGS[tag]
     if (level !== undefined) {
-      const text = lines(inlineOf(element, baseUrl)).join(' ')
+      const text = lines(inlineOf(element, context)).join(' ')
       if (text) out.push(`${'#'.repeat(level)} ${text}`)
     } else if (tag === 'p') {
-      const paragraph = paragraphOf([...element.childNodes], baseUrl)
+      const paragraph = paragraphOf([...element.childNodes], context)
       if (paragraph) out.push(paragraph)
     } else if (tag === 'ul' || tag === 'ol') {
-      const list = listOf(element, baseUrl)
+      const list = listOf(element, context)
       if (list) out.push(list)
     } else if (tag === 'blockquote') {
-      const quoted = blocks(element, baseUrl)
+      const quoted = blocks(element, context)
       if (quoted.length > 0) {
         out.push(
           quoted
@@ -156,7 +172,7 @@ function blocks(container: ParentNode, baseUrl: string): string[] {
       const fence = fencedCodeOf(element)
       if (fence) out.push(fence)
     } else if (tag === 'table') {
-      const table = tableOf(element, baseUrl)
+      const table = tableOf(element, context)
       if (table) out.push(table)
     } else if (tag === 'math') {
       const tex = texOf(element)
@@ -166,7 +182,7 @@ function blocks(container: ParentNode, baseUrl: string): string[] {
     } else {
       // Anything else — div, section, figure, article — is only a container
       // here: its children speak, the wrapper itself has nothing to add.
-      out.push(...blocks(element, baseUrl))
+      out.push(...blocks(element, context))
     }
   }
 
@@ -175,8 +191,8 @@ function blocks(container: ParentNode, baseUrl: string): string[] {
 }
 
 /** One paragraph from a run of phrasing nodes, or nothing worth keeping. */
-function paragraphOf(nodes: readonly Node[], baseUrl: string): string | undefined {
-  const text = nodes.map((node) => inlineNode(node, baseUrl)).join('')
+function paragraphOf(nodes: readonly Node[], context: Rendering): string | undefined {
+  const text = nodes.map((node) => inlineNode(node, context)).join('')
   const kept = lines(text)
   return kept.length > 0 ? kept.join('\n') : undefined
 }
@@ -198,11 +214,11 @@ function lines(text: string): string[] {
     .filter((line) => line !== '')
 }
 
-function inlineOf(element: Element, baseUrl: string): string {
-  return [...element.childNodes].map((node) => inlineNode(node, baseUrl)).join('')
+function inlineOf(element: Element, context: Rendering): string {
+  return [...element.childNodes].map((node) => inlineNode(node, context)).join('')
 }
 
-function inlineNode(node: Node, baseUrl: string): string {
+function inlineNode(node: Node, context: Rendering): string {
   if (node.nodeType === node.TEXT_NODE) return escapeText(node.textContent ?? '')
   if (node.nodeType !== node.ELEMENT_NODE) return ''
 
@@ -224,26 +240,34 @@ function inlineNode(node: Node, baseUrl: string): string {
     }
     case 'strong':
     case 'b': {
-      const inner = inlineOf(element, baseUrl).trim()
+      const inner = inlineOf(element, context).trim()
       return inner ? `**${inner}**` : ''
     }
     case 'em':
     case 'i': {
-      const inner = inlineOf(element, baseUrl).trim()
+      const inner = inlineOf(element, context).trim()
       return inner ? `*${inner}*` : ''
     }
     case 'a': {
-      const inner = inlineOf(element, baseUrl)
-      const destination = safeDestination(element.getAttribute('href'), baseUrl)
+      const inner = inlineOf(element, context)
+      const destination = safeDestination(element.getAttribute('href'), context)
       if (!inner.trim()) return ''
       return destination ? `[${inner.trim()}](${destination})` : inner
+    }
+    case 'img': {
+      // The publisher's URL never reaches the markdown: an approved source is
+      // rewritten to the signed same-origin path, anything else disappears.
+      const source = absoluteHttpUrl(element.getAttribute('src'), context)
+      if (!source || !context.signImageUrl) return ''
+      const alt = escapeText(element.getAttribute('alt') ?? '').trim()
+      return `![${alt}](${escapeParentheses(context.signImageUrl(source))})`
     }
     case 'math': {
       const tex = texOf(element)
       return tex ? `$${tex}$` : ''
     }
     default:
-      return inlineOf(element, baseUrl)
+      return inlineOf(element, context)
   }
 }
 
@@ -252,18 +276,29 @@ function inlineNode(node: Node, baseUrl: string): string {
  * against the article, and plain http or https — nothing executable, nothing
  * that smuggles a document inline.
  */
-function safeDestination(href: string | null, baseUrl: string): string | undefined {
+function safeDestination(href: string | null, context: Rendering): string | undefined {
+  const url = absoluteHttpUrl(href, context)
+  return url === undefined ? undefined : escapeParentheses(url)
+}
+
+/** The address itself, before any Markdown-specific escaping. */
+function absoluteHttpUrl(href: string | null, context: Rendering): string | undefined {
   if (href === null) return undefined
   try {
-    const url = new URL(href, baseUrl)
+    const url = new URL(href, context.baseUrl)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined
-    return url.href.replaceAll('(', '%28').replaceAll(')', '%29')
+    return url.href
   } catch {
     return undefined
   }
 }
 
-function listOf(list: Element, baseUrl: string): string | undefined {
+/** An unescaped `)` would end the Markdown destination early. */
+function escapeParentheses(destination: string): string {
+  return destination.replaceAll('(', '%28').replaceAll(')', '%29')
+}
+
+function listOf(list: Element, context: Rendering): string | undefined {
   const ordered = list.localName === 'ol'
   const items: string[] = []
 
@@ -271,7 +306,7 @@ function listOf(list: Element, baseUrl: string): string | undefined {
     if (child.localName !== 'li') continue
     // Tight on purpose: inside an item, a nested list or second paragraph
     // continues the item rather than opening a new block.
-    const content = blocks(child, baseUrl).join('\n')
+    const content = blocks(child, context).join('\n')
     if (!content) continue
     const marker = ordered ? `${items.length + 1}. ` : '- '
     // A fixed width, not the marker's: only this dialect's own parser reads
@@ -299,11 +334,11 @@ function fencedCodeOf(pre: Element): string | undefined {
   return `${fence}${language}\n${trimmed}\n${fence}`
 }
 
-function tableOf(table: Element, baseUrl: string): string | undefined {
+function tableOf(table: Element, context: Rendering): string | undefined {
   const rows = [...table.querySelectorAll('tr')].map((row) =>
     [...row.children]
       .filter((cell) => cell.localName === 'td' || cell.localName === 'th')
-      .map((cell) => lines(inlineOf(cell, baseUrl)).join(' ')),
+      .map((cell) => lines(inlineOf(cell, context)).join(' ')),
   )
   const kept = rows.filter((cells) => cells.length > 0)
   const header = kept[0]

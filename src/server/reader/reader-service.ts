@@ -48,6 +48,7 @@ export class ReaderService {
   readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
+  readonly #signImageUrl: (url: string) => string
   readonly #inFlight = new Map<number, Promise<ReaderArticleOutcome>>()
   readonly #failures = new Map<number, FailureEpisode>()
 
@@ -57,12 +58,15 @@ export class ReaderService {
     settings: InstallationSettingsStore
     retrieval: Retrieval
     digest: DigestService
+    /** Mints the signed proxy path an embedded article image travels behind. */
+    signImageUrl: (url: string) => string
   }) {
     this.#db = drizzle(options.database)
     this.#clock = options.clock
     this.#settings = options.settings
     this.#retrieval = options.retrieval
     this.#digest = options.digest
+    this.#signImageUrl = options.signImageUrl
   }
 
   /** The header, fallback summary, and onward path for one Feed Item. */
@@ -151,7 +155,12 @@ export class ReaderService {
       return { kind: 'retrieval-failed', failure: result }
     }
 
-    const extracted = await extractArticle({ bytes: result.bytes, charset: result.charset, url: result.url })
+    const extracted = await extractArticle({
+      bytes: result.bytes,
+      charset: result.charset,
+      url: result.url,
+      signImageUrl: this.#signImageUrl,
+    })
     if (!extracted) {
       this.#recordFailure(feedItemId)
       return { kind: 'unreadable' }

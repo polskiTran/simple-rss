@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ArticleMarkdown } from '../../src/client/components/article-markdown.js'
 
@@ -96,5 +96,51 @@ describe('article markdown rendering', () => {
 
   it('renders a thematic break between paragraphs', () => {
     expect(bodyOf('one\n\n---\n\ntwo').querySelector('hr')).not.toBeNull()
+  })
+})
+
+describe('article images', () => {
+  const SIGNED = '/api/reader/image?url=https%3A%2F%2Fpress.example%2Fa.jpg&exp=99&sig=mac'
+
+  it('renders a proxied image lazily with its alt text', () => {
+    const body = bodyOf(`![First \\[light\\]](${SIGNED})`)
+
+    const image = body.querySelector('img')
+    expect(image?.getAttribute('src')).toBe(SIGNED)
+    expect(image?.getAttribute('alt')).toBe('First [light]')
+    expect(image?.getAttribute('loading')).toBe('lazy')
+    expect(image?.className).toBe('article-image')
+  })
+
+  it('renders no image from anywhere but the signed proxy route', () => {
+    const body = bodyOf(
+      '![leak](https://tracker.example/pixel.png) then ![wrong route](/api/items/1/image)',
+    )
+
+    // The alt text still speaks; the foreign request is simply never made.
+    expect(body.querySelector('img')).toBeNull()
+    expect(body.textContent).toContain('leak')
+    expect(body.textContent).toContain('wrong route')
+  })
+
+  it('shows a stable fallback in place of an image that cannot load', () => {
+    const body = bodyOf(`![First light](${SIGNED})`)
+    const image = body.querySelector('img')
+    if (!image) throw new Error('the image did not render')
+
+    fireEvent.error(image)
+
+    expect(body.querySelector('img')).toBeNull()
+    expect(body.querySelector('.article-image-fallback')?.textContent).toContain('First light')
+  })
+
+  it('falls back calmly even without alt text', () => {
+    const body = bodyOf(`![](${SIGNED})`)
+    const image = body.querySelector('img')
+    if (!image) throw new Error('the image did not render')
+
+    fireEvent.error(image)
+
+    expect(body.querySelector('.article-image-fallback')?.textContent).toBe('image unavailable')
   })
 })

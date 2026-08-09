@@ -116,6 +116,69 @@ describe('links', () => {
   })
 })
 
+describe('images', () => {
+  /** A recognisable stand-in for the real signer, which the routes own. */
+  const sign = (url: string) => `/api/reader/image?url=${encodeURIComponent(url)}&exp=99&sig=mac`
+
+  it('rewrites approved images to the signed proxy path, resolving relative sources', () => {
+    const markdown = articleMarkdown('<img src="/photos/morning.jpg" alt="First [light]">', BASE, {
+      signImageUrl: sign,
+    })
+
+    expect(markdown).toBe(
+      '![First \\[light\\]](/api/reader/image?url=https%3A%2F%2Fpublisher.example%2Fphotos%2Fmorning.jpg&exp=99&sig=mac)',
+    )
+  })
+
+  it('keeps an image inline within its paragraph', () => {
+    const markdown = articleMarkdown(
+      '<p>Before <img src="https://publisher.example/a.png" alt="a chart"> after.</p>',
+      BASE,
+      { signImageUrl: sign },
+    )
+
+    expect(markdown).toBe(
+      'Before ![a chart](/api/reader/image?url=https%3A%2F%2Fpublisher.example%2Fa.png&exp=99&sig=mac) after.',
+    )
+  })
+
+  it('renders the img inside a picture and drops its sources', () => {
+    const markdown = articleMarkdown(
+      '<picture><source srcset="big.avif" type="image/avif"><img src="fallback.jpg" alt="the valley"></picture>',
+      BASE,
+      { signImageUrl: sign },
+    )
+
+    expect(markdown).toBe(
+      '![the valley](/api/reader/image?url=https%3A%2F%2Fpublisher.example%2Fwriting%2Ffallback.jpg&exp=99&sig=mac)',
+    )
+  })
+
+  it('signs only http and https image sources', () => {
+    const markdown = articleMarkdown(
+      '<p>kept</p><img src="data:image/png;base64,x" alt="inline"><img src="javascript:alert(1)" alt="run"><img alt="no source">',
+      BASE,
+      { signImageUrl: sign },
+    )
+
+    expect(markdown).toBe('kept')
+  })
+
+  it('escapes parentheses so a source cannot end the markdown destination early', () => {
+    const markdown = articleMarkdown('<img src="https://publisher.example/a(1).png" alt="x">', BASE, {
+      signImageUrl: (url) => `/api/reader/image?url=${url}`,
+    })
+
+    expect(markdown).toBe('![x](/api/reader/image?url=https://publisher.example/a%281%29.png)')
+  })
+
+  it('drops images entirely when no signer is offered', () => {
+    const markdown = articleMarkdown('<p>kept</p><img src="https://publisher.example/a.png" alt="a chart">', BASE)
+
+    expect(markdown).toBe('kept')
+  })
+})
+
 describe('sanitization', () => {
   it('removes scripts, styles, and templates with their content', () => {
     const markdown = articleMarkdown(

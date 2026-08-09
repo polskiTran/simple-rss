@@ -21,6 +21,8 @@ export interface ExtractArticleInput {
   readonly charset?: string | undefined
   /** The address the bytes actually came from, for resolving links. */
   readonly url: string
+  /** Rewrites an approved embedded image to its signed proxy path. */
+  readonly signImageUrl?: (url: string) => string
 }
 
 /**
@@ -40,7 +42,11 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     // of linkedom does not survive every module loader this code runs under.
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
     const result = await Defuddle(document, input.url)
-    const markdown = articleMarkdown(result.content ?? '', input.url)
+    const markdown = articleMarkdown(
+      result.content ?? '',
+      input.url,
+      input.signImageUrl ? { signImageUrl: input.signImageUrl } : {},
+    )
     if (!markdown) return undefined
 
     const wordCount = countWords(markdown)

@@ -104,7 +104,9 @@ describe('Subscriptions', () => {
               link: 'https://journal.example/first-light',
               publishedAt: '2026-08-08T07:15:00.000Z',
               displayTime: '07:15',
-              imageUrl: 'https://images.example/first-light.jpg',
+              // The publisher's image URL stays server-side; the Digest
+              // only ever names the same-origin proxy route.
+              imageUrl: '/api/items/1/image',
               summary: 'A clear morning.',
               firstSeenAt: '2026-08-08T09:00:00.000Z',
               saved: false,

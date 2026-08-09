@@ -962,6 +962,21 @@
     text-align: center;
   }
 
+  /* Images arrive only through the same-origin proxy, sized to the measure.
+     The enclosing paragraph owns the block spacing. */
+  .article-body .article-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  /* An image that cannot load leaves its words, not a broken glyph. */
+  .article-body .article-image-fallback {
+    font-style: italic;
+    color: var(--color-meta);
+  }
+
   /* Links inside the article all leave for someone else's page: underlined
      with the hairline, and the same departure arrow as `open original`. */
   .article-link {

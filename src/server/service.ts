@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import type { Hono } from 'hono'
 import { createApp } from './app.js'
 import { createAuthentication, type Authentication } from './auth/authentication.js'
@@ -5,6 +6,8 @@ import type { Sleeper } from './auth/sleeper.js'
 import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
 import { DigestService } from './digest/digest-service.js'
+import { ImageService } from './images/image-service.js'
+import { createImageUrlSignature, type ImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
@@ -76,6 +79,8 @@ export function createService(options: ServiceOptions): Service {
   let digest: DigestService | undefined
   let library: LibraryService | undefined
   let reader: ReaderService | undefined
+  let images: ImageService | undefined
+  let imageSignature: ImageUrlSignature | undefined
   let scheduler: PollScheduler | undefined
 
   try {
@@ -94,7 +99,18 @@ export function createService(options: ServiceOptions): Service {
 
     digest = new DigestService({ database, clock, settings })
     library = new LibraryService({ database, clock, settings })
-    reader = new ReaderService({ database, clock, settings, retrieval, digest })
+    // The signing key is minted per process from the CSPRNG: nothing at rest,
+    // and a restart only costs already-cached articles their images.
+    imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
+    images = new ImageService({ database, retrieval })
+    reader = new ReaderService({
+      database,
+      clock,
+      settings,
+      retrieval,
+      digest,
+      signImageUrl: imageSignature.sign,
+    })
     const retention = new RetentionService({ database, clock, logger, ...options.retention })
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
     scheduler.start()
@@ -121,6 +137,8 @@ export function createService(options: ServiceOptions): Service {
     digest: () => digest,
     library: () => library,
     reader: () => reader,
+    images: () => images,
+    imageSignature: () => imageSignature,
   })
 
   return {
@@ -153,6 +171,8 @@ export function createService(options: ServiceOptions): Service {
       digest = undefined
       library = undefined
       reader = undefined
+      images = undefined
+      imageSignature = undefined
     },
   }
 }

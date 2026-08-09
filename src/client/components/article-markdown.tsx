@@ -1,4 +1,5 @@
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
+import { READER_IMAGE_PATH } from '../../shared/api.js'
 
 /**
  * Renders the constrained Markdown the server's Reader extraction generates.
@@ -320,10 +321,25 @@ function inline(text: string): ReactNode[] {
       }
     }
 
+    if (char === '!' && text[index + 1] === '[') {
+      const image = parseLink(text, index + 1)
+      if (image) {
+        // Only the server's own signed proxy route may become a request; any
+        // other source renders as its alt text and asks nobody for anything.
+        if (image.destination.startsWith(`${READER_IMAGE_PATH}?`)) {
+          push(<ArticleImage src={image.destination} alt={literal(image.text)} />)
+        } else {
+          push(<Fragment>{inline(image.text)}</Fragment>)
+        }
+        index = image.end
+        continue
+      }
+    }
+
     if (char === '[') {
       const link = parseLink(text, index)
       if (link) {
-        if (link.destination) {
+        if (isSafeDestination(link.destination)) {
           push(
             <a className="article-link" href={link.destination} target="_blank" rel="noopener noreferrer">
               {inline(link.text)}
@@ -345,10 +361,31 @@ function inline(text: string): ReactNode[] {
   return nodes
 }
 
+/**
+ * A proxied article image. The stable fallback for one that cannot load —
+ * missing, expired signature, publisher gone — is its alt text in the image's
+ * place, so a broken image never becomes a broken page.
+ */
+function ArticleImage({ src, alt }: { readonly src: string; readonly alt: string }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return <span className="article-image-fallback">{alt || 'image unavailable'}</span>
+  }
+  return (
+    <img className="article-image" src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+  )
+}
+
+/** Markdown-escaped text as the plain words it spells, for an alt attribute. */
+function literal(text: string): string {
+  return text.replace(/\\(.)/g, '$1')
+}
+
 interface ParsedLink {
   readonly text: string
-  /** Absent when the destination is not a safe http(s) address. */
-  readonly destination: string | undefined
+  /** Exactly as written; each caller decides what it is willing to follow. */
+  readonly destination: string
   readonly end: number
 }
 
@@ -358,10 +395,9 @@ function parseLink(text: string, start: number): ParsedLink | undefined {
   const closeParen = text.indexOf(')', closeBracket + 2)
   if (closeParen === -1) return undefined
 
-  const destination = text.slice(closeBracket + 2, closeParen)
   return {
     text: text.slice(start + 1, closeBracket),
-    destination: isSafeDestination(destination) ? destination : undefined,
+    destination: text.slice(closeBracket + 2, closeParen),
     end: closeParen + 1,
   }
 }

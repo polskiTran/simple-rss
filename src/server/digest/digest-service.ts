@@ -69,7 +69,9 @@ export class DigestService {
         link: row.link,
         publishedAt: row.publishedAt,
         displayTime: timeLabel(instant, timezone),
-        imageUrl: row.imageUrl,
+        // The publisher's URL stays server-side; the client only ever hears
+        // about the same-origin proxy route for this item.
+        imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
         summary: row.summary,
         firstSeenAt: row.firstSeenAt,
         saved: row.savedAt !== null,

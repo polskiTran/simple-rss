@@ -303,6 +303,7 @@ export const digestItemSchema = z.object({
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   displayTime: z.string(),
+  /** Same-origin proxy path for the item's image; never a publisher URL. */
   imageUrl: z.string().nullable(),
   summary: z.string().nullable(),
   firstSeenAt: z.string(),
@@ -353,6 +354,16 @@ export type Library = z.infer<typeof librarySchema>
 
 /** How long a browser may keep a successful Reader extraction, privately. */
 export const READER_CACHE_SECONDS = 86_400
+
+/** How long a browser may keep a successfully proxied image, privately. */
+export const IMAGE_CACHE_SECONDS = 7 * 86_400
+
+/**
+ * The one same-origin route Reader image references are rewritten to during
+ * extraction. The client renders no image from anywhere else, which is what
+ * lets the CSP keep `img-src` free of publisher origins.
+ */
+export const READER_IMAGE_PATH = '/api/reader/image'
 
 /** The Feed Item that follows in Digest order, so reading never dead-ends. */
 export const readerNextSchema = z.object({
