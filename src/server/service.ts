@@ -10,6 +10,7 @@ import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
+import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
 import { Readiness } from './readiness.js'
 import { createNetworkRetrieval, type Retrieval } from './upstream/retrieval.js'
@@ -22,6 +23,8 @@ export interface ServiceOptions {
   readonly retrieval?: Retrieval
   /** Overridden by tests so progressive login delays cost no wall-clock time. */
   readonly sleep?: Sleeper
+  /** Tests shrink the polling batch and concurrency; production uses defaults. */
+  readonly scheduling?: PollSchedulerLimits
 }
 
 export interface Service {
@@ -35,6 +38,8 @@ export interface Service {
   /** Undefined only when startup failed to open the database. */
   readonly database: SqliteDatabase | undefined
   readonly settings: InstallationSettingsStore | undefined
+  /** The in-process background poller; absent only when startup failed. */
+  readonly scheduler: PollScheduler | undefined
   close(): void
 }
 
@@ -64,6 +69,7 @@ export function createService(options: ServiceOptions): Service {
   let subscriptions: SubscriptionService | undefined
   let refresh: FeedRefresh | undefined
   let digest: DigestService | undefined
+  let scheduler: PollScheduler | undefined
 
   try {
     database = openDatabase(config.databasePath)
@@ -80,6 +86,8 @@ export function createService(options: ServiceOptions): Service {
     refresh = new FeedRefresh({ clock, subscriptions })
 
     digest = new DigestService({ database, clock, settings })
+    scheduler = new PollScheduler({ subscriptions, refresh, logger, ...options.scheduling })
+    scheduler.start()
     readiness.markReady()
     logger.info('startup.migrations_applied', {
       databasePath: config.databasePath,
@@ -115,7 +123,14 @@ export function createService(options: ServiceOptions): Service {
     get settings() {
       return settings
     },
+    get scheduler() {
+      return scheduler
+    },
     close() {
+      // The scheduler stops before the database closes, so no further wake
+      // lands on a closed handle.
+      scheduler?.stop()
+      scheduler = undefined
       database?.close()
       database = undefined
       settings = undefined

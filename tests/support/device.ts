@@ -45,6 +45,10 @@ export class Device {
     return this.#send(path, 'POST', body)
   }
 
+  put(path: string, body?: unknown): Promise<Response> {
+    return this.#send(path, 'PUT', body)
+  }
+
   delete(path: string): Promise<Response> {
     return this.#send(path, 'DELETE')
   }

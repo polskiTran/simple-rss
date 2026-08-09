@@ -47,6 +47,9 @@ export const feeds = sqliteTable('feeds', {
   resolvedUrl: text('resolved_url').notNull().unique(),
   title: text('title').notNull(),
   domain: text('domain').notNull(),
+  /** Validators from the last successful retrieval, for conditional requests. */
+  etag: text('etag'),
+  lastModified: text('last_modified'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
@@ -64,13 +67,20 @@ export const feedUrlAliases = sqliteTable(
 )
 
 /** The Owner's active choice to include a Feed in the Digest. */
-export const subscriptions = sqliteTable('subscriptions', {
-  feedId: integer('feed_id')
-    .primaryKey()
-    .references(() => feeds.id, { onDelete: 'cascade' }),
-  pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
-  createdAt: text('created_at').notNull(),
-})
+export const subscriptions = sqliteTable(
+  'subscriptions',
+  {
+    feedId: integer('feed_id')
+      .primaryKey()
+      .references(() => feeds.id, { onDelete: 'cascade' }),
+    pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
+    /** The persisted due-time frontier the scheduler wakes to query. */
+    nextPollAt: text('next_poll_at').notNull(),
+    lastPolledAt: text('last_polled_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('subscriptions_next_poll_at').on(table.nextPollAt)],
+)
 
 /** Normalized Feed Window entries, deduplicated only inside their Feed. */
 export const feedItems = sqliteTable(

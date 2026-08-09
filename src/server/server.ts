@@ -50,6 +50,9 @@ export async function startService(options: StartOptions): Promise<RunningServic
     get settings() {
       return service.settings
     },
+    get scheduler() {
+      return service.scheduler
+    },
     close: () => service.close(),
     port,
     url: `http://127.0.0.1:${port}`,

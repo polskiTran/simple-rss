@@ -5,6 +5,7 @@ import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { SqliteDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import { startService, type RunningService } from '../../src/server/server.js'
+import type { PollSchedulerLimits } from '../../src/server/subscriptions/poll-scheduler.js'
 import { createRetrieval, type Retrieval } from '../../src/server/upstream/retrieval.js'
 import { ManualClock } from './manual-clock.js'
 import { makeTempDataDir } from './temp-dir.js'
@@ -25,6 +26,8 @@ export interface HarnessOptions {
   readonly upstream?: UpstreamFixtures
   /** Built client bundle to serve. Omitted means "no client on disk". */
   readonly clientDir?: string
+  /** Shrinks the polling batch or concurrency below the production defaults. */
+  readonly scheduling?: PollSchedulerLimits
 }
 
 export interface TestService {
@@ -47,6 +50,12 @@ export interface TestService {
   readonly sleeps: readonly number[]
   /** Same-origin request against the running service; `path` starts with `/`. */
   fetch(path: string, init?: RequestInit): Promise<Response>
+  /**
+   * One scheduler wake, driven explicitly instead of by the once-per-minute
+   * timer, so a test states when the minute passes just as the manual clock
+   * states what time it is.
+   */
+  wakeScheduler(): Promise<void>
   /**
    * Stops the process and starts a new one on the same data directory —
    * the application-level shape of replacing a container.
@@ -106,6 +115,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       retrieval,
       sleep: async (milliseconds) => void sleeps.push(milliseconds),
       logger,
+      ...(options.scheduling ? { scheduling: options.scheduling } : {}),
     })
     running.push(started)
     return started
@@ -135,6 +145,11 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     logs,
     sleeps,
     fetch: (path, init) => fetch(new URL(path, service.url), init),
+    async wakeScheduler() {
+      const scheduler = service.scheduler
+      if (!scheduler) throw new Error('the service started without a scheduler')
+      await scheduler.tick()
+    },
     async restart() {
       await service.stop()
       remove(service)

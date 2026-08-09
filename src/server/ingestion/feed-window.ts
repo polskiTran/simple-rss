@@ -12,9 +12,20 @@ export type DatabaseTransaction = BetterSQLiteTransaction<EmptySchema, ExtractTa
  */
 export function persistFeedWindow(
   db: BetterSQLite3Database,
-  options: { feedId: number; parsed: ParsedFeedDocument; resolvedUrl: string; now: string },
+  options: {
+    feedId: number
+    parsed: ParsedFeedDocument
+    resolvedUrl: string
+    /**
+     * Validators from this retrieval, stored verbatim — including their
+     * absence, so a stale `ETag` is never replayed after a publisher stops
+     * sending one.
+     */
+    validators: { etag: string | null; lastModified: string | null }
+    now: string
+  },
 ): void {
-  const { feedId, parsed, resolvedUrl, now } = options
+  const { feedId, parsed, resolvedUrl, validators, now } = options
   const domain = new URL(resolvedUrl).hostname
   db.transaction((tx) => {
     const alias = tx
@@ -27,7 +38,14 @@ export function persistFeedWindow(
 
     tx.insert(feedUrlAliases).values({ url: resolvedUrl, feedId }).onConflictDoNothing().run()
     tx.update(feeds)
-      .set({ title: parsed.title, domain, resolvedUrl, updatedAt: now })
+      .set({
+        title: parsed.title,
+        domain,
+        resolvedUrl,
+        etag: validators.etag,
+        lastModified: validators.lastModified,
+        updatedAt: now,
+      })
       .where(eq(feeds.id, feedId))
       .run()
     for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)

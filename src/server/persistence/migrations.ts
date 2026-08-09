@@ -134,6 +134,26 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 4,
+    name: 'polling-schedule',
+    sql: `
+      -- Retrieval validators live with the Feed, whose publisher issued them.
+      -- They let the next poll ask "anything new?" instead of re-downloading.
+      ALTER TABLE feeds ADD COLUMN etag TEXT;
+      ALTER TABLE feeds ADD COLUMN last_modified TEXT;
+
+      -- The persisted due-time frontier. Backfilled from created_at so every
+      -- Subscription that predates this migration is immediately due and the
+      -- scheduler's first wake catches it up.
+      ALTER TABLE subscriptions ADD COLUMN next_poll_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z';
+      ALTER TABLE subscriptions ADD COLUMN last_polled_at TEXT;
+      UPDATE subscriptions SET next_poll_at = created_at;
+
+      -- The scheduler queries this frontier once a minute; it must not scan.
+      CREATE INDEX subscriptions_next_poll_at ON subscriptions (next_poll_at);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

@@ -92,6 +92,36 @@ export const passwordChangeRequestSchema = z.object({
 })
 export type PasswordChangeRequest = z.infer<typeof passwordChangeRequestSchema>
 
+/**
+ * The Polling Interval presets, in minutes. A Subscription is only ever one of
+ * these; there is no free-form schedule to tune or to get wrong.
+ */
+export const POLLING_INTERVAL_PRESETS = [30, 60, 120, 360, 720, 1440] as const
+export type PollingIntervalMinutes = (typeof POLLING_INTERVAL_PRESETS)[number]
+
+export const DEFAULT_POLLING_INTERVAL_MINUTES: PollingIntervalMinutes = 120
+
+export const pollingIntervalMinutesSchema = z.union([
+  z.literal(30),
+  z.literal(60),
+  z.literal(120),
+  z.literal(360),
+  z.literal(720),
+  z.literal(1440),
+])
+
+export const updatePollingIntervalRequestSchema = z.object({
+  pollingIntervalMinutes: pollingIntervalMinutesSchema,
+})
+export type UpdatePollingIntervalRequest = z.infer<typeof updatePollingIntervalRequestSchema>
+
+/** One Subscription's schedule: its preset and when it next becomes due. */
+export const pollingScheduleSchema = z.object({
+  pollingIntervalMinutes: pollingIntervalMinutesSchema,
+  nextPollAt: z.string(),
+})
+export type PollingSchedule = z.infer<typeof pollingScheduleSchema>
+
 export const feedIdParameterSchema = z
   .string()
   .regex(/^[1-9]\d*$/)

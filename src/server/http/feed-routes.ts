@@ -3,10 +3,12 @@ import {
   createSubscriptionRequestSchema,
   feedIdParameterSchema,
   importOpmlRequestSchema,
+  updatePollingIntervalRequestSchema,
   type CreateSubscriptionResponse,
   type Digest,
   type OpmlImportFeed,
   type OpmlImportReport,
+  type PollingSchedule,
   type RefreshFeedResponse,
   type SubscriptionList,
 } from '../../shared/api.js'
@@ -90,7 +92,28 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     if (outcome.kind === 'updated') {
       return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems }, 200, NO_STORE)
     }
+    // The publisher confirmed nothing changed, which is a successful refresh
+    // that simply observed no Feed Items.
+    if (outcome.kind === 'not-modified') {
+      return c.json<RefreshFeedResponse>({ observedItems: 0 }, 200, NO_STORE)
+    }
     return refreshFailure(c, outcome)
+  })
+
+  app.put('/feeds/:feedId/interval', async (c) => {
+    const service = deps.subscriptions()
+    if (!service) return unavailable(c)
+    const feedId = feedIdParameterSchema.safeParse(c.req.param('feedId'))
+    if (!feedId.success) return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
+
+    const body = await readJsonBody(c, updatePollingIntervalRequestSchema)
+    if (!body.ok) return body.response
+
+    const outcome = service.setPollingInterval(feedId.data, body.value.pollingIntervalMinutes)
+    if (outcome.kind === 'missing') {
+      return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
+    }
+    return c.json<PollingSchedule>(outcome.schedule, 200, NO_STORE)
   })
 
   app.get('/digest', (c) => {
@@ -126,7 +149,10 @@ function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, {
   }
 }
 
-function refreshFailure(c: Context, outcome: Exclude<RefreshFeedOutcome, { kind: 'updated' }>) {
+function refreshFailure(
+  c: Context,
+  outcome: Exclude<RefreshFeedOutcome, { kind: 'updated' } | { kind: 'not-modified' }>,
+) {
   switch (outcome.kind) {
     case 'missing':
       return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
