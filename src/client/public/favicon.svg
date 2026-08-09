@@ -1,12 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15">
-  <!-- The wordmark's 3x3 grid: five squares on, four off, starting with ink. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
+  <!-- The wordmark's 4x4 tile: 3px squares on a 5px pitch, in the five ink
+       levels of the cadence ramp. `l0`–`l3` are the ramp's tints, a bare rect
+       its peak — the same values `styles.css` binds as `--cadence-*`. -->
   <style>
     rect { fill: #12110f }
+    .l0 { fill-opacity: 0.06 }
+    .l1 { fill-opacity: 0.2 }
+    .l2 { fill-opacity: 0.38 }
+    .l3 { fill-opacity: 0.6 }
     @media (prefers-color-scheme: dark) { rect { fill: #f7f7f5 } }
   </style>
   <rect x="0" y="0" width="3" height="3" />
-  <rect x="12" y="0" width="3" height="3" />
-  <rect x="6" y="6" width="3" height="3" />
-  <rect x="0" y="12" width="3" height="3" />
-  <rect x="12" y="12" width="3" height="3" />
+  <rect x="5" y="0" width="3" height="3" class="l1" />
+  <rect x="10" y="0" width="3" height="3" class="l3" />
+  <rect x="15" y="0" width="3" height="3" class="l0" />
+  <rect x="0" y="5" width="3" height="3" class="l2" />
+  <rect x="5" y="5" width="3" height="3" />
+  <rect x="10" y="5" width="3" height="3" class="l0" />
+  <rect x="15" y="5" width="3" height="3" class="l2" />
+  <rect x="0" y="10" width="3" height="3" class="l3" />
+  <rect x="5" y="10" width="3" height="3" class="l0" />
+  <rect x="10" y="10" width="3" height="3" />
+  <rect x="15" y="10" width="3" height="3" class="l1" />
+  <rect x="0" y="15" width="3" height="3" class="l0" />
+  <rect x="5" y="15" width="3" height="3" class="l2" />
+  <rect x="10" y="15" width="3" height="3" class="l1" />
+  <rect x="15" y="15" width="3" height="3" class="l3" />
 </svg>

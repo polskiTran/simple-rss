@@ -161,8 +161,13 @@
     gap: 24px;
   }
 
-  /* Wordmark: a 3x3 grid of 3px squares, alternating ink and gap starting
-     with ink, then the name in italic 10px away. */
+  /* Wordmark: a 4x4 tile of 3px squares, `gap:2px`, in the cadence ramp's five
+     ink levels, then the name in italic 10px away.
+
+     The tile is the cadence figure at mark size, so it takes the cadence
+     tokens rather than a second set of greys — one ramp, bound once, and dark
+     follows for free. Only the peak reads as the wordmark's own ink
+     (`--color-ink-strong`, §2), which is what the name beside it is set in. */
   .wordmark {
     display: flex;
     align-items: center;
@@ -171,16 +176,29 @@
 
   .wordmark-grid {
     display: grid;
-    grid-template-columns: repeat(3, 3px);
-    gap: 3px;
+    grid-template-columns: repeat(4, 3px);
+    gap: 2px;
   }
 
   .wordmark-cell {
     width: 3px;
     height: 3px;
+    background: var(--cadence-0);
   }
 
-  .wordmark-cell[data-ink='on'] {
+  .wordmark-cell[data-level='1'] {
+    background: var(--cadence-1);
+  }
+
+  .wordmark-cell[data-level='2'] {
+    background: var(--cadence-2);
+  }
+
+  .wordmark-cell[data-level='3'] {
+    background: var(--cadence-3);
+  }
+
+  .wordmark-cell[data-level='4'] {
     background: var(--color-ink-strong);
   }
 

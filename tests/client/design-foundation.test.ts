@@ -93,6 +93,24 @@ describe('type', () => {
     ])
   })
 
+  it('draws the wordmark tile as 4x4 3px squares on a 2px gap', () => {
+    expect(lightOnly()).toMatch(/\.wordmark-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4, 3px\)/)
+    expect(lightOnly()).toMatch(/\.wordmark-grid\s*\{[^}]*gap:\s*2px/)
+    expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*width:\s*3px/)
+  })
+
+  it('takes the tile’s tints from the cadence ramp and its peak from the wordmark ink', () => {
+    // One ramp, bound once: a second set of greys here would need a second
+    // dark binding too, and would be the fifth ink level §6 rules out.
+    expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*background:\s*var\(--cadence-0\)/)
+    for (const level of [1, 2, 3]) {
+      expect(lightOnly()).toMatch(
+        new RegExp(`\\.wordmark-cell\\[data-level='${level}'\\]\\s*\\{[^}]*background:\\s*var\\(--cadence-${level}\\)`),
+      )
+    }
+    expect(lightOnly()).toMatch(/\.wordmark-cell\[data-level='4'\]\s*\{[^}]*background:\s*var\(--color-ink-strong\)/)
+  })
+
   it('sets the desktop wordmark and tab sizes', () => {
     expect(lightOnly()).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*21px/)
     expect(lightOnly()).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12\.5px/)

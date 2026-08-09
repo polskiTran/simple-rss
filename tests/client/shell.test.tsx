@@ -58,6 +58,20 @@ describe('the application shell', () => {
     expect(screen.getByText('simple')).toBeDefined()
   })
 
+  it('draws the mark as the 4x4 cadence tile of docs/references/brand.png', async () => {
+    const { container } = await renderAt('/digest')
+
+    // The pattern is the design, so it is held here rather than left to the
+    // eye: sixteen cells, row by row, in the cadence ramp's levels. The tile
+    // is decoration for a screen reader, which is why it is queried by class.
+    const levels = [...container.querySelectorAll('.wordmark-cell')].map((cell) =>
+      cell.getAttribute('data-level'),
+    )
+
+    expect(levels).toEqual(['4', '1', '3', '0', '2', '4', '0', '2', '3', '0', '4', '1', '0', '2', '1', '3'])
+    expect(container.querySelector('.wordmark-grid')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
   it.each([...ROUTES])('marks %s as the current section when its path is open', async (route) => {
     await renderAt(`/${route}`)
 
