@@ -40,9 +40,32 @@ Point the platform's liveness check at `/health/live` and its readiness check at
 while liveness stays green, so an operator can read the reason in the logs
 instead of watching a restart loop.
 
+## Released images
+
+Releases are public, versioned, immutable `linux/amd64` images:
+
+```
+ghcr.io/polskitran/simple-rss:<version>    e.g. ghcr.io/polskitran/simple-rss:0.1.0
+```
+
+There is deliberately **no `latest` tag** — an installation names an explicit
+version, and nothing ever updates it automatically. A published version is
+never overwritten; the release workflow refuses to push a tag that already
+exists.
+
+A release is cut by pushing a Git tag `v<version>` matching `package.json`
+and `src/shared/version.ts`. The workflow
+([`.github/workflows/release.yml`](../.github/workflows/release.yml)) runs the
+release smoke test — deploy, claim, persist state, back up, replace the
+container, restore onto a fresh volume — against the exact image it then
+publishes, then confirms the published version pulls anonymously — the GHCR
+package's public visibility is a one-time package setting, and the release
+fails loudly until it is set. Pulling never needs registry credentials.
+
 ## Building the image
 
-The released image targets `linux/amd64`:
+Deployments pull the released image; building is for development and for
+cutting releases. The released image targets `linux/amd64`:
 
 ```sh
 docker build --platform linux/amd64 -t simple-rss:$(node -p "require('./package.json').version") .
@@ -54,7 +77,12 @@ produces an image for the host, which is what local development wants. Building
 (`docker run --privileged --rm tonistiigi/binfmt --install amd64`); CI builds it
 natively on an amd64 runner instead.
 
-## Running it
+## Running it anywhere Docker runs
+
+These are the generic instructions; no Railway API is involved. The platform
+injects `PORT`, mounts something durable at `/app/data`, supplies the setup
+secret and the public origin, points health checks at the endpoints above, and
+stops the container with `SIGTERM`:
 
 ```sh
 docker run -d \
@@ -63,11 +91,13 @@ docker run -d \
   -v simple-rss-data:/app/data \
   -e SETUP_SECRET="$(openssl rand -base64 32)" \
   -e PUBLIC_ORIGIN="https://reader.example.com" \
-  simple-rss:0.1.0
+  ghcr.io/polskitran/simple-rss:0.1.0
 ```
 
 The container runs as the unprivileged `node` user, writes structured JSON logs
-to stdout, and stops gracefully on `SIGTERM`.
+to stdout, and stops gracefully on `SIGTERM` (allow at least
+`SHUTDOWN_GRACE_MS` before force-killing). Backups are the CLI snapshot
+command below — never a raw copy of the live database file.
 
 ## Railway
 
@@ -75,9 +105,89 @@ The supported shape is in [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md#supported-r
 one Hobby-plan service, one replica, sleep disabled, restart policy `Always`,
 and one volume mounted at `/app/data`.
 
-Railway mounts the volume only at runtime, so migrations run during application
-startup rather than as a pre-deploy command. That is why readiness — not
-liveness — is the gate that holds traffic back.
+### The template
+
+The template provisions exactly one service and one volume — no Postgres, no
+Redis, no queue, no second service of any kind:
+
+| Setting | Value |
+|---|---|
+| Source | `ghcr.io/polskitran/simple-rss:<version>` — an explicit version, never `latest` |
+| Replicas | 1 — SQLite on the volume constrains the service to a single instance |
+| Resources | 1 vCPU limit, 1 GB memory limit |
+| Volume | mounted at `/app/data` |
+| Serverless | **disabled** — a sleeping service would stop background Feed polling |
+| Restart policy | `Always` |
+| Health check | `/health/ready` |
+| `SETUP_SECRET` | `${{ secret(32) }}` — generated per deployment by the template, never a shared or hard-coded value |
+| `PUBLIC_ORIGIN` | `https://${{ RAILWAY_PUBLIC_DOMAIN }}` |
+
+Railway bills actual usage, not the configured limits; this workload is
+expected to stay near the Hobby plan's minimum, and the 1 GB limit is
+headroom rather than a reservation. Session secrets need no configuration at
+all — session tokens are generated at sign-in and only their hashes are
+stored.
+
+There is no `railway.json` in the repository on purpose: config-as-code
+applies to services Railway builds from a connected repo, while this template
+deploys the published image, so the settings above live in the template
+itself.
+
+### First deployment and claim
+
+1. Deploy the template. Railway generates an HTTPS domain
+   (`https://<service>.up.railway.app`) that works immediately — no custom
+   DNS is required, and `PUBLIC_ORIGIN` already points at it.
+2. The deployment becomes healthy only after startup migrations complete and
+   the readiness check passes. Railway mounts the volume only at runtime, so
+   migrations run during application startup rather than as a pre-deploy
+   command — that is why readiness, not liveness, is the gate that holds
+   traffic back.
+3. Open the domain and claim the installation: the setup secret is in the
+   service's variables, and the claim screen wants it once, together with the
+   Owner's chosen password. Setup then closes permanently.
+
+State lives on the volume, so a redeploy — same version or an upgrade — keeps
+the Owner's claim, sessions, Subscriptions, and reading history.
+
+### Custom domain (optional)
+
+The generated domain is fully supported; a custom domain changes nothing
+structural:
+
+1. Add the domain to the service in Railway and follow its DNS instructions.
+2. Update `PUBLIC_ORIGIN` to the new origin (e.g. `https://reader.example.com`)
+   and redeploy, so outbound retrieval refuses Feed URLs pointing back at the
+   installation's own new address.
+
+Everything else already behaves: the session cookie is host-only
+(`Secure; SameSite=Strict`), so the Owner simply signs in once on the new
+domain; the same-origin check compares each request against its own host, the
+CSP is `'self'`-relative, and the health endpoints are unchanged.
+
+### Deploys and downtime
+
+One replica and one volume mean each deploy has a brief downtime while the
+volume detaches from the old container and attaches to the new one. That is a
+deliberate trade for a personal reader — see
+[`docs/ARCHITECTURE.md`](./ARCHITECTURE.md#single-instance-consequences).
+Persisted polling schedules catch the scheduler up after the gap.
+
+### Watching it run
+
+- **Logs** — structured JSON on stdout, in Railway's log view. `LOG_LEVEL`
+  raises or lowers the detail.
+- **Health** — point Railway's health check at `/health/ready`. Liveness
+  staying green while readiness fails means the process is up but refusing
+  traffic for a stated reason (failed migration, full volume); the reason is
+  in the readiness response and the logs.
+- **Volume usage** — visible in Railway's volume metrics. A full volume closes
+  readiness rather than corrupting writes; growth is bounded by Retention
+  plus whatever the Library keeps.
+- **Backups** — Railway's daily volume backups are on by default and are the
+  baseline safety net. Take an explicit CLI backup (below) before anything
+  deliberate, and download it off the volume if it should survive the volume
+  itself.
 
 ## Operational commands
 
@@ -199,9 +309,12 @@ Installations never follow a mutable `latest` tag, and nothing updates
 automatically. Upgrading is deliberate:
 
 1. Take a backup (above).
-2. Pick an explicit image version — a tag like `simple-rss:0.2.0`, never
-   `latest` — and replace the container while retaining the volume. That is
-   what preserves state, and the container smoke tests cover exactly that path.
+2. Pick an explicit image version — `ghcr.io/polskitran/simple-rss:0.2.0`,
+   never `latest` — and replace the container while retaining the volume. On
+   Railway that means editing the service's image reference and redeploying;
+   the volume moves to the new container, with the brief downtime described
+   above. Retaining the volume is what preserves state, and the release smoke
+   test covers exactly that path.
 3. Watch `/health/ready`: the new build applies its migrations during startup
    and holds traffic until they finish.
 

@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { authStatusSchema, apiErrorSchema, readinessSchema, serviceMetaSchema } from '../../src/shared/api.js'
+import { migrations } from '../../src/server/persistence/migrations.js'
 import { VERSION } from '../../src/shared/version.js'
-import { buildImage, docker, logRecords, startContainer, uniqueName, type Container } from './docker.js'
+import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type Container } from './docker.js'
 
 /** The one-time secret this deployment is configured with. */
 const SETUP_SECRET = 'a-deployment-setup-secret'
@@ -98,7 +99,10 @@ describe('the production image', () => {
     const records = logRecords(await container.logs())
     const migrated = records.find((record) => record.message === 'startup.migrations_applied')
 
-    expect(migrated).toMatchObject({ databasePath: '/app/data/simple-rss.db', applied: [1, 2, 3, 4, 5] })
+    expect(migrated).toMatchObject({
+      databasePath: '/app/data/simple-rss.db',
+      applied: migrations.map((migration) => migration.version),
+    })
   })
 
   it('reports liveness and readiness', async () => {
@@ -279,6 +283,73 @@ describe('emergency password reset through the platform shell', () => {
     await container.exec(['node', 'dist/server/cli-main.js', 'reset-password', 'the-recovered-password'])
 
     expect((await signIn(container, 'the-recovered-password')).status).toBe(200)
+  })
+})
+
+describe('the release lifecycle', () => {
+  /**
+   * The whole documented journey in one pass, the way `docs/DEPLOYMENT.md`
+   * walks an Owner through it: deploy and claim, accumulate state, back up
+   * before an upgrade, replace the container on the retained volume, and
+   * recover from the snapshot onto a fresh volume.
+   *
+   * The replacement runs the same image twice; a version-to-version upgrade
+   * follows the identical path, with startup migrations covered by the
+   * `replacing the container` cases below.
+   */
+  it('claims, persists state, backs up, upgrades, and restores the backup onto a fresh volume', async () => {
+    // A new Owner deploys the template and claims the installation.
+    const first = await start()
+    const cookie = await claim(first.container)
+    await first.container.exec(['node', 'dist/server/cli-main.js', 'set-timezone', 'Europe/Berlin'])
+
+    // A deliberate backup before the upgrade.
+    const backup = await first.container.exec([
+      'node',
+      'dist/server/cli-main.js',
+      'backup',
+      '/app/data/backups/pre-upgrade.db',
+    ])
+    expect(JSON.parse(backup.stdout)).toMatchObject({ backupCreated: true })
+
+    // The upgrade: a new container over the retained volume. Readiness gates
+    // traffic, the Owner's session and settings ride the volume.
+    await retire(first.container)
+    const upgraded = await start({ volume: first.volume })
+    expect((await upgraded.container.fetch('/health/ready')).status).toBe(200)
+    expect((await upgraded.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
+    await retire(upgraded.container)
+
+    // Disaster recovery: restore the snapshot into a fresh data directory
+    // before any server has initialized it — the CLI refuses a directory that
+    // already holds a database, so this must happen in a one-off container.
+    const freshVolume = uniqueName('simple-rss-data')
+    volumes.push(freshVolume)
+    const restored = await docker([
+      'run',
+      '--rm',
+      '-v',
+      `${freshVolume}:/app/data`,
+      '-v',
+      `${first.volume}:/backup:ro`,
+      '-e',
+      'PUBLIC_ORIGIN=https://reader.test',
+      IMAGE,
+      'node',
+      'dist/server/cli-main.js',
+      'restore',
+      '/backup/backups/pre-upgrade.db',
+    ])
+    expect(restored.code, restored.stderr).toBe(0)
+    expect(JSON.parse(restored.stdout)).toMatchObject({ restored: true, claimed: true })
+
+    // The restored installation serves, keeps its settings, and lets the same
+    // password in — the verifier travelled inside the snapshot.
+    const recovered = await start({ volume: freshVolume })
+    expect((await recovered.container.fetch('/health/ready')).status).toBe(200)
+    expect((await signIn(recovered.container, OWNER_PASSWORD)).status).toBe(200)
+    const shown = await recovered.container.exec(['node', 'dist/server/cli-main.js', 'show'])
+    expect(JSON.parse(shown.stdout).timezone).toBe('Europe/Berlin')
   })
 })
 
