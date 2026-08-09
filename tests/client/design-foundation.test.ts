@@ -251,6 +251,27 @@ describe('the Reader', () => {
     expect(monospace[0]).toContain('.article-body code')
   })
 
+  it('breaks a word no space will break rather than widening the measure', () => {
+    // An address or a hash longer than the narrow paper is the one thing that
+    // can push the reading column sideways on a phone.
+    expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*overflow-wrap:\s*break-word/)
+    expect(lightOnly()).toMatch(/\.reader-title\s*\{[^}]*overflow-wrap:\s*break-word/)
+    expect(lightOnly()).toMatch(/\.reader-summary\s*\{[^}]*overflow-wrap:\s*break-word/)
+  })
+
+  it('holds the departure arrow to its text form, never the colour emoji', () => {
+    // Bare U+2197 is rendered by the emoji font on both mobile platforms; the
+    // U+FE0E after it asks for the typographic glyph instead.
+    const arrows = css.match(/content:\s*'[^']*2197[^']*'/g) ?? []
+    expect(arrows.length).toBeGreaterThan(0)
+    for (const arrow of arrows) expect(arrow).toContain('\\2197\\FE0E')
+  })
+
+  it('leaves a linked image unmarked — no underline, no arrow', () => {
+    expect(lightOnly()).toMatch(/\.article-link:has\(\.article-image\)\s*\{[^}]*text-decoration:\s*none/)
+    expect(lightOnly()).toMatch(/\.article-link:has\(\.article-image\)::after\s*\{[^}]*content:\s*none/)
+  })
+
   it('steps the reader down with everything else at the breakpoint', () => {
     const narrow = css.split('@media (max-width: 640px)')[1] ?? ''
     expect(narrow).toMatch(/\.paper-reader\s*\{[^}]*padding:\s*28px 24px 0/)

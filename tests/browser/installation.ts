@@ -28,6 +28,27 @@ export interface Installation {
  * enough — script, iframe, form, event handler — to prove sanitization in a
  * real browser rather than only in jsdom.
  */
+/**
+ * A figure linking to its own full-size copy, the way every newsletter
+ * platform emits one.
+ */
+const FIGURE_IMAGE_URL = 'https://cdn.publisher.example/image/fetch/$s_!9LbW!,w_424,c_limit,f_webp/valley.png'
+const FIGURE_FULL_SIZE_URL =
+  'https://cdn.publisher.example/image/fetch/$s_!9LbW!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fpost-media.publisher.example%2Fpublic%2Fimages%2F22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7_996x477.png'
+
+/**
+ * An address quoted in the prose, with no space in it anywhere: the shape
+ * that used to push the whole reading column past the edge of a phone.
+ */
+const QUOTED_LONG_URL =
+  'https://cdn.publisher.example/archive/2026/08/09/the-long-unbroken-address-a-publisher-quotes-in-running-prose-22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7.html'
+
+/** A 1×1 PNG — enough to pass the proxy's magic-byte sniff and paint. */
+const PNG_PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+)
+
 const ARTICLE_HTML = `<!doctype html>
   <html lang="en">
     <head><meta charset="utf-8"><title>First light</title></head>
@@ -44,6 +65,8 @@ const ARTICLE_HTML = `<!doctype html>
         <ul><li>arrive before the light</li><li>write down what is actually there</li></ul>
         <pre><code class="language-python">def observe():\n    return light</code></pre>
         <p>The full notes live in <a href="/notes">the notebook</a>.</p>
+        <figure><a href="${FIGURE_FULL_SIZE_URL}"><img src="${FIGURE_IMAGE_URL}" alt="the valley at dawn"></a><figcaption>Dawn from the ridge.</figcaption></figure>
+        <p>The plate above was filed at ${QUOTED_LONG_URL} on the morning it was made.</p>
         <script>document.body.innerHTML = 'a hostile page took over'</script>
         <iframe src="https://tracker.example/pixel"></iframe>
         <form action="/subscribe"><button>Subscribe now</button></form>
@@ -92,6 +115,10 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
       .stub('https://publisher.example/first-light', {
         headers: { 'content-type': 'text/html; charset=utf-8' },
         body: ARTICLE_HTML,
+      })
+      .stub(FIGURE_IMAGE_URL, {
+        headers: { 'content-type': 'image/png' },
+        body: PNG_PIXEL,
       })
       .stub(brokenArticleFeedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
