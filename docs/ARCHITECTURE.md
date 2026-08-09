@@ -171,9 +171,10 @@ The entered URL is preserved while a validated resolved URL may be recorded for 
 ### Feed retrieval limits
 
 - HTTP and HTTPS only
-- Ten-second network timeout
+- Ten seconds to answer, counted across resolution, connection, and every redirect hop
+- Sixty further seconds for the answer to finish arriving, reported separately from a publisher that never answered
 - Five redirects at most
-- Two MiB decoded Feed body
+- Twenty MiB decoded Feed body
 - Redirect destinations revalidated independently
 - No credentials, localhost, private/reserved destinations, or self-reference
 - No forwarding of browser credentials or cookies

@@ -137,6 +137,34 @@ export function chunkedBody(chunks: readonly Uint8Array[]): ReadableStream<Uint8
   })
 }
 
+export interface PacedBodyOptions {
+  /** How long the publisher pauses between chunks. */
+  readonly gapMs: number
+  /**
+   * Whether the body ever finishes. `false` is a publisher that answered,
+   * sent some of what it promised, and then went quiet without closing.
+   */
+  readonly ends?: boolean
+}
+
+/**
+ * A body that arrives steadily but slowly, so a test can tell the wait for an
+ * answer apart from the wait for that answer to finish.
+ */
+export function pacedBody(chunks: readonly Uint8Array[], options: PacedBodyOptions): ReadableStream<Uint8Array> {
+  let index = 0
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      await new Promise((resolve) => setTimeout(resolve, options.gapMs))
+      const chunk = chunks[index]
+      index += 1
+      if (chunk !== undefined) controller.enqueue(chunk)
+      else if (options.ends ?? true) controller.close()
+      else await new Promise(() => {})
+    },
+  })
+}
+
 function safeHostname(url: string): string | undefined {
   try {
     return new URL(url).hostname

@@ -1,4 +1,4 @@
-import type { FeedAvailabilityCategory } from '../../shared/api.js'
+import { MAX_FEED_SIZE_MIB, type FeedAvailabilityCategory } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
 /**
@@ -11,7 +11,7 @@ import { ApiError } from '../api.js'
 export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'the feed cannot be reached',
   timeout: 'the feed is taking too long to respond',
-  too_large: 'the feed has grown past the 2 MiB limit',
+  too_large: `the feed has grown past the ${MAX_FEED_SIZE_MIB} MiB limit`,
   unsupported_content: 'the URL no longer returns feed content',
   http_error: 'the publisher is answering with an error',
   invalid_feed: 'the feed is returning unusable XML',
@@ -20,10 +20,11 @@ export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string
 export const SUBSCRIPTION_FAILURE_COPY: Readonly<Record<string, string>> = {
   duplicate_subscription: 'already subscribed',
   invalid_feed_url: 'enter an exact RSS or Atom URL',
-  feed_too_large: 'that Feed is larger than 2 MiB',
+  feed_too_large: `that Feed is larger than ${MAX_FEED_SIZE_MIB} MiB`,
   unsupported_feed: 'that URL does not return supported RSS or Atom',
   malformed_feed: 'that Feed contains malformed XML',
   feed_timeout: 'that Feed took too long to respond',
+  feed_body_timeout: 'that Feed took too long to download',
   feed_unreachable: 'that Feed could not be reached',
 }
 

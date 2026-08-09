@@ -10,7 +10,7 @@ import {
   type RetrievalOperation,
   type RetrievalRequest,
 } from '../../../src/server/upstream/retrieval.js'
-import { chunkedBody, UpstreamFixtures } from '../../support/upstream-fixtures.js'
+import { chunkedBody, pacedBody, UpstreamFixtures } from '../../support/upstream-fixtures.js'
 
 interface Harness {
   readonly retrieval: Retrieval
@@ -50,10 +50,11 @@ type RequestOverrides = Partial<Omit<RetrievalRequest, 'url' | 'limits'>> & Retr
 
 /** A Feed-shaped retrieval, which every test varies rather than restates. */
 function feedRequest(url: string, overrides: RequestOverrides = {}): RetrievalRequest {
-  const { maxBytes, timeoutMs, maxRedirects, ...request } = overrides
+  const { maxBytes, timeoutMs, bodyTimeoutMs, maxRedirects, ...request } = overrides
   const limits: RetrievalLimits = {
     ...(maxBytes === undefined ? {} : { maxBytes }),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(bodyTimeoutMs === undefined ? {} : { bodyTimeoutMs }),
     ...(maxRedirects === undefined ? {} : { maxRedirects }),
   }
   const hasLimits = Object.keys(limits).length > 0
@@ -509,6 +510,36 @@ describe('giving up', () => {
     expect(upstream.requests).toHaveLength(0)
   })
 
+  it('lets a large body take longer to arrive than the publisher had to answer', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stubDynamic('https://example.com/feed.xml', () => ({
+      headers: { 'content-type': 'application/xml' },
+      body: pacedBody([new Uint8Array(8), new Uint8Array(8), new Uint8Array(8)], { gapMs: 25 }),
+    }))
+
+    // Every chunk lands after the deadline for answering at all has passed:
+    // this Feed is slow to send, not silent, and the two are not the same.
+    const result = await retrieval.retrieveBytes(
+      feedRequest('https://example.com/feed.xml', { timeoutMs: 20, bodyTimeoutMs: 2_000 }),
+    )
+
+    expect(result).toMatchObject({ ok: true })
+    if (result.ok) expect(result.bytes.byteLength).toBe(24)
+  })
+
+  it('reports a body that stops arriving as a body timeout rather than an unanswered request', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stubDynamic('https://example.com/feed.xml', () => ({
+      headers: { 'content-type': 'application/xml' },
+      body: pacedBody([new Uint8Array(8)], { gapMs: 5, ends: false }),
+    }))
+
+    await expect(
+      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { bodyTimeoutMs: 30 })),
+    ).resolves.toMatchObject({ ok: false, code: 'body_timeout' })
+    expect(upstream.aborted).toContain('https://example.com/feed.xml')
+  })
+
   it('counts the deadline across redirects rather than restarting it each hop', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/a', {
@@ -640,7 +671,7 @@ describe('capacity', () => {
     }))
     const imageRequest = feedRequest('https://example.com/photo.jpg', {
       operation: 'image',
-      timeoutMs: 20,
+      bodyTimeoutMs: 20,
     })
 
     // Nobody reads or cancels it: the deadline is the only thing left to end it.
