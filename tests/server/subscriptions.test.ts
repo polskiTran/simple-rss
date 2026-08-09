@@ -297,6 +297,78 @@ describe('Subscriptions', () => {
     })
   })
 
+  it('corrects an Atom entry under its Atom ID exactly as RSS GUIDs are corrected', async () => {
+    const service = await startTestService()
+    const atomUrl = 'https://atom.example/feed.xml'
+    const entry = (title: string, summary: string) => `<?xml version="1.0"?>
+      <feed xmlns="http://www.w3.org/2005/Atom">
+        <title>Atom Letters</title>
+        <entry>
+          <id>tag:atom.example,2026:one</id>
+          <title>${title}</title>
+          <published>2026-08-08T06:00:00Z</published>
+          <summary>${summary}</summary>
+        </entry>
+      </feed>`
+    service.upstream.stub(atomUrl, {
+      headers: { 'content-type': 'application/atom+xml' },
+      body: entry('first title', 'first summary'),
+    })
+    const owner = await claimedDevice(service)
+    expect((await owner.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
+
+    service.clock.advance(60 * 60 * 1_000)
+    service.upstream.stub(atomUrl, {
+      headers: { 'content-type': 'application/atom+xml' },
+      body: entry('corrected title', 'corrected summary'),
+    })
+    expect((await owner.post('/api/feeds/1/refresh')).status).toBe(200)
+
+    const digest = await (await owner.get('/api/digest')).json()
+    expect(digest.groups[0].items).toHaveLength(1)
+    expect(digest.groups[0].items[0]).toMatchObject({
+      title: 'corrected title',
+      summary: 'corrected summary',
+      firstSeenAt: '2026-08-08T09:00:00.000Z',
+    })
+  })
+
+  it('keeps the same entry distinct in two Feeds: identity never crosses a Feed', async () => {
+    const service = await startTestService()
+    const syndicated = (feedTitle: string) => `<?xml version="1.0"?>
+      <rss version="2.0"><channel><title>${feedTitle}</title>
+        <item>
+          <guid>shared-story</guid>
+          <title>Syndicated everywhere</title>
+          <link>https://origin.example/story</link>
+          <pubDate>Fri, 08 Aug 2026 06:00:00 GMT</pubDate>
+        </item>
+      </channel></rss>`
+    service.upstream
+      .stub('https://first.example/feed', {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: syndicated('First Wire'),
+      })
+      .stub('https://second.example/feed', {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: syndicated('Second Wire'),
+      })
+    const owner = await claimedDevice(service)
+
+    expect((await owner.post('/api/subscriptions', { url: 'https://first.example/feed' })).status).toBe(201)
+    expect((await owner.post('/api/subscriptions', { url: 'https://second.example/feed' })).status).toBe(201)
+
+    const digest = await (await owner.get('/api/digest')).json()
+    expect(
+      digest.groups[0].items
+        .map((item: { feedTitle: string; title: string }) => [item.feedTitle, item.title])
+        .sort(),
+    ).toEqual([
+      ['First Wire', 'Syndicated everywhere'],
+      ['Second Wire', 'Syndicated everywhere'],
+    ])
+  })
+
   it('accepts RDF-shaped RSS 1.0 Feeds', async () => {
     const service = await startTestService()
     const rssUrl = 'https://rdf.example/feed'

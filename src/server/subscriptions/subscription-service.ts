@@ -13,6 +13,7 @@ import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
+import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
 
 export type CreateSubscriptionOutcome =
   | { readonly kind: 'created'; readonly subscription: SubscriptionSummary; readonly importedItems: number }
@@ -20,6 +21,13 @@ export type CreateSubscriptionOutcome =
   | { readonly kind: 'invalid-url' }
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
   | { readonly kind: 'invalid-feed'; readonly code: FeedDocumentError['code'] }
+
+export type ImportOpmlOutcome =
+  | { readonly kind: 'invalid-opml'; readonly code: OpmlFailureCode }
+  | {
+      readonly kind: 'report'
+      readonly entries: readonly { readonly url: string; readonly outcome: CreateSubscriptionOutcome }[]
+    }
 
 export type IngestFeedOutcome =
   | { readonly kind: 'updated'; readonly observedItems: number }
@@ -129,6 +137,42 @@ export class SubscriptionService {
     return { kind: 'created', subscription: this.#withCadence(created), importedItems }
   }
 
+  /**
+   * Moves another reader's OPML in through the normal Subscription creation
+   * path, one Feed at a time, so one bad Feed fails alone and every rule that
+   * guards `create` — validation, retrieval bounds, deduplication, the default
+   * Polling Interval — holds for imports too.
+   */
+  async importOpml(opml: string): Promise<ImportOpmlOutcome> {
+    let outlines
+    try {
+      outlines = parseOpml(opml)
+    } catch (error) {
+      if (error instanceof OpmlError) return { kind: 'invalid-opml', code: error.code }
+      throw error
+    }
+
+    const entries: { url: string; outcome: CreateSubscriptionOutcome }[] = []
+    for (const outline of outlines) {
+      entries.push({ url: outline.url, outcome: await this.create(outline.url) })
+    }
+
+    const counted = (kind: CreateSubscriptionOutcome['kind']) =>
+      entries.filter((entry) => entry.outcome.kind === kind).length
+    this.#logger.info('subscriptions.opml_imported', {
+      feeds: entries.length,
+      added: counted('created'),
+      skipped: counted('duplicate'),
+      failed: entries.length - counted('created') - counted('duplicate'),
+    })
+    return { kind: 'report', entries }
+  }
+
+  /** The Owner's active Subscriptions as an OPML document another reader can import. */
+  exportOpml(): string {
+    return serializeOpml(this.#subscribedFeeds(), this.#clock.now())
+  }
+
   async ingest(feedId: number): Promise<IngestFeedOutcome> {
     const feed = this.#feedById(feedId)
     if (!feed) return { kind: 'missing' }
@@ -161,14 +205,20 @@ export class SubscriptionService {
   }
 
   list(): readonly SubscriptionSummary[] {
-    const records = this.#db
+    const cadence = this.#cadenceByFeed()
+    return this.#subscribedFeeds().map((record) => ({
+      ...record,
+      cadence: cadence.get(record.feedId) ?? emptyCadence(),
+    }))
+  }
+
+  #subscribedFeeds(): readonly FeedRecord[] {
+    return this.#db
       .select(FEED_RECORD_COLUMNS)
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .orderBy(feeds.title)
       .all()
-    const cadence = this.#cadenceByFeed()
-    return records.map((record) => ({ ...record, cadence: cadence.get(record.feedId) ?? emptyCadence() }))
   }
 
   #withCadence(feed: FeedRecord): SubscriptionSummary {

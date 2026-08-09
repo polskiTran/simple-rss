@@ -82,6 +82,69 @@ describe('Feeds', () => {
   })
 })
 
+describe('OPML portability', () => {
+  const OPML = '<opml version="2.0"><body><outline xmlUrl="https://journal.example/feed"/></body></opml>'
+
+  it('imports an OPML file and reports each Feed as added, skipped, or failed', async () => {
+    const api = stubApi()
+      .on('POST /api/subscriptions/import', {
+        body: {
+          feeds: [
+            { url: 'https://journal.example/feed', outcome: 'added', title: 'Field Notes', reason: null },
+            { url: 'https://old.example/feed', outcome: 'skipped', title: 'Old Friend', reason: 'already subscribed' },
+            {
+              url: 'https://gone.example/feed',
+              outcome: 'failed',
+              title: null,
+              reason: 'The Feed could not be reached',
+            },
+          ],
+        },
+      })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+    const file = new File([OPML], 'subscriptions.opml', { type: 'text/x-opml' })
+    await user.upload(await screen.findByLabelText(/import opml/i), file)
+
+    expect(await screen.findByText('imported — 1 added, 1 skipped, 1 failed')).toBeDefined()
+    expect(screen.getByText(/old friend — already subscribed/i)).toBeDefined()
+    expect(screen.getByText(/gone\.example\/feed — the feed could not be reached/i)).toBeDefined()
+    expect(api.requestsTo('POST /api/subscriptions/import')).toMatchObject([{ body: { opml: OPML } }])
+    // The list is refetched, so the added Subscriptions appear.
+    expect(await screen.findByText('Field Notes')).toBeDefined()
+  })
+
+  it('explains an upload the server refused', async () => {
+    stubApi().on('POST /api/subscriptions/import', {
+      status: 422,
+      body: { error: { code: 'unsupported_opml', message: 'The file is not an OPML subscription list' } },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    // `applyAccept` off: this test hands the reader exactly the file the
+    // picker's filter would discourage, because the server still must refuse it.
+    const user = userEvent.setup({ applyAccept: false })
+
+    const file = new File(['not xml'], 'notes.txt', { type: 'text/plain' })
+    await user.upload(await screen.findByLabelText(/import opml/i), file)
+
+    expect(await screen.findByText('that file is not an OPML subscription list')).toBeDefined()
+  })
+
+  it('offers the export as a plain same-origin download link', async () => {
+    stubApi()
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    const link = (await screen.findByRole('link', { name: /export opml/i })) as HTMLAnchorElement
+    expect(link.getAttribute('href')).toBe('/api/subscriptions/export')
+    expect(link.getAttribute('download')).toBe('subscriptions.opml')
+  })
+})
+
 describe('daily Digest band', () => {
   it('is stable for one date and changes with the date', () => {
     const first = dailyShadows('2026-08-08', 12, 20, 20)

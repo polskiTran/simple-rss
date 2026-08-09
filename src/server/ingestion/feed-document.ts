@@ -165,21 +165,26 @@ function imageOf(record: Record<string, unknown>, atom: boolean): unknown {
   }), 'url')
   if (mediaUrl) return mediaUrl
 
-  const enclosure = atom ? atomLink(record, 'enclosure') : recordField(record, ['enclosure'])
+  const enclosure = atom ? atomLinkElement(record, 'enclosure') : recordField(record, ['enclosure'])
   const enclosureRecord = asRecord(enclosure)
   const enclosureType = plainValue(enclosureRecord['@_type'])
   return enclosureType?.startsWith('image/') ? enclosureRecord['@_url'] ?? enclosureRecord['@_href'] : undefined
 }
 
 function atomLink(record: Record<string, unknown>, relationship: string): unknown {
+  const selected = atomLinkElement(record, relationship)
+  return asRecord(selected)['@_href'] ?? selected
+}
+
+/** The whole `<link>` element, for callers that need its other attributes. */
+function atomLinkElement(record: Record<string, unknown>, relationship: string): unknown {
   const links = arrayOf(recordField(record, ['link', 'atom:link']))
-  const selected =
+  return (
     links.find((candidate) => plainValue(asRecord(candidate)['@_rel']) === relationship) ??
     (relationship === 'alternate'
       ? links.find((candidate) => !plainValue(asRecord(candidate)['@_rel']))
       : undefined)
-  const link = asRecord(selected)
-  return link['@_href'] ?? selected
+  )
 }
 
 function requiredFeedTitle(value: unknown, baseUrl: string): string {
@@ -212,7 +217,12 @@ function normalizeDate(value: unknown): string | null {
 function boundedPlainText(value: unknown, limit: number): string | null {
   const raw = plainValue(value)
   if (!raw) return null
-  const source = raw.replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, '$1')
+
+  // Stop nodes arrive raw. CDATA already wraps literal markup, but outside it
+  // the XML entities are still encoded — `&lt;p&gt;` is markup to interpret,
+  // not text — so they get one decode before the HTML-to-text pass.
+  const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(raw)
+  const source = cdata ? cdata[1]! : decodeXmlEntities(raw)
 
   const text = convert(source, {
     wordwrap: false,
@@ -228,6 +238,27 @@ function boundedPlainText(value: unknown, limit: number): string | null {
 
   if (!text) return null
   return text.slice(0, limit)
+}
+
+const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  amp: '&',
+}
+
+/** The five XML entities plus numeric references; anything else stays as written. */
+function decodeXmlEntities(text: string): string {
+  return text.replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g, (entity, hex, decimal, named) => {
+    if (typeof named === 'string') return NAMED_ENTITIES[named] ?? entity
+    const codePoint = Number.parseInt(hex ?? decimal, hex ? 16 : 10)
+    try {
+      return String.fromCodePoint(codePoint)
+    } catch {
+      return entity
+    }
+  })
 }
 
 function plainValue(value: unknown): string | null {

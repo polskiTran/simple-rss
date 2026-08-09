@@ -3,11 +3,13 @@ import {
   authStatusSchema,
   createSubscriptionResponseSchema,
   digestSchema,
+  opmlImportReportSchema,
   subscriptionListSchema,
   serviceMetaSchema,
   type AuthStatus,
   type CreateSubscriptionResponse,
   type Digest,
+  type OpmlImportReport,
   type SubscriptionList,
   type ServiceMeta,
 } from '../shared/api.js'
@@ -118,6 +120,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
 export async function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
   const response = await post('/api/subscriptions', { url })
   return createSubscriptionResponseSchema.parse(await response.json())
+}
+
+export async function importOpml(opml: string): Promise<OpmlImportReport> {
+  const response = await post('/api/subscriptions/import', { opml })
+  return opmlImportReportSchema.parse(await response.json())
 }
 
 export async function fetchSubscriptions(): Promise<SubscriptionList> {

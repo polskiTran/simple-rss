@@ -104,6 +104,32 @@ export const createSubscriptionRequestSchema = z.object({
 })
 export type CreateSubscriptionRequest = z.infer<typeof createSubscriptionRequestSchema>
 
+/** The largest OPML upload one import accepts, in UTF-16 code units. */
+export const MAX_OPML_LENGTH = 1_048_576
+
+/** One uploaded OPML document, carried as text inside the usual JSON body. */
+export const importOpmlRequestSchema = z.object({
+  opml: z.string().min(1).max(MAX_OPML_LENGTH),
+})
+export type ImportOpmlRequest = z.infer<typeof importOpmlRequestSchema>
+
+/**
+ * What happened to one Feed the OPML listed. `reason` explains a skip or a
+ * failure in the Owner's terms; an added Feed needs none.
+ */
+export const opmlImportFeedSchema = z.object({
+  url: z.string(),
+  outcome: z.enum(['added', 'skipped', 'failed']),
+  title: z.string().nullable(),
+  reason: z.string().nullable(),
+})
+export type OpmlImportFeed = z.infer<typeof opmlImportFeedSchema>
+
+export const opmlImportReportSchema = z.object({
+  feeds: z.array(opmlImportFeedSchema),
+})
+export type OpmlImportReport = z.infer<typeof opmlImportReportSchema>
+
 export const feedSummarySchema = z.object({
   feedId: z.number().int().positive(),
   title: z.string(),

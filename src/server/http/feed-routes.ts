@@ -2,14 +2,18 @@ import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
   feedIdParameterSchema,
+  importOpmlRequestSchema,
   type CreateSubscriptionResponse,
   type Digest,
+  type OpmlImportFeed,
+  type OpmlImportReport,
   type RefreshFeedResponse,
   type SubscriptionList,
 } from '../../shared/api.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { FeedDocumentFailureCode } from '../ingestion/feed-document.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
+import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
 import type { RetrievalFailureCode } from '../upstream/retrieval.js'
 import { readJsonBody } from './json-body.js'
@@ -41,6 +45,33 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
       )
     }
     return createFailure(c, outcome)
+  })
+
+  app.post('/subscriptions/import', async (c) => {
+    const service = deps.subscriptions()
+    if (!service) return unavailable(c)
+
+    const body = await readJsonBody(c, importOpmlRequestSchema)
+    if (!body.ok) return body.response
+
+    const outcome = await service.importOpml(body.value.opml)
+    if (outcome.kind === 'invalid-opml') return opmlFailure(c, outcome.code)
+    return c.json<OpmlImportReport>(
+      { feeds: outcome.entries.map((entry) => importedFeed(entry.url, entry.outcome)) },
+      200,
+      NO_STORE,
+    )
+  })
+
+  app.get('/subscriptions/export', (c) => {
+    const service = deps.subscriptions()
+    if (!service) return unavailable(c)
+
+    return c.body(service.exportOpml(), 200, {
+      ...NO_STORE,
+      'Content-Type': 'text/x-opml; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="subscriptions.opml"',
+    })
   })
 
   app.get('/feeds', (c) => {
@@ -113,63 +144,93 @@ function refreshFailure(c: Context, outcome: Exclude<RefreshFeedOutcome, { kind:
 }
 
 function invalidFeed(c: Context, code: FeedDocumentFailureCode) {
-  return c.json(
-    {
-      error: {
-        code,
-        message:
-          code === 'malformed_feed'
-            ? 'The Feed returned malformed XML'
-            : 'The URL did not return a supported RSS or Atom Feed',
-      },
-    },
-    422,
-    NO_STORE,
-  )
+  return c.json({ error: { code, message: feedDocumentMessage(code) } }, 422, NO_STORE)
+}
+
+function feedDocumentMessage(code: FeedDocumentFailureCode): string {
+  return code === 'malformed_feed'
+    ? 'The Feed returned malformed XML'
+    : 'The URL did not return a supported RSS or Atom Feed'
+}
+
+interface FailureAnswer {
+  readonly status: 400 | 413 | 415 | 502 | 504
+  readonly code: string
+  readonly message: string
+}
+
+const UNSAFE_URL: FailureAnswer = {
+  status: 400,
+  code: 'invalid_feed_url',
+  message: 'The Feed URL is not a safe retrieval destination',
+}
+const UNSUPPORTED_CONTENT: FailureAnswer = {
+  status: 415,
+  code: 'unsupported_feed',
+  message: 'The URL returned unsupported Feed content',
+}
+// A host that does not resolve is an unreachable Feed, not a badly formed
+// URL: the address was acceptable, the network simply had no answer.
+const UNREACHABLE: FailureAnswer = {
+  status: 502,
+  code: 'feed_unreachable',
+  message: 'The Feed could not be reached',
+}
+
+/** One answer per retrieval failure, shared by direct creation and OPML import. */
+const RETRIEVAL_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> = {
+  invalid_request: UNSAFE_URL,
+  invalid_url: UNSAFE_URL,
+  blocked_destination: UNSAFE_URL,
+  invalid_redirect: UNSAFE_URL,
+  too_many_redirects: UNSAFE_URL,
+  redirect_loop: UNSAFE_URL,
+  unsupported_content_type: UNSUPPORTED_CONTENT,
+  unsupported_content_encoding: UNSUPPORTED_CONTENT,
+  too_large: { status: 413, code: 'feed_too_large', message: 'The Feed is larger than the 2 MiB limit' },
+  timeout: { status: 504, code: 'feed_timeout', message: 'The Feed did not respond within 10 seconds' },
+  unresolvable_host: UNREACHABLE,
+  http_error: UNREACHABLE,
+  cancelled: UNREACHABLE,
+  busy: UNREACHABLE,
+  unavailable: UNREACHABLE,
 }
 
 function retrievalFailure(c: Context, code: RetrievalFailureCode) {
+  const answer = RETRIEVAL_ANSWERS[code]
+  return c.json({ error: { code: answer.code, message: answer.message } }, answer.status, NO_STORE)
+}
+
+/**
+ * One line of the import report. The reasons are the same messages the
+ * single-subscription route answers with, so the two paths cannot describe
+ * one failure two ways.
+ */
+function importedFeed(url: string, outcome: CreateSubscriptionOutcome): OpmlImportFeed {
+  switch (outcome.kind) {
+    case 'created':
+      return { url, outcome: 'added', title: outcome.subscription.title, reason: null }
+    case 'duplicate':
+      return { url, outcome: 'skipped', title: outcome.subscription.title, reason: 'already subscribed' }
+    case 'invalid-url':
+      return { url, outcome: 'failed', title: null, reason: 'Enter an exact HTTP or HTTPS Feed URL' }
+    case 'invalid-feed':
+      return { url, outcome: 'failed', title: null, reason: feedDocumentMessage(outcome.code) }
+    case 'retrieval-failed':
+      return { url, outcome: 'failed', title: null, reason: RETRIEVAL_ANSWERS[outcome.failure.code].message }
+  }
+}
+
+function opmlFailure(c: Context, code: OpmlFailureCode) {
   switch (code) {
-    case 'invalid_request':
-    case 'invalid_url':
-    case 'blocked_destination':
-    case 'invalid_redirect':
-    case 'too_many_redirects':
-    case 'redirect_loop':
+    case 'malformed_opml':
+      return c.json({ error: { code, message: 'The OPML file is malformed XML' } }, 422, NO_STORE)
+    case 'unsupported_opml':
+      return c.json({ error: { code, message: 'The file is not an OPML subscription list' } }, 422, NO_STORE)
+    case 'too_many_feeds':
       return c.json(
-        { error: { code: 'invalid_feed_url', message: 'The Feed URL is not a safe retrieval destination' } },
-        400,
-        NO_STORE,
-      )
-    case 'unsupported_content_type':
-    case 'unsupported_content_encoding':
-      return c.json(
-        { error: { code: 'unsupported_feed', message: 'The URL returned unsupported Feed content' } },
-        415,
-        NO_STORE,
-      )
-    case 'too_large':
-      return c.json(
-        { error: { code: 'feed_too_large', message: 'The Feed is larger than the 2 MiB limit' } },
+        { error: { code, message: `One import processes at most ${MAX_OPML_FEEDS} Feeds` } },
         413,
-        NO_STORE,
-      )
-    case 'timeout':
-      return c.json(
-        { error: { code: 'feed_timeout', message: 'The Feed did not respond within 10 seconds' } },
-        504,
-        NO_STORE,
-      )
-    // A host that does not resolve is an unreachable Feed, not a badly formed
-    // URL: the address was acceptable, the network simply had no answer.
-    case 'unresolvable_host':
-    case 'http_error':
-    case 'cancelled':
-    case 'busy':
-    case 'unavailable':
-      return c.json(
-        { error: { code: 'feed_unreachable', message: 'The Feed could not be reached' } },
-        502,
         NO_STORE,
       )
   }

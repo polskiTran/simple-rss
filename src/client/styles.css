@@ -296,7 +296,8 @@
   /* A word cannot take an underline the way a field can, so it takes one of
      its own — still a rule under text rather than a box around it. */
   .text-button:focus-visible,
-  .tab:focus-visible {
+  .tab:focus-visible,
+  .opml-export:focus-visible {
     outline: none;
     text-decoration: underline;
     text-underline-offset: 4px;
@@ -334,6 +335,57 @@
 
   .feed-notice {
     margin-top: 8px;
+  }
+
+  /* Import and export are words too, sitting quietly under the form. */
+  .opml-controls {
+    display: flex;
+    gap: 24px;
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .opml-import {
+    color: var(--color-ink-strong);
+    cursor: pointer;
+  }
+
+  /* Off screen rather than `display: none`, so the input keeps the keyboard:
+     Tab still reaches it and Enter still opens the file picker. */
+  .opml-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .opml-import:focus-within {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .opml-export {
+    color: var(--color-ink-strong);
+    text-decoration: none;
+  }
+
+  .import-report-summary {
+    margin-top: 4px;
+  }
+
+  .import-report-details {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--color-quiet);
   }
 
   .subscription-list,
@@ -490,6 +542,15 @@
 
   .feed-form {
     gap: 16px;
+  }
+
+  .opml-controls {
+    gap: 18px;
+    font-size: 12px;
+  }
+
+  .import-report-details {
+    font-size: 12px;
   }
 
   .content-list {
