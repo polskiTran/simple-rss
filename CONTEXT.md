@@ -52,6 +52,10 @@ _Avoid_: Inbox, reading list
 The Owner's explicitly saved Feed Items.
 _Avoid_: Reading list, bookmarks
 
+**Retention**:
+The rule keeping ordinary history bounded: an unsaved Feed Item is removed 90 days after it was last observed in a Feed Window, and an unsubscribed Feed's unsaved items are removed at the next sweep. Library membership always survives Retention, and a Feed with saves keeps the metadata behind their attribution.
+_Avoid_: Expiry, archiving, garbage collection
+
 **Reader View**:
 A temporary, distraction-reduced rendering derived from a Feed Item's original webpage.
 _Avoid_: Stored article, cached content

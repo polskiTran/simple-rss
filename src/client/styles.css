@@ -560,6 +560,29 @@
     margin-top: 44px;
   }
 
+  /* Leaving a Feed is words at the end of the page, not a warning dialog.
+     The consequence sentence carries the weight; the buttons stay quiet. */
+  .unsubscribe-controls {
+    margin-top: 44px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--color-quiet);
+  }
+
+  .unsubscribe-controls .text-button {
+    font-size: 12.5px;
+  }
+
+  .unsubscribe-consequences {
+    margin: 0;
+  }
+
+  .unsubscribe-choice {
+    display: flex;
+    gap: 24px;
+    margin: 6px 0 0;
+  }
+
   /* Import and export are words too, sitting quietly under the form. */
   .opml-controls {
     display: flex;

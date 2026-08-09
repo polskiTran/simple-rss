@@ -4,7 +4,7 @@ import {
   type FeedDetail,
   type PollingIntervalMinutes,
 } from '../../shared/api.js'
-import { ApiError, fetchFeedDetail, refreshFeed, updatePollingInterval } from '../api.js'
+import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
@@ -32,6 +32,8 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [changingInterval, setChangingInterval] = useState(false)
+  const [confirmingUnsubscribe, setConfirmingUnsubscribe] = useState(false)
+  const [unsubscribing, setUnsubscribing] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -91,6 +93,24 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
     }
   }
 
+  /**
+   * The confirmed unsubscribe. Success returns the Owner to the Feeds list —
+   * this screen describes a Subscription that no longer exists.
+   */
+  async function unsubscribe() {
+    if (unsubscribing) return
+    setUnsubscribing(true)
+    setNotice('')
+    try {
+      await unsubscribeFromFeed(feedId)
+      onBack()
+    } catch {
+      setNotice('the feed could not be unsubscribed')
+      setUnsubscribing(false)
+      setConfirmingUnsubscribe(false)
+    }
+  }
+
   /** The server confirmed a membership change; the word flips in place. */
   function setSaved(feedItemId: number, saved: boolean) {
     setState((current) =>
@@ -143,6 +163,10 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
           onChangeInterval={changeInterval}
           onShowDay={showDay}
           onSaved={setSaved}
+          confirmingUnsubscribe={confirmingUnsubscribe}
+          unsubscribing={unsubscribing}
+          onConfirmUnsubscribe={setConfirmingUnsubscribe}
+          onUnsubscribe={unsubscribe}
         />
       ) : null}
     </div>
@@ -157,6 +181,10 @@ function OpenFeed({
   onChangeInterval,
   onShowDay,
   onSaved,
+  confirmingUnsubscribe,
+  unsubscribing,
+  onConfirmUnsubscribe,
+  onUnsubscribe,
 }: {
   detail: FeedDetail
   notice: string
@@ -165,6 +193,10 @@ function OpenFeed({
   onChangeInterval: (minutes: PollingIntervalMinutes) => void
   onShowDay: (date: string) => void
   onSaved: (feedItemId: number, saved: boolean) => void
+  confirmingUnsubscribe: boolean
+  unsubscribing: boolean
+  onConfirmUnsubscribe: (confirming: boolean) => void
+  onUnsubscribe: () => void
 }) {
   const grid = cadenceGrid(detail.cadence)
   return (
@@ -196,7 +228,56 @@ function OpenFeed({
         {notice}
       </p>
       <Items detail={detail} onSaved={onSaved} />
+      <Unsubscribe
+        confirming={confirmingUnsubscribe}
+        working={unsubscribing}
+        onConfirm={onConfirmUnsubscribe}
+        onUnsubscribe={onUnsubscribe}
+      />
     </>
+  )
+}
+
+/**
+ * Leaving a Feed, said plainly before it happens: checking stops and the
+ * Digest lets go, while everything saved stays in the Library. Two quiet
+ * words rather than a warning dialog — the consequence sentence is the
+ * confirmation step.
+ */
+function Unsubscribe({
+  confirming,
+  working,
+  onConfirm,
+  onUnsubscribe,
+}: {
+  confirming: boolean
+  working: boolean
+  onConfirm: (confirming: boolean) => void
+  onUnsubscribe: () => void
+}) {
+  if (!confirming) {
+    return (
+      <p className="unsubscribe-controls">
+        <button className="text-button unsubscribe-open" type="button" onClick={() => onConfirm(true)}>
+          unsubscribe from this feed
+        </button>
+      </p>
+    )
+  }
+  return (
+    <div className="unsubscribe-controls">
+      <p className="unsubscribe-consequences">
+        this stops checking the feed and its items leave the digest — anything saved stays in your library
+      </p>
+      <p className="unsubscribe-choice">
+        <button className="text-button" type="button" disabled={working} onClick={onUnsubscribe}>
+          {working ? 'unsubscribing…' : 'unsubscribe'}
+        </button>
+        <button className="text-button" type="button" disabled={working} onClick={() => onConfirm(false)}>
+          keep subscribed
+        </button>
+      </p>
+    </div>
   )
 }
 

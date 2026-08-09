@@ -4,6 +4,7 @@ import { DATABASE_FILE, loadConfig, type Config } from '../../src/server/config.
 import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { SqliteDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
+import type { RetentionLimits } from '../../src/server/retention/retention-service.js'
 import { startService, type RunningService } from '../../src/server/server.js'
 import type { PollSchedulerLimits } from '../../src/server/subscriptions/poll-scheduler.js'
 import { createRetrieval, type Retrieval } from '../../src/server/upstream/retrieval.js'
@@ -28,6 +29,8 @@ export interface HarnessOptions {
   readonly clientDir?: string
   /** Shrinks the polling batch or concurrency below the production defaults. */
   readonly scheduling?: PollSchedulerLimits
+  /** Shrinks the retention sweep batch below the production default. */
+  readonly retention?: RetentionLimits
 }
 
 export interface TestService {
@@ -116,6 +119,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       sleep: async (milliseconds) => void sleeps.push(milliseconds),
       logger,
       ...(options.scheduling ? { scheduling: options.scheduling } : {}),
+      ...(options.retention ? { retention: options.retention } : {}),
     })
     running.push(started)
     return started

@@ -10,6 +10,7 @@ import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
+import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
@@ -26,6 +27,8 @@ export interface ServiceOptions {
   readonly sleep?: Sleeper
   /** Tests shrink the polling batch and concurrency; production uses defaults. */
   readonly scheduling?: PollSchedulerLimits
+  /** Tests shrink the retention sweep batch; production uses the default. */
+  readonly retention?: RetentionLimits
 }
 
 export interface Service {
@@ -89,7 +92,8 @@ export function createService(options: ServiceOptions): Service {
 
     digest = new DigestService({ database, clock, settings })
     library = new LibraryService({ database, clock, settings })
-    scheduler = new PollScheduler({ subscriptions, refresh, logger, ...options.scheduling })
+    const retention = new RetentionService({ database, clock, logger, ...options.retention })
+    scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
     scheduler.start()
     readiness.markReady()
     logger.info('startup.migrations_applied', {

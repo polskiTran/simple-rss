@@ -80,7 +80,9 @@ export function SavedView() {
           <article className="content-item" key={item.feedItemId}>
             <h2 className="content-item-title">{item.title}</h2>
             <div className="content-meta">
-              <span>{item.feedTitle}</span>
+              {/* A save outlives its Subscription; said as a fact, not a nudge
+                  to clean anything up. */}
+              <span>{item.subscribed ? item.feedTitle : `${item.feedTitle} · no longer subscribed`}</span>
               <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>
               <SaveToggle
                 feedItemId={item.feedItemId}

@@ -112,6 +112,19 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     return refreshFailure(c, outcome)
   })
 
+  app.delete('/feeds/:feedId', (c) => {
+    const service = deps.subscriptions()
+    if (!service) return unavailable(c)
+    const feedId = feedIdParameterSchema.safeParse(c.req.param('feedId'))
+    if (!feedId.success) return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
+
+    const outcome = service.unsubscribe(feedId.data)
+    if (outcome.kind === 'missing') {
+      return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
+    }
+    return c.body(null, 204, NO_STORE)
+  })
+
   app.put('/feeds/:feedId/interval', async (c) => {
     const service = deps.subscriptions()
     if (!service) return unavailable(c)

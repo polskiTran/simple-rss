@@ -1,6 +1,6 @@
 import { eq, type ExtractTablesWithRelations } from 'drizzle-orm'
 import type { BetterSQLite3Database, BetterSQLiteTransaction } from 'drizzle-orm/better-sqlite3'
-import { feedItems, feeds, feedUrlAliases } from '../persistence/schema.js'
+import { feedItems, feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
 import type { NormalizedFeedItem, ParsedFeedDocument } from './feed-document.js'
 
 type EmptySchema = Record<string, never>
@@ -9,6 +9,10 @@ export type DatabaseTransaction = BetterSQLiteTransaction<EmptySchema, ExtractTa
 /**
  * Persists one retrieved Feed Window: corrects the Feed's own metadata and
  * upserts every Feed Item under the identity `parseFeedDocument` assigned.
+ *
+ * Returns false — writing nothing — when the Subscription is gone by the time
+ * the retrieval lands. Unsubscribing takes effect immediately, so a poll that
+ * was already in flight must not resurrect what the Owner let go of.
  */
 export function persistFeedWindow(
   db: BetterSQLite3Database,
@@ -24,10 +28,18 @@ export function persistFeedWindow(
     validators: { etag: string | null; lastModified: string | null }
     now: string
   },
-): void {
+): boolean {
   const { feedId, parsed, resolvedUrl, validators, now } = options
   const domain = new URL(resolvedUrl).hostname
-  db.transaction((tx) => {
+  return db.transaction((tx) => {
+    const subscribed = tx
+      .select({ feedId: subscriptions.feedId })
+      .from(subscriptions)
+      .where(eq(subscriptions.feedId, feedId))
+      .limit(1)
+      .all()[0]
+    if (!subscribed) return false
+
     const alias = tx
       .select({ feedId: feedUrlAliases.feedId })
       .from(feedUrlAliases)
@@ -49,6 +61,7 @@ export function persistFeedWindow(
       .where(eq(feeds.id, feedId))
       .run()
     for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)
+    return true
   })
 }
 

@@ -2,6 +2,11 @@ import type { Logger } from '../logger.js'
 import type { FeedRefresh } from './feed-refresh.js'
 import type { SubscriptionService } from './subscription-service.js'
 
+/** The slice of retention the scheduler drives: one bounded sweep per wake. */
+export interface RetentionSweeper {
+  sweep(): void
+}
+
 /** The scheduler sleeps this long between looks at the due-time frontier. */
 export const WAKE_INTERVAL_MS = 60_000
 
@@ -20,13 +25,16 @@ export interface PollSchedulerLimits {
 export interface PollSchedulerOptions extends PollSchedulerLimits {
   readonly subscriptions: SubscriptionService
   readonly refresh: FeedRefresh
+  readonly retention: RetentionSweeper
   readonly logger: Logger
 }
 
 /**
- * Background polling inside the one application process: no OS cron, no queue,
+ * Background work inside the one application process: no OS cron, no queue,
  * no second service. Once a minute it asks the persisted due-time frontier
- * what has become due and polls a bounded batch of it.
+ * what has become due, polls a bounded batch of it, and then runs one bounded
+ * retention sweep — after the polls, so this wake's own observations count
+ * before anything is judged expired.
  *
  * Because due times are persisted rather than held as timers, work missed
  * during downtime is simply still due at the next wake — catch-up after a
@@ -38,6 +46,7 @@ export interface PollSchedulerOptions extends PollSchedulerLimits {
 export class PollScheduler {
   readonly #subscriptions: SubscriptionService
   readonly #refresh: FeedRefresh
+  readonly #retention: RetentionSweeper
   readonly #logger: Logger
   readonly #batchLimit: number
   readonly #concurrency: number
@@ -47,6 +56,7 @@ export class PollScheduler {
   constructor(options: PollSchedulerOptions) {
     this.#subscriptions = options.subscriptions
     this.#refresh = options.refresh
+    this.#retention = options.retention
     this.#logger = options.logger.child({ component: 'scheduler' })
     this.#batchLimit = options.batchLimit ?? DEFAULT_BATCH_LIMIT
     this.#concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
@@ -73,19 +83,21 @@ export class PollScheduler {
     this.#ticking = true
     try {
       const due = this.#subscriptions.dueFeedIds(this.#batchLimit)
-      if (due.length === 0) return
-
-      let cursor = 0
-      const worker = async (): Promise<void> => {
-        for (;;) {
-          const feedId = due[cursor]
-          cursor += 1
-          if (feedId === undefined) return
-          await this.#poll(feedId)
+      if (due.length > 0) {
+        let cursor = 0
+        const worker = async (): Promise<void> => {
+          for (;;) {
+            const feedId = due[cursor]
+            cursor += 1
+            if (feedId === undefined) return
+            await this.#poll(feedId)
+          }
         }
+        await Promise.all(Array.from({ length: Math.min(this.#concurrency, due.length) }, worker))
+        this.#logger.info('scheduler.tick_completed', { due: due.length })
       }
-      await Promise.all(Array.from({ length: Math.min(this.#concurrency, due.length) }, worker))
-      this.#logger.info('scheduler.tick_completed', { due: due.length })
+
+      this.#retention.sweep()
     } catch (error) {
       this.#logger.error('scheduler.tick_failed', { error })
     } finally {

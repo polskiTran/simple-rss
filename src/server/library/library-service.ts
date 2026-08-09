@@ -5,7 +5,7 @@ import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { feedItems, feeds, libraryItems } from '../persistence/schema.js'
+import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 /**
  * The Owner's explicitly saved Feed Items. Membership is its own table, so a
@@ -70,10 +70,12 @@ export class LibraryService {
         publishedAt: feedItems.publishedAt,
         firstSeenAt: feedItems.firstSeenAt,
         savedAt: libraryItems.savedAt,
+        subscribedFeedId: subscriptions.feedId,
       })
       .from(libraryItems)
       .innerJoin(feedItems, eq(feedItems.id, libraryItems.feedItemId))
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .all()
       .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
       .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
@@ -85,6 +87,9 @@ export class LibraryService {
         title: row.title ?? 'untitled',
         feedId: row.feedId,
         feedTitle: row.feedTitle,
+        // A save outlives its Subscription; the view says so instead of
+        // leaving the Owner to wonder whether the reader forgot.
+        subscribed: row.subscribedFeedId !== null,
         link: row.link,
         publishedAt: row.publishedAt,
         firstSeenAt: row.firstSeenAt,

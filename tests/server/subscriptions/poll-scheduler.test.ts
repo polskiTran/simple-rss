@@ -30,6 +30,7 @@ describe('poll scheduler wakes', () => {
     const scheduler = new PollScheduler({
       subscriptions,
       refresh: {} as FeedRefresh,
+      retention: { sweep: () => {} },
       logger: quietLogger(),
     })
     scheduler.start()
@@ -63,7 +64,12 @@ describe('poll scheduler wakes', () => {
         }),
     } as unknown as FeedRefresh
 
-    const scheduler = new PollScheduler({ subscriptions, refresh, logger: quietLogger() })
+    const scheduler = new PollScheduler({
+      subscriptions,
+      refresh,
+      retention: { sweep: () => {} },
+      logger: quietLogger(),
+    })
     const first = scheduler.tick()
     const second = scheduler.tick()
     expect(frontierQueries).toBe(1)

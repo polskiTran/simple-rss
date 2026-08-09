@@ -181,6 +181,14 @@ export async function updatePollingInterval(
   return pollingScheduleSchema.parse(await response.json())
 }
 
+/**
+ * Withdraws the Subscription. Polling stops and the Feed's items leave the
+ * Digest; anything saved stays in the Library with its attribution.
+ */
+export async function unsubscribeFromFeed(feedId: number): Promise<void> {
+  await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
+}
+
 export async function fetchDigest(): Promise<Digest> {
   const response = await request('/api/digest')
   return digestSchema.parse(await response.json())

@@ -244,6 +244,61 @@ describe('managing one Feed', () => {
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'refresh now' })).toBeDefined()
   })
+
+  it('says what unsubscribing means before doing it, and lets the Owner keep the Feed', async () => {
+    const api = stubApi().on('GET /api/feeds/1', { body: DETAIL })
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe from this feed' }))
+
+    // The consequences appear as words; nothing has been asked of the server.
+    expect(
+      screen.getByText('this stops checking the feed and its items leave the digest — anything saved stays in your library'),
+    ).toBeDefined()
+    expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'keep subscribed' }))
+
+    expect(screen.getByRole('button', { name: 'unsubscribe from this feed' })).toBeDefined()
+    expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
+  })
+
+  it('unsubscribes on the confirming word and returns to the Feeds list', async () => {
+    const api = stubApi()
+      .on('GET /api/feeds/1', { body: DETAIL })
+      .on('DELETE /api/feeds/1', { status: 204 })
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe from this feed' }))
+    await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
+
+    expect(await screen.findByRole('textbox', { name: /search or add feeds/i })).toBeDefined()
+    expect(window.location.pathname).toBe('/feeds')
+    expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(1)
+  })
+
+  it('stays on the Feed and says so when unsubscribing does not go through', async () => {
+    stubApi()
+      .on('GET /api/feeds/1', { body: DETAIL })
+      .on('DELETE /api/feeds/1', {
+        status: 503,
+        body: { error: { code: 'service_unavailable', message: 'Starting' } },
+      })
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe from this feed' }))
+    await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
+
+    expect(await screen.findByText('the feed could not be unsubscribed')).toBeDefined()
+    expect(window.location.pathname).toBe('/feeds/1')
+    expect(screen.getByRole('button', { name: 'unsubscribe from this feed' })).toBeDefined()
+  })
 })
 
 describe('the quiet states of one Feed', () => {

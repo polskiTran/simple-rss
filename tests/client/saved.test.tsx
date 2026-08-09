@@ -11,6 +11,7 @@ const LIBRARY = {
       title: 'First light',
       feedId: 1,
       feedTitle: 'Field Notes',
+      subscribed: true,
       link: 'https://journal.example/first-light',
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
@@ -22,6 +23,7 @@ const LIBRARY = {
       title: 'A June letter',
       feedId: 2,
       feedTitle: 'The Slow Press',
+      subscribed: true,
       link: null,
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
@@ -80,6 +82,19 @@ describe('the Saved tab', () => {
 
     await waitFor(() => expect(toggle.textContent).toBe('saved'))
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
+  })
+
+  it('says quietly when a save outlived its Subscription, keeping the attribution', async () => {
+    const items = [LIBRARY.items[0], { ...LIBRARY.items[1], subscribed: false }]
+    stubApi().on('GET /api/library', { body: { items } })
+    window.history.replaceState(null, '', '/saved')
+    const { container } = render(<App />)
+
+    expect(await screen.findByText('The Slow Press · no longer subscribed')).toBeDefined()
+    // The still-subscribed source carries no such note, and nothing suggests
+    // the unsubscribed save needs tidying away.
+    expect(screen.getByText('Field Notes').textContent).toBe('Field Notes')
+    expect(container.querySelector('main')?.textContent).not.toMatch(/remove|delete|clean/i)
   })
 
   it('explains an empty Library with direction, not mechanics', async () => {

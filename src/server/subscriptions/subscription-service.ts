@@ -1,4 +1,4 @@
-import { eq, lte } from 'drizzle-orm'
+import { and, eq, isNull, lte } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
@@ -17,13 +17,14 @@ import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import {
   FeedDocumentError,
   parseFeedDocument,
+  type ParsedFeedDocument,
 } from '../ingestion/feed-document.js'
 import { persistFeedWindow, upsertFeedItem } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, feedUrlAliases, libraryItems, subscriptions } from '../persistence/schema.js'
-import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
+import type { Retrieval, RetrievalBytes, RetrievalFailure } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
 import { nextPollTime, nextRetryTime } from './polling-schedule.js'
@@ -52,6 +53,8 @@ export type IngestFeedOutcome =
 export type SetPollingIntervalOutcome =
   | { readonly kind: 'updated'; readonly schedule: PollingSchedule }
   | { readonly kind: 'missing' }
+
+export type UnsubscribeOutcome = { readonly kind: 'unsubscribed' } | { readonly kind: 'missing' }
 
 interface FeedRecord {
   readonly feedId: number
@@ -138,6 +141,11 @@ export class SubscriptionService {
     const now = this.#clock.now().toISOString()
     if (duplicate) return { kind: 'duplicate', subscription: this.#withCadence(duplicate) }
 
+    // A Feed the Library kept after an unsubscribe: reuse its identity, so the
+    // old saves and the new Subscription describe one Feed rather than two.
+    const dormant = this.#dormantFeedByUrl(requestedUrl) ?? this.#dormantFeedByUrl(retrieved.url)
+    if (dormant) return this.#resubscribe(dormant, parsed, retrieved, now)
+
     const domain = new URL(retrieved.url).hostname
     let created: SubscribedFeedRecord
     try {
@@ -158,19 +166,7 @@ export class SubscriptionService {
 
         const aliases = [...new Set([requestedUrl, retrieved.url])].map((url) => ({ url, feedId }))
         tx.insert(feedUrlAliases).values(aliases).run()
-        // The initial import counts as a successful poll, so the first
-        // background check lands one full interval plus this Feed's jitter
-        // from now, and Feed Availability starts from an observed success.
-        tx.insert(subscriptions)
-          .values({
-            feedId,
-            pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES,
-            nextPollAt: nextPollTime(feedId, DEFAULT_POLLING_INTERVAL_MINUTES, new Date(now)),
-            lastPolledAt: now,
-            lastSuccessAt: now,
-            createdAt: now,
-          })
-          .run()
+        tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
 
         for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)
         return {
@@ -199,6 +195,53 @@ export class SubscriptionService {
       importedItems,
     })
     return { kind: 'created', subscription: this.#withCadence(created), importedItems }
+  }
+
+  /**
+   * Brings a retained Feed back under a Subscription: the same Feed row —
+   * so Library items keep pointing at the identity they were saved from —
+   * with a fresh default schedule and the currently exposed Feed Window.
+   */
+  #resubscribe(feed: FeedRecord, parsed: ParsedFeedDocument, retrieved: RetrievalBytes, now: string): CreateSubscriptionOutcome {
+    try {
+      this.#db.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
+    } catch (error) {
+      const raced = this.#feedByCanonicalUrl(feed.resolvedUrl) ?? this.#feedByCanonicalUrl(feed.enteredUrl)
+      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
+      throw error
+    }
+
+    persistFeedWindow(this.#db, {
+      feedId: feed.feedId,
+      parsed,
+      resolvedUrl: retrieved.url,
+      validators: validatorsOf(retrieved),
+      now,
+    })
+
+    const importedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
+    this.#logger.info('subscriptions.subscription_created', {
+      feedId: feed.feedId,
+      enteredUrl: loggableUrl(feed.enteredUrl),
+      resolvedUrl: loggableUrl(retrieved.url),
+      importedItems,
+      revived: true,
+    })
+    return {
+      kind: 'created',
+      subscription: this.#withCadence({
+        feedId: feed.feedId,
+        title: parsed.title,
+        domain: new URL(retrieved.url).hostname,
+        enteredUrl: feed.enteredUrl,
+        resolvedUrl: retrieved.url,
+        lastPolledAt: now,
+        lastSuccessAt: now,
+        consecutiveFailures: 0,
+        lastFailureCategory: null,
+      }),
+      importedItems,
+    }
   }
 
   /**
@@ -249,13 +292,16 @@ export class SubscriptionService {
     // Every completed attempt is recorded and advances the schedule: a
     // success by one Polling Interval, a failure by an exponential backoff,
     // so a struggling Feed is retried patiently rather than every minute.
+    // `missing` records nothing — the Subscription vanished mid-retrieval,
+    // so there is no schedule left to advance.
+    if (outcome.kind === 'missing') return outcome
     if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.#recordSuccess(feed)
     else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
     else this.#recordFailure(feed, availabilityCategoryOf(outcome))
     return outcome
   }
 
-  async #poll(feed: PollableFeed): Promise<Exclude<IngestFeedOutcome, { kind: 'missing' }>> {
+  async #poll(feed: PollableFeed): Promise<IngestFeedOutcome> {
     const headers: Record<string, string> = {}
     if (feed.etag) headers['if-none-match'] = feed.etag
     if (feed.lastModified) headers['if-modified-since'] = feed.lastModified
@@ -294,13 +340,14 @@ export class SubscriptionService {
       throw error
     }
 
-    persistFeedWindow(this.#db, {
+    const persisted = persistFeedWindow(this.#db, {
       feedId: feed.feedId,
       parsed,
       resolvedUrl: retrieved.url,
       validators: validatorsOf(retrieved),
       now: this.#clock.now().toISOString(),
     })
+    if (!persisted) return { kind: 'missing' }
     const observedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
     this.#logger.info('subscriptions.feed_window_ingested', {
       feedId: feed.feedId,
@@ -340,6 +387,19 @@ export class SubscriptionService {
       nextPollAt,
     })
     return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
+  }
+
+  /**
+   * Withdraws the Owner's Subscription and nothing else. Polling stops at
+   * once and the Feed's ordinary items leave the Digest, because both are
+   * questions only a Subscription row answers. The retained rows themselves
+   * wait for the retention sweep, which keeps saves and their attribution.
+   */
+  unsubscribe(feedId: number): UnsubscribeOutcome {
+    const deleted = this.#db.delete(subscriptions).where(eq(subscriptions.feedId, feedId)).run()
+    if (deleted.changes === 0) return { kind: 'missing' }
+    this.#logger.info('subscriptions.unsubscribed', { feedId })
+    return { kind: 'unsubscribed' }
   }
 
   /** Feed ids whose persisted due time has arrived, oldest frontier first. */
@@ -545,6 +605,18 @@ export class SubscriptionService {
       .all()[0]
   }
 
+  /** A Feed still on the volume — its Library items kept it — but unsubscribed. */
+  #dormantFeedByUrl(url: string): FeedRecord | undefined {
+    return this.#db
+      .select(FEED_RECORD_COLUMNS)
+      .from(feedUrlAliases)
+      .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .where(and(eq(feedUrlAliases.url, url), isNull(subscriptions.feedId)))
+      .limit(1)
+      .all()[0]
+  }
+
   #cadenceByFeed(): Map<number, number[]> {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
@@ -606,6 +678,23 @@ export function availabilityCategoryOf(
       return 'http_error'
     default:
       return 'unreachable'
+  }
+}
+
+/**
+ * A brand-new Subscription's row, shared by first subscription and revival.
+ * The import that came with it counts as a successful poll, so the first
+ * background check lands one full interval plus this Feed's jitter from now,
+ * and Feed Availability starts from an observed success.
+ */
+function newSubscription(feedId: number, now: string) {
+  return {
+    feedId,
+    pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES,
+    nextPollAt: nextPollTime(feedId, DEFAULT_POLLING_INTERVAL_MINUTES, new Date(now)),
+    lastPolledAt: now,
+    lastSuccessAt: now,
+    createdAt: now,
   }
 }
 

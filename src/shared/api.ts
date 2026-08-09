@@ -336,6 +336,8 @@ export const libraryItemSchema = z.object({
   title: z.string(),
   feedId: z.number().int().positive(),
   feedTitle: z.string(),
+  /** False once the Feed was unsubscribed; the save and attribution remain. */
+  subscribed: z.boolean(),
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
