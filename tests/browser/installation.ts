@@ -38,13 +38,17 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
   installation: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
     const feedUrl = 'https://publisher.example/feed.xml'
+    // Today at 07:15 UTC, so the item lands in the Digest's "today" group on
+    // any run date (chronology tolerates a publication up to a day ahead).
+    const publishedAt = new Date()
+    publishedAt.setUTCHours(7, 15, 0, 0)
     const upstream = new UpstreamFixtures().stub(feedUrl, {
       headers: { 'content-type': 'application/rss+xml' },
       body: `<?xml version="1.0"?>
         <rss version="2.0"><channel><title>Field Notes</title>
           <item><guid>one</guid><title>First light</title>
             <link>https://publisher.example/first-light</link>
-            <pubDate>Fri, 08 Aug 2026 07:15:00 GMT</pubDate>
+            <pubDate>${publishedAt.toUTCString()}</pubDate>
             <description>A clear morning.</description>
           </item>
         </channel></rss>`,
