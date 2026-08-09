@@ -6,9 +6,9 @@ import {
 } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
+import { ItemTitleLink } from '../components/item-title-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
-import { readerPathOf } from '../routing.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
 
 type DetailState =
@@ -376,13 +376,7 @@ function Items({
             {...(anchors ? { id: dayAnchor(detail.feedId, item.date), tabIndex: -1 } : {})}
           >
             <h2 className="content-item-title">
-              <a
-                className="content-item-link"
-                href={readerPathOf(item.feedItemId)}
-                onClick={routedClick(() => onOpenItem(item.feedItemId))}
-              >
-                {item.title}
-              </a>
+              <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
             </h2>
             <div className="content-meta">
               <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>

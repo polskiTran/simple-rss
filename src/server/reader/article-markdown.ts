@@ -274,7 +274,9 @@ function listOf(list: Element, baseUrl: string): string | undefined {
     const content = blocks(child, baseUrl).join('\n')
     if (!content) continue
     const marker = ordered ? `${items.length + 1}. ` : '- '
-    const indent = ' '.repeat(ordered ? marker.length : 2)
+    // A fixed width, not the marker's: only this dialect's own parser reads
+    // the indent back, and `10. ` must not dedent differently from `9. `.
+    const indent = ' '.repeat(ordered ? 3 : 2)
     items.push(
       content
         .split('\n')

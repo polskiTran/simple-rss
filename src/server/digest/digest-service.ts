@@ -81,6 +81,18 @@ export class DigestService {
       groups: [...groups.values()],
     }
   }
+
+  /**
+   * The Feed Item that follows one item in this chronology — what the Reader
+   * says under `next in the digest`. Answered here so the Reader and the
+   * Digest can never disagree about the order. `undefined` when the item is
+   * last, or is not in the Digest at all.
+   */
+  after(feedItemId: number): DigestItem | undefined {
+    const ordered = this.read().groups.flatMap((group) => group.items)
+    const index = ordered.findIndex((entry) => entry.feedItemId === feedItemId)
+    return index === -1 ? undefined : ordered[index + 1]
+  }
 }
 
 function calendarLabel(date: Date, timezone: string): string {

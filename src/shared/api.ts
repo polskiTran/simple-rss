@@ -391,7 +391,6 @@ export type ReaderItem = z.infer<typeof readerItemSchema>
 export const readerArticleSchema = z.object({
   feedItemId: z.number().int().positive(),
   markdown: z.string(),
-  wordCount: z.number().int().nonnegative(),
   readingTimeMinutes: z.number().int().positive(),
 })
 export type ReaderArticle = z.infer<typeof readerArticleSchema>

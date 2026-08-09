@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Digest, DigestGroup } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { DailyBand } from '../components/daily-band.js'
+import { ItemTitleLink } from '../components/item-title-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { routedClick } from '../routed-link.js'
-import { readerPathOf } from '../routing.js'
 
 export interface DigestViewProps {
   /** Opens one Feed Item in the Reader. */
@@ -108,13 +107,7 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
             {group.items.map((item) => (
               <article className="content-item" key={item.feedItemId}>
                 <h3 className="content-item-title">
-                  <a
-                    className="content-item-link"
-                    href={readerPathOf(item.feedItemId)}
-                    onClick={routedClick(() => onOpenItem(item.feedItemId))}
-                  >
-                    {item.title}
-                  </a>
+                  <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
                 </h3>
                 <div className="content-meta">
                   <span>{item.feedTitle}</span>

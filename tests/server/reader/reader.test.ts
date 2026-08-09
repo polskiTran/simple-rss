@@ -210,7 +210,7 @@ describe('the Reader article', () => {
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_unreadable')
   })
 
-  it('rate-limits retrying a failed parse, then allows it after the cooldown', async () => {
+  it('lets the offered retry through once, then rate-limits until the cooldown', async () => {
     const service = await startTestService()
     let healed = false
     const { owner, feedItemId } = await readingSetup(service)
@@ -222,17 +222,28 @@ describe('the Reader article', () => {
 
     expect((await owner.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
 
-    // Retrying immediately is refused with the wait, not another retrieval.
+    // The fallback offers `retry parsing`; the offer is honest, so the first
+    // deliberate retry really retrieves rather than being told to wait.
+    expect((await owner.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+
+    // Beyond that, retrying is refused with the wait, not another retrieval.
     const tooSoon = await owner.get(`/api/items/${feedItemId}/reader`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
-    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
 
     healed = true
     service.clock.advance(30_000)
     const retried = await owner.get(`/api/items/${feedItemId}/reader`)
     expect(retried.status).toBe(200)
     expect(readerArticleSchema.parse(await retried.json()).markdown).toContain('Field methods')
+
+    // Success ends the episode: the next failure starts fresh, with the
+    // automatic attempt and one honest retry again.
+    healed = false
+    const failed = await owner.get(`/api/items/${feedItemId}/reader`)
+    expect(failed.status).toBe(502)
   })
 
   it('answers 422 when the Feed Item never had an original link', async () => {

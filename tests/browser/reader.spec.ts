@@ -94,7 +94,14 @@ test.describe('Reader View', () => {
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    // Retrying straight away is refused with the wait, not another fetch.
+    // The offered retry is honest: the first click really tries again and,
+    // with the publisher still down, lands back on the same calm fallback.
+    await page.getByRole('button', { name: 'retry parsing' }).click()
+    await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
+    await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
+
+    // Hammering it is not: the next attempt inside the cooldown is refused
+    // with the wait rather than another retrieval.
     await page.getByRole('button', { name: 'retry parsing' }).click()
     await expect(page.getByText(/wait \d+s, then retry/)).toBeVisible()
 

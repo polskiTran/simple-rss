@@ -11,11 +11,21 @@ import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
 import { extractArticle } from './extract-article.js'
 
 /**
- * How long a failed parse blocks the next deliberate retry. Long enough that
- * a stuck publisher is not hammered, short enough that "try again" is a real
- * offer rather than a scolding.
+ * How long a failing Feed Item's parse attempts stay rate-limited. Each
+ * failure episode affords the automatic attempt plus one deliberate retry —
+ * the fallback offers `retry parsing`, so that offer must be honest — and
+ * further attempts wait out the cooldown, so a stuck publisher is never
+ * hammered.
  */
 const RETRY_COOLDOWN_MS = 30_000
+
+/** Attempts a failure episode allows before the cooldown starts refusing. */
+const ATTEMPTS_BEFORE_COOLDOWN = 2
+
+interface FailureEpisode {
+  readonly attempts: number
+  readonly lastAttemptAt: number
+}
 
 export type ReaderArticleOutcome =
   | { readonly kind: 'missing' }
@@ -39,7 +49,7 @@ export class ReaderService {
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
   readonly #inFlight = new Map<number, Promise<ReaderArticleOutcome>>()
-  readonly #lastFailureAt = new Map<number, number>()
+  readonly #failures = new Map<number, FailureEpisode>()
 
   constructor(options: {
     database: SqliteDatabase
@@ -115,15 +125,17 @@ export class ReaderService {
     const inFlight = this.#inFlight.get(feedItemId)
     if (inFlight) return inFlight
 
+    // An elapsed cooldown ends the episode entirely, so a later failure
+    // affords its automatic attempt and one honest retry again.
     const now = this.#clock.now().getTime()
-    for (const [id, failedAt] of this.#lastFailureAt) {
-      if (now - failedAt >= RETRY_COOLDOWN_MS) this.#lastFailureAt.delete(id)
+    for (const [id, episode] of this.#failures) {
+      if (now - episode.lastAttemptAt >= RETRY_COOLDOWN_MS) this.#failures.delete(id)
     }
-    const failedAt = this.#lastFailureAt.get(feedItemId)
-    if (failedAt !== undefined) {
+    const episode = this.#failures.get(feedItemId)
+    if (episode && episode.attempts >= ATTEMPTS_BEFORE_COOLDOWN) {
       return {
         kind: 'rate-limited',
-        retryAfterSeconds: Math.ceil((RETRY_COOLDOWN_MS - (now - failedAt)) / 1_000),
+        retryAfterSeconds: Math.ceil((RETRY_COOLDOWN_MS - (now - episode.lastAttemptAt)) / 1_000),
       }
     }
 
@@ -135,27 +147,37 @@ export class ReaderService {
   async #extract(feedItemId: number, link: string): Promise<ReaderArticleOutcome> {
     const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader' })
     if (!result.ok) {
-      this.#lastFailureAt.set(feedItemId, this.#clock.now().getTime())
+      this.#recordFailure(feedItemId)
       return { kind: 'retrieval-failed', failure: result }
     }
 
     const extracted = await extractArticle({ bytes: result.bytes, charset: result.charset, url: result.url })
     if (!extracted) {
-      this.#lastFailureAt.set(feedItemId, this.#clock.now().getTime())
+      this.#recordFailure(feedItemId)
       return { kind: 'unreadable' }
     }
 
-    return { kind: 'extracted', article: { feedItemId, ...extracted } }
+    this.#failures.delete(feedItemId)
+    return {
+      kind: 'extracted',
+      article: {
+        feedItemId,
+        markdown: extracted.markdown,
+        readingTimeMinutes: extracted.readingTimeMinutes,
+      },
+    }
   }
 
-  /**
-   * What follows this item in the Digest, read from the Digest itself so the
-   * two can never disagree about the order.
-   */
+  #recordFailure(feedItemId: number): void {
+    this.#failures.set(feedItemId, {
+      attempts: (this.#failures.get(feedItemId)?.attempts ?? 0) + 1,
+      lastAttemptAt: this.#clock.now().getTime(),
+    })
+  }
+
+  /** What follows this item, as the Digest itself orders it. */
   #nextInDigest(feedItemId: number): ReaderItem['nextInDigest'] {
-    const ordered = this.#digest.read().groups.flatMap((group) => group.items)
-    const index = ordered.findIndex((entry) => entry.feedItemId === feedItemId)
-    const next = index === -1 ? undefined : ordered[index + 1]
+    const next = this.#digest.after(feedItemId)
     if (!next) return null
     return {
       feedItemId: next.feedItemId,

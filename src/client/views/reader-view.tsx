@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { ArticleMarkdown } from '../components/article-markdown.js'
+import { ItemTitleLink } from '../components/item-title-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
-import { pathOf, readerPathOf } from '../routing.js'
+import { pathOf } from '../routing.js'
 
 type ItemState =
   | { readonly kind: 'loading' }
@@ -132,13 +133,7 @@ export function ReaderView({ feedItemId, onBack, onOpenItem }: ReaderViewProps) 
         <footer className="reader-next">
           <p className="reader-next-label">next in the digest</p>
           <h2 className="content-item-title">
-            <a
-              className="content-item-link"
-              href={readerPathOf(next.feedItemId)}
-              onClick={routedClick(() => onOpenItem(next.feedItemId))}
-            >
-              {next.title}
-            </a>
+            <ItemTitleLink feedItemId={next.feedItemId} title={next.title} onOpen={onOpenItem} />
           </h2>
           <p className="content-meta">
             <span>{next.feedTitle}</span>

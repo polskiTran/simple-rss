@@ -57,7 +57,8 @@ function viewFor(gate: Gate, navigation: Navigation) {
 }
 
 function readerViewFor(navigation: Navigation, gate: Gate) {
-  // An opened article sits over whichever tab it was reached from.
+  // An opened Feed Item reads under the Digest tab wherever it was opened
+  // from — the Reader belongs to the reading flow it ends by returning to.
   if (navigation.readerItemId !== undefined) {
     return (
       <ReaderView

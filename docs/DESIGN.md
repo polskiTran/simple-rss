@@ -138,6 +138,22 @@ Generation: value noise → ordered (Bayer) dither → four ink levels. Seeded b
 
 In the reader it thins to a four-row strip above the article.
 
+### Reader body
+
+**Implementation notes.** Two values the accepted reader reference
+(`docs/references/reader.png`, issue #14) fixes against the prose above:
+
+- The reference opens straight from the metadata line into the first
+  paragraph, so the daily band's four-row reader strip is deferred until a
+  design pass actually draws it above an article.
+- Code inside an article renders in the platform monospace stack at 0.82em.
+  Alignment is code's meaning and Literata has no mono; this is imported
+  content keeping its own voice, not a second interface typeface. Interface
+  chrome never uses it.
+- Article links and `open original` mark their departure with ↗ and leave
+  with `noopener noreferrer`; supported math stays TeX source in v1, italic,
+  never executed.
+
 ## 6. Density rules
 
 - Never more than four ink levels in a matrix.

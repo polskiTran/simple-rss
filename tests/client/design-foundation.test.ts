@@ -220,6 +220,44 @@ describe('the Digest', () => {
   })
 })
 
+describe('the Reader', () => {
+  it('breaks the card to its own 720px paper with the 552px measure', () => {
+    // 720 wide minus 84px either side is the 552px measure; the reader-view
+    // needs no width of its own.
+    expect(lightOnly()).toMatch(/\.paper-reader\s*\{[^}]*max-width:\s*720px/)
+    expect(lightOnly()).toMatch(/\.paper-reader\s*\{[^}]*padding:\s*32px 84px 0/)
+  })
+
+  it('sets the article title and body to the §3 type table', () => {
+    expect(lightOnly()).toMatch(/\.reader-title\s*\{[^}]*font-weight:\s*200/)
+    expect(lightOnly()).toMatch(/\.reader-title\s*\{[^}]*font-size:\s*38px/)
+    expect(lightOnly()).toMatch(/\.reader-title\s*\{[^}]*letter-spacing:\s*-0?\.024em/)
+    expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*font-size:\s*18\.5px/)
+    expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*line-height:\s*1\.74/)
+    expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*color:\s*var\(--color-body\)/)
+  })
+
+  it('keeps the pull quote italic in the muted prose grey, indented by whitespace', () => {
+    expect(lightOnly()).toMatch(/\.article-body blockquote\s*\{[^}]*font-style:\s*italic/)
+    expect(lightOnly()).toMatch(/\.article-body blockquote\s*\{[^}]*color:\s*var\(--color-muted\)/)
+    expect(lightOnly()).not.toMatch(/\.article-body blockquote\s*\{[^}]*border/)
+  })
+
+  it('confines the monospace exception to article code', () => {
+    // The one departure from Literata `docs/DESIGN.md` §5 records: imported
+    // code keeps its own voice. It must never leak into interface chrome.
+    const monospace = css.match(/^\s*\.[^{}]*\{[^}]*ui-monospace[^}]*\}/gm) ?? []
+    expect(monospace).toHaveLength(1)
+    expect(monospace[0]).toContain('.article-body code')
+  })
+
+  it('steps the reader down with everything else at the breakpoint', () => {
+    const narrow = css.split('@media (max-width: 640px)')[1] ?? ''
+    expect(narrow).toMatch(/\.paper-reader\s*\{[^}]*padding:\s*28px 24px 0/)
+    expect(narrow).toMatch(/\.reader-title\s*\{[^}]*font-size:\s*29px/)
+  })
+})
+
 describe('pinned appearance', () => {
   /** The custom-property bindings inside a block of CSS, as `name: value`. */
   function bindings(block: string): string[] {
