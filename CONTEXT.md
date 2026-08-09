@@ -8,6 +8,14 @@ The domain of a calm, single-owner RSS reader that collects recent entries witho
 The single person who controls an installation and accesses it from their devices.
 _Avoid_: User, account, tenant
 
+**Setup Secret**:
+The random value the deployment is configured with, which lets the first visitor become the Owner. It is spent once: claiming the installation disables setup permanently.
+_Avoid_: Invite code, admin token, registration key
+
+**Session**:
+One of the Owner's signed-in devices, held as an opaque token whose hash alone is stored. Sessions are independent, so a phone and a laptop do not displace each other.
+_Avoid_: Login, token, credential
+
 **Feed**:
 An external RSS or Atom source that publishes entries.
 _Avoid_: Channel, source
@@ -32,6 +40,10 @@ _Avoid_: Post, article
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch
 
+**Cadence**:
+A Feed's publishing rhythm, drawn from retained Feed Items as per-day counts in the installation timezone and rendered at four ink levels — a strip on the Feeds list, a 26-week grid on an opened Feed. The stat line's "posts" is display copy fixed by the design system; the domain term remains Feed Item.
+_Avoid_: Activity graph, contribution graph, frequency chart
+
 **Digest**:
 The time-grouped collection of Feed Items from the Owner's Subscriptions.
 _Avoid_: Inbox, reading list
@@ -39,6 +51,10 @@ _Avoid_: Inbox, reading list
 **Library**:
 The Owner's explicitly saved Feed Items.
 _Avoid_: Reading list, bookmarks
+
+**Retention**:
+The rule keeping ordinary history bounded: an unsaved Feed Item is removed 90 days after it was last observed in a Feed Window, and an unsubscribed Feed's unsaved items are removed at the next sweep. Library membership always survives Retention, and a Feed with saves keeps the metadata behind their attribution.
+_Avoid_: Expiry, archiving, garbage collection
 
 **Reader View**:
 A temporary, distraction-reduced rendering derived from a Feed Item's original webpage.

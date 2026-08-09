@@ -16,7 +16,7 @@ Derived from turn 7. Every value below is literal; nothing is approximate.
 
 | Role | Value |
 | --- | --- |
-| App background (canvas around cards) | `#EDEDEA` |
+| ~~App background (canvas around cards)~~ | ~~`#EDEDEA`~~ — dropped, see below |
 | Paper | `#F7F7F5` |
 | Ink — titles, active tab | `#12110F` |
 | Ink — body prose | `#26251F` |
@@ -25,6 +25,21 @@ Derived from turn 7. Every value below is literal; nothing is approximate.
 | Grey — muted prose / pull quote | `#6B6A66` |
 | Accent (saved, cursor) | `#2438D8` |
 | Hairline (search underline) | `rgba(18,17,15,.15)` |
+
+**Implementation note — one surface, not two.** The `#EDEDEA` app background is
+not drawn. It was carried into this table as a role without a picture behind
+it: every reference render in `docs/references/` is exported at the paper's own
+edge, so none of them shows a canvas, and §4's 820 × 760 "card" is the artboard
+the screens were drawn on rather than an object meant to float. Rendered
+against a real viewport, the second tone appeared only as two vertical bands
+beside a full-height 820px column — it surrounded nothing, and a strip of
+another colour along an edge is a box by another name, which §1's third
+principle forbids. Dark already collapsed the two roles into one; light now
+does the same. The paper is the whole field, edge to edge, in both schemes.
+
+Restoring the canvas means answering what it is *around* — vertical margin, a
+radius, or a shadow, all of which §1 rules out — so it is a design change, not
+a stylesheet fix.
 
 ### Dark (dark paper)
 
@@ -98,12 +113,46 @@ Four ink levels — never more:
 ### Cadence grid (feed opened)
 26 weeks as columns: 7 rows of 11px squares, `gap:3px` both axes, columns run left (oldest) to right (newest). A column is a day you can jump to. Month labels below at 11.5px, then a one-line stat: `167 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 9 days`.
 
+**Implementation notes.** Values the reference renders imply but the tables
+above do not state, fixed here so the stylesheet has a source:
+
+- At the narrow breakpoint the grid keeps all 26 × 7 cells — nothing hides —
+  and the cell steps down one size: 9px squares, `gap:2px`, so the columns fit
+  the 390px paper.
+- A represented day is a button. Its keyboard focus is a 2px **accent** rule
+  beneath the square: a square cannot take a text underline, and this is the
+  text cursor's role — the mark of where the keyboard is — not a third accent
+  use. The stat line's "posts" is likewise this design's display copy; the
+  domain vocabulary keeps saying Feed Item.
+- The opened Feed's header line (`← feeds`, name in ink, domain) sits at 14px
+  (13px narrow) with 40px to the content below, per §4's feed-header row.
+  Retained items begin 44px below the stat block — the §4 day-group rhythm.
+- Month labels are announced where a column opens a month, but never within
+  six columns of the previous label; that spacing is what produces the
+  reference's `february · april · june · august`.
+
 ### Daily band (digest)
-A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. 64px tall on desktop, 54px at 390px, sits 34px below the header with the date line 40px under it.
+A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. 64px tall at every width — the field is drawn at the full 620px measure and the container clips it, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
 
 Generation: value noise → ordered (Bayer) dither → four ink levels. Seeded by the date, so no two mornings repeat. Light levels `.07 / .16 / .30`; dark levels `.07 / .17 / .32 / .56`. It is decoration with a source — the day's own volume — not ornament.
 
 In the reader it thins to a four-row strip above the article.
+
+### Reader body
+
+**Implementation notes.** Two values the accepted reader reference
+(`docs/references/reader.png`, issue #14) fixes against the prose above:
+
+- The reference opens straight from the metadata line into the first
+  paragraph, so the daily band's four-row reader strip is deferred until a
+  design pass actually draws it above an article.
+- Code inside an article renders in the platform monospace stack at 0.82em.
+  Alignment is code's meaning and Literata has no mono; this is imported
+  content keeping its own voice, not a second interface typeface. Interface
+  chrome never uses it.
+- Article links and `open original` mark their departure with ↗ and leave
+  with `noopener noreferrer`; supported math stays TeX source in v1, italic,
+  never executed.
 
 ## 6. Density rules
 
@@ -114,4 +163,6 @@ In the reader it thins to a four-row strip above the article.
 
 ## 7. Breakpoints
 
-Single breakpoint at 390px. Changes: type down one step, padding 56 → 24, cadence 30 days → 14, band 64px → 54px, measure becomes full width. Structure is identical — nothing reflows, reorders, or hides.
+Single breakpoint at 390px. Changes: type down one step, padding 56 → 24, cadence 30 days → 14, measure becomes full width. The daily band keeps its 64px height and only its clipped length follows the viewport. Structure is identical — nothing reflows, reorders, or hides.
+
+**Implementation note.** 390px is the width the narrow layout is *drawn at*, not the width the media query fires at. A phone at 430px needs the narrow scale too, and the 820px paper stops being comfortable well above 390px, so the stylesheet switches at `max-width: 640px`. Every value inside the query is still the literal 390px column of the tables above.

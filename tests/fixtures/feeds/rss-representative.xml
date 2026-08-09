@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Field Notes</title>
+    <link>https://journal.example/</link>
+    <description>Notes from the field</description>
+    <item>
+      <guid isPermaLink="false">entry-1</guid>
+      <title>First light</title>
+      <link>https://journal.example/first-light#section</link>
+      <pubDate>Fri, 08 Aug 2026 07:15:00 GMT</pubDate>
+      <description><![CDATA[<p>A clear <strong>morning</strong>.</p><script>alert('no')</script>]]></description>
+      <media:content url="https://images.example/first-light.jpg" medium="image" />
+    </item>
+    <item>
+      <title>No stable id</title>
+      <link>/relative-path</link>
+      <pubDate>Thu, 07 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Falls back to its link.</description>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Letters</title>
+  <link rel="self" href="https://atom.example/feed.xml"/>
+  <entry>
+    <id>tag:atom.example,2026:one</id>
+    <title type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">One <em>letter</em></div></title>
+    <published>2026-08-08T07:15:00Z</published>
+    <updated>2026-08-08T08:00:00Z</updated>
+    <link rel="alternate" href="/letters/one#top"/>
+    <link rel="enclosure" type="image/jpeg" href="https://images.example/one.jpg"/>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Kept as <em>plain text</em>.</p><script>alert('no')</script></div></summary>
+  </entry>
+  <entry>
+    <id>tag:atom.example,2026:two</id>
+    <title>Two</title>
+    <updated>2026-08-07T20:00:00Z</updated>
+    <link href="https://atom.example/letters/two"/>
+    <content type="html">&lt;p&gt;Content stands in for a missing summary.&lt;/p&gt;</content>
+  </entry>
+</feed>

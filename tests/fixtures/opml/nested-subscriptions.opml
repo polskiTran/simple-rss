@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Another reader's export</title>
+  </head>
+  <body>
+    <outline text="News">
+      <outline type="rss" text="Field Notes" title="Field Notes" xmlUrl="https://journal.example/feed" htmlUrl="https://journal.example/"/>
+      <outline type="atom" text="Atom Letters" xmlUrl="https://atom.example/feed.xml"/>
+    </outline>
+    <outline text="A folder without feeds"/>
+    <outline text="Duplicate of Field Notes" xmlUrl="https://journal.example/feed"/>
+    <outline XMLURL="https://uppercase.example/feed" text="Shouting exporter"/>
+    <outline type="link" text="A plain link, not a Feed" url="https://elsewhere.example/page"/>
+  </body>
+</opml>

@@ -1,0 +1,5 @@
+# Simple RSS is deliberately one package. This file only carries pnpm
+# settings, which pnpm 11 no longer reads from package.json.
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true

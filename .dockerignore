@@ -1,0 +1,12 @@
+node_modules
+dist
+.data
+.git
+.github
+.playwright-mcp
+agent-traces
+coverage
+docs
+tests
+*.md
+!package.json

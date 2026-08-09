@@ -1,0 +1,101 @@
+name: Release
+
+# Publishes the versioned production image when a `v*` tag is pushed. The
+# image that ships is the exact image the smoke suite exercised on this
+# runner, and a published version is immutable: the workflow refuses to
+# overwrite a tag that already exists in the registry, and no `latest` tag is
+# ever published — production instructions always name an explicit version.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    name: Smoke-test and publish the versioned image
+    # ubuntu-latest is amd64, so the image built and tested here is the
+    # linux/amd64 image the release targets.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Confirm the tag names the version the build reports
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "tag v$VERSION does not match package.json version $PACKAGE_VERSION" >&2
+            exit 1
+          fi
+          REPORTED_VERSION="$(node -p "require('fs').readFileSync('src/shared/version.ts', 'utf8').match(/VERSION = '(.+)'/)[1]")"
+          if [ "$VERSION" != "$REPORTED_VERSION" ]; then
+            echo "tag v$VERSION does not match src/shared/version.ts VERSION $REPORTED_VERSION" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      # The release smoke test: builds the production image and walks it
+      # through deploy, claim, persisted state, backup, container replacement,
+      # and restore onto a fresh volume. The `simple-rss:smoke` image it
+      # certifies is the image published below.
+      - name: Release smoke test
+        run: pnpm test:smoke
+
+      - name: Confirm the image targets linux/amd64
+        run: |
+          test "$(docker image inspect simple-rss:smoke --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Fail closed: only a definite "the tag does not exist" allows the push.
+      # A transient registry or auth error must not be mistaken for absence,
+      # because pushing over an existing tag would overwrite a published
+      # version.
+      - name: Refuse to overwrite a published version
+        run: |
+          if INSPECTION="$(docker manifest inspect "$IMAGE:$VERSION" 2>&1)"; then
+            echo "$IMAGE:$VERSION already exists; a published version is immutable" >&2
+            exit 1
+          elif ! grep -qiE 'manifest unknown|name unknown|not found|no such manifest' <<< "$INSPECTION"; then
+            echo "could not determine whether $IMAGE:$VERSION already exists:" >&2
+            echo "$INSPECTION" >&2
+            exit 1
+          fi
+
+      - name: Publish
+        run: |
+          docker tag simple-rss:smoke "$IMAGE:$VERSION"
+          docker push "$IMAGE:$VERSION"
+          echo "published \`$IMAGE:$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # The published image must be publicly pullable — a fresh GHCR package
+      # defaults to private until its visibility is flipped once in the
+      # repository's package settings. Verified as an anonymous client. If this
+      # step fails, the version is published and intact: make the package
+      # public and re-run only this verification, do not republish.
+      - name: Confirm the image pulls anonymously
+        run: |
+          REPOSITORY="${IMAGE#ghcr.io/}"
+          if ! TOKEN="$(curl -fsS "https://ghcr.io/token?scope=repository:$REPOSITORY:pull" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).token")" \
+            || ! curl -fsS -o /dev/null \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/$REPOSITORY/manifests/$VERSION"; then
+            echo "$IMAGE:$VERSION is not anonymously pullable — make the GHCR package public (a one-time package setting) and re-run this check" >&2
+            exit 1
+          fi
