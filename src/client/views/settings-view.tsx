@@ -1,12 +1,18 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import type { AuthStatus, ServiceMeta } from '../../shared/api.js'
-import { changePassword, fetchServiceMeta, signOut } from '../api.js'
+import { changePassword, fetchInstallationPreferences, fetchServiceMeta, signOut, updateInstallationTimezone } from '../api.js'
+import { APPEARANCE_OPTIONS, chooseAppearance, storedAppearance, type Appearance } from '../appearance.js'
 import { Field } from '../components/field.js'
 import { describeFailure, reasonToHold } from './failure.js'
 
 type Version =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly meta: ServiceMeta }
+  | { readonly kind: 'unavailable' }
+
+type Timezone =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'loaded'; readonly timezone: string; readonly saving: boolean }
   | { readonly kind: 'unavailable' }
 
 export interface SettingsViewProps {
@@ -50,6 +56,16 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   return (
     <div className="view measure">
       <dl className="sheet">
+        <dt className="sheet-label">timezone</dt>
+        <dd className="sheet-value">
+          <TimezoneChoice />
+        </dd>
+
+        <dt className="sheet-label">appearance</dt>
+        <dd className="sheet-value">
+          <AppearanceChoice />
+        </dd>
+
         <dt className="sheet-label">version</dt>
         <dd className="sheet-value">{describe(version)}</dd>
 
@@ -70,6 +86,105 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
 
       {changing ? <PasswordChange onChanged={onAccessChanged} /> : null}
     </div>
+  )
+}
+
+/**
+ * The one installation timezone, editable after its detection at claim. It is
+ * a select rather than a free field because the only valid values are the
+ * zones this runtime already knows.
+ */
+function TimezoneChoice() {
+  const [state, setState] = useState<Timezone>({ kind: 'loading' })
+  const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    let current = true
+    fetchInstallationPreferences().then(
+      ({ timezone }) => current && setState({ kind: 'loaded', timezone, saving: false }),
+      () => current && setState({ kind: 'unavailable' }),
+    )
+    return () => {
+      current = false
+    }
+  }, [])
+
+  if (state.kind === 'loading') return <span>—</span>
+  if (state.kind === 'unavailable') return <span>unavailable</span>
+
+  async function change(event: ChangeEvent<HTMLSelectElement>) {
+    if (state.kind !== 'loaded' || state.saving) return
+    const previous = state.timezone
+    const chosen = event.target.value
+
+    setState({ kind: 'loaded', timezone: chosen, saving: true })
+    setNotice('')
+    try {
+      const { timezone } = await updateInstallationTimezone(chosen)
+      setState({ kind: 'loaded', timezone, saving: false })
+    } catch (error) {
+      setState({ kind: 'loaded', timezone: previous, saving: false })
+      setNotice(describeFailure(error, { 400: 'that timezone is not recognized' }))
+    }
+  }
+
+  return (
+    <>
+      <select
+        className="sheet-select"
+        aria-label="installation timezone"
+        value={state.timezone}
+        disabled={state.saving}
+        onChange={change}
+      >
+        {timezoneOptions(state.timezone).map((zone) => (
+          <option key={zone} value={zone}>
+            {zone}
+          </option>
+        ))}
+      </select>
+      {notice ? (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      ) : null}
+    </>
+  )
+}
+
+/** Every zone the runtime knows, always including the one already chosen. */
+function timezoneOptions(current: string): string[] {
+  const known = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+  return known.includes(current) ? [...known] : [current, ...known]
+}
+
+/**
+ * Three words, the chosen one in ink — the interval presets' shape. `system`
+ * keeps following the device, so it reads as the resting state rather than a
+ * third theme.
+ */
+function AppearanceChoice() {
+  const [appearance, setAppearance] = useState<Appearance>(storedAppearance)
+
+  function choose(option: Appearance) {
+    chooseAppearance(option)
+    setAppearance(option)
+  }
+
+  return (
+    <span className="appearance-options">
+      {APPEARANCE_OPTIONS.map((option) => (
+        <button
+          key={option}
+          className="appearance-option"
+          type="button"
+          aria-pressed={appearance === option}
+          onClick={() => choose(option)}
+        >
+          {option}
+        </button>
+      ))}
+    </span>
   )
 }
 

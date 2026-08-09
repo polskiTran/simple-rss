@@ -1,7 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './app.js'
+import { applyAppearance, storedAppearance } from './appearance.js'
 import './styles.css'
+
+// Before the first paint, so a device that pinned dark never flashes light.
+applyAppearance(storedAppearance())
 
 /**
  * The client is a plain responsive web application. There is deliberately no

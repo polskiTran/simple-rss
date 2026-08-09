@@ -309,7 +309,7 @@ describe('Digest', () => {
     window.history.replaceState(null, '', '/digest')
     const { container } = render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'today' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.daily-band-field')).toHaveLength(1)

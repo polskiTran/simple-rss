@@ -18,5 +18,9 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     trace: 'retain-on-failure',
+    // Claiming seeds the installation timezone from the browser, so the
+    // browser's zone is pinned; otherwise the Digest's calendar groups would
+    // follow whatever machine runs the suite.
+    timezoneId: 'UTC',
   },
 })

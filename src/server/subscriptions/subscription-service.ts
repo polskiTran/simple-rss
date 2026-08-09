@@ -468,7 +468,7 @@ export class SubscriptionService {
       .all()[0]
     if (!record) return undefined
 
-    const timezone = this.#settings.read()?.timezone ?? 'UTC'
+    const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
@@ -543,7 +543,7 @@ export class SubscriptionService {
   }
 
   #cadenceByFeed(): Map<number, number[]> {
-    const timezone = this.#settings.read()?.timezone ?? 'UTC'
+    const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
     const indexByDate = new Map(trailingDayKeys(today, 30).map((key, index) => [key, index]))

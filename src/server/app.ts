@@ -7,11 +7,13 @@ import type { Config } from './config.js'
 import type { DigestService } from './digest/digest-service.js'
 import type { Logger } from './logger.js'
 import { assertWritable, type SqliteDatabase } from './persistence/database.js'
+import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { Readiness } from './readiness.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
 import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
 import { feedRoutes } from './http/feed-routes.js'
+import { settingsRoutes } from './http/settings-routes.js'
 import { requireSession } from './http/require-session.js'
 import { sameOrigin } from './http/same-origin.js'
 import { securityHeaders } from './http/security-headers.js'
@@ -29,6 +31,7 @@ export interface AppDependencies {
   readonly database: () => SqliteDatabase | undefined
   /** Absent for the same reason the database is. */
   readonly authentication: () => Authentication | undefined
+  readonly settings: () => InstallationSettingsStore | undefined
   /** Feed work is absent only while startup could not open the database. */
   readonly subscriptions: () => SubscriptionService | undefined
   readonly refresh: () => FeedRefresh | undefined
@@ -75,10 +78,13 @@ export function createApp(deps: AppDependencies): Hono {
     '/api/auth',
     authRoutes({
       authentication: deps.authentication,
+      settings: deps.settings,
       clock: deps.clock,
       trustProxyHeaders: deps.config.trustProxyHeaders,
     }),
   )
+
+  app.route('/api', settingsRoutes({ settings: deps.settings, clock: deps.clock }))
 
   app.route(
     '/api',

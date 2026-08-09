@@ -27,6 +27,7 @@ export class StubbedApi {
     this.on('GET /api/meta', { body: { name: 'simple-rss', version: '0.1.0' } })
     this.on('GET /api/feeds', { body: { subscriptions: [] } })
     this.on('GET /api/digest', { body: { today: { date: '2026-08-08', volume: 0 }, groups: [] } })
+    this.on('GET /api/settings', { body: { timezone: 'UTC' } })
   }
 
   on(route: string, reply: Route): this {

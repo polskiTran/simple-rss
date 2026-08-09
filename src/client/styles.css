@@ -50,9 +50,14 @@
 
    `docs/DESIGN.md` §2 names six dark roles. The remaining three are derived,
    not invented: body prose takes the title ink, muted prose takes the metadata
-   grey, and the hairline is the title ink at the same 15%. */
+   grey, and the hairline is the title ink at the same 15%.
+
+   The Owner may pin an appearance per device in Settings, carried as
+   `data-appearance` on the document element. `system` sets no attribute and
+   these media rules keep deciding; a pinned `light` opts out of them, and a
+   pinned `dark` rebinds the same tokens below regardless of the device. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-appearance='light']) {
     --color-paper: #12110f;
     --color-ink: #f0eee9;
     --color-ink-strong: #f7f7f5;
@@ -73,10 +78,42 @@
   }
 }
 
+/* Pinned dark: the same bindings as the media block above, token for token —
+   `tests/client/design-foundation.test.ts` holds the two lists equal. */
+:root[data-appearance='dark'] {
+  --color-paper: #12110f;
+  --color-ink: #f0eee9;
+  --color-ink-strong: #f7f7f5;
+  --color-body: #f0eee9;
+  --color-meta: #8c8b86;
+  --color-quiet: #6b6a66;
+  --color-muted: #8c8b86;
+  --color-accent: #e3b341;
+  --color-hairline: rgb(240 238 233 / 0.15);
+  --band-0: rgb(240 238 233 / 0.07);
+  --band-1: rgb(240 238 233 / 0.17);
+  --band-2: rgb(240 238 233 / 0.32);
+  --band-3: rgb(240 238 233 / 0.56);
+  --cadence-0: rgb(240 238 233 / 0.06);
+  --cadence-1: rgb(240 238 233 / 0.2);
+  --cadence-2: rgb(240 238 233 / 0.38);
+  --cadence-3: rgb(240 238 233 / 0.6);
+}
+
 @layer base {
   html {
     background: var(--color-paper);
     color-scheme: light dark;
+  }
+
+  /* A pinned appearance also pins the scheme the browser paints its own
+     chrome with — form controls, scrollbars — so nothing renders half-dark. */
+  html[data-appearance='light'] {
+    color-scheme: light;
+  }
+
+  html[data-appearance='dark'] {
+    color-scheme: dark;
   }
 
   /* The paper is the whole field, in both schemes. Nothing else in the system
@@ -211,6 +248,47 @@
     color: var(--color-body);
   }
 
+  /* Settings' one non-text control: the timezone select, dressed as the
+     sheet's own text. The transparent rule reserves the pixels its focus
+     underline needs, so choosing a zone never shifts the sheet. */
+  .sheet-select {
+    max-width: 100%;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 14px;
+    color: var(--color-body);
+    cursor: pointer;
+  }
+
+  .sheet-select:focus-visible {
+    outline: none;
+    border-bottom: 2px solid var(--color-ink);
+  }
+
+  /* Three words, the chosen one in ink — the interval presets' shape. */
+  .appearance-options {
+    display: inline-flex;
+    gap: 12px;
+  }
+
+  .appearance-option {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--color-quiet);
+    cursor: pointer;
+  }
+
+  .appearance-option[aria-pressed='true'] {
+    color: var(--color-ink-strong);
+  }
+
   /* Setup, sign-in, and the password change. They share the sheet's 13/14px
      scale rather than the 21px item shape, for the same reason Settings does:
      these are not something to read. */
@@ -297,6 +375,7 @@
      its own — still a rule under text rather than a box around it. */
   .text-button:focus-visible,
   .tab:focus-visible,
+  .appearance-option:focus-visible,
   .opml-export:focus-visible,
   .feed-open:focus-visible,
   .feed-back:focus-visible {
@@ -640,6 +719,19 @@
     font-style: italic;
   }
 
+  /* Today's count, in the grey `docs/DESIGN.md` §2 reserves for counts. It
+     answers "is there something to read" — past headings never carry one. */
+  .day-heading-count {
+    color: var(--color-quiet);
+  }
+
+  /* The way back from an unreachable or failed digest: one word under the
+     note. `docs/DESIGN.md` does not draw this screen; the 12px is the word
+     gap the interval presets already use. */
+  .digest-retry {
+    margin: 12px 0 0;
+  }
+
   .digest-view-today {
     padding-top: 34px;
   }
@@ -807,9 +899,16 @@
   }
 }
 
-/* Dark paper carries 4px more headroom, per the layout table. */
+/* Dark paper carries 4px more headroom, per the layout table — whether the
+   device chose dark or the Owner pinned it. */
 @media (prefers-color-scheme: dark) and (min-width: 641px) {
-  .paper {
+  :root:not([data-appearance='light']) .paper {
+    padding: 36px 56px 0;
+  }
+}
+
+@media (min-width: 641px) {
+  :root[data-appearance='dark'] .paper {
     padding: 36px 56px 0;
   }
 }

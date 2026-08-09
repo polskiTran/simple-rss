@@ -146,8 +146,8 @@ describe('layout', () => {
     // Every `outline: none` must sit inside a `:focus-visible` block that
     // draws something in its place — minimalism is not a reason to make the
     // keyboard invisible.
-    expect(focusRules).toHaveLength(3)
-    expect(suppressions).toHaveLength(3)
+    expect(focusRules).toHaveLength(4)
+    expect(suppressions).toHaveLength(4)
     expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-ink\)/)
     expect(focusRules.join('\n')).toMatch(/text-decoration: underline/)
     // A cadence cell cannot take an underline, so its focus is the accent
@@ -174,6 +174,72 @@ describe('the Feeds tab', () => {
   it('keeps the month labels and stat line on the documented axis scale', () => {
     expect(lightOnly()).toMatch(/\.cadence-month\s*\{[^}]*font-size:\s*11\.5px/)
     expect(lightOnly()).toMatch(/\.cadence-stats\s*\{[^}]*font-size:\s*12\.5px/)
+  })
+})
+
+describe('the Digest', () => {
+  it('holds the day-group rhythm and heading scale to the layout table', () => {
+    // 44px above a date line, 24px below it — 32/20 at the narrow step.
+    expect(lightOnly()).toMatch(/\.day-group \+ \.day-group\s*\{[^}]*margin-top:\s*44px/)
+    expect(lightOnly()).toMatch(/\.day-heading\s*\{[^}]*margin:\s*0 0 24px/)
+    expect(lightOnly()).toMatch(/\.day-heading\s*\{[^}]*font-size:\s*12\.5px/)
+    expect(lightOnly()).toMatch(/\.day-heading-past\s*\{[^}]*font-style:\s*italic/)
+    expect(lightOnly()).toMatch(/\.day-heading-past\s*\{[^}]*color:\s*var\(--color-quiet\)/)
+
+    const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+    expect(narrow).toMatch(/\.day-group \+ \.day-group\s*\{[^}]*margin-top:\s*32px/)
+    expect(narrow).toMatch(/\.day-heading\s*\{[^}]*margin-bottom:\s*20px/)
+    expect(narrow).toMatch(/\.day-heading\s*\{[^}]*font-size:\s*12px/)
+  })
+
+  it('keeps today’s count in the grey reserved for counts', () => {
+    expect(lightOnly()).toMatch(/\.day-heading-count\s*\{[^}]*color:\s*var\(--color-quiet\)/)
+  })
+
+  it('draws the band 64px tall, 34px under the header, the date line 40px below', () => {
+    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*height:\s*64px/)
+    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*margin-bottom:\s*40px/)
+    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*overflow:\s*hidden/)
+    expect(lightOnly()).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*34px/)
+
+    const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+    // The band itself keeps its height; only the header gap steps down.
+    expect(narrow).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*26px/)
+    expect(narrow).not.toMatch(/\.daily-band\s*\{/)
+  })
+
+  it('binds the band ink levels to the documented light and dark values', () => {
+    expect(lightOnly()).toContain('--band-0: rgb(18 17 15 / 0.07)')
+    expect(lightOnly()).toContain('--band-1: rgb(18 17 15 / 0.16)')
+    expect(lightOnly()).toContain('--band-2: rgb(18 17 15 / 0.3)')
+
+    expect(darkBlocks()).toContain('--band-0: rgb(240 238 233 / 0.07)')
+    expect(darkBlocks()).toContain('--band-1: rgb(240 238 233 / 0.17)')
+    expect(darkBlocks()).toContain('--band-2: rgb(240 238 233 / 0.32)')
+    expect(darkBlocks()).toContain('--band-3: rgb(240 238 233 / 0.56)')
+  })
+})
+
+describe('pinned appearance', () => {
+  /** The custom-property bindings inside a block of CSS, as `name: value`. */
+  function bindings(block: string): string[] {
+    return (block.match(/--[a-z0-9-]+:\s*[^;]+/g) ?? []).sort()
+  }
+
+  it('rebinds exactly the tokens the dark media block binds — no drift', () => {
+    const pinned = /:root\[data-appearance='dark'\]\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+
+    expect(bindings(pinned)).toEqual(bindings(darkBlocks()))
+    expect(bindings(pinned).length).toBeGreaterThan(0)
+  })
+
+  it('lets a pinned light opt out of the device dark preference', () => {
+    expect(darkBlocks()).toContain(":root:not([data-appearance='light'])")
+  })
+
+  it('pins the browser’s own scheme along with the tokens', () => {
+    expect(css).toMatch(/html\[data-appearance='light'\]\s*\{[^}]*color-scheme:\s*light/)
+    expect(css).toMatch(/html\[data-appearance='dark'\]\s*\{[^}]*color-scheme:\s*dark/)
   })
 })
 

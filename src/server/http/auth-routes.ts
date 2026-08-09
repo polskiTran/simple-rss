@@ -7,6 +7,7 @@ import {
 } from '../../shared/api.js'
 import type { Authentication } from '../auth/authentication.js'
 import type { Clock } from '../clock.js'
+import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { clientAddress } from './client-address.js'
 import { readJsonBody } from './json-body.js'
 import { invalidCredentials, NO_STORE, unavailable } from './responses.js'
@@ -29,6 +30,8 @@ export const PUBLIC_API_PATHS: ReadonlySet<string> = new Set([
 export interface AuthRouteDependencies {
   /** Absent while the database could not be opened. */
   readonly authentication: () => Authentication | undefined
+  /** Where a successful claim seeds the detected installation timezone. */
+  readonly settings: () => InstallationSettingsStore | undefined
   readonly clock: Clock
   readonly trustProxyHeaders: boolean
 }
@@ -58,6 +61,7 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
 
     switch (outcome.kind) {
       case 'claimed':
+        seedTimezone(deps.settings(), body.value.timezone, deps.clock.now())
         writeSessionCookie(c, outcome.session, deps.clock.now())
         return status(c, { claimed: true, authenticated: true }, 201)
       case 'already-claimed':
@@ -132,6 +136,20 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   })
 
   return app
+}
+
+/**
+ * Setup detection is best-effort: a zone this runtime cannot resolve — or a
+ * browser that offered none — leaves the installation on UTC rather than
+ * failing the one claim this installation will ever accept.
+ */
+function seedTimezone(settings: InstallationSettingsStore | undefined, timezone: string | undefined, now: Date) {
+  if (!settings || !timezone) return
+  try {
+    settings.setTimezone(timezone, now)
+  } catch {
+    // The claim stands; the Owner can still pick a timezone in Settings.
+  }
 }
 
 function status(c: Context, body: AuthStatus, code: 200 | 201 = 200) {

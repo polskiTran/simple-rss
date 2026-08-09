@@ -105,6 +105,7 @@ export function createService(options: ServiceOptions): Service {
     readiness,
     database: () => database,
     authentication: () => authentication,
+    settings: () => settings,
     subscriptions: () => subscriptions,
     refresh: () => refresh,
     digest: () => digest,

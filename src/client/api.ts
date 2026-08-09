@@ -4,6 +4,7 @@ import {
   createSubscriptionResponseSchema,
   digestSchema,
   feedDetailSchema,
+  installationPreferencesSchema,
   opmlImportReportSchema,
   pollingScheduleSchema,
   refreshFeedResponseSchema,
@@ -13,6 +14,7 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type FeedDetail,
+  type InstallationPreferences,
   type OpmlImportReport,
   type PollingIntervalMinutes,
   type PollingSchedule,
@@ -109,7 +111,20 @@ export async function fetchAuthStatus(): Promise<AuthStatus> {
 }
 
 export async function claimInstallation(setupSecret: string, password: string): Promise<AuthStatus> {
-  return status(await post('/api/auth/setup', { setupSecret, password }))
+  return status(await post('/api/auth/setup', { setupSecret, password, timezone: detectedTimezone() }))
+}
+
+/**
+ * The claiming device's own zone, offered once so the installation timezone is
+ * detected during setup rather than defaulting to UTC. Absent rather than
+ * wrong when the browser cannot say.
+ */
+function detectedTimezone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return undefined
+  }
 }
 
 export async function signIn(password: string): Promise<AuthStatus> {
@@ -165,6 +180,20 @@ export async function updatePollingInterval(
 export async function fetchDigest(): Promise<Digest> {
   const response = await request('/api/digest')
   return digestSchema.parse(await response.json())
+}
+
+export async function fetchInstallationPreferences(): Promise<InstallationPreferences> {
+  const response = await request('/api/settings')
+  return installationPreferencesSchema.parse(await response.json())
+}
+
+export async function updateInstallationTimezone(timezone: string): Promise<InstallationPreferences> {
+  const response = await request('/api/settings/timezone', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ timezone }),
+  })
+  return installationPreferencesSchema.parse(await response.json())
 }
 
 export async function fetchServiceMeta(): Promise<ServiceMeta> {

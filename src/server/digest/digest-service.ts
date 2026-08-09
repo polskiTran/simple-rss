@@ -20,7 +20,7 @@ export class DigestService {
   }
 
   read(): Digest {
-    const timezone = this.#settings.read()?.timezone ?? 'UTC'
+    const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const rows = this.#db
       .select({

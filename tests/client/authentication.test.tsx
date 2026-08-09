@@ -55,6 +55,9 @@ describe('an installation nobody has claimed', () => {
     expect(api.requestsTo('POST /api/auth/setup')[0]?.body).toEqual({
       setupSecret: 'a-deployment-setup-secret',
       password: 'a-calm-reading-password',
+      // Claiming offers this device's own zone, so the installation timezone
+      // is detected during setup rather than defaulting to UTC.
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     })
     expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeDefined()
   })

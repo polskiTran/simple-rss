@@ -42,6 +42,15 @@ export class InstallationSettingsStore {
   }
 
   /**
+   * The zone every calendar grouping uses. An installation that never chose
+   * one — claimed before detection existed, or by a browser that offered
+   * nothing — reads as UTC, which is how its days were grouped all along.
+   */
+  effectiveTimezone(): string {
+    return this.read()?.timezone ?? 'UTC'
+  }
+
+  /**
    * Seeds or updates the installation timezone. `createdAt` is written once so
    * the age of an installation stays meaningful across later edits.
    */
@@ -61,6 +70,17 @@ export class InstallationSettingsStore {
 }
 
 /**
+ * Typed so a route can refuse the zone itself as a bad request while letting
+ * any other failure — a full volume, a closed handle — surface as what it is.
+ */
+export class UnknownTimezoneError extends Error {
+  constructor(timezone: string) {
+    super(`Unknown installation timezone: ${timezone}`)
+    this.name = 'UnknownTimezoneError'
+  }
+}
+
+/**
  * A timezone the runtime cannot resolve would silently break every Digest
  * grouping, so it is rejected at the point of entry rather than at read time.
  */
@@ -68,6 +88,6 @@ function assertResolvableTimezone(timezone: string): void {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone })
   } catch {
-    throw new Error(`Unknown installation timezone: ${timezone}`)
+    throw new UnknownTimezoneError(timezone)
   }
 }

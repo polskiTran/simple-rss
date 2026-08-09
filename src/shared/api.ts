@@ -75,11 +75,38 @@ export const authStatusSchema = z.object({
 })
 export type AuthStatus = z.infer<typeof authStatusSchema>
 
+/**
+ * An IANA zone name as a request carries it. Whether the runtime can actually
+ * resolve it is the server's question, not a shape the schema can state.
+ */
+const timezoneNameSchema = z.string().min(1).max(100)
+
 export const claimRequestSchema = z.object({
   setupSecret: z.string().min(1).max(1024),
   password: newPasswordSchema,
+  /**
+   * The claiming browser's own zone, offered so the installation timezone is
+   * detected during setup rather than defaulting to UTC. Optional: a claim
+   * must never fail over a calendar preference.
+   */
+  timezone: timezoneNameSchema.optional(),
 })
 export type ClaimRequest = z.infer<typeof claimRequestSchema>
+
+/**
+ * The Owner-editable installation preferences behind the Settings sheet. One
+ * timezone for the whole installation, so the Digest's calendar groups agree
+ * across the Owner's devices.
+ */
+export const installationPreferencesSchema = z.object({
+  timezone: z.string(),
+})
+export type InstallationPreferences = z.infer<typeof installationPreferencesSchema>
+
+export const updateTimezoneRequestSchema = z.object({
+  timezone: timezoneNameSchema,
+})
+export type UpdateTimezoneRequest = z.infer<typeof updateTimezoneRequestSchema>
 
 export const signInRequestSchema = z.object({
   password: presentedPasswordSchema,
