@@ -6,6 +6,7 @@ import {
 } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, refreshFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
+import { routedClick } from '../routed-link.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
 
 type DetailState =
@@ -100,17 +101,7 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
   return (
     <div className="view measure feed-view">
       <p className="feed-header">
-        <a
-          className="feed-back"
-          href="/feeds"
-          onClick={(event) => {
-            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
-              return
-            }
-            event.preventDefault()
-            onBack()
-          }}
-        >
+        <a className="feed-back" href="/feeds" onClick={routedClick(onBack)}>
           ← feeds
         </a>
         {state.kind === 'loaded' ? (

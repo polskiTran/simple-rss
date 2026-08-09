@@ -156,3 +156,4 @@ vite.config.ts.timestamp-*
 
 # simple-rss local data volume
 .data/
+.claude/settings.local.json

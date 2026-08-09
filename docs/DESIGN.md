@@ -113,6 +113,24 @@ Four ink levels — never more:
 ### Cadence grid (feed opened)
 26 weeks as columns: 7 rows of 11px squares, `gap:3px` both axes, columns run left (oldest) to right (newest). A column is a day you can jump to. Month labels below at 11.5px, then a one-line stat: `167 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 9 days`.
 
+**Implementation notes.** Values the reference renders imply but the tables
+above do not state, fixed here so the stylesheet has a source:
+
+- At the narrow breakpoint the grid keeps all 26 × 7 cells — nothing hides —
+  and the cell steps down one size: 9px squares, `gap:2px`, so the columns fit
+  the 390px paper.
+- A represented day is a button. Its keyboard focus is a 2px **accent** rule
+  beneath the square: a square cannot take a text underline, and this is the
+  text cursor's role — the mark of where the keyboard is — not a third accent
+  use. The stat line's "posts" is likewise this design's display copy; the
+  domain vocabulary keeps saying Feed Item.
+- The opened Feed's header line (`← feeds`, name in ink, domain) sits at 14px
+  (13px narrow) with 40px to the content below, per §4's feed-header row.
+  Retained items begin 44px below the stat block — the §4 day-group rhythm.
+- Month labels are announced where a column opens a month, but never within
+  six columns of the previous label; that spacing is what produces the
+  reference's `february · april · june · august`.
+
 ### Daily band (digest)
 A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. 64px tall at every width — the field is drawn at the full 620px measure and the container clips it, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
 

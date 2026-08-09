@@ -1,3 +1,4 @@
+import { routedClick } from '../routed-link.js'
 import { pathOf, ROUTES, type Route } from '../routing.js'
 
 export interface TabBarProps {
@@ -19,14 +20,7 @@ export function TabBar({ active, onNavigate }: TabBarProps) {
           className="tab"
           href={pathOf(route)}
           aria-current={route === active ? 'page' : undefined}
-          onClick={(event) => {
-            // Let the browser handle anything that is not a plain left click.
-            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
-              return
-            }
-            event.preventDefault()
-            onNavigate(route)
-          }}
+          onClick={routedClick(() => onNavigate(route))}
         >
           {route}
         </a>

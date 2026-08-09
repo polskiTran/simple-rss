@@ -2,19 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
-import type { CadenceObservation } from '../../src/shared/api.js'
+import { cadenceWindow as cadence } from './cadence-window.js'
 import { stubApi } from './stub-api.js'
-
-const DAY_MS = 24 * 60 * 60 * 1_000
-
-/** The window the server sends for today = 2026-08-08: Monday 2026-02-09 on. */
-function cadence(counts: Record<string, number> = {}): CadenceObservation[] {
-  const opening = Date.parse('2026-02-09T00:00:00.000Z')
-  return Array.from({ length: 181 }, (_, index) => {
-    const date = new Date(opening + index * DAY_MS).toISOString().slice(0, 10)
-    return { date, count: counts[date] ?? 0 }
-  })
-}
 
 const AVAILABLE = {
   state: 'available',

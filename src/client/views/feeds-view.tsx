@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import type { OpmlImportFeed, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
+import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
 
@@ -246,14 +247,7 @@ function SubscriptionList({
               <a
                 className="feed-open"
                 href={feedPathOf(subscription.feedId)}
-                onClick={(event) => {
-                  // Let the browser handle anything that is not a plain left click.
-                  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
-                    return
-                  }
-                  event.preventDefault()
-                  onOpen(subscription.feedId)
-                }}
+                onClick={routedClick(() => onOpen(subscription.feedId))}
               >
                 {subscription.title}
               </a>
