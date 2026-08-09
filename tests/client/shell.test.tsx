@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -18,7 +18,10 @@ async function renderAt(path: string) {
 }
 
 function tabNames() {
-  return screen.getAllByRole('link').map((tab) => tab.textContent)
+  // Scoped to the tab bar: a view behind it may hold links of its own, like
+  // the Settings export downloads.
+  const sections = screen.getByRole('navigation', { name: 'Sections' })
+  return within(sections).getAllByRole('link').map((tab) => tab.textContent)
 }
 
 function activeTab() {

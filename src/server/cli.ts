@@ -1,9 +1,12 @@
+import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, newPasswordSchema } from '../shared/api.js'
 import { createAuthentication } from './auth/authentication.js'
+import { OwnerAuthStore } from './auth/owner-auth.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
 import { createLogger, type Logger } from './logger.js'
-import { openDatabase, type SqliteDatabase } from './persistence/database.js'
+import { assertWritable, openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations, appliedVersions } from './persistence/migrations.js'
 import { rebuildSearchIndex } from './search/search-service.js'
@@ -14,6 +17,10 @@ const USAGE = `simple-rss <command>
   show                    Print the installation settings as JSON
   set-timezone <iana>     Set the installation timezone, e.g. Europe/Berlin
   rebuild-search          Rebuild the derived search index from retained Feed Items
+  backup <destination>    Write an application-consistent snapshot of the live
+                          database to <destination>. Never overwrites.
+  restore <backup>        Initialize an empty data directory from a snapshot:
+                          verify it, migrate it, and rebuild the search index.
   reset-password [new]    Replace the Owner password and revoke every session.
                           Reads SIMPLE_RSS_NEW_PASSWORD when given no argument,
                           which keeps the password out of the shell history.
@@ -45,6 +52,12 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
     context.out(USAGE)
     return command ? 0 : 1
   }
+
+  // The snapshot commands manage database files themselves. Opening the live
+  // path first would create an empty database exactly where `restore` must
+  // refuse to find one and where `backup` must find something real.
+  if (command === 'backup') return backup(rest[0], context)
+  if (command === 'restore') return restore(rest[0], context)
 
   const db = openDatabase(context.config.databasePath)
   try {
@@ -87,6 +100,137 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
   } finally {
     db.close()
   }
+}
+
+/**
+ * Writes an application-consistent snapshot of the live database. `VACUUM
+ * INTO` produces a compacted, transaction-consistent copy even while the WAL
+ * is active, which is what makes this safe where a raw file copy of an open
+ * database is not.
+ *
+ * The snapshot is written under a partial name and renamed only once
+ * complete, so a failure can never leave an artifact that looks like a
+ * finished backup — and an existing file is never overwritten, because the
+ * backup an operator is replacing is the one they need if this run fails.
+ */
+function backup(destination: string | undefined, context: CliContext): number {
+  if (!destination) {
+    context.out('backup needs a destination path for the snapshot')
+    return 1
+  }
+
+  const source = context.config.databasePath
+  if (!existsSync(source)) {
+    context.out(`There is no database at ${source} to back up`)
+    return 1
+  }
+
+  const target = resolve(destination)
+  if (existsSync(target)) {
+    context.out(`${target} already exists; back up to a new path instead of overwriting one`)
+    return 1
+  }
+
+  const partial = `${target}.partial`
+  try {
+    mkdirSync(dirname(target), { recursive: true })
+    rmSync(partial, { force: true })
+
+    const db = openDatabase(source)
+    try {
+      db.prepare('VACUUM INTO ?').run(partial)
+    } finally {
+      db.close()
+    }
+
+    renameSync(partial, target)
+  } catch (error) {
+    rmSync(partial, { force: true })
+    context.out(`The backup failed and no snapshot was written: ${reasonOf(error)}`)
+    return 1
+  }
+
+  context.out(JSON.stringify({ backupCreated: true, destination: target, bytes: statSync(target).size }))
+  return 0
+}
+
+/**
+ * Initializes an empty data directory from a snapshot. All verification —
+ * integrity, migrations, the derived search rebuild, a real write — happens
+ * on a staging copy that is renamed into place only after everything passed,
+ * so a failed restore leaves the directory uninitialized and the service
+ * unready rather than serving half a database.
+ *
+ * Migrations run here so a backup taken on an older release comes forward to
+ * the schema this build serves; the FTS index is rebuilt rather than trusted,
+ * because derived state is this installation's to derive.
+ */
+function restore(backupPath: string | undefined, context: CliContext): number {
+  if (!backupPath) {
+    context.out('restore needs the path to a backup snapshot')
+    return 1
+  }
+
+  const source = resolve(backupPath)
+  if (!existsSync(source)) {
+    context.out(`There is no backup at ${source}`)
+    return 1
+  }
+
+  const target = context.config.databasePath
+  if (existsSync(target)) {
+    context.out(`${target} already exists; restore only initializes a fresh data directory`)
+    return 1
+  }
+
+  const staging = `${target}.restoring`
+  const stagingFiles = [staging, `${staging}-wal`, `${staging}-shm`]
+  let report: string
+  try {
+    mkdirSync(dirname(target), { recursive: true })
+    for (const leftover of stagingFiles) rmSync(leftover, { force: true })
+    copyFileSync(source, staging)
+
+    const db = openDatabase(staging)
+    try {
+      if (db.pragma('integrity_check', { simple: true }) !== 'ok') {
+        throw new Error('the snapshot failed its integrity check')
+      }
+      const migrationsApplied = applyMigrations(db, context.clock)
+      const indexedItems = rebuildSearchIndex(db)
+      assertWritable(db, context.clock.now())
+
+      report = JSON.stringify({
+        restored: true,
+        migrationsApplied,
+        indexedItems,
+        feeds: countRows(db, 'feeds'),
+        subscriptions: countRows(db, 'subscriptions'),
+        feedItems: countRows(db, 'feed_items'),
+        libraryItems: countRows(db, 'library_items'),
+        claimed: new OwnerAuthStore(db).isClaimed(),
+      })
+    } finally {
+      db.close()
+    }
+
+    renameSync(staging, target)
+  } catch (error) {
+    for (const leftover of stagingFiles) rmSync(leftover, { force: true })
+    context.out(`The restore failed and the data directory was left uninitialized: ${reasonOf(error)}`)
+    return 1
+  }
+
+  context.out(report)
+  return 0
+}
+
+function countRows(db: SqliteDatabase, table: 'feeds' | 'subscriptions' | 'feed_items' | 'library_items'): number {
+  return (db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as { count: number }).count
+}
+
+function reasonOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 /**

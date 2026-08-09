@@ -17,6 +17,7 @@ import type { Readiness } from './readiness.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
 import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
+import { exportRoutes } from './http/export-routes.js'
 import { feedRoutes } from './http/feed-routes.js'
 import { imageRoutes } from './http/image-routes.js'
 import { libraryRoutes } from './http/library-routes.js'
@@ -100,6 +101,8 @@ export function createApp(deps: AppDependencies): Hono {
   )
 
   app.route('/api', settingsRoutes({ settings: deps.settings, clock: deps.clock }))
+
+  app.route('/api', exportRoutes({ database: deps.database, settings: deps.settings, clock: deps.clock }))
 
   app.route(
     '/api',

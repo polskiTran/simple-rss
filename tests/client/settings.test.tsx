@@ -53,6 +53,21 @@ describe('the Settings timezone', () => {
   })
 })
 
+describe('the Settings export actions', () => {
+  it('offers the OPML and complete JSON downloads as plain links', async () => {
+    stubApi()
+    openSettings()
+
+    const opml = await screen.findByRole('link', { name: 'subscriptions (OPML)' })
+    expect(opml.getAttribute('href')).toBe('/api/subscriptions/export')
+    expect(opml.getAttribute('download')).toBe('subscriptions.opml')
+
+    const json = screen.getByRole('link', { name: 'everything (JSON)' })
+    expect(json.getAttribute('href')).toBe('/api/export')
+    expect(json.getAttribute('download')).toBe('simple-rss-export.json')
+  })
+})
+
 describe('the Settings appearance', () => {
   it('offers system, light, and dark, resting on system', async () => {
     stubApi()

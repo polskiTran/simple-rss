@@ -69,6 +69,18 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
         <dt className="sheet-label">version</dt>
         <dd className="sheet-value">{describe(version)}</dd>
 
+        <dt className="sheet-label">export</dt>
+        <dd className="sheet-value">
+          <span className="export-links">
+            <a className="opml-export" href="/api/subscriptions/export" download="subscriptions.opml">
+              subscriptions (OPML)
+            </a>
+            <a className="opml-export" href="/api/export" download="simple-rss-export.json">
+              everything (JSON)
+            </a>
+          </span>
+        </dd>
+
         <dt className="sheet-label">password</dt>
         <dd className="sheet-value">
           <button className="text-button" type="button" onClick={() => setChanging(!changing)}>

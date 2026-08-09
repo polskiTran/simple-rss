@@ -274,6 +274,12 @@
     gap: 12px;
   }
 
+  /* The two downloads sit side by side, words like every other affordance. */
+  .export-links {
+    display: inline-flex;
+    gap: 24px;
+  }
+
   .appearance-option {
     background: none;
     border: 0;

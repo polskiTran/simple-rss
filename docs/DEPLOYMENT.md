@@ -88,6 +88,9 @@ and need no HTTP session.
 node dist/server/cli-main.js migrate                     # apply pending migrations
 node dist/server/cli-main.js show                        # print installation settings
 node dist/server/cli-main.js set-timezone Europe/Berlin  # set the Digest timezone
+node dist/server/cli-main.js rebuild-search              # rebuild the derived search index
+node dist/server/cli-main.js backup /app/data/backups/simple-rss-2026-08-09.db
+node dist/server/cli-main.js restore /app/data/backups/simple-rss-2026-08-09.db
 node dist/server/cli-main.js reset-password              # emergency password reset
 ```
 
@@ -122,11 +125,86 @@ secret went missing before it was used. Passing the password as an argument
 works too — `reset-password '…'` — but puts it in the shell history, so prefer
 the variable.
 
+## Exports
+
+Settings offers two downloads, both for the signed-in Owner only:
+
+- **`subscriptions (OPML)`** — the active Subscriptions as an OPML 2.0
+  document any other reader imports.
+- **`everything (JSON)`** — the complete portable reading state: Subscriptions
+  and Polling Intervals, Feed metadata, retained Feed Items, Library
+  membership, the installation timezone, and the export and schema versions.
+  It never contains the password verifier, sessions, the setup secret,
+  retrieval caches, or any other operational state, so the file is safe to
+  keep anywhere the Owner keeps documents.
+
+Exports are portability, not disaster recovery — the JSON file preserves
+reading state, but restoring an installation wholesale is what backups are for.
+
+## Backups
+
+Railway's daily volume backups are the default safety net; nothing has to be
+configured for them, and no S3/R2 credentials or off-platform replication are
+required. Take an explicit backup before anything deliberate — an upgrade, a
+migration to another host — with the CLI:
+
+```sh
+node dist/server/cli-main.js backup /app/data/backups/simple-rss-2026-08-09.db
+```
+
+The command uses SQLite's `VACUUM INTO`, so the snapshot is
+application-consistent even while the service is running — never copy the live
+`simple-rss.db` file directly, because a raw copy of an open WAL database can
+be torn. The snapshot is written under a temporary name and renamed only once
+complete, so a file at the destination is always a finished backup; the
+command refuses to overwrite an existing file and reports failures on stdout
+with a non-zero exit code. Copy the snapshot off the volume (e.g. download it
+through the platform shell) if it should survive the volume itself.
+
+## Restoring
+
+Restore initializes a **fresh** data directory from a snapshot — it refuses to
+run where a database already exists, so it can never silently clobber a live
+installation:
+
+```sh
+# 1. Provision a service with an empty volume (or empty the data directory).
+# 2. From the platform shell:
+node dist/server/cli-main.js restore /path/to/simple-rss-2026-08-09.db
+# 3. Start (or restart) the service and verify readiness before using it:
+curl -fsS "$PUBLIC_ORIGIN/health/ready"
+```
+
+The command verifies the snapshot's integrity, applies any migrations a newer
+build ships, rebuilds the derived search index from the restored Feed Items,
+and proves the directory is writable — all against a staging copy that only
+replaces `simple-rss.db` after every check passed. A failed restore leaves the
+data directory uninitialized and the service unready, and says why.
+
+A restored installation preserves Subscriptions and their Polling Intervals,
+retained Feed Items, Library membership, installation settings, and Owner
+access — the same password signs in, because the Owner's verifier lives in the
+database. What a backup does not carry is anything derived or in flight:
+Reader renderings and proxied images are re-fetched on demand, and Feed Items
+published between the backup and the restore arrive with the next poll.
+
 ## Upgrading
 
-Installations never follow a mutable `latest` tag. Pick a version deliberately
-and take a backup first — replacing the container while retaining the volume is
-what preserves state, and the container smoke tests cover exactly that path.
+Installations never follow a mutable `latest` tag, and nothing updates
+automatically. Upgrading is deliberate:
+
+1. Take a backup (above).
+2. Pick an explicit image version — a tag like `simple-rss:0.2.0`, never
+   `latest` — and replace the container while retaining the volume. That is
+   what preserves state, and the container smoke tests cover exactly that path.
+3. Watch `/health/ready`: the new build applies its migrations during startup
+   and holds traffic until they finish.
+
+Migrations only move forward — a newer build never downgrades a database, and
+an older build must not be pointed at a volume a newer one migrated. Rolling
+back therefore means the backup, not the old image alone: deploy the previous
+image version against a fresh data directory restored from the pre-upgrade
+snapshot, accepting that anything that happened after that snapshot is lost.
 
 ## Local development
 
