@@ -18,7 +18,39 @@ export interface Installation {
   readonly url: string
   /** Exact Feed URL served by the controllable publisher fixture. */
   readonly feedUrl: string
+  /** A second Feed whose one item's original page always answers 500. */
+  readonly brokenArticleFeedUrl: string
 }
+
+/**
+ * The original page behind `First light`. Long enough to extract as a real
+ * article, structured enough to prove the Reader keeps structure, and armed
+ * enough — script, iframe, form, event handler — to prove sanitization in a
+ * real browser rather than only in jsdom.
+ */
+const ARTICLE_HTML = `<!doctype html>
+  <html lang="en">
+    <head><meta charset="utf-8"><title>First light</title></head>
+    <body>
+      <nav><a href="/">Home</a><a href="/archive">Archive</a></nav>
+      <main><article>
+        <h1>First light</h1>
+        ${Array.from(
+          { length: 24 },
+          (_, index) =>
+            `<p>Paragraph ${index} follows the light across the valley floor with a steady sentence, long enough to be honest reading rather than filler.</p>`,
+        ).join('\n')}
+        <h2>Field methods</h2>
+        <ul><li>arrive before the light</li><li>write down what is actually there</li></ul>
+        <pre><code class="language-python">def observe():\n    return light</code></pre>
+        <p>The full notes live in <a href="/notes">the notebook</a>.</p>
+        <script>document.body.innerHTML = 'a hostile page took over'</script>
+        <iframe src="https://tracker.example/pixel"></iframe>
+        <form action="/subscribe"><button>Subscribe now</button></form>
+        <p onmouseover="alert(1)">A final calm paragraph.</p>
+      </article></main>
+    </body>
+  </html>`
 
 export interface ForeignSite {
   /** A different origin, for proving what a foreign page cannot do. */
@@ -38,21 +70,45 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
   installation: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
     const feedUrl = 'https://publisher.example/feed.xml'
+    const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
     // Today at 07:15 UTC, so the item lands in the Digest's "today" group on
     // any run date (chronology tolerates a publication up to a day ahead).
     const publishedAt = new Date()
     publishedAt.setUTCHours(7, 15, 0, 0)
-    const upstream = new UpstreamFixtures().stub(feedUrl, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: `<?xml version="1.0"?>
-        <rss version="2.0"><channel><title>Field Notes</title>
-          <item><guid>one</guid><title>First light</title>
-            <link>https://publisher.example/first-light</link>
-            <pubDate>${publishedAt.toUTCString()}</pubDate>
-            <description>A clear morning.</description>
-          </item>
-        </channel></rss>`,
-    })
+    // The second Feed's item is older, so `next in the digest` is stable.
+    const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
+    const upstream = new UpstreamFixtures()
+      .stub(feedUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>Field Notes</title>
+            <item><guid>one</guid><title>First light</title>
+              <link>https://publisher.example/first-light</link>
+              <pubDate>${publishedAt.toUTCString()}</pubDate>
+              <description>A clear morning.</description>
+            </item>
+          </channel></rss>`,
+      })
+      .stub('https://publisher.example/first-light', {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        body: ARTICLE_HTML,
+      })
+      .stub(brokenArticleFeedUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>The Quiet Coast</title>
+            <item><guid>tide</guid><title>Slow water</title>
+              <link>https://publisher.example/slow-water</link>
+              <pubDate>${publishedEarlier.toUTCString()}</pubDate>
+              <description>Tide notes from the shore.</description>
+            </item>
+          </channel></rss>`,
+      })
+      .stub('https://publisher.example/slow-water', {
+        status: 500,
+        headers: { 'content-type': 'text/html' },
+        body: 'the shore is closed',
+      })
     let service: RunningService | undefined
 
     try {
@@ -75,7 +131,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
           self: new URL(config.publicOrigin),
         }),
       })
-      await use({ url: service.url, feedUrl })
+      await use({ url: service.url, feedUrl, brokenArticleFeedUrl })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })

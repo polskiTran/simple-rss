@@ -86,7 +86,22 @@ describe('retrieveBytes', () => {
     expect(result.status).toBe(200)
     expect(result.url).toBe('https://example.com/feed.xml')
     expect(result.contentType).toBe('application/rss+xml')
+    expect(result.charset).toBe('utf-8')
     expect(result.etag).toBe('"v1"')
+  })
+
+  it('carries no charset when the publisher declared none', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: '<rss></rss>',
+    })
+
+    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.charset).toBeUndefined()
   })
 
   it('sends only the headers the caller is allowed to set', async () => {

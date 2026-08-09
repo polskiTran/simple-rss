@@ -90,8 +90,11 @@ function waitForLog(child: ChildProcessWithoutNullStreams, predicate: () => bool
   }
 
   // This watchdog bounds a real child process; fake timers cannot drive an
-  // operating-system process or its stdout/exit events.
-  const timeout = setTimeout(() => finish(new Error('service did not start')), 3_000)
+  // operating-system process or its stdout/exit events. It exists to catch a
+  // hang, not to race startup: the Reader's extraction stack alone costs the
+  // child half a second of module loading before it can say anything, and
+  // the rest of the suite is competing for the same cores.
+  const timeout = setTimeout(() => finish(new Error('service did not start')), 8_000)
   child.stdout.on('data', onData)
   child.once('exit', onExit)
   onData()

@@ -8,6 +8,7 @@ import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePoll
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
+import { readerPathOf } from '../routing.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
 
 type DetailState =
@@ -20,6 +21,8 @@ export interface FeedViewProps {
   readonly feedId: number
   /** Told when the Owner goes back to the Feeds list. */
   onBack(): void
+  /** Opens one Feed Item in the Reader. */
+  onOpenItem(feedItemId: number): void
 }
 
 /**
@@ -27,7 +30,7 @@ export interface FeedViewProps {
  * statistics beneath it, the retained Feed Items, and the polling behaviour —
  * interval, manual refresh, Feed Availability — the Owner manages here.
  */
-export function FeedView({ feedId, onBack }: FeedViewProps) {
+export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
   const [state, setState] = useState<DetailState>({ kind: 'loading' })
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -163,6 +166,7 @@ export function FeedView({ feedId, onBack }: FeedViewProps) {
           onChangeInterval={changeInterval}
           onShowDay={showDay}
           onSaved={setSaved}
+          onOpenItem={onOpenItem}
           confirmingUnsubscribe={confirmingUnsubscribe}
           unsubscribing={unsubscribing}
           onConfirmUnsubscribe={setConfirmingUnsubscribe}
@@ -181,6 +185,7 @@ function OpenFeed({
   onChangeInterval,
   onShowDay,
   onSaved,
+  onOpenItem,
   confirmingUnsubscribe,
   unsubscribing,
   onConfirmUnsubscribe,
@@ -193,6 +198,7 @@ function OpenFeed({
   onChangeInterval: (minutes: PollingIntervalMinutes) => void
   onShowDay: (date: string) => void
   onSaved: (feedItemId: number, saved: boolean) => void
+  onOpenItem: (feedItemId: number) => void
   confirmingUnsubscribe: boolean
   unsubscribing: boolean
   onConfirmUnsubscribe: (confirming: boolean) => void
@@ -241,7 +247,7 @@ function OpenFeed({
       <p className="notice feed-notice" aria-live="polite">
         {notice}
       </p>
-      <Items detail={detail} onSaved={onSaved} />
+      <Items detail={detail} onSaved={onSaved} onOpenItem={onOpenItem} />
     </>
   )
 }
@@ -345,9 +351,11 @@ function AvailabilityNote({ detail }: { detail: FeedDetail }) {
 function Items({
   detail,
   onSaved,
+  onOpenItem,
 }: {
   detail: FeedDetail
   onSaved: (feedItemId: number, saved: boolean) => void
+  onOpenItem: (feedItemId: number) => void
 }) {
   if (detail.items.length === 0) {
     return <p className="empty-note feed-items-state">nothing retained from this feed yet</p>
@@ -367,7 +375,15 @@ function Items({
             key={item.feedItemId}
             {...(anchors ? { id: dayAnchor(detail.feedId, item.date), tabIndex: -1 } : {})}
           >
-            <h2 className="content-item-title">{item.title}</h2>
+            <h2 className="content-item-title">
+              <a
+                className="content-item-link"
+                href={readerPathOf(item.feedItemId)}
+                onClick={routedClick(() => onOpenItem(item.feedItemId))}
+              >
+                {item.title}
+              </a>
+            </h2>
             <div className="content-meta">
               <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>
               <SaveToggle

@@ -55,6 +55,23 @@ export function metaRowDate(instant: Date, itemDate: string, today: string, time
     .toLowerCase()
 }
 
+/**
+ * The Reader header's date — `saturday, 8 august` — which names the weekday
+ * because a single opened article has room for it, with the year only once
+ * it stops being this one.
+ */
+export function readerDate(instant: Date, today: string, timezone: string): string {
+  const sameYear = dateKey(instant, timezone).slice(0, 4) === today.slice(0, 4)
+  const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'long' }).format(instant)
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    day: 'numeric',
+    month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  }).format(instant)
+  return `${weekday}, ${day}`.toLowerCase()
+}
+
 export function dayBefore(dayKey: string): string {
   return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - 24 * 60 * 60 * 1_000).toISOString().slice(0, 10)
 }

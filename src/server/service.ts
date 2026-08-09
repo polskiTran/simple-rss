@@ -10,6 +10,7 @@ import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
+import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
@@ -74,6 +75,7 @@ export function createService(options: ServiceOptions): Service {
   let refresh: FeedRefresh | undefined
   let digest: DigestService | undefined
   let library: LibraryService | undefined
+  let reader: ReaderService | undefined
   let scheduler: PollScheduler | undefined
 
   try {
@@ -92,6 +94,7 @@ export function createService(options: ServiceOptions): Service {
 
     digest = new DigestService({ database, clock, settings })
     library = new LibraryService({ database, clock, settings })
+    reader = new ReaderService({ database, clock, settings, retrieval, digest })
     const retention = new RetentionService({ database, clock, logger, ...options.retention })
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
     scheduler.start()
@@ -117,6 +120,7 @@ export function createService(options: ServiceOptions): Service {
     refresh: () => refresh,
     digest: () => digest,
     library: () => library,
+    reader: () => reader,
   })
 
   return {
@@ -148,6 +152,7 @@ export function createService(options: ServiceOptions): Service {
       refresh = undefined
       digest = undefined
       library = undefined
+      reader = undefined
     },
   }
 }

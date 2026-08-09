@@ -122,6 +122,8 @@ export interface RetrievalSuccess {
   /** Where the bytes came from, which is the last hop rather than what was asked for. */
   readonly url: string
   readonly contentType: string
+  /** The `charset` parameter the publisher declared alongside it, if any. */
+  readonly charset: string | undefined
   readonly etag: string | undefined
   readonly lastModified: string | undefined
   /** True when a conditional request was answered `304` and there is no body. */
@@ -361,6 +363,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
         status: 304,
         url: url.href,
         contentType: '',
+        charset: undefined,
         etag: response.headers.get('etag') ?? undefined,
         lastModified: response.headers.get('last-modified') ?? undefined,
         notModified: true,
@@ -397,6 +400,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       status: response.status,
       url: url.href,
       contentType,
+      charset: charsetOf(response.headers.get('content-type')),
       etag: response.headers.get('etag') ?? undefined,
       lastModified: response.headers.get('last-modified') ?? undefined,
       notModified: false,
@@ -555,6 +559,12 @@ function forwardableHeaders(
 /** The media type without its parameters: `text/html; charset=utf-8` is `text/html`. */
 function mediaType(contentType: string | null): string {
   return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+}
+
+/** The declared text encoding, for callers that must decode what they read. */
+function charsetOf(contentType: string | null): string | undefined {
+  const charset = /;\s*charset\s*=\s*"?([\w-]+)"?/i.exec(contentType ?? '')?.[1]
+  return charset?.toLowerCase()
 }
 
 function accepted(contentType: string, accept: readonly string[]): boolean {

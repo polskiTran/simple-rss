@@ -7,6 +7,7 @@ import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
 import { EmptyView } from './views/empty-view.js'
 import { LoginView } from './views/login-view.js'
+import { ReaderView } from './views/reader-view.js'
 import { SavedView } from './views/saved-view.js'
 import { SettingsView } from './views/settings-view.js'
 import { SetupView } from './views/setup-view.js'
@@ -25,8 +26,10 @@ export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
 
+  const reading = gate.access.kind === 'open' && navigation.readerItemId !== undefined
+
   return (
-    <div className="paper">
+    <div className={reading ? 'paper paper-reader' : 'paper'}>
       <header className="masthead">
         <Wordmark />
         {gate.access.kind === 'open' ? <TabBar active={navigation.route} onNavigate={navigation.navigate} /> : null}
@@ -54,17 +57,32 @@ function viewFor(gate: Gate, navigation: Navigation) {
 }
 
 function readerViewFor(navigation: Navigation, gate: Gate) {
+  // An opened article sits over whichever tab it was reached from.
+  if (navigation.readerItemId !== undefined) {
+    return (
+      <ReaderView
+        feedItemId={navigation.readerItemId}
+        onBack={() => navigation.navigate('digest')}
+        onOpenItem={navigation.openReader}
+      />
+    )
+  }
+
   switch (navigation.route) {
     case 'digest':
-      return <DigestView />
+      return <DigestView onOpenItem={navigation.openReader} />
     case 'feeds':
       return navigation.feedId === undefined ? (
         <FeedsView onOpenFeed={navigation.openFeed} />
       ) : (
-        <FeedView feedId={navigation.feedId} onBack={() => navigation.navigate('feeds')} />
+        <FeedView
+          feedId={navigation.feedId}
+          onBack={() => navigation.navigate('feeds')}
+          onOpenItem={navigation.openReader}
+        />
       )
     case 'saved':
-      return <SavedView />
+      return <SavedView onOpenItem={navigation.openReader} />
     case 'settings':
       return <SettingsView onAccessChanged={gate.adopt} />
   }

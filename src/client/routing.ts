@@ -29,23 +29,44 @@ export function feedPathOf(feedId: number): string {
 }
 
 export function feedIdOf(pathname: string): number | undefined {
+  return nestedIdOf(pathname, 'feeds')
+}
+
+/**
+ * The Reader: `/reader/42` is one Feed Item opened for reading. It lives
+ * outside the four tabs, the way an opened article sits over the reading
+ * flow rather than inside its furniture; the Digest stays the active tab.
+ */
+export function readerPathOf(feedItemId: number): string {
+  return `/reader/${feedItemId}`
+}
+
+export function readerItemIdOf(pathname: string): number | undefined {
+  return nestedIdOf(pathname, 'reader')
+}
+
+function nestedIdOf(pathname: string, section: string): number | undefined {
   const [first, second] = pathname.split('/').filter(Boolean)
-  if (first !== 'feeds' || !second || !/^[1-9]\d*$/.test(second)) return undefined
-  const feedId = Number(second)
-  return Number.isSafeInteger(feedId) ? feedId : undefined
+  if (first !== section || !second || !/^[1-9]\d*$/.test(second)) return undefined
+  const id = Number(second)
+  return Number.isSafeInteger(id) ? id : undefined
 }
 
 export interface Navigation {
   readonly route: Route
   /** Set while one Feed is open inside the Feeds tab. */
   readonly feedId: number | undefined
+  /** Set while one Feed Item is open in the Reader. */
+  readonly readerItemId: number | undefined
   navigate(route: Route): void
   openFeed(feedId: number): void
+  openReader(feedItemId: number): void
 }
 
 interface Location {
   readonly route: Route
   readonly feedId: number | undefined
+  readonly readerItemId: number | undefined
 }
 
 /**
@@ -65,20 +86,31 @@ export function useNavigation(): Navigation {
     if (window.location.pathname !== pathOf(next)) {
       window.history.pushState(null, '', pathOf(next))
     }
-    setLocation({ route: next, feedId: undefined })
+    setLocation({ route: next, feedId: undefined, readerItemId: undefined })
   }, [])
 
   const openFeed = useCallback((feedId: number) => {
     if (window.location.pathname !== feedPathOf(feedId)) {
       window.history.pushState(null, '', feedPathOf(feedId))
     }
-    setLocation({ route: 'feeds', feedId })
+    setLocation({ route: 'feeds', feedId, readerItemId: undefined })
   }, [])
 
-  return { ...location, navigate, openFeed }
+  const openReader = useCallback((feedItemId: number) => {
+    if (window.location.pathname !== readerPathOf(feedItemId)) {
+      window.history.pushState(null, '', readerPathOf(feedItemId))
+    }
+    setLocation({ route: 'digest', feedId: undefined, readerItemId: feedItemId })
+  }, [])
+
+  return { ...location, navigate, openFeed, openReader }
 }
 
 function locationOf(pathname: string): Location {
   const route = routeOf(pathname)
-  return { route, feedId: route === 'feeds' ? feedIdOf(pathname) : undefined }
+  return {
+    route,
+    feedId: route === 'feeds' ? feedIdOf(pathname) : undefined,
+    readerItemId: readerItemIdOf(pathname),
+  }
 }

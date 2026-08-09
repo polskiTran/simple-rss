@@ -363,6 +363,7 @@ describe('congestion at the retrieval boundary', () => {
       status: 200,
       url,
       contentType: 'application/rss+xml',
+      charset: undefined,
       etag: undefined,
       lastModified: undefined,
       notModified: false,

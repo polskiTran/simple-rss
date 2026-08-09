@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import type { Library } from '../../shared/api.js'
 import { fetchLibrary } from '../api.js'
 import { SaveToggle } from '../components/save-toggle.js'
+import { routedClick } from '../routed-link.js'
+import { readerPathOf } from '../routing.js'
+
+export interface SavedViewProps {
+  /** Opens one saved Feed Item in the Reader. */
+  onOpenItem(feedItemId: number): void
+}
 
 type LibraryState =
   | { readonly kind: 'loading' }
@@ -17,7 +24,7 @@ type LibraryState =
  * word in place; the row leaves the list on the next visit, so a misread tap
  * can be undone where it happened.
  */
-export function SavedView() {
+export function SavedView({ onOpenItem }: SavedViewProps) {
   const [state, setState] = useState<LibraryState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
@@ -78,7 +85,15 @@ export function SavedView() {
       <div className="content-list">
         {state.library.items.map((item) => (
           <article className="content-item" key={item.feedItemId}>
-            <h2 className="content-item-title">{item.title}</h2>
+            <h2 className="content-item-title">
+              <a
+                className="content-item-link"
+                href={readerPathOf(item.feedItemId)}
+                onClick={routedClick(() => onOpenItem(item.feedItemId))}
+              >
+                {item.title}
+              </a>
+            </h2>
             <div className="content-meta">
               {/* A save outlives its Subscription; said as a fact, not a nudge
                   to clean anything up. */}

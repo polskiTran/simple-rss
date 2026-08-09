@@ -9,6 +9,8 @@ import {
   librarySchema,
   opmlImportReportSchema,
   pollingScheduleSchema,
+  readerArticleSchema,
+  readerItemSchema,
   refreshFeedResponseSchema,
   subscriptionListSchema,
   serviceMetaSchema,
@@ -22,6 +24,8 @@ import {
   type OpmlImportReport,
   type PollingIntervalMinutes,
   type PollingSchedule,
+  type ReaderArticle,
+  type ReaderItem,
   type RefreshFeedResponse,
   type SubscriptionList,
   type ServiceMeta,
@@ -211,6 +215,21 @@ export async function saveToLibrary(feedItemId: number): Promise<LibraryMembersh
 export async function unsaveFromLibrary(feedItemId: number): Promise<LibraryMembership> {
   const response = await request(`/api/library/${feedItemId}`, { method: 'DELETE' })
   return libraryMembershipSchema.parse(await response.json())
+}
+
+/** The Reader header for one Feed Item: identity, membership, what's next. */
+export async function fetchReaderItem(feedItemId: number): Promise<ReaderItem> {
+  const response = await request(`/api/items/${feedItemId}`)
+  return readerItemSchema.parse(await response.json())
+}
+
+/**
+ * The extracted article. A success carries `Cache-Control: private` for a
+ * day, so rereading is usually the browser's copy rather than a re-parse.
+ */
+export async function fetchReaderArticle(feedItemId: number): Promise<ReaderArticle> {
+  const response = await request(`/api/items/${feedItemId}/reader`)
+  return readerArticleSchema.parse(await response.json())
 }
 
 export async function fetchInstallationPreferences(): Promise<InstallationPreferences> {
