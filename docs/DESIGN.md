@@ -1,7 +1,5 @@
 # simple — design system
 
-Derived from turn 7. Every value below is literal; nothing is approximate.
-
 ## 1. Principles
 
 1. **One shape, repeated.** A content item is a 21px line with a 12.5px grey line under it. Posts, feeds, saved items are all that shape. Filters differ; the object does not.
