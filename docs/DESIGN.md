@@ -230,6 +230,6 @@ fades remain — gentler, not zero. Nothing else animates.
 
 ## 7. Breakpoints
 
-Single breakpoint at 390px. Changes: type down one step, padding 56 → 24, cadence 30 days → 14, measure becomes full width. The daily band keeps its 64px height and only its clipped length follows the viewport. Structure is identical — nothing reflows, reorders, or hides.
+Single breakpoint at 390px. Changes: type down one step, padding 56 → 24, cadence 30 days → 14, measure becomes full width. The daily band keeps its 114px height and only its clipped length follows the viewport. Structure is identical — nothing reflows, reorders, or hides.
 
 **Implementation note.** 390px is the width the narrow layout is *drawn at*, not the width the media query fires at. A phone at 430px needs the narrow scale too, and the 820px paper stops being comfortable well above 390px, so the stylesheet switches at `max-width: 640px`. Every value inside the query is still the literal 390px column of the tables above.

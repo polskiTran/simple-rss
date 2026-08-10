@@ -107,8 +107,8 @@ test.describe('the Digest inside the narrow paper', () => {
     const heading = page.getByRole('heading', { name: 'today · 1 post' })
     await expect(heading).toBeVisible()
     await expect(heading).toHaveCSS('font-size', '12px')
-    // 64px at every width: the field is clipped, never redrawn shorter.
-    await expect(page.locator('.daily-band')).toHaveCSS('height', '64px')
+    // 114px at every width: the field is clipped, never redrawn shorter.
+    await expect(page.locator('.daily-band')).toHaveCSS('height', '114px')
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       await page.evaluate(() => window.innerWidth),
     )
