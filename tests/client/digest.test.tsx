@@ -25,6 +25,7 @@ const DIGEST = {
     { date: '2026-08-07', label: 'yesterday', items: [item(1, 'Evening notes', '09:31')] },
     { date: '2026-06-03', label: 'june 3, 2026', items: [item(4, 'A June letter', '12:00')] },
   ],
+  nextCursor: null,
 }
 
 afterEach(() => {
@@ -97,7 +98,7 @@ describe('the chronological Digest', () => {
 
   it('says today · 1 post, in the singular, when one post is all there is', async () => {
     stubApi().on('GET /api/digest', {
-      body: { today: { date: '2026-08-08', volume: 1 }, groups: [{ ...DIGEST.groups[0], items: [item(3, 'First light', '07:15')] }] },
+      body: { today: { date: '2026-08-08', volume: 1 }, groups: [{ ...DIGEST.groups[0], items: [item(3, 'First light', '07:15')] }], nextCursor: null },
     })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -107,7 +108,7 @@ describe('the chronological Digest', () => {
 
   it('counts nothing on a day when nothing has landed yet', async () => {
     stubApi().on('GET /api/digest', {
-      body: { today: { date: '2026-08-08', volume: 0 }, groups: [DIGEST.groups[1], DIGEST.groups[2]] },
+      body: { today: { date: '2026-08-08', volume: 0 }, groups: [DIGEST.groups[1], DIGEST.groups[2]], nextCursor: null },
     })
     window.history.replaceState(null, '', '/')
     render(<App />)

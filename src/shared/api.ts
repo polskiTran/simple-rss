@@ -330,7 +330,13 @@ export const digestSchema = z.object({
     date: z.string(),
     volume: z.number().int().nonnegative(),
   }),
+  /**
+   * One page of the chronology. A page may end mid-day; the next page repeats
+   * that day's `date` and the client joins the two halves of the group.
+   */
   groups: z.array(digestGroupSchema),
+  /** Where the next page begins — opaque — or null at the very end. */
+  nextCursor: z.string().nullable(),
 })
 export type Digest = z.infer<typeof digestSchema>
 
@@ -355,7 +361,10 @@ export const libraryItemSchema = z.object({
 export type LibraryItem = z.infer<typeof libraryItemSchema>
 
 export const librarySchema = z.object({
+  /** One page of saves, newest first in the Digest's own chronology. */
   items: z.array(libraryItemSchema),
+  /** Where the next page begins — opaque — or null at the very end. */
+  nextCursor: z.string().nullable(),
 })
 export type Library = z.infer<typeof librarySchema>
 

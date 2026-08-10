@@ -21,6 +21,7 @@ import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
 import { RETRIEVAL_PROFILES, type RetrievalFailureCode } from '../upstream/retrieval.js'
 import { readJsonBody } from './json-body.js'
+import { readListCursor } from './list-cursor.js'
 import { NO_STORE, unavailable } from './responses.js'
 
 export interface FeedRouteDependencies {
@@ -145,7 +146,10 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   app.get('/digest', (c) => {
     const digest = deps.digest()
     if (!digest) return unavailable(c)
-    return c.json<Digest>(digest.read(), 200, NO_STORE)
+
+    const cursor = readListCursor(c)
+    if (!cursor.ok) return cursor.response
+    return c.json<Digest>(digest.read(cursor.cursor), 200, NO_STORE)
   })
 
   return app

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Library } from '../../shared/api.js'
 import { fetchLibrary } from '../api.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
+import { OlderItems, type OlderState } from '../components/older-items.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { failureKind } from './failure.js'
 
@@ -31,6 +32,7 @@ export function SavedView({ onOpenItem }: SavedViewProps) {
   useEffect(() => {
     let active = true
     setState({ kind: 'loading' })
+    setOlder('idle')
     void fetchLibrary()
       .then((library) => {
         if (active) setState({ kind: 'loaded', library })
@@ -42,6 +44,25 @@ export function SavedView({ onOpenItem }: SavedViewProps) {
       active = false
     }
   }, [attempt])
+
+  const [older, setOlder] = useState<OlderState>('idle')
+
+  const loadOlder = (cursor: string) => {
+    setOlder('loading')
+    void fetchLibrary(cursor)
+      .then((page) => {
+        setOlder('idle')
+        setState((current) =>
+          current.kind === 'loaded'
+            ? {
+                kind: 'loaded',
+                library: { items: [...current.library.items, ...page.items], nextCursor: page.nextCursor },
+              }
+            : current,
+        )
+      })
+      .catch(() => setOlder('failed'))
+  }
 
   // Membership changes made on this screen, kept beside the fetched list so
   // an unsaved row stays visible — and reversible — until the next visit.
@@ -101,6 +122,7 @@ export function SavedView({ onOpenItem }: SavedViewProps) {
           </article>
         ))}
       </div>
+      <OlderItems nextCursor={state.library.nextCursor} older={older} noun="saves" onLoadOlder={loadOlder} />
     </div>
   )
 }

@@ -1,11 +1,12 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, sql, type SQL } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Digest, DigestItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import { dateKey, dayBefore, inDigestOrder, timeLabel } from './chronology.js'
+import { chronologyTime, dateKey, dayAfter, dayBefore, dayStartUtc, inDigestOrder, timeLabel } from './chronology.js'
+import { beyondCursorSql, chronologySql, LIST_PAGE_SIZE, nextListCursor, type ListCursor } from './list-page.js'
 
 /** Chronology and installation-timezone date grouping for the User's Digest. */
 export class DigestService {
@@ -19,31 +20,36 @@ export class DigestService {
     this.#settings = options.settings
   }
 
-  read(): Digest {
+  /** One page of the Digest, from the top or resumed from a cursor. */
+  read(cursor?: ListCursor): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
-    const rows = inDigestOrder(
-      this.#db
-        .select({
-          feedItemId: feedItems.id,
-          title: feedItems.title,
-          feedId: feeds.id,
-          feedTitle: feeds.title,
-          link: feedItems.link,
-          publishedAt: feedItems.publishedAt,
-          imageUrl: feedItems.imageUrl,
-          summary: feedItems.summary,
-          firstSeenAt: feedItems.firstSeenAt,
-          savedAt: libraryItems.savedAt,
-        })
-        .from(feedItems)
-        .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
-        .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-        .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
-        .orderBy(desc(feedItems.firstSeenAt))
-        .all(),
-      now,
-    )
+    const chronology = chronologySql(now)
+
+    // One row past the page says whether a next page exists at all.
+    const fetched = this.#db
+      .select({
+        feedItemId: feedItems.id,
+        title: feedItems.title,
+        feedId: feeds.id,
+        feedTitle: feeds.title,
+        link: feedItems.link,
+        publishedAt: feedItems.publishedAt,
+        imageUrl: feedItems.imageUrl,
+        summary: feedItems.summary,
+        firstSeenAt: feedItems.firstSeenAt,
+        savedAt: libraryItems.savedAt,
+      })
+      .from(feedItems)
+      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+      .where(cursor ? beyondCursorSql(chronology, cursor) : undefined)
+      .orderBy(sql`${chronology} DESC`, desc(feedItems.id))
+      .limit(LIST_PAGE_SIZE + 1)
+      .all()
+
+    const rows = inDigestOrder(fetched.slice(0, LIST_PAGE_SIZE), now)
 
     const today = dateKey(now, timezone)
     const yesterday = dayBefore(today)
@@ -62,39 +68,114 @@ export class DigestService {
         groups.set(date, group)
       }
 
-      group.items.push({
-        feedItemId: row.feedItemId,
-        title: row.title ?? 'untitled',
-        feedId: row.feedId,
-        feedTitle: row.feedTitle,
-        link: row.link,
-        publishedAt: row.publishedAt,
-        displayTime: timeLabel(instant, timezone),
-        // The publisher's URL stays server-side; the client only ever hears
-        // about the same-origin proxy route for this item.
-        imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
-        summary: row.summary,
-        firstSeenAt: row.firstSeenAt,
-        saved: row.savedAt !== null,
-      })
+      group.items.push(digestItemOf(row, instant, timezone))
     }
 
     return {
-      today: { date: today, volume: groups.get(today)?.items.length ?? 0 },
+      today: { date: today, volume: this.#todayVolume(chronology, today, timezone) },
       groups: [...groups.values()],
+      nextCursor: nextListCursor(fetched.length, rows.at(-1)),
     }
+  }
+
+  /**
+   * How many Feed Items today holds in total. Counted on its own because the
+   * page may end mid-today, and the daily band speaks for the whole day.
+   */
+  #todayVolume(chronology: SQL, today: string, timezone: string): number {
+    const start = dayStartUtc(today, timezone).toISOString()
+    const end = dayStartUtc(dayAfter(today), timezone).toISOString()
+    const counted = this.#db
+      .select({ volume: sql<number>`COUNT(*)` })
+      .from(feedItems)
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feedItems.feedId))
+      .where(sql`${chronology} >= ${start} AND ${chronology} < ${end}`)
+      .all()[0]
+    return counted?.volume ?? 0
   }
 
   /**
    * The Feed Item that follows one item in this chronology — what the Reader
    * says under `next in the digest`. Answered here so the Reader and the
-   * Digest can never disagree about the order. `undefined` when the item is
-   * last, or is not in the Digest at all.
+   * Digest can never disagree about the order: the item's own chronology
+   * becomes a cursor, and the follower is whatever a page starting there
+   * would show first — however many pages away that is. `undefined` when the
+   * item is last, or is not in the Digest at all.
    */
   after(feedItemId: number): DigestItem | undefined {
-    const ordered = this.read().groups.flatMap((group) => group.items)
-    const index = ordered.findIndex((entry) => entry.feedItemId === feedItemId)
-    return index === -1 ? undefined : ordered[index + 1]
+    const timezone = this.#settings.effectiveTimezone()
+    const now = this.#clock.now()
+
+    const current = this.#db
+      .select({ publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
+      .from(feedItems)
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feedItems.feedId))
+      .where(eq(feedItems.id, feedItemId))
+      .limit(1)
+      .all()[0]
+    if (!current) return undefined
+
+    const chronology = chronologySql(now)
+    const cursor: ListCursor = {
+      chronology: new Date(chronologyTime(current.publishedAt, current.firstSeenAt, now)).toISOString(),
+      feedItemId,
+    }
+    const next = this.#db
+      .select({
+        feedItemId: feedItems.id,
+        title: feedItems.title,
+        feedId: feeds.id,
+        feedTitle: feeds.title,
+        link: feedItems.link,
+        publishedAt: feedItems.publishedAt,
+        imageUrl: feedItems.imageUrl,
+        summary: feedItems.summary,
+        firstSeenAt: feedItems.firstSeenAt,
+        savedAt: libraryItems.savedAt,
+      })
+      .from(feedItems)
+      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+      .where(beyondCursorSql(chronology, cursor))
+      .orderBy(sql`${chronology} DESC`, desc(feedItems.id))
+      .limit(1)
+      .all()[0]
+    if (!next) return undefined
+
+    const instant = new Date(chronologyTime(next.publishedAt, next.firstSeenAt, now))
+    return digestItemOf(next, instant, timezone)
+  }
+}
+
+interface DigestRow {
+  readonly feedItemId: number
+  readonly title: string | null
+  readonly feedId: number
+  readonly feedTitle: string
+  readonly link: string | null
+  readonly publishedAt: string | null
+  readonly imageUrl: string | null
+  readonly summary: string | null
+  readonly firstSeenAt: string
+  readonly savedAt: string | null
+}
+
+function digestItemOf(row: DigestRow, instant: Date, timezone: string): DigestItem {
+  return {
+    feedItemId: row.feedItemId,
+    title: row.title ?? 'untitled',
+    feedId: row.feedId,
+    feedTitle: row.feedTitle,
+    link: row.link,
+    publishedAt: row.publishedAt,
+    displayTime: timeLabel(instant, timezone),
+    // The publisher's URL stays server-side; the client only ever hears
+    // about the same-origin proxy route for this item.
+    imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
+    summary: row.summary,
+    firstSeenAt: row.firstSeenAt,
+    saved: row.savedAt !== null,
   }
 }
 

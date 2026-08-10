@@ -137,6 +137,7 @@ describe('Reader View', () => {
           ],
         },
       ],
+      nextCursor: null,
     }
     reading()
       .on('GET /api/digest', { body: digest })

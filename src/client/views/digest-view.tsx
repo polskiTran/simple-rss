@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { MAX_SEARCH_QUERY_LENGTH, type Digest, type DigestGroup, type SearchResult } from '../../shared/api.js'
+import { MAX_SEARCH_QUERY_LENGTH, type Digest, type SearchResult } from '../../shared/api.js'
 import { fetchDigest, fetchSearchResults } from '../api.js'
 import { DailyBand } from '../components/daily-band.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
+import { OlderItems, type OlderState } from '../components/older-items.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { failureKind } from './failure.js'
 
@@ -30,6 +31,24 @@ type SearchState =
 /** How long typing rests before the line is asked of the server. */
 const SEARCH_SETTLE_MS = 250
 
+/**
+ * The loaded chronology, extended by one more page. A page may begin in the
+ * day the previous one ended in; that day's two halves join under the group
+ * already on screen.
+ */
+function withOlderPage(digest: Digest, page: Digest): Digest {
+  const groups = [...digest.groups]
+  const seam = groups.at(-1)
+  const [first, ...rest] = page.groups
+  if (seam && first && first.date === seam.date) {
+    groups[groups.length - 1] = { ...seam, items: [...seam.items, ...first.items] }
+    groups.push(...rest)
+  } else {
+    groups.push(...page.groups)
+  }
+  return { ...digest, groups, nextCursor: page.nextCursor }
+}
+
 export function DigestView({ onOpenItem }: DigestViewProps) {
   const [state, setState] = useState<DigestState>({ kind: 'loading' })
   // Trying again re-runs the effect, so every attempt — the first or a retry
@@ -39,6 +58,7 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
   useEffect(() => {
     let active = true
     setState({ kind: 'loading' })
+    setOlder('idle')
     void fetchDigest()
       .then((digest) => {
         if (active) setState({ kind: 'loaded', digest })
@@ -50,6 +70,20 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
       active = false
     }
   }, [attempt])
+
+  const [older, setOlder] = useState<OlderState>('idle')
+
+  const loadOlder = (cursor: string) => {
+    setOlder('loading')
+    void fetchDigest(cursor)
+      .then((page) => {
+        setOlder('idle')
+        setState((current) =>
+          current.kind === 'loaded' ? { kind: 'loaded', digest: withOlderPage(current.digest, page) } : current,
+        )
+      })
+      .catch(() => setOlder('failed'))
+  }
 
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' })
@@ -162,8 +196,9 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
                 {group.label}
                 {group.label === 'today' ? (
                   // The one number the design allows: it answers "is there
-                  // something to read", never how much is left or unread.
-                  <span className="day-heading-count"> · {countLabel(group)}</span>
+                  // something to read", never how much is left or unread. The
+                  // whole day's volume, even when the page cuts today short.
+                  <span className="day-heading-count"> · {countLabel(state.digest.today.volume)}</span>
                 ) : null}
               </h2>
               <div className="content-list">
@@ -187,6 +222,12 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
               </div>
             </section>
           ))}
+          <OlderItems
+            nextCursor={state.digest.nextCursor}
+            older={older}
+            noun="items"
+            onLoadOlder={loadOlder}
+          />
         </>
       ) : (
         <SearchOutcome state={search} line={line} onOpenItem={onOpenItem} onSaved={setSaved} />
@@ -259,7 +300,6 @@ function SearchOutcome({
   )
 }
 
-function countLabel(group: DigestGroup): string {
-  const count = group.items.length
+function countLabel(count: number): string {
   return count === 1 ? '1 post' : `${count} posts`
 }

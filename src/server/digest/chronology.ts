@@ -99,3 +99,38 @@ export function readerDate(instant: Date, today: string, timezone: string): stri
 export function dayBefore(dayKey: string): string {
   return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - 24 * 60 * 60 * 1_000).toISOString().slice(0, 10)
 }
+
+export function dayAfter(dayKey: string): string {
+  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) + 24 * 60 * 60 * 1_000).toISOString().slice(0, 10)
+}
+
+/**
+ * The UTC instant a timezone's calendar day begins, so a SQL range can count
+ * one Digest day without fetching it. Two refinement rounds settle the zone
+ * offset even when a transition moves it across the guess.
+ */
+export function dayStartUtc(dayKey: string, timezone: string): Date {
+  const guess = Date.parse(`${dayKey}T00:00:00.000Z`)
+  let instant = guess
+  for (let round = 0; round < 2; round += 1) {
+    instant = guess - zoneOffsetMs(instant, timezone)
+  }
+  return new Date(instant)
+}
+
+/** How far ahead of UTC the zone's wall clock reads at one instant. */
+function zoneOffsetMs(instant: number, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  const wall = Date.parse(`${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:${values.second}.000Z`)
+  return wall - instant
+}

@@ -5,6 +5,7 @@ import {
   type LibraryMembership,
 } from '../../shared/api.js'
 import type { LibraryService } from '../library/library-service.js'
+import { readListCursor } from './list-cursor.js'
 import { NO_STORE, unavailable } from './responses.js'
 
 export interface LibraryRouteDependencies {
@@ -23,7 +24,10 @@ export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   app.get('/library', (c) => {
     const library = deps.library()
     if (!library) return unavailable(c)
-    return c.json<Library>(library.list(), 200, NO_STORE)
+
+    const cursor = readListCursor(c)
+    if (!cursor.ok) return cursor.response
+    return c.json<Library>(library.list(cursor.cursor), 200, NO_STORE)
   })
 
   app.put('/library/:feedItemId', (c) => {
