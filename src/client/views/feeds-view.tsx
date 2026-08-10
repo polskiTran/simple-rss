@@ -12,7 +12,7 @@ type SubscriptionState =
   | { readonly kind: 'unavailable' }
 
 export interface FeedsViewProps {
-  /** Told when the Owner opens one Feed from the list. */
+  /** Told when the User opens one Feed from the list. */
   onOpenFeed(feedId: number): void
 }
 

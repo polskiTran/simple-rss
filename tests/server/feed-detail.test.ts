@@ -28,10 +28,10 @@ describe('one opened Feed', () => {
         item('yesterday', 'Evening notes', '2026-08-07T09:31:00.000Z'),
       ),
     })
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const response = await owner.get('/api/feeds/1')
+    const response = await user.get('/api/feeds/1')
 
     expect(response.status).toBe(200)
     const detail = feedDetailSchema.parse(await response.json())
@@ -67,11 +67,11 @@ describe('one opened Feed', () => {
       headers: { 'content-type': 'application/rss+xml' },
       body: rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')),
     })
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const first = await (await owner.get('/api/feeds/1')).json()
-    const second = await (await owner.get('/api/feeds/1')).json()
+    const first = await (await user.get('/api/feeds/1')).json()
+    const second = await (await user.get('/api/feeds/1')).json()
 
     expect(second).toEqual(first)
   })
@@ -83,11 +83,11 @@ describe('one opened Feed', () => {
       // 20:00 UTC on the 7th is already the morning of the 8th in Auckland.
       body: rss(item('one', 'Crossing midnight', '2026-08-07T20:00:00.000Z')),
     })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const detail = feedDetailSchema.parse(await (await owner.get('/api/feeds/1')).json())
+    const detail = feedDetailSchema.parse(await (await user.get('/api/feeds/1')).json())
 
     expect(detail.items[0]).toMatchObject({ date: '2026-08-08', displayDate: 'today, 08:00' })
     expect(detail.cadence.at(-1)).toEqual({ date: '2026-08-08', count: 1 })
@@ -95,9 +95,9 @@ describe('one opened Feed', () => {
 
   it('answers not found for a Feed that is not subscribed', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.get('/api/feeds/999')).status).toBe(404)
-    expect((await owner.get('/api/feeds/1e1')).status).toBe(404)
+    expect((await user.get('/api/feeds/999')).status).toBe(404)
+    expect((await user.get('/api/feeds/1e1')).status).toBe(404)
   })
 })

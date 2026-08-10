@@ -5,7 +5,7 @@
  * choice therefore lives in this browser, not on the server.
  *
  * `system` is the default and stores nothing: the stylesheet's
- * `prefers-color-scheme` rules keep deciding, exactly as before the Owner
+ * `prefers-color-scheme` rules keep deciding, exactly as before the User
  * ever opened Settings.
  */
 

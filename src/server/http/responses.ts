@@ -18,7 +18,7 @@ export function unavailable(c: Context) {
 
 /**
  * The one answer every failed credential gets, whatever was actually wrong:
- * no Owner yet, wrong password, wrong setup secret. Distinguishing them would
+ * no User yet, wrong password, wrong setup secret. Distinguishing them would
  * tell someone guessing which half of the problem to work on.
  */
 export function invalidCredentials(c: Context) {

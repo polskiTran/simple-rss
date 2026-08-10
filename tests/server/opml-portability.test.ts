@@ -38,10 +38,10 @@ describe('OPML import', () => {
         headers: { 'content-type': 'application/rss+xml' },
         body: '<rss><channel>',
       })
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
-    const imported = await owner.post('/api/subscriptions/import', {
+    const imported = await user.post('/api/subscriptions/import', {
       opml: opmlListing([RSS_URL, ATOM_URL, 'https://down.example/feed', 'https://broken.example/feed', 'not a url']),
     })
 
@@ -71,7 +71,7 @@ describe('OPML import', () => {
       ],
     })
 
-    const feeds = await (await owner.get('/api/feeds')).json()
+    const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions.map((subscription: { title: string }) => subscription.title)).toEqual([
       'Atom Letters',
       'Field Notes',
@@ -81,9 +81,9 @@ describe('OPML import', () => {
   it('gives imported Subscriptions the default 2-hour Polling Interval', async () => {
     const service = await startTestService()
     stubHealthyFeeds(service)
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.post('/api/subscriptions/import', { opml: opmlListing([ATOM_URL]) })).status).toBe(200)
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([ATOM_URL]) })).status).toBe(200)
 
     expect(
       service.database?.prepare('SELECT polling_interval_minutes FROM subscriptions').all(),
@@ -93,13 +93,13 @@ describe('OPML import', () => {
   it('keeps a repeated import from duplicating Subscriptions or Feed Items', async () => {
     const service = await startTestService()
     stubHealthyFeeds(service)
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const opml = opmlListing([RSS_URL, ATOM_URL])
 
-    const first = await (await owner.post('/api/subscriptions/import', { opml })).json()
+    const first = await (await user.post('/api/subscriptions/import', { opml })).json()
     expect(first.feeds.map((feed: { outcome: string }) => feed.outcome)).toEqual(['added', 'added'])
 
-    const second = await (await owner.post('/api/subscriptions/import', { opml })).json()
+    const second = await (await user.post('/api/subscriptions/import', { opml })).json()
     expect(second.feeds).toEqual([
       { url: RSS_URL, outcome: 'skipped', title: 'Field Notes', reason: 'already subscribed' },
       { url: ATOM_URL, outcome: 'skipped', title: 'Atom Letters', reason: 'already subscribed' },
@@ -113,29 +113,29 @@ describe('OPML import', () => {
 
   it('validates the upload before touching any Feed', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const notXml = await owner.post('/api/subscriptions/import', { opml: '<opml><body><outline' })
+    const notXml = await user.post('/api/subscriptions/import', { opml: '<opml><body><outline' })
     expect(notXml.status).toBe(422)
     expect(await notXml.json()).toMatchObject({ error: { code: 'malformed_opml' } })
 
-    const notOpml = await owner.post('/api/subscriptions/import', { opml: '<rss version="2.0"/>' })
+    const notOpml = await user.post('/api/subscriptions/import', { opml: '<rss version="2.0"/>' })
     expect(notOpml.status).toBe(422)
     expect(await notOpml.json()).toMatchObject({ error: { code: 'unsupported_opml' } })
 
     const urls = Array.from({ length: MAX_OPML_FEEDS + 1 }, (_, index) => `https://feeds.example/${index}`)
-    const oversized = await owner.post('/api/subscriptions/import', { opml: opmlListing(urls) })
+    const oversized = await user.post('/api/subscriptions/import', { opml: opmlListing(urls) })
     expect(oversized.status).toBe(413)
     expect(await oversized.json()).toMatchObject({ error: { code: 'too_many_feeds' } })
 
-    const wrongShape = await owner.post('/api/subscriptions/import', { file: 'nope' })
+    const wrongShape = await user.post('/api/subscriptions/import', { file: 'nope' })
     expect(wrongShape.status).toBe(400)
 
     expect(service.upstream.requests).toHaveLength(0)
-    expect(await (await owner.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
+    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
   })
 
-  it('is closed to anyone but the Owner', async () => {
+  it('is closed to anyone but the User', async () => {
     const service = await startTestService()
     await claimedDevice(service)
     const stranger = new Device(service)
@@ -149,10 +149,10 @@ describe('OPML export', () => {
   it('answers with a portable OPML document holding every active Subscription', async () => {
     const service = await startTestService()
     stubHealthyFeeds(service)
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
 
-    const exported = await owner.get('/api/subscriptions/export')
+    const exported = await user.get('/api/subscriptions/export')
 
     expect(exported.status).toBe(200)
     expect(exported.headers.get('content-type')).toBe('text/x-opml; charset=utf-8')
@@ -167,11 +167,11 @@ describe('OPML export', () => {
   it('round trips: importing its own export changes nothing', async () => {
     const service = await startTestService()
     stubHealthyFeeds(service)
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
 
-    const exported = await (await owner.get('/api/subscriptions/export')).text()
-    const reimported = await (await owner.post('/api/subscriptions/import', { opml: exported })).json()
+    const exported = await (await user.get('/api/subscriptions/export')).text()
+    const reimported = await (await user.post('/api/subscriptions/import', { opml: exported })).json()
 
     expect(reimported.feeds.map((feed: { outcome: string }) => feed.outcome)).toEqual(['skipped', 'skipped'])
     expect(service.database?.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })

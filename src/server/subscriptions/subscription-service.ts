@@ -64,7 +64,7 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
-/** A Feed the Owner is subscribed to, with its recorded Feed Availability. */
+/** A Feed the User is subscribed to, with its recorded Feed Availability. */
 interface SubscribedFeedRecord extends FeedRecord {
   readonly lastPolledAt: string | null
   readonly lastSuccessAt: string | null
@@ -275,7 +275,7 @@ export class SubscriptionService {
     return { kind: 'report', entries }
   }
 
-  /** The Owner's active Subscriptions as an OPML document another reader can import. */
+  /** The User's active Subscriptions as an OPML document another reader can import. */
   exportOpml(): string {
     return serializeOpml(this.#subscribedFeeds(), this.#clock.now())
   }
@@ -390,7 +390,7 @@ export class SubscriptionService {
   }
 
   /**
-   * Withdraws the Owner's Subscription and nothing else. Polling stops at
+   * Withdraws the User's Subscription and nothing else. Polling stops at
    * once and the Feed's ordinary items leave the Digest, because both are
    * questions only a Subscription row answers. The retained rows themselves
    * wait for the retention sweep, which keeps saves and their attribution.
@@ -434,7 +434,7 @@ export class SubscriptionService {
 
   /**
    * A failure lengthens the wait before the next attempt instead of shortening
-   * it: hammering a Feed that is struggling helps nobody, and the Owner can
+   * it: hammering a Feed that is struggling helps nobody, and the User can
    * always retry by hand. The Subscription itself is never touched — a failing
    * Feed stays subscribed and its retained Feed Items stay in the Digest.
    */
@@ -511,8 +511,8 @@ export class SubscriptionService {
   /**
    * One opened Feed: its retained Feed Items newest first, the day-by-day
    * cadence observations behind the 26-week grid, and the polling behaviour
-   * the Owner manages from there. Days and labels use the installation
-   * timezone, so the grid reads in the Owner's own calendar.
+   * the User manages from there. Days and labels use the installation
+   * timezone, so the grid reads in the User's own calendar.
    */
   detail(feedId: number): FeedDetail | undefined {
     const record = this.#db
@@ -660,7 +660,7 @@ function wasNeverAsked(
  * The safe category one failed poll is remembered as. Retrieval, parse,
  * timeout, size, and content-type failures stay distinguishable; everything
  * the network refused to answer collapses into `unreachable`, because the
- * distinctions below that are transport detail the Owner cannot act on.
+ * distinctions below that are transport detail the User cannot act on.
  */
 export function availabilityCategoryOf(
   outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
@@ -669,7 +669,7 @@ export function availabilityCategoryOf(
   switch (outcome.failure.code) {
     // The stored vocabulary stays coarse on purpose: whether the publisher
     // never answered or answered too slowly, the Feed is taking too long, and
-    // that is the whole of what the Owner can act on.
+    // that is the whole of what the User can act on.
     case 'timeout':
     case 'body_timeout':
       return 'timeout'

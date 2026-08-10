@@ -36,7 +36,7 @@ const ARTICLE_HTML = `<!doctype html>
 async function readingSetup(
   service: TestService,
   options: { article?: Parameters<TestService['upstream']['stub']>[1] } = {},
-): Promise<{ owner: Device; feedItemId: number }> {
+): Promise<{ user: Device; feedItemId: number }> {
   service.upstream.stub(FEED_URL, {
     headers: { 'content-type': 'application/rss+xml' },
     body: rss(
@@ -49,11 +49,11 @@ async function readingSetup(
     body: ARTICLE_HTML,
   })
 
-  const owner = await claimedDevice(service)
-  expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+  const user = await claimedDevice(service)
+  expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-  const items = readerItemFind(await (await owner.get('/api/digest')).json(), 'First light')
-  return { owner, feedItemId: items }
+  const items = readerItemFind(await (await user.get('/api/digest')).json(), 'First light')
+  return { user, feedItemId: items }
 }
 
 function readerItemFind(digest: unknown, title: string): number {
@@ -66,9 +66,9 @@ function readerItemFind(digest: unknown, title: string): number {
 describe('the Reader item', () => {
   it('describes the Feed Item, its save state, and what comes next', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service)
+    const { user, feedItemId } = await readingSetup(service)
 
-    const response = await owner.get(`/api/items/${feedItemId}`)
+    const response = await user.get(`/api/items/${feedItemId}`)
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
 
@@ -82,18 +82,18 @@ describe('the Reader item', () => {
     expect(reader.nextInDigest).toMatchObject({ title: 'Evening notes', feedTitle: 'Field Notes' })
 
     // Saving elsewhere is visible here: membership is never cached.
-    await owner.put(`/api/library/${feedItemId}`)
-    const saved = readerItemSchema.parse(await (await owner.get(`/api/items/${feedItemId}`)).json())
+    await user.put(`/api/library/${feedItemId}`)
+    const saved = readerItemSchema.parse(await (await user.get(`/api/items/${feedItemId}`)).json())
     expect(saved.saved).toBe(true)
   })
 
   it('answers 404 for Feed Items that do not exist', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.get('/api/items/999')).status).toBe(404)
-    expect((await owner.get('/api/items/not-an-id')).status).toBe(404)
-    expect((await owner.get('/api/items/999/reader')).status).toBe(404)
+    expect((await user.get('/api/items/999')).status).toBe(404)
+    expect((await user.get('/api/items/not-an-id')).status).toBe(404)
+    expect((await user.get('/api/items/999/reader')).status).toBe(404)
   })
 
   it('is not readable without a session', async () => {
@@ -108,9 +108,9 @@ describe('the Reader item', () => {
 describe('the Reader article', () => {
   it('extracts the original page into cacheable, sanitized markdown', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service)
+    const { user, feedItemId } = await readingSetup(service)
 
-    const response = await owner.get(`/api/items/${feedItemId}/reader`)
+    const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe(`private, max-age=${READER_CACHE_SECONDS}`)
 
@@ -125,8 +125,8 @@ describe('the Reader article', () => {
 
   it('never writes article content to SQLite', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service)
-    expect((await owner.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
+    const { user, feedItemId } = await readingSetup(service)
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
 
     const database = service.database
     if (!database) throw new Error('the service has no database')
@@ -141,13 +141,13 @@ describe('the Reader article', () => {
 
   it('asks the publisher once when two devices read at the same time', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service, {
+    const { user, feedItemId } = await readingSetup(service, {
       article: { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML, delayMs: 50 },
     })
 
     const [first, second] = await Promise.all([
-      owner.get(`/api/items/${feedItemId}/reader`),
-      owner.get(`/api/items/${feedItemId}/reader`),
+      user.get(`/api/items/${feedItemId}/reader`),
+      user.get(`/api/items/${feedItemId}/reader`),
     ])
 
     expect(first?.status).toBe(200)
@@ -157,11 +157,11 @@ describe('the Reader article', () => {
 
   it('falls back calmly when the page is not supported HTML', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service, {
+    const { user, feedItemId } = await readingSetup(service, {
       article: { headers: { 'content-type': 'application/pdf' }, body: '%PDF-1.4' },
     })
 
-    const response = await owner.get(`/api/items/${feedItemId}/reader`)
+    const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(415)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('unsupported_article')
@@ -169,14 +169,14 @@ describe('the Reader article', () => {
 
   it('refuses a page that declares itself larger than the ceiling', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service, {
+    const { user, feedItemId } = await readingSetup(service, {
       article: {
         headers: { 'content-type': 'text/html', 'content-length': String(6 * 1024 * 1024) },
         body: ARTICLE_HTML,
       },
     })
 
-    const response = await owner.get(`/api/items/${feedItemId}/reader`)
+    const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(413)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_too_large')
@@ -184,28 +184,28 @@ describe('the Reader article', () => {
 
   it('reports an unreachable original without touching the Feed Item', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service, {
+    const { user, feedItemId } = await readingSetup(service, {
       article: { status: 500, headers: { 'content-type': 'text/html' }, body: 'nope' },
     })
 
-    const response = await owner.get(`/api/items/${feedItemId}/reader`)
+    const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(502)
     expect(response.headers.get('cache-control')).toBe('no-store')
 
-    // The failure changed nothing the Owner keeps: the item is still in the
+    // The failure changed nothing the User keeps: the item is still in the
     // Digest with its summary, and it is still unsaved.
-    const reader = readerItemSchema.parse(await (await owner.get(`/api/items/${feedItemId}`)).json())
+    const reader = readerItemSchema.parse(await (await user.get(`/api/items/${feedItemId}`)).json())
     expect(reader.summary).toBe('A clear morning over the valley.')
     expect(reader.saved).toBe(false)
   })
 
   it('answers 422 when the original page has no readable article', async () => {
     const service = await startTestService()
-    const { owner, feedItemId } = await readingSetup(service, {
+    const { user, feedItemId } = await readingSetup(service, {
       article: { headers: { 'content-type': 'text/html' }, body: '<!doctype html><html><body></body></html>' },
     })
 
-    const response = await owner.get(`/api/items/${feedItemId}/reader`)
+    const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(422)
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_unreadable')
   })
@@ -213,36 +213,36 @@ describe('the Reader article', () => {
   it('lets the offered retry through once, then rate-limits until the cooldown', async () => {
     const service = await startTestService()
     let healed = false
-    const { owner, feedItemId } = await readingSetup(service)
+    const { user, feedItemId } = await readingSetup(service)
     service.upstream.stubDynamic(ARTICLE_URL, () =>
       healed
         ? { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML }
         : { status: 503, headers: { 'content-type': 'text/html' }, body: 'down' },
     )
 
-    expect((await owner.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
 
     // The fallback offers `retry parsing`; the offer is honest, so the first
     // deliberate retry really retrieves rather than being told to wait.
-    expect((await owner.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
 
     // Beyond that, retrying is refused with the wait, not another retrieval.
-    const tooSoon = await owner.get(`/api/items/${feedItemId}/reader`)
+    const tooSoon = await user.get(`/api/items/${feedItemId}/reader`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
 
     healed = true
     service.clock.advance(30_000)
-    const retried = await owner.get(`/api/items/${feedItemId}/reader`)
+    const retried = await user.get(`/api/items/${feedItemId}/reader`)
     expect(retried.status).toBe(200)
     expect(readerArticleSchema.parse(await retried.json()).markdown).toContain('Field methods')
 
     // Success ends the episode: the next failure starts fresh, with the
     // automatic attempt and one honest retry again.
     healed = false
-    const failed = await owner.get(`/api/items/${feedItemId}/reader`)
+    const failed = await user.get(`/api/items/${feedItemId}/reader`)
     expect(failed.status).toBe(502)
   })
 
@@ -252,11 +252,11 @@ describe('the Reader article', () => {
       headers: { 'content-type': 'application/rss+xml' },
       body: rss(item('linkless', 'A linkless note', '2026-08-08T07:15:00.000Z', '')),
     })
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    const feedItemId = readerItemFind(await (await owner.get('/api/digest')).json(), 'A linkless note')
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const feedItemId = readerItemFind(await (await user.get('/api/digest')).json(), 'A linkless note')
 
-    const response = await owner.get(`/api/items/${feedItemId}/reader`)
+    const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(422)
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('no_original_link')
   })

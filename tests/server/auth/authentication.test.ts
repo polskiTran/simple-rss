@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Authentication } from '../../../src/server/auth/authentication.js'
-import { OwnerAuthStore } from '../../../src/server/auth/owner-auth.js'
+import { UserAuthStore } from '../../../src/server/auth/user-auth.js'
 import type { PasswordHasher } from '../../../src/server/auth/password.js'
 import { LoginRateLimiter } from '../../../src/server/auth/rate-limit.js'
 import { SessionStore } from '../../../src/server/auth/sessions.js'
@@ -22,9 +22,9 @@ describe('credential rotation races', () => {
     const clock = new ManualClock('2026-08-08T09:00:00.000Z')
     applyMigrations(database, clock)
 
-    const owner = new OwnerAuthStore(database)
+    const user = new UserAuthStore(database)
     const sessions = new SessionStore(database)
-    owner.claim('hash:old-password', clock.now())
+    user.claim('hash:old-password', clock.now())
 
     let verificationStarted!: () => void
     const started = new Promise<void>((resolve) => {
@@ -43,7 +43,7 @@ describe('credential rotation races', () => {
       },
     }
     const authentication = new Authentication({
-      owner,
+      user,
       sessions,
       hasher,
       limiter: new LoginRateLimiter(clock),
@@ -59,6 +59,6 @@ describe('credential rotation races', () => {
     finishVerification()
 
     expect(await staleSignIn).toEqual({ kind: 'rejected' })
-    expect(owner.read()?.passwordHash).toBe('hash:new-password')
+    expect(user.read()?.passwordHash).toBe('hash:new-password')
   })
 })

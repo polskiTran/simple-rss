@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Clock } from '../clock.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
-import { OwnerAuthStore } from './owner-auth.js'
+import { UserAuthStore } from './user-auth.js'
 import { argon2idHasher, type PasswordHasher } from './password.js'
 import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
 import { SessionStore, type IssuedSession } from './sessions.js'
@@ -16,7 +16,7 @@ import { realSleeper, type Sleeper } from './sleeper.js'
 export const MIN_SETUP_SECRET_LENGTH = 16
 
 export interface AuthenticationOptions {
-  readonly owner: OwnerAuthStore
+  readonly user: UserAuthStore
   readonly sessions: SessionStore
   readonly hasher: PasswordHasher
   readonly limiter: LoginRateLimiter
@@ -54,14 +54,14 @@ interface Attempt {
 }
 
 export interface AuthenticationStatus {
-  /** Whether an Owner has claimed this installation. */
+  /** Whether a User has claimed this installation. */
   readonly claimed: boolean
   /** Whether the caller presented a live session. */
   readonly authenticated: boolean
 }
 
 /**
- * Everything the installation knows about who its Owner is: claiming it,
+ * Everything the installation knows about who its User is: claiming it,
  * returning to it, leaving it, and recovering it.
  *
  * The HTTP routes above this are deliberately thin. They translate outcomes
@@ -77,7 +77,7 @@ export class Authentication {
   }
 
   status(token: string | undefined): AuthenticationStatus {
-    return { claimed: this.#deps.owner.isClaimed(), authenticated: this.authenticate(token) }
+    return { claimed: this.#deps.user.isClaimed(), authenticated: this.authenticate(token) }
   }
 
   /**
@@ -86,7 +86,7 @@ export class Authentication {
    * its setup secret never takes traffic it could not usefully answer.
    */
   setupBlocker(): string | undefined {
-    if (this.#deps.owner.isClaimed()) return undefined
+    if (this.#deps.user.isClaimed()) return undefined
 
     const secret = this.#deps.setupSecret
     if (!secret) return 'setup secret is not configured'
@@ -95,11 +95,11 @@ export class Authentication {
   }
 
   /**
-   * Claims the installation for the one Owner and signs their device in.
+   * Claims the installation for the one User and signs their device in.
    *
    * The password is hashed before the claim is attempted, so two simultaneous
    * claims both reach the write with real work behind them and SQLite — not
-   * the order they arrived in — decides which one is the Owner.
+   * the order they arrived in — decides which one is the User.
    */
   async claim(input: Attempt & { readonly setupSecret: string; readonly password: string }): Promise<ClaimOutcome> {
     const blocker = this.setupBlocker()
@@ -108,7 +108,7 @@ export class Authentication {
       return { kind: 'unavailable', reason: blocker }
     }
 
-    if (this.#deps.owner.isClaimed()) return { kind: 'already-claimed' }
+    if (this.#deps.user.isClaimed()) return { kind: 'already-claimed' }
 
     const attempt = await this.#beginAttempt(input.client, 'auth.claim_throttled')
     if ('kind' in attempt) return attempt
@@ -120,7 +120,7 @@ export class Authentication {
       }
 
       const passwordHash = await this.#deps.hasher.hash(input.password)
-      if (!this.#deps.owner.claim(passwordHash, this.#deps.clock.now())) {
+      if (!this.#deps.user.claim(passwordHash, this.#deps.clock.now())) {
         await this.#delaySuccess(attempt)
         attempt.recordSuccess()
         this.#deps.logger.warn('auth.claim_lost_race')
@@ -147,7 +147,7 @@ export class Authentication {
 
   /**
    * Signs a device in. Wrong passwords cost progressively more time and are
-   * answered identically whether or not the installation has an Owner yet.
+   * answered identically whether or not the installation has a User yet.
    */
   async signIn(input: Attempt & { readonly password: string }): Promise<SignInOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.sign_in_throttled')
@@ -193,7 +193,7 @@ export class Authentication {
   }
 
   /**
-   * Replaces the password for an Owner who knows the current one, and signs
+   * Replaces the password for a User who knows the current one, and signs
    * every device out — including the one asking. The compare, replacement, and
    * revocation are tied to one verifier generation.
    */
@@ -212,7 +212,7 @@ export class Authentication {
 
       const passwordHash = await this.#deps.hasher.hash(input.newPassword)
       await this.#delaySuccess(attempt)
-      const revoked = this.#deps.owner.changePassword(currentHash, passwordHash, this.#deps.clock.now())
+      const revoked = this.#deps.user.changePassword(currentHash, passwordHash, this.#deps.clock.now())
 
       if (revoked === undefined) {
         attempt.cancel()
@@ -236,14 +236,14 @@ export class Authentication {
    */
   async resetPassword(newPassword: string): Promise<number> {
     const passwordHash = await this.#deps.hasher.hash(newPassword)
-    const revoked = this.#deps.owner.resetPassword(passwordHash, this.#deps.clock.now())
+    const revoked = this.#deps.user.resetPassword(passwordHash, this.#deps.clock.now())
     this.#deps.logger.warn('auth.password_reset', { sessionsRevoked: revoked })
     return revoked
   }
 
   /** The verifier generation this password proved, or nothing on a mismatch. */
   async #verifiedPasswordHash(password: string): Promise<string | undefined> {
-    const record = this.#deps.owner.read()
+    const record = this.#deps.user.read()
     if (!record) return undefined
     return (await this.#deps.hasher.verify(record.passwordHash, password)) ? record.passwordHash : undefined
   }
@@ -293,7 +293,7 @@ export function createAuthentication(deps: AuthenticationDependencies): Authenti
   sessions.prune(deps.clock.now())
 
   return new Authentication({
-    owner: new OwnerAuthStore(deps.database),
+    user: new UserAuthStore(deps.database),
     sessions,
     hasher: argon2idHasher(),
     limiter: new LoginRateLimiter(deps.clock),

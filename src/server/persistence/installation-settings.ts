@@ -3,11 +3,11 @@ import { eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from './database.js'
 import { installationSettings } from './schema.js'
 
-/** The one row's fixed identity — this installation belongs to one Owner. */
+/** The one row's fixed identity — this installation belongs to one User. */
 const SINGLETON_ID = 1
 
 export interface InstallationSettings {
-  /** IANA zone that defines the Owner's Digest calendar groups. */
+  /** IANA zone that defines the User's Digest calendar groups. */
   readonly timezone: string
   readonly createdAt: string
   readonly updatedAt: string
@@ -16,7 +16,7 @@ export interface InstallationSettings {
 /**
  * Reads and writes the singleton installation row.
  *
- * Later tickets add the Owner's other preferences here; the shape that matters
+ * Later tickets add the User's other preferences here; the shape that matters
  * now is that state lives on the mounted volume and survives the process.
  */
 export class InstallationSettingsStore {

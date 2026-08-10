@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Clock } from '../clock.js'
-import { buildOwnerExport } from '../export/owner-export.js'
+import { buildUserExport } from '../export/user-export.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { NO_STORE, unavailable } from './responses.js'
@@ -13,9 +13,9 @@ export interface ExportRouteDependencies {
 }
 
 /**
- * The complete JSON download beside the OPML one: the Owner's portable
+ * The complete JSON download beside the OPML one: the User's portable
  * reading state as one attachment. Mounted at `/api`, behind `requireSession`
- * like every non-auth route, and never cached — the file is the Owner's data
+ * like every non-auth route, and never cached — the file is the User's data
  * at this instant, not a resource to revalidate.
  */
 export function exportRoutes(deps: ExportRouteDependencies): Hono {
@@ -26,7 +26,7 @@ export function exportRoutes(deps: ExportRouteDependencies): Hono {
     const settings = deps.settings()
     if (!database || !settings) return unavailable(c)
 
-    const document = buildOwnerExport({ database, settings, clock: deps.clock })
+    const document = buildUserExport({ database, settings, clock: deps.clock })
     return c.body(JSON.stringify(document, null, 2), 200, {
       ...NO_STORE,
       'Content-Type': 'application/json; charset=utf-8',

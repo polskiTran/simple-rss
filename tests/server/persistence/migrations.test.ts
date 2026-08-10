@@ -110,24 +110,51 @@ describe('migrations', () => {
     db.close()
   })
 
-  it('creates the owner_auth singleton table', async () => {
+  it('creates the user_auth singleton table', async () => {
     const db = await openFreshDatabase()
     applyMigrations(db)
 
-    const columns = (db.pragma('table_info(owner_auth)') as Array<{ name: string }>).map((column) => column.name)
+    const columns = (db.pragma('table_info(user_auth)') as Array<{ name: string }>).map((column) => column.name)
 
     expect(columns).toEqual(expect.arrayContaining(['id', 'password_hash', 'claimed_at', 'updated_at']))
     db.close()
   })
 
-  it('makes a second Owner unrepresentable rather than merely refused', async () => {
+  it('makes a second User unrepresentable rather than merely refused', async () => {
     const db = await openFreshDatabase()
     applyMigrations(db)
-    const insert = db.prepare('INSERT INTO owner_auth (id, password_hash, claimed_at, updated_at) VALUES (?, ?, ?, ?)')
+    const insert = db.prepare('INSERT INTO user_auth (id, password_hash, claimed_at, updated_at) VALUES (?, ?, ?, ?)')
 
     insert.run(1, '$argon2id$first', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
 
     expect(() => insert.run(2, '$argon2id$second', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')).toThrow()
+    db.close()
+  })
+
+  it('carries an already-claimed volume through the rename to user_auth', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version < 7),
+    )
+    db.prepare('INSERT INTO owner_auth (id, password_hash, claimed_at, updated_at) VALUES (?, ?, ?, ?)').run(
+      1,
+      '$argon2id$claimed-before-the-rename',
+      '2026-01-01T00:00:00.000Z',
+      '2026-01-01T00:00:00.000Z',
+    )
+
+    const applied = applyMigrations(db)
+
+    expect(applied).toEqual([7])
+    const row = db.prepare('SELECT password_hash, claimed_at FROM user_auth').get() as {
+      password_hash: string
+      claimed_at: string
+    }
+    expect(row.password_hash).toBe('$argon2id$claimed-before-the-rename')
+    expect(row.claimed_at).toBe('2026-01-01T00:00:00.000Z')
+    expect(db.pragma('table_list(owner_auth)')).toEqual([])
     db.close()
   })
 

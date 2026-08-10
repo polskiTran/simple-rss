@@ -29,7 +29,7 @@ interface MatchRow {
  * the reader still shows: ordinary retained items of subscribed Feeds, and
  * Library items wherever their Feed went. An unsubscribed Feed's unsaved
  * items are excluded immediately — they are awaiting the sweep, and a derived
- * index must not resurrect what the Owner let go of.
+ * index must not resurrect what the User let go of.
  */
 export class SearchService {
   readonly #db: SqliteDatabase
@@ -102,7 +102,7 @@ export class SearchService {
 }
 
 /**
- * The Owner's line, restated in FTS5 MATCH terms it can never misparse:
+ * The User's line, restated in FTS5 MATCH terms it can never misparse:
  * every whitespace-separated word becomes a quoted phrase, all words must
  * match, and the last one matches as a prefix so search-as-you-type finds
  * "chronology" from "chrono". FTS5 operators — AND, NOT, `^`, column filters

@@ -35,9 +35,9 @@ describe('Subscriptions', () => {
         headers: { 'content-type': 'application/rss+xml; charset=utf-8' },
         body: RSS,
       })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const added = await owner.post('/api/subscriptions', { url: ENTERED_URL })
+    const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
     expect(added.status).toBe(201)
     expect(await added.json()).toEqual({
@@ -66,7 +66,7 @@ describe('Subscriptions', () => {
       }),
     )
 
-    const feeds = await owner.get('/api/feeds')
+    const feeds = await user.get('/api/feeds')
     expect(feeds.status).toBe(200)
     expect(await feeds.json()).toEqual({
       subscriptions: [
@@ -88,7 +88,7 @@ describe('Subscriptions', () => {
       ],
     })
 
-    const digest = await owner.get('/api/digest')
+    const digest = await user.get('/api/digest')
     expect(digest.status).toBe(200)
     expect(await digest.json()).toEqual({
       today: { date: '2026-08-08', volume: 1 },
@@ -121,14 +121,14 @@ describe('Subscriptions', () => {
 
   it('preserves the exact entered URL while retrieving and deduplicating its canonical endpoint', async () => {
     const service = await startTestService()
-    const exact = 'https://journal.example:443/feed#owner-fragment'
+    const exact = 'https://journal.example:443/feed#user-fragment'
     service.upstream.stub(ENTERED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
       body: RSS,
     })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const added = await owner.post('/api/subscriptions', { url: exact })
+    const added = await user.post('/api/subscriptions', { url: exact })
     expect(await added.json()).toMatchObject({
       subscription: { enteredUrl: exact, resolvedUrl: ENTERED_URL },
     })
@@ -138,23 +138,23 @@ describe('Subscriptions', () => {
       status: 301,
       headers: { location: ENTERED_URL, 'content-type': 'text/plain' },
     })
-    expect((await owner.post('/api/subscriptions', { url: alias })).status).toBe(409)
-    expect((await (await owner.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
+    expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(409)
+    expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
   })
   it('returns safe failure outcomes without leaving inert or duplicate records', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const invalid = await owner.post('/api/subscriptions', { url: 'not a URL' })
+    const invalid = await user.post('/api/subscriptions', { url: 'not a URL' })
     expect(invalid.status).toBe(400)
     expect(await invalid.json()).toMatchObject({ error: { code: 'invalid_feed_url' } })
 
     service.upstream.stub('https://missing.example/feed', { status: 503 })
-    const unreachable = await owner.post('/api/subscriptions', { url: 'https://missing.example/feed' })
+    const unreachable = await user.post('/api/subscriptions', { url: 'https://missing.example/feed' })
     expect(unreachable.status).toBe(502)
     expect(await unreachable.json()).toMatchObject({ error: { code: 'feed_unreachable' } })
 
-    const unresolvable = await owner.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })
+    const unresolvable = await user.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })
     expect(unresolvable.status).toBe(502)
     expect(await unresolvable.json()).toMatchObject({ error: { code: 'feed_unreachable' } })
 
@@ -162,7 +162,7 @@ describe('Subscriptions', () => {
       headers: { 'content-type': 'text/html' },
       body: '<html></html>',
     })
-    const unsupported = await owner.post('/api/subscriptions', { url: 'https://wrong.example/feed' })
+    const unsupported = await user.post('/api/subscriptions', { url: 'https://wrong.example/feed' })
     expect(unsupported.status).toBe(415)
     expect(await unsupported.json()).toMatchObject({ error: { code: 'unsupported_feed' } })
 
@@ -170,7 +170,7 @@ describe('Subscriptions', () => {
       headers: { 'content-type': 'application/rss+xml' },
       body: '<rss><channel>',
     })
-    const malformed = await owner.post('/api/subscriptions', { url: 'https://broken.example/feed' })
+    const malformed = await user.post('/api/subscriptions', { url: 'https://broken.example/feed' })
     expect(malformed.status).toBe(422)
     expect(await malformed.json()).toMatchObject({ error: { code: 'malformed_feed' } })
 
@@ -178,20 +178,20 @@ describe('Subscriptions', () => {
       headers: { 'content-type': 'application/rss+xml' },
       body: new Uint8Array(MAX_FEED_SIZE_MIB * 1024 * 1024 + 1),
     })
-    const oversized = await owner.post('/api/subscriptions', { url: 'https://huge.example/feed' })
+    const oversized = await user.post('/api/subscriptions', { url: 'https://huge.example/feed' })
     expect(oversized.status).toBe(413)
     expect(await oversized.json()).toMatchObject({ error: { code: 'feed_too_large' } })
 
-    expect(await (await owner.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
+    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
 
     service.upstream.stub(ENTERED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
       body: RSS,
     })
-    expect((await owner.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
-    expect((await owner.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(409)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(409)
     expect(service.upstream.requestsTo(ENTERED_URL)).toHaveLength(1)
-    expect((await (await owner.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
+    expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
   })
 
   it('rolls back the Feed, Subscription, and Feed Window when any persistence step fails', async () => {
@@ -207,14 +207,14 @@ describe('Subscriptions', () => {
         SELECT RAISE(ABORT, 'fixture failure');
       END;
     `)
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const failed = await owner.post('/api/subscriptions', { url: ENTERED_URL })
+    const failed = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
     expect(failed.status).toBe(500)
     service.database?.exec('DROP TRIGGER reject_feed_item')
-    expect(await (await owner.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
-    expect(await (await owner.get('/api/digest')).json()).toEqual({
+    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
+    expect(await (await user.get('/api/digest')).json()).toEqual({
       today: { date: '2026-08-08', volume: 0 },
       groups: [],
     })
@@ -231,8 +231,8 @@ describe('Subscriptions', () => {
           <item><title>fingerprint</title><description>same body</description><pubDate>Fri, 08 Aug 2026 04:00:00 GMT</pubDate></item>
         </channel></rss>`,
     })
-    const owner = await claimedDevice(service)
-    const added = await owner.post('/api/subscriptions', { url: ENTERED_URL })
+    const user = await claimedDevice(service)
+    const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
     expect(await added.json()).toMatchObject({ importedItems: 3 })
     service.database?.exec(`
       INSERT INTO library_items (feed_item_id, saved_at)
@@ -250,17 +250,17 @@ describe('Subscriptions', () => {
         </channel></rss>`,
     })
 
-    expect((await owner.post('/api/feeds/1e1/refresh')).status).toBe(404)
-    expect((await owner.post('/api/feeds/999/refresh')).status).toBe(404)
-    expect((await owner.post('/api/feeds/999/refresh')).status).toBe(404)
-    expect((await owner.post('/api/feeds/1/refresh')).status).toBe(200)
+    expect((await user.post('/api/feeds/1e1/refresh')).status).toBe(404)
+    expect((await user.post('/api/feeds/999/refresh')).status).toBe(404)
+    expect((await user.post('/api/feeds/999/refresh')).status).toBe(404)
+    expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
     const requestsAfterRefresh = service.upstream.requestsTo(ENTERED_URL).length
-    const limited = await owner.post('/api/feeds/1/refresh')
+    const limited = await user.post('/api/feeds/1/refresh')
     expect(limited.status).toBe(429)
     expect(limited.headers.get('retry-after')).toBe('60')
     expect(service.upstream.requestsTo(ENTERED_URL)).toHaveLength(requestsAfterRefresh)
 
-    const digest = await (await owner.get('/api/digest')).json()
+    const digest = await (await user.get('/api/digest')).json()
     expect(digest.groups[0].items.map((item: { title: string }) => item.title)).toEqual([
       'corrected GUID title',
       'corrected link title',
@@ -297,10 +297,10 @@ describe('Subscriptions', () => {
           </entry>
         </feed>`,
     })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
-    const digest = await (await owner.get('/api/digest')).json()
+    expect((await user.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
+    const digest = await (await user.get('/api/digest')).json()
 
     expect(digest.groups[0]).toMatchObject({
       date: '2026-08-07',
@@ -332,17 +332,17 @@ describe('Subscriptions', () => {
       headers: { 'content-type': 'application/atom+xml' },
       body: entry('first title', 'first summary'),
     })
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
 
     service.clock.advance(60 * 60 * 1_000)
     service.upstream.stub(atomUrl, {
       headers: { 'content-type': 'application/atom+xml' },
       body: entry('corrected title', 'corrected summary'),
     })
-    expect((await owner.post('/api/feeds/1/refresh')).status).toBe(200)
+    expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
 
-    const digest = await (await owner.get('/api/digest')).json()
+    const digest = await (await user.get('/api/digest')).json()
     expect(digest.groups[0].items).toHaveLength(1)
     expect(digest.groups[0].items[0]).toMatchObject({
       title: 'corrected title',
@@ -371,12 +371,12 @@ describe('Subscriptions', () => {
         headers: { 'content-type': 'application/rss+xml' },
         body: syndicated('Second Wire'),
       })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.post('/api/subscriptions', { url: 'https://first.example/feed' })).status).toBe(201)
-    expect((await owner.post('/api/subscriptions', { url: 'https://second.example/feed' })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: 'https://first.example/feed' })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: 'https://second.example/feed' })).status).toBe(201)
 
-    const digest = await (await owner.get('/api/digest')).json()
+    const digest = await (await user.get('/api/digest')).json()
     expect(
       digest.groups[0].items
         .map((item: { feedTitle: string; title: string }) => [item.feedTitle, item.title])
@@ -404,10 +404,10 @@ describe('Subscriptions', () => {
           </item>
         </rdf:RDF>`,
     })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.post('/api/subscriptions', { url: rssUrl })).status).toBe(201)
-    const digest = await (await owner.get('/api/digest')).json()
+    expect((await user.post('/api/subscriptions', { url: rssUrl })).status).toBe(201)
+    const digest = await (await user.get('/api/digest')).json()
     expect(digest.groups[0].items[0]).toMatchObject({
       title: 'RDF item',
       link: 'https://rdf.example/one',

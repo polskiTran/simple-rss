@@ -116,8 +116,8 @@ describe('retrieveBytes', () => {
       feedRequest('https://example.com/feed.xml', {
         headers: {
           'if-none-match': '"v1"',
-          cookie: 'session=owner-token',
-          authorization: 'Bearer owner-token',
+          cookie: 'session=user-token',
+          authorization: 'Bearer user-token',
           'x-setup-secret': 'the-setup-secret',
           referer: 'https://reader.example.com/digest',
         },

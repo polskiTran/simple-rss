@@ -20,7 +20,7 @@ const USAGE = `simple-rss <command>
                           database to <destination>. Never overwrites.
   restore <backup>        Initialize an empty data directory from a snapshot:
                           verify it, migrate it, and rebuild the search index.
-  reset-password [new]    Replace the Owner password and revoke every session.
+  reset-password [new]    Replace the User password and revoke every session.
                           Reads SIMPLE_RSS_NEW_PASSWORD when given no argument,
                           which keeps the password out of the shell history.
 `
@@ -145,7 +145,7 @@ function reasonOf(error: unknown): string {
 }
 
 /**
- * The recovery path an installation with one Owner and no identity provider
+ * The recovery path an installation with one User and no identity provider
  * has to have. It asks for no current password, because whoever can run it
  * already holds the volume — but it does end every session, since an intruder
  * who provoked the reset must not keep the one they already have.

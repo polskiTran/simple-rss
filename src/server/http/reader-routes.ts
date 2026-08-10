@@ -19,7 +19,7 @@ export interface ReaderRouteDependencies {
  * no route on this surface accepts an article URL from the caller.
  *
  * A successful extraction is the one API answer a browser may keep — private
- * to the Owner, for a day. Every failure stays uncached, so retrying is
+ * to the User, for a day. Every failure stays uncached, so retrying is
  * always a fresh question.
  */
 export function readerRoutes(deps: ReaderRouteDependencies): Hono {

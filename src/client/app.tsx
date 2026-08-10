@@ -18,7 +18,7 @@ import { SetupView } from './views/setup-view.js'
  * The structure is identical at every width and on every screen — nothing
  * reflows, reorders, or hides — so only the type scale and padding change.
  *
- * The tabs appear only once the Owner is in. Setup and signing in are not
+ * The tabs appear only once the User is in. Setup and signing in are not
  * sections of the reader, and navigation to four screens that would all refuse
  * would be furniture pretending to be a way through.
  */

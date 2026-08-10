@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OWNER_EXPORT_FORMAT, OWNER_EXPORT_VERSION } from '../../src/server/export/owner-export.js'
+import { USER_EXPORT_FORMAT, USER_EXPORT_VERSION } from '../../src/server/export/user-export.js'
 import { migrations } from '../../src/server/persistence/migrations.js'
 import { VERSION } from '../../src/shared/version.js'
 import { Device, claimedDevice } from '../support/device.js'
@@ -32,7 +32,7 @@ function stubFeeds(service: TestService): void {
 }
 
 describe('the JSON export', () => {
-  it('is closed to anyone but the Owner', async () => {
+  it('is closed to anyone but the User', async () => {
     const service = await startTestService()
     await claimedDevice(service)
 
@@ -41,9 +41,9 @@ describe('the JSON export', () => {
 
   it('downloads as a versioned attachment that is never cached', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const exported = await owner.get('/api/export')
+    const exported = await user.get('/api/export')
 
     expect(exported.status).toBe(200)
     expect(exported.headers.get('content-type')).toContain('application/json')
@@ -51,8 +51,8 @@ describe('the JSON export', () => {
     expect(exported.headers.get('cache-control')).toBe('no-store')
 
     const document = await exported.json()
-    expect(document.format).toBe(OWNER_EXPORT_FORMAT)
-    expect(document.exportVersion).toBe(OWNER_EXPORT_VERSION)
+    expect(document.format).toBe(USER_EXPORT_FORMAT)
+    expect(document.exportVersion).toBe(USER_EXPORT_VERSION)
     expect(document.schemaVersion).toBe(migrations[migrations.length - 1]!.version)
     expect(document.applicationVersion).toBe(VERSION)
   })
@@ -60,18 +60,18 @@ describe('the JSON export', () => {
   it('carries Subscriptions, Polling Intervals, Feed metadata, retained Feed Items, Library membership, and preferences', async () => {
     const service = await startTestService()
     stubFeeds(service)
-    const owner = await claimedDevice(service)
-    await owner.put('/api/settings/timezone', { timezone: 'Europe/Berlin' })
-    expect((await owner.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
-    expect((await owner.post('/api/subscriptions', { url: ATOM_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    await user.put('/api/settings/timezone', { timezone: 'Europe/Berlin' })
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: ATOM_URL })).status).toBe(201)
 
-    const feeds = await (await owner.get('/api/feeds')).json()
+    const feeds = await (await user.get('/api/feeds')).json()
     const fieldNotes = feeds.subscriptions.find((entry: { title: string }) => entry.title === 'Field Notes')
-    await owner.put(`/api/feeds/${fieldNotes.feedId}/interval`, { pollingIntervalMinutes: 360 })
-    const detail = await (await owner.get(`/api/feeds/${fieldNotes.feedId}`)).json()
-    expect((await owner.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
+    await user.put(`/api/feeds/${fieldNotes.feedId}/interval`, { pollingIntervalMinutes: 360 })
+    const detail = await (await user.get(`/api/feeds/${fieldNotes.feedId}`)).json()
+    expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
 
-    const document = await (await owner.get('/api/export')).json()
+    const document = await (await user.get('/api/export')).json()
 
     expect(document.installation).toEqual({ timezone: 'Europe/Berlin' })
     expect(document.exportedAt).toBe(service.clock.now().toISOString())
@@ -107,16 +107,16 @@ describe('the JSON export', () => {
   it('keeps an unsubscribed Feed that Library saves still attribute', async () => {
     const service = await startTestService()
     stubFeeds(service)
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
-    const feeds = await (await owner.get('/api/feeds')).json()
+    const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId
-    const detail = await (await owner.get(`/api/feeds/${feedId}`)).json()
-    await owner.put(`/api/library/${detail.items[0].feedItemId}`)
-    expect((await owner.delete(`/api/feeds/${feedId}`)).status).toBe(204)
+    const detail = await (await user.get(`/api/feeds/${feedId}`)).json()
+    await user.put(`/api/library/${detail.items[0].feedItemId}`)
+    expect((await user.delete(`/api/feeds/${feedId}`)).status).toBe(204)
 
-    const document = await (await owner.get('/api/export')).json()
+    const document = await (await user.get('/api/export')).json()
 
     expect(document.feeds).toHaveLength(1)
     expect(document.feeds[0]).toMatchObject({ title: 'Field Notes', subscription: null })
@@ -126,10 +126,10 @@ describe('the JSON export', () => {
   it('excludes verifiers, sessions, retrieval caches, schedules, and migration internals', async () => {
     const service = await startTestService()
     stubFeeds(service)
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
-    const exported = await owner.get('/api/export')
+    const exported = await user.get('/api/export')
     const text = await exported.text()
     const document = JSON.parse(text)
 
@@ -156,7 +156,7 @@ describe('the JSON export', () => {
 
     // The verifier, the session hash, and the conditional-request validator
     // all exist in the database this export was drawn from.
-    const storedHash = service.database?.prepare('SELECT password_hash FROM owner_auth').get() as {
+    const storedHash = service.database?.prepare('SELECT password_hash FROM user_auth').get() as {
       password_hash: string
     }
     const storedSession = service.database?.prepare('SELECT token_hash FROM sessions').get() as {

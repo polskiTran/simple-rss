@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
  * Browser flows for the things only a browser can prove: that the session
  * cookie really is unreadable from script, that `SameSite=Strict` and the
  * Origin check together stop a foreign page, and that a real reload keeps the
- * Owner signed in.
+ * User signed in.
  *
  * Separated from `pnpm test` because it needs a downloaded browser and the
  * built client. Everything that can be asserted at the HTTP boundary is

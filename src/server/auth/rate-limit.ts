@@ -12,7 +12,7 @@ export const PER_CLIENT_FAILURES = 5
  *
  * The per-client limit alone does nothing against guessing spread over many
  * addresses, which is cheap to arrange. This ceiling is deliberately well
- * above anything the Owner would produce by mistyping.
+ * above anything the User would produce by mistyping.
  */
 export const GLOBAL_FAILURES = 20
 
@@ -33,7 +33,7 @@ export interface AllowedAttempt {
   readonly retryAfterSeconds: 0
   /** Converts the reservation into a failure and returns this attempt's delay. */
   recordFailure(): number
-  /** Clears this client's history after it proves it is the Owner. */
+  /** Clears this client's history after it proves it is the User. */
   recordSuccess(): void
   /** Releases a reservation when the secret check could not finish. */
   cancel(): void
@@ -64,7 +64,7 @@ type AttemptOutcome = 'failure' | 'success' | 'cancelled'
  *
  * The two limits deliberately work differently. Only a client's own attempts
  * can block it; the installation-wide ceiling slows everyone down but blocks
- * nobody. That asymmetry prevents strangers from locking the Owner out.
+ * nobody. That asymmetry prevents strangers from locking the User out.
  */
 export class LoginRateLimiter {
   readonly #attempts = new Map<string, AttemptRecord[]>()

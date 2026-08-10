@@ -12,7 +12,7 @@ export interface SettingsRouteDependencies {
 }
 
 /**
- * The Owner's installation preferences. Mounted at `/api`, behind
+ * The User's installation preferences. Mounted at `/api`, behind
  * `requireSession` like every non-auth route.
  *
  * An installation that was claimed before timezone detection existed — or by a
@@ -39,7 +39,7 @@ export function settingsRoutes(deps: SettingsRouteDependencies): Hono {
     try {
       settings.setTimezone(body.value.timezone, deps.clock.now())
     } catch (error) {
-      // Only the zone itself is the Owner's mistake; a failing write is the
+      // Only the zone itself is the User's mistake; a failing write is the
       // installation's, and belongs to the app-level error answer.
       if (!(error instanceof UnknownTimezoneError)) throw error
       return c.json(

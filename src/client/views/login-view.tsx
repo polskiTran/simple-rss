@@ -9,7 +9,7 @@ export interface LoginViewProps {
 }
 
 /**
- * Coming back to the reader. One field, because there is one Owner and so
+ * Coming back to the reader. One field, because there is one User and so
  * nobody to name — and no "forgot your password" link, because recovery is a
  * shell command rather than an email this installation could not send.
  */

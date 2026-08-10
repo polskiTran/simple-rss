@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { OwnerAuthStore } from '../../src/server/auth/owner-auth.js'
+import { UserAuthStore } from '../../src/server/auth/user-auth.js'
 import { argon2idHasher } from '../../src/server/auth/password.js'
 import { SessionStore } from '../../src/server/auth/sessions.js'
 import { runCli, NEW_PASSWORD_VARIABLE, type CliContext } from '../../src/server/cli.js'
@@ -122,7 +122,7 @@ describe('runCli', () => {
 
 /**
  * Emergency recovery, which by design needs no email, no OAuth, no security
- * question, and no second Owner — only the mounted volume and a shell.
+ * question, and no second User — only the mounted volume and a shell.
  */
 describe('runCli reset-password', () => {
   let context: CliContext
@@ -130,11 +130,11 @@ describe('runCli reset-password', () => {
   let dataDir: string
 
   /** Reads the volume the way the running service would, after the CLI exits. */
-  function inspect<T>(read: (stores: { owner: OwnerAuthStore; sessions: SessionStore }) => T): T {
+  function inspect<T>(read: (stores: { user: UserAuthStore; sessions: SessionStore }) => T): T {
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
     try {
       applyMigrations(db)
-      return read({ owner: new OwnerAuthStore(db), sessions: new SessionStore(db) })
+      return read({ user: new UserAuthStore(db), sessions: new SessionStore(db) })
     } finally {
       db.close()
     }
@@ -154,20 +154,20 @@ describe('runCli reset-password', () => {
   it('installs a verifier that accepts the new password', async () => {
     expect(await runCli(['reset-password', 'a-recovered-password'], context)).toBe(0)
 
-    const record = inspect(({ owner }) => owner.read())
+    const record = inspect(({ user }) => user.read())
     expect(await argon2idHasher().verify(record!.passwordHash, 'a-recovered-password')).toBe(true)
   })
 
   it('claims an installation whose setup secret was never used', async () => {
     await runCli(['reset-password', 'a-recovered-password'], context)
 
-    expect(inspect(({ owner }) => owner.isClaimed())).toBe(true)
+    expect(inspect(({ user }) => user.isClaimed())).toBe(true)
   })
 
   it('revokes every session, and says how many it ended', async () => {
     const at = context.clock.now()
-    const issued = inspect(({ owner, sessions }) => {
-      owner.resetPassword('an-existing-verifier', at)
+    const issued = inspect(({ user, sessions }) => {
+      user.resetPassword('an-existing-verifier', at)
       return [
         sessions.issueForPasswordHash('an-existing-verifier', at),
         sessions.issueForPasswordHash('an-existing-verifier', at),
@@ -181,13 +181,13 @@ describe('runCli reset-password', () => {
     expect(inspect(({ sessions }) => sessions.touch(issued[1]!.token, at))).toBe(false)
   })
 
-  it('replaces a password the Owner has forgotten, without being told it', async () => {
+  it('replaces a password the User has forgotten, without being told it', async () => {
     await runCli(['reset-password', 'the-original-password'], context)
     output.length = 0
 
     await runCli(['reset-password', 'the-recovered-password'], context)
 
-    const record = inspect(({ owner }) => owner.read())
+    const record = inspect(({ user }) => user.read())
     expect(await argon2idHasher().verify(record!.passwordHash, 'the-recovered-password')).toBe(true)
     expect(await argon2idHasher().verify(record!.passwordHash, 'the-original-password')).toBe(false)
   })
@@ -197,7 +197,7 @@ describe('runCli reset-password', () => {
 
     expect(await runCli(['reset-password'], withEnv)).toBe(0)
 
-    const record = inspect(({ owner }) => owner.read())
+    const record = inspect(({ user }) => user.read())
     expect(await argon2idHasher().verify(record!.passwordHash, 'a-recovered-password')).toBe(true)
   })
 
@@ -206,7 +206,7 @@ describe('runCli reset-password', () => {
 
     await runCli(['reset-password', 'the-argument-one'], withEnv)
 
-    const record = inspect(({ owner }) => owner.read())
+    const record = inspect(({ user }) => user.read())
     expect(await argon2idHasher().verify(record!.passwordHash, 'the-argument-one')).toBe(true)
   })
 
@@ -214,20 +214,20 @@ describe('runCli reset-password', () => {
     expect(await runCli(['reset-password'], context)).toBe(1)
 
     expect(output.join('\n')).toContain(NEW_PASSWORD_VARIABLE)
-    expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
+    expect(inspect(({ user }) => user.isClaimed())).toBe(false)
   })
 
   it('holds a recovered password to the same length rule as a chosen one', async () => {
     expect(await runCli(['reset-password', 'short'], context)).toBe(1)
 
     expect(output.join('\n')).toMatch(/at least 12 characters/)
-    expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
+    expect(inspect(({ user }) => user.isClaimed())).toBe(false)
   })
 
   it('rejects a multibyte password beyond the hashing byte limit', async () => {
     expect(await runCli(['reset-password', '界'.repeat(400)], context)).toBe(1)
 
-    expect(inspect(({ owner }) => owner.isClaimed())).toBe(false)
+    expect(inspect(({ user }) => user.isClaimed())).toBe(false)
   })
 
   it('is listed in the usage an operator sees', async () => {

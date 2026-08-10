@@ -245,7 +245,7 @@ describe('managing one Feed', () => {
     expect(screen.getByRole('button', { name: 'refresh now' })).toBeDefined()
   })
 
-  it('says what unsubscribing means before doing it, and lets the Owner keep the Feed', async () => {
+  it('says what unsubscribing means before doing it, and lets the User keep the Feed', async () => {
     const api = stubApi().on('GET /api/feeds/1', { body: DETAIL })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)

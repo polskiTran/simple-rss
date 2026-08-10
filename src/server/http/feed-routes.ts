@@ -29,7 +29,7 @@ export interface FeedRouteDependencies {
   readonly digest: () => DigestService | undefined
 }
 
-/** Subscription creation, the Owner's Subscriptions, and the chronological Digest. */
+/** Subscription creation, the User's Subscriptions, and the chronological Digest. */
 export function feedRoutes(deps: FeedRouteDependencies): Hono {
   const app = new Hono()
 
@@ -230,7 +230,7 @@ const UNREACHABLE: FailureAnswer = {
 }
 
 /**
- * The Owner is told the actual ceilings rather than a number copied from them,
+ * The User is told the actual ceilings rather than a number copied from them,
  * so raising a limit cannot leave the explanation behind.
  */
 const FEED_PROFILE = RETRIEVAL_PROFILES.feed
@@ -267,7 +267,7 @@ const RETRIEVAL_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> =
   unavailable: UNREACHABLE,
 }
 
-/** Milliseconds as the whole seconds the Owner is told about. */
+/** Milliseconds as the whole seconds the User is told about. */
 function seconds(ms: number): number {
   return Math.round(ms / 1_000)
 }

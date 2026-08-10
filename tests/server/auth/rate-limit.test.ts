@@ -10,7 +10,7 @@ import { ManualClock } from '../../support/manual-clock.js'
 /**
  * The sliding-window arithmetic, which has more combinations than it is worth
  * driving through HTTP. `tests/server/authentication.test.ts` covers the same
- * policy as the Owner meets it: five wrong passwords, then a wait.
+ * policy as the User meets it: five wrong passwords, then a wait.
  */
 describe('LoginRateLimiter', () => {
   let clock: ManualClock
@@ -129,7 +129,7 @@ describe('LoginRateLimiter', () => {
   it('never blocks a client for attempts that were not its own', () => {
     saturateAcrossClients()
 
-    // The Owner arriving from an address with a clean history is slowed down
+    // The User arriving from an address with a clean history is slowed down
     // but always let through — otherwise anyone with a few addresses could
     // keep them out of their own reader indefinitely.
     expect(limiter.begin('198.51.100.9').allowed).toBe(true)

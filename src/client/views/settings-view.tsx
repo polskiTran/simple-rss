@@ -25,8 +25,8 @@ export interface SettingsViewProps {
  * can never be mistaken for reading.
  *
  * It shows the running version because upgrades are deliberate here — the
- * Owner picks a version rather than following a moving tag — and it holds the
- * two Owner actions that are the only controls in the reader able to end a
+ * User picks a version rather than following a moving tag — and it holds the
+ * two User actions that are the only controls in the reader able to end a
  * Session.
  */
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
@@ -201,7 +201,7 @@ function AppearanceChoice() {
 }
 
 /**
- * Changing the password signs every device out, including this one. The Owner
+ * Changing the password signs every device out, including this one. The User
  * is told that before submitting rather than after, because they may be doing
  * it from a phone with the laptop closed somewhere else.
  */

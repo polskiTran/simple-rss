@@ -5,7 +5,7 @@ import type { MiddlewareHandler } from 'hono'
  * origins, and no embedded media, so the policy can stay this narrow.
  *
  * `img-src 'self'` is what the image proxy exists to make possible: Feed and
- * Reader images are fetched by the server, never by the Owner's browser.
+ * Reader images are fetched by the server, never by the User's browser.
  * `data:` stays allowed for the small inline SVGs the client draws itself.
  */
 const CONTENT_SECURITY_POLICY = [
@@ -27,7 +27,7 @@ const CONTENT_SECURITY_POLICY = [
  * installation stops being reachable over a downgradable connection.
  *
  * No `preload` — that is a submission to a browser-vendor list, which is not
- * this service's decision to make on an Owner's domain.
+ * this service's decision to make on a User's domain.
  */
 const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
 

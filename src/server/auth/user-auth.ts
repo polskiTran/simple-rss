@@ -1,12 +1,12 @@
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { and, eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from '../persistence/database.js'
-import { ownerAuth, sessions } from '../persistence/schema.js'
+import { userAuth, sessions } from '../persistence/schema.js'
 
-/** The one row's fixed identity — an installation has exactly one Owner. */
+/** The one row's fixed identity — an installation has exactly one User. */
 const SINGLETON_ID = 1
 
-export interface OwnerAuthRecord {
+export interface UserAuthRecord {
   /** The encoded Argon2id verifier. */
   readonly passwordHash: string
   readonly claimedAt: string
@@ -14,25 +14,25 @@ export interface OwnerAuthRecord {
 }
 
 /**
- * The Owner's password verifier, and therefore the answer to whether this
+ * The User's password verifier, and therefore the answer to whether this
  * installation has been claimed at all: the row exists only after setup.
  */
-export class OwnerAuthStore {
+export class UserAuthStore {
   readonly #db: BetterSQLite3Database
 
   constructor(db: SqliteDatabase) {
     this.#db = drizzle(db)
   }
 
-  read(): OwnerAuthRecord | undefined {
+  read(): UserAuthRecord | undefined {
     const [row] = this.#db
       .select({
-        passwordHash: ownerAuth.passwordHash,
-        claimedAt: ownerAuth.claimedAt,
-        updatedAt: ownerAuth.updatedAt,
+        passwordHash: userAuth.passwordHash,
+        claimedAt: userAuth.claimedAt,
+        updatedAt: userAuth.updatedAt,
       })
-      .from(ownerAuth)
-      .where(eq(ownerAuth.id, SINGLETON_ID))
+      .from(userAuth)
+      .where(eq(userAuth.id, SINGLETON_ID))
       .limit(1)
       .all()
 
@@ -56,9 +56,9 @@ export class OwnerAuthStore {
     const at = now.toISOString()
 
     const result = this.#db
-      .insert(ownerAuth)
+      .insert(userAuth)
       .values({ id: SINGLETON_ID, passwordHash, claimedAt: at, updatedAt: at })
-      .onConflictDoNothing({ target: ownerAuth.id })
+      .onConflictDoNothing({ target: userAuth.id })
       .run()
 
     return result.changes === 1
@@ -74,9 +74,9 @@ export class OwnerAuthStore {
 
     return this.#db.transaction((tx) => {
       const changed = tx
-        .update(ownerAuth)
+        .update(userAuth)
         .set({ passwordHash, updatedAt: at })
-        .where(and(eq(ownerAuth.id, SINGLETON_ID), eq(ownerAuth.passwordHash, expectedHash)))
+        .where(and(eq(userAuth.id, SINGLETON_ID), eq(userAuth.passwordHash, expectedHash)))
         .run()
 
       if (changed.changes !== 1) return undefined
@@ -92,10 +92,10 @@ export class OwnerAuthStore {
     const at = now.toISOString()
 
     return this.#db.transaction((tx) => {
-      tx.insert(ownerAuth)
+      tx.insert(userAuth)
         .values({ id: SINGLETON_ID, passwordHash, claimedAt: at, updatedAt: at })
         .onConflictDoUpdate({
-          target: ownerAuth.id,
+          target: userAuth.id,
           set: { passwordHash: sql`excluded.password_hash`, updatedAt: sql`excluded.updated_at` },
         })
         .run()

@@ -23,7 +23,7 @@ describe('the Settings timezone', () => {
     expect(await screen.findByLabelText('installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
   })
 
-  it('lets the Owner change it, sending the choice to the installation', async () => {
+  it('lets the User change it, sending the choice to the installation', async () => {
     const api = stubApi().on('PUT /api/settings/timezone', (request) => ({
       body: { timezone: (request.body as { timezone: string }).timezone },
     }))

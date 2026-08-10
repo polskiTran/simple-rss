@@ -53,7 +53,7 @@ describe('validateDestination', () => {
   })
 
   it('refuses credentials embedded in the URL without repeating them in the reason', async () => {
-    const verdict = await validateDestination('https://owner:hunter2@example.com/feed.xml', {
+    const verdict = await validateDestination('https://user:hunter2@example.com/feed.xml', {
       resolve: publicResolver,
     })
 

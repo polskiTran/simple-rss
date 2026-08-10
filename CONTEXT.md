@@ -1,19 +1,19 @@
 # Simple RSS
 
-The domain of a calm, single-owner RSS reader that collects recent entries without turning reading into inbox management.
+The domain of a calm, single-user RSS reader that collects recent entries without turning reading into inbox management.
 
 ## Language
 
-**Owner**:
+**User**:
 The single person who controls an installation and accesses it from their devices.
-_Avoid_: User, account, tenant
+_Avoid_: Owner, account, tenant
 
 **Setup Secret**:
-The random value the deployment is configured with, which lets the first visitor become the Owner. It is spent once: claiming the installation disables setup permanently.
+The random value the deployment is configured with, which lets the first visitor become the User. It is spent once: claiming the installation disables setup permanently.
 _Avoid_: Invite code, admin token, registration key
 
 **Session**:
-One of the Owner's signed-in devices, held as an opaque token whose hash alone is stored. Sessions are independent, so a phone and a laptop do not displace each other.
+One of the User's signed-in devices, held as an opaque token whose hash alone is stored. Sessions are independent, so a phone and a laptop do not displace each other.
 _Avoid_: Login, token, credential
 
 **Feed**:
@@ -21,11 +21,11 @@ An external RSS or Atom source that publishes entries.
 _Avoid_: Channel, source
 
 **Subscription**:
-The Owner's decision to include a Feed in their Digest, together with preferences specific to that Feed.
+The User's decision to include a Feed in their Digest, together with preferences specific to that Feed.
 _Avoid_: Feed list, followed feed
 
 **Polling Interval**:
-The Owner-selected preset controlling how often a Subscription becomes eligible to be checked for updates.
+The User-selected preset controlling how often a Subscription becomes eligible to be checked for updates.
 _Avoid_: Polling rate, exact schedule
 
 **Feed Availability**:
@@ -45,11 +45,11 @@ A Feed's publishing rhythm, drawn from retained Feed Items as per-day counts in 
 _Avoid_: Activity graph, contribution graph, frequency chart
 
 **Digest**:
-The time-grouped collection of Feed Items from the Owner's Subscriptions.
+The time-grouped collection of Feed Items from the User's Subscriptions.
 _Avoid_: Inbox, reading list
 
 **Library**:
-The Owner's explicitly saved Feed Items.
+The User's explicitly saved Feed Items.
 _Avoid_: Reading list, bookmarks
 
 **Retention**:

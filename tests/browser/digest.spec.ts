@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, OWNER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
 
 const LIGHT_PAPER = 'rgb(247, 247, 245)'
 const DARK_PAPER = 'rgb(18, 17, 15)'
@@ -8,8 +8,8 @@ const DARK_PAPER = 'rgb(18, 17, 15)'
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(OWNER_PASSWORD)
-  await page.getByLabel('confirm password').fill(OWNER_PASSWORD)
+  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
+  await page.getByLabel('confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'claim' }).click()
   await page.getByRole('link', { name: 'feeds' }).click()
   await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
@@ -47,7 +47,7 @@ test.describe('the Digest presentation', () => {
     await expect(page.getByRole('heading', { name: 'today · 1 post' })).toBeVisible()
   })
 
-  test('lets the Owner pin dark on a light device, surviving a reload', async ({ page, installation }) => {
+  test('lets the User pin dark on a light device, surviving a reload', async ({ page, installation }) => {
     await page.emulateMedia({ colorScheme: 'light' })
     await subscribe(page, installation)
     await expect(page.locator('body')).toHaveCSS('background-color', LIGHT_PAPER)

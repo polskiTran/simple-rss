@@ -91,7 +91,7 @@ export interface RetrievalLimits {
 
 /**
  * The only request headers that reach a publisher. Everything else — the
- * Owner's Session cookie, an `Authorization` header, the Setup Secret, and the
+ * User's Session cookie, an `Authorization` header, the Setup Secret, and the
  * page they came from — belongs to this installation and stays here.
  */
 const FORWARDABLE_HEADERS: Readonly<Record<string, true>> = {
@@ -160,7 +160,7 @@ export interface RetrievalSuccess {
 export interface RetrievalFailure {
   readonly ok: false
   readonly code: RetrievalFailureCode
-  /** Safe for logs and never shown raw to the Owner. */
+  /** Safe for logs and never shown raw to the User. */
   readonly reason: string
   /** Present for `http_error`, so a caller can tell 404 from 503. */
   readonly status?: number

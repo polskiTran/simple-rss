@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 /**
- * The four places the Owner can be. They are fixed and always in this order —
+ * The four places the User can be. They are fixed and always in this order —
  * `docs/DESIGN.md` treats the tab bar as furniture that never moves, so the
  * route list and the navigation are the same list.
  */

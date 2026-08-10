@@ -16,7 +16,7 @@ import { clearSessionCookie, readSessionCookie, writeSessionCookie } from './ses
 /**
  * The routes that must stay reachable without a session, because they are how
  * a session is obtained. Everything else under `/api` — including changing the
- * password, which is an Owner action — is closed by `requireSession`.
+ * password, which is a User action — is closed by `requireSession`.
  *
  * Listed as exact paths rather than a prefix, so mounting a new route under
  * `/api/auth` leaves it guarded until it is named here deliberately.
@@ -66,7 +66,7 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
         return status(c, { claimed: true, authenticated: true }, 201)
       case 'already-claimed':
         return c.json(
-          { error: { code: 'already_claimed', message: 'This installation already has an Owner' } },
+          { error: { code: 'already_claimed', message: 'This installation already has a User' } },
           409,
           NO_STORE,
         )
@@ -148,7 +148,7 @@ function seedTimezone(settings: InstallationSettingsStore | undefined, timezone:
   try {
     settings.setTimezone(timezone, now)
   } catch {
-    // The claim stands; the Owner can still pick a timezone in Settings.
+    // The claim stands; the User can still pick a timezone in Settings.
   }
 }
 

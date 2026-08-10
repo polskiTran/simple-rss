@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq, lte, or } from 'drizzle-orm'
 import type { SqliteDatabase } from '../persistence/database.js'
-import { ownerAuth, sessions } from '../persistence/schema.js'
+import { userAuth, sessions } from '../persistence/schema.js'
 
 /** A session dies this long after the device last used it. */
 export const IDLE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000
@@ -53,8 +53,8 @@ export class SessionStore {
 
     return this.#db.transaction((tx) => {
       const [current] = tx
-        .select({ passwordHash: ownerAuth.passwordHash })
-        .from(ownerAuth)
+        .select({ passwordHash: userAuth.passwordHash })
+        .from(userAuth)
         .limit(1)
         .all()
 
