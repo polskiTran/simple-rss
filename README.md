@@ -1,35 +1,22 @@
 # Simple RSS
 
-> Work in progress. 
+> Work in progress. Expect a lot of breaking changes and rapid improvements.
 
-Simple RSS is an opinionated, extremely minimal RSS reader for intentional and calm reading. It is designed as an open-source template that one person can deploy and access from any modern phone or laptop browser.
+Simple RSS is an opinionated RSS reader for intentional reading. It is designed as an open-source template that one person can deploy and access from any modern phone or laptop browser.
 
 ## Motivation
 
-RSS is a great way to follow blogs and news without surrendering control to an algorithm. Many readers eventually adopt inbox mechanics, productivity metrics, and dense interfaces that turn reading into another obligation. Simple RSS deliberately avoids that direction.
+*The need for content curation*: RSS is a great way to follow blogs and news. It allows you to escape from the algorithm of social media. As much as I love discovering new visual and wholesome content, I think there's value to slowing down and curating your source of information. 
+
+*The need for a calm reader*: Many readers eventually adopt an inbox-like system of read/unread status, which turns feed posts into "rss debts" that keep accumulating into a grave yeard of unread post.
 
 ## Philosophy
 
 - **no read/unread state**: I dont want to see un read badge as it gets out of hand pretty quick
 - **Digest**: Feed Items are grouped by date and ordered chronologically without ranking.
-- **Library**: Home to your saved feed items.
+- **Saved**: Home to your saved feed items.
 - **Reader**: Read your feed item right here (powered by [defuddle](https://github.com/kepano/defuddle))
 - **One user, one installation.**
-
-## Planned v1
-
-- Single user setup and login
-- RSS and Atom Subscriptions
-- OPML import and export
-- Digest grouped by date
-- Configurable per feed Polling Intervals
-- Manual Feed refresh and availability status
-- Library for saved Feed Items
-- Search across Feed titles, item titles, and summaries
-- Reader view 
-- Feed and Reader image proxying
-- JSON setting export
-- Responsive web interface for both desktop and mobile web usage
 
 see the roadmap over at [roadmap doc](docs/ROADMAP.md)
 
