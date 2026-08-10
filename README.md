@@ -1,9 +1,6 @@
 # Simple RSS
 
-> Work in progress. The service boots, migrates its volume, serves the
-> application shell, and survives container replacement. One Owner can claim it
-> with its setup secret and sign in from phone and laptop — see
-> [deployment](docs/DEPLOYMENT.md). Subscriptions and the Digest come next.
+> Work in progress. 
 
 Simple RSS is an opinionated, extremely minimal RSS reader for intentional and calm reading. It is designed as an open-source template that one person can deploy and access from any modern phone or laptop browser.
 
@@ -21,18 +18,18 @@ RSS is a great way to follow blogs and news without surrendering control to an a
 
 ## Planned v1
 
-- Single-Owner setup and login
+- Single user setup and login
 - RSS and Atom Subscriptions
 - OPML import and export
 - Digest grouped by date
-- Configurable per-Feed Polling Intervals
+- Configurable per feed Polling Intervals
 - Manual Feed refresh and availability status
 - Library for saved Feed Items
 - Search across Feed titles, item titles, and summaries
-- On-demand Reader View with retry and original-page fallback
-- Privacy-preserving Feed and Reader image proxying
-- Complete portable JSON export
-- Responsive web interface
+- Reader view 
+- Feed and Reader image proxying
+- JSON setting export
+- Responsive web interface for both desktop and mobile web usage
 
 see the roadmap over at [roadmap doc](docs/ROADMAP.md)
 
@@ -79,4 +76,3 @@ pnpm test:smoke   # builds the image and exercises the container (needs Docker)
 - [ADR 0002: Container-first Railway deployment](docs/adr/0002-container-first-railway-deployment.md)
 - [ADR 0003: Application-owned authentication](docs/adr/0003-application-owned-single-owner-authentication.md)
 - [ADR 0004: The API is closed by default](docs/adr/0004-api-closed-by-default.md)
-
