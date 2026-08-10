@@ -115,6 +115,7 @@ describe('Subscriptions', () => {
           ],
         },
       ],
+      nextCursor: null,
     })
   })
 
@@ -217,6 +218,7 @@ describe('Subscriptions', () => {
     expect(await (await user.get('/api/digest')).json()).toEqual({
       today: { date: '2026-08-08', volume: 0 },
       groups: [],
+      nextCursor: null,
     })
   })
 

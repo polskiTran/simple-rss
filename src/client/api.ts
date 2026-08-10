@@ -195,8 +195,12 @@ export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }
 
-export async function fetchDigest(): Promise<Digest> {
-  const response = await request('/api/digest')
+/**
+ * One page of the Digest: the top of the chronology, or — given the cursor a
+ * previous page ended with — the items that follow it.
+ */
+export async function fetchDigest(cursor?: string): Promise<Digest> {
+  const response = await request(cursor ? `/api/digest?cursor=${encodeURIComponent(cursor)}` : '/api/digest')
   return digestSchema.parse(await response.json())
 }
 
@@ -206,8 +210,9 @@ export async function fetchSearchResults(query: string): Promise<SearchResults> 
   return searchResultsSchema.parse(await response.json())
 }
 
-export async function fetchLibrary(): Promise<Library> {
-  const response = await request('/api/library')
+/** One page of the Library, on the same cursor convention as the Digest. */
+export async function fetchLibrary(cursor?: string): Promise<Library> {
+  const response = await request(cursor ? `/api/library?cursor=${encodeURIComponent(cursor)}` : '/api/library')
   return librarySchema.parse(await response.json())
 }
 

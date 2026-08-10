@@ -305,6 +305,7 @@ describe('Digest', () => {
             ],
           },
         ],
+        nextCursor: null,
       },
     })
     window.history.replaceState(null, '', '/digest')
@@ -344,6 +345,7 @@ describe('Digest', () => {
             ],
           },
         ],
+        nextCursor: null,
       },
     })
     window.history.replaceState(null, '', '/digest')

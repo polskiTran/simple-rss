@@ -83,6 +83,29 @@ test.describe('the Digest presentation', () => {
     await expect(page.locator('main')).not.toContainText('07:15')
   })
 
+  test('ends at fifty items with `older items`, and one press extends the day', async ({ page, installation }) => {
+    await page.goto(installation.url)
+    await page.getByLabel('setup secret').fill(SETUP_SECRET)
+    await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
+    await page.getByLabel('confirm password').fill(USER_PASSWORD)
+    await page.getByRole('button', { name: 'claim' }).click()
+    await page.getByRole('link', { name: 'feeds' }).click()
+    await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.longFeedUrl)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
+    await page.getByRole('link', { name: 'digest' }).click()
+
+    // One page, then a quiet word — never an auto-load on scroll.
+    await expect(page.locator('.content-item')).toHaveCount(50)
+    const older = page.getByRole('button', { name: 'older items' })
+    await expect(older).toBeVisible()
+
+    await older.click()
+    await expect(page.locator('.content-item')).toHaveCount(55)
+    // Everything is loaded, so the list simply ends.
+    await expect(older).toBeHidden()
+  })
+
   test('names a network loss plainly and recovers on try again', async ({ page, installation }) => {
     await subscribe(page, installation)
 

@@ -862,6 +862,12 @@
     margin: 12px 0 0;
   }
 
+  /* A paged list's deliberate end: `older items` under what is loaded, in
+     the rhythm one more day-group would take. Absent, the list is over. */
+  .older-items {
+    margin: 44px 0 0;
+  }
+
   .digest-view-today {
     padding-top: 34px;
   }
@@ -1348,6 +1354,10 @@
   }
 
   .day-group + .day-group {
+    margin-top: 32px;
+  }
+
+  .older-items {
     margin-top: 32px;
   }
 

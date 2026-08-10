@@ -31,6 +31,7 @@ const LIBRARY = {
       displayDate: '3 june',
     },
   ],
+  nextCursor: null,
 }
 
 afterEach(() => {
@@ -86,7 +87,7 @@ describe('the Saved tab', () => {
 
   it('says quietly when a save outlived its Subscription, keeping the attribution', async () => {
     const items = [LIBRARY.items[0], { ...LIBRARY.items[1], subscribed: false }]
-    stubApi().on('GET /api/library', { body: { items } })
+    stubApi().on('GET /api/library', { body: { items, nextCursor: null } })
     window.history.replaceState(null, '', '/saved')
     const { container } = render(<App />)
 

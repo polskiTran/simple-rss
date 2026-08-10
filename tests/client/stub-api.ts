@@ -26,8 +26,8 @@ export class StubbedApi {
     this.authStatus(status)
     this.on('GET /api/meta', { body: { name: 'simple-rss', version: '0.1.0' } })
     this.on('GET /api/feeds', { body: { subscriptions: [] } })
-    this.on('GET /api/digest', { body: { today: { date: '2026-08-08', volume: 0 }, groups: [] } })
-    this.on('GET /api/library', { body: { items: [] } })
+    this.on('GET /api/digest', { body: { today: { date: '2026-08-08', volume: 0 }, groups: [], nextCursor: null } })
+    this.on('GET /api/library', { body: { items: [], nextCursor: null } })
     this.on('GET /api/settings', { body: { timezone: 'UTC' } })
   }
 

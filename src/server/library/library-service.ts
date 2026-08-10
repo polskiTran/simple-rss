@@ -1,8 +1,15 @@
-import { eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Library, LibraryItem, LibraryMembership } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
+import {
+  beyondCursorSql,
+  chronologySql,
+  LIST_PAGE_SIZE,
+  nextListCursor,
+  type ListCursor,
+} from '../digest/list-page.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -54,32 +61,39 @@ export class LibraryService {
     return { feedItemId, saved: false, savedAt: null }
   }
 
-  /** The Library, in the same chronology the Digest orders by. */
-  list(): Library {
+  /**
+   * One page of the Library, in the same chronology — and on the same cursor
+   * — the Digest orders by.
+   */
+  list(cursor?: ListCursor): Library {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
+    const chronology = chronologySql(now)
 
-    const rows = inDigestOrder(
-      this.#db
-        .select({
-          feedItemId: feedItems.id,
-          title: feedItems.title,
-          feedId: feeds.id,
-          feedTitle: feeds.title,
-          link: feedItems.link,
-          publishedAt: feedItems.publishedAt,
-          firstSeenAt: feedItems.firstSeenAt,
-          savedAt: libraryItems.savedAt,
-          subscribedFeedId: subscriptions.feedId,
-        })
-        .from(libraryItems)
-        .innerJoin(feedItems, eq(feedItems.id, libraryItems.feedItemId))
-        .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
-        .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-        .all(),
-      now,
-    )
+    // One row past the page says whether a next page exists at all.
+    const fetched = this.#db
+      .select({
+        feedItemId: feedItems.id,
+        title: feedItems.title,
+        feedId: feeds.id,
+        feedTitle: feeds.title,
+        link: feedItems.link,
+        publishedAt: feedItems.publishedAt,
+        firstSeenAt: feedItems.firstSeenAt,
+        savedAt: libraryItems.savedAt,
+        subscribedFeedId: subscriptions.feedId,
+      })
+      .from(libraryItems)
+      .innerJoin(feedItems, eq(feedItems.id, libraryItems.feedItemId))
+      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .where(cursor ? beyondCursorSql(chronology, cursor) : undefined)
+      .orderBy(sql`${chronology} DESC`, desc(feedItems.id))
+      .limit(LIST_PAGE_SIZE + 1)
+      .all()
+
+    const rows = inDigestOrder(fetched.slice(0, LIST_PAGE_SIZE), now)
 
     const items: LibraryItem[] = rows.map(({ row, chronology }) => {
       const instant = new Date(chronology)
@@ -99,7 +113,7 @@ export class LibraryService {
       }
     })
 
-    return { items }
+    return { items, nextCursor: nextListCursor(fetched.length, rows.at(-1)) }
   }
 
   #membership(feedItemId: number): LibraryMembership {

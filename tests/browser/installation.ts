@@ -20,6 +20,8 @@ export interface Installation {
   readonly feedUrl: string
   /** A second Feed whose one item's original page always answers 500. */
   readonly brokenArticleFeedUrl: string
+  /** A Feed of 55 items — more than one Digest page, so the list ends early. */
+  readonly longFeedUrl: string
 }
 
 /**
@@ -94,6 +96,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
     const feedUrl = 'https://publisher.example/feed.xml'
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
+    const longFeedUrl = 'https://publisher.example/meadow.xml'
     // Today at 07:15 UTC, so the item lands in the Digest's "today" group on
     // any run date (chronology tolerates a publication up to a day ahead).
     const publishedAt = new Date()
@@ -136,6 +139,19 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
         headers: { 'content-type': 'text/html' },
         body: 'the shore is closed',
       })
+      .stub(longFeedUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>Long Meadow</title>
+            ${Array.from(
+              { length: 55 },
+              (_, index) => `<item><guid>meadow-${index}</guid><title>Meadow note ${index}</title>
+                <link>https://publisher.example/meadow-${index}</link>
+                <pubDate>${new Date(publishedAt.getTime() - (index + 1) * 60_000).toUTCString()}</pubDate>
+              </item>`,
+            ).join('\n')}
+          </channel></rss>`,
+      })
     let service: RunningService | undefined
 
     try {
@@ -158,7 +174,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
           self: new URL(config.publicOrigin),
         }),
       })
-      await use({ url: service.url, feedUrl, brokenArticleFeedUrl })
+      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, longFeedUrl })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })
