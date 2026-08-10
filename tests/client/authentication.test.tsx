@@ -124,7 +124,7 @@ describe('an installation nobody has claimed', () => {
   it('moves to the sign-in screen when someone else claimed it first', async () => {
     const api = new StubbedApi({ claimed: false, authenticated: false }).on('POST /api/auth/setup', {
       status: 409,
-      body: { error: { code: 'already_claimed', message: 'This installation already has an Owner' } },
+      body: { error: { code: 'already_claimed', message: 'This installation already has a User' } },
     })
     api.install()
     renderApp()
@@ -177,7 +177,7 @@ describe('coming back to a claimed installation', () => {
     await press('sign in')
 
     const notice = await screen.findByText(/that password is not right/i)
-    expect(notice.textContent).not.toMatch(/owner|claimed|attempt/i)
+    expect(notice.textContent).not.toMatch(/user|claimed|attempt/i)
   })
 
   it('clears the field after a refusal, so the next attempt starts clean', async () => {
@@ -264,7 +264,7 @@ describe('leaving the reader', () => {
     expect(screen.getByText(/signs out every device/i)).toBeDefined()
   })
 
-  it('keeps the Owner where they are when the current password is wrong', async () => {
+  it('keeps the User where they are when the current password is wrong', async () => {
     stubApi().on('POST /api/auth/password', {
       status: 401,
       body: { error: { code: 'invalid_credentials', message: 'Invalid credentials' } },

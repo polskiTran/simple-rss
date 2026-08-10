@@ -15,8 +15,8 @@ import { UpstreamFixtures } from './upstream-fixtures.js'
 /** The setup secret a test installation is deployed with. */
 export const SETUP_SECRET = 'a-deployment-setup-secret'
 
-/** The password the Owner picks when a test claims an installation. */
-export const OWNER_PASSWORD = 'a-calm-reading-password'
+/** The password the User picks when a test claims an installation. */
+export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface HarnessOptions {
   /** Reuse an existing data directory, e.g. to model a container replacement. */

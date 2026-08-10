@@ -3,11 +3,11 @@ import { ApiError } from '../api.js'
 
 /**
  * What to say when the server refuses. Shared by the three screens that ask
- * for a secret, so they cannot drift into telling the Owner three different
+ * for a secret, so they cannot drift into telling the User three different
  * things about the same refusal.
  *
  * The wording says what happened and nothing more. A message that
- * distinguished "no Owner yet" from "wrong password" would hand someone
+ * distinguished "no User yet" from "wrong password" would hand someone
  * guessing exactly the hint the server's generic errors withhold.
  */
 export function describeFailure(error: unknown, overrides: Record<number, string> = {}): string {
@@ -47,7 +47,7 @@ export function reasonToHold(password: string, confirmation: string): string | u
  * Which side a failed fetch fell on. A rejected fetch is the network staying
  * silent — `unreachable`; anything else — a refusal, a body that fails its
  * schema — is the reader's problem, `unavailable`. Shared so every view tells
- * the Owner the same thing about the same silence, and the way back it
+ * the User the same thing about the same silence, and the way back it
  * implies: check the connection, or wait for the reader.
  */
 export function failureKind(error: unknown): 'unreachable' | 'unavailable' {

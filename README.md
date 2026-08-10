@@ -72,7 +72,7 @@ pnpm test:smoke   # builds the image and exercises the container (needs Docker)
 ## Domain and decisions
 
 - [Domain language](CONTEXT.md)
-- [ADR 0001: Server-authoritative single-owner model](docs/adr/0001-server-authoritative-single-owner.md)
+- [ADR 0001: Server-authoritative single-user model](docs/adr/0001-server-authoritative-single-user.md)
 - [ADR 0002: Container-first Railway deployment](docs/adr/0002-container-first-railway-deployment.md)
-- [ADR 0003: Application-owned authentication](docs/adr/0003-application-owned-single-owner-authentication.md)
+- [ADR 0003: Application-owned authentication](docs/adr/0003-application-owned-single-user-authentication.md)
 - [ADR 0004: The API is closed by default](docs/adr/0004-api-closed-by-default.md)

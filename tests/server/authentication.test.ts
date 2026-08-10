@@ -3,7 +3,7 @@ import { ABSOLUTE_TIMEOUT_MS, IDLE_TIMEOUT_MS } from '../../src/server/auth/sess
 import { SESSION_COOKIE } from '../../src/server/http/session-cookie.js'
 import { apiErrorSchema, authStatusSchema } from '../../src/shared/api.js'
 import { claimedDevice, Device } from '../support/device.js'
-import { OWNER_PASSWORD, SETUP_SECRET, startTestService, type TestService } from '../support/service-harness.js'
+import { USER_PASSWORD, SETUP_SECRET, startTestService, type TestService } from '../support/service-harness.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MINUTE_MS = 60 * 1000
@@ -14,7 +14,7 @@ function storedSessions(service: TestService): Array<{ token_hash: string }> {
 }
 
 function storedVerifier(service: TestService): string | undefined {
-  const rows = service.database!.prepare('SELECT password_hash FROM owner_auth').all() as Array<{
+  const rows = service.database!.prepare('SELECT password_hash FROM user_auth').all() as Array<{
     password_hash: string
   }>
   return rows.length === 1 ? rows[0]?.password_hash : undefined
@@ -92,7 +92,7 @@ describe('an unclaimed installation', () => {
   it('refuses to be claimed while its setup secret is unusable', async () => {
     const service = await startTestService({ env: { SETUP_SECRET: '' } })
 
-    const response = await new Device(service).claim(OWNER_PASSWORD, 'any-secret-at-all')
+    const response = await new Device(service).claim(USER_PASSWORD, 'any-secret-at-all')
 
     expect(response.status).toBe(503)
     expect(await errorCode(response)).toBe('setup_unavailable')
@@ -103,7 +103,7 @@ describe('claiming an installation', () => {
   it('requires the deployment setup secret', async () => {
     const service = await startTestService()
 
-    const response = await new Device(service).claim(OWNER_PASSWORD, 'not-the-setup-secret')
+    const response = await new Device(service).claim(USER_PASSWORD, 'not-the-setup-secret')
 
     expect(response.status).toBe(401)
     expect(await errorCode(response)).toBe('invalid_credentials')
@@ -125,7 +125,7 @@ describe('claiming an installation', () => {
     await new Device(service).claim()
 
     expect(storedVerifier(service)).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/)
-    expect(storedVerifier(service)).not.toContain(OWNER_PASSWORD)
+    expect(storedVerifier(service)).not.toContain(USER_PASSWORD)
   })
 
   it('refuses a password too short to be the only thing protecting the installation', async () => {
@@ -148,11 +148,11 @@ describe('claiming an installation', () => {
     expect(storedVerifier(service)).toBeUndefined()
   })
 
-  it('disables setup permanently, so the secret cannot make a second Owner', async () => {
+  it('disables setup permanently, so the secret cannot make a second User', async () => {
     const service = await startTestService()
     await claimedDevice(service)
 
-    const response = await new Device(service).claim('a-second-owner-password')
+    const response = await new Device(service).claim('a-second-user-password')
 
     expect(response.status).toBe(409)
     expect(await errorCode(response)).toBe('already_claimed')
@@ -161,15 +161,15 @@ describe('claiming an installation', () => {
   it('leaves the original password working after a refused second claim', async () => {
     const service = await startTestService()
     await claimedDevice(service)
-    await new Device(service).claim('a-second-owner-password')
+    await new Device(service).claim('a-second-user-password')
 
     const returning = new Device(service)
 
-    expect((await returning.signIn(OWNER_PASSWORD)).status).toBe(200)
-    expect((await new Device(service).signIn('a-second-owner-password')).status).toBe(401)
+    expect((await returning.signIn(USER_PASSWORD)).status).toBe(200)
+    expect((await new Device(service).signIn('a-second-user-password')).status).toBe(401)
   })
 
-  it('makes exactly one Owner when two devices claim it at the same instant', async () => {
+  it('makes exactly one User when two devices claim it at the same instant', async () => {
     const service = await startTestService()
     const first = new Device(service)
     const second = new Device(service)
@@ -195,7 +195,7 @@ describe('claiming an installation', () => {
 })
 
 describe('returning to a claimed installation', () => {
-  it('signs the Owner in with the password', async () => {
+  it('signs the User in with the password', async () => {
     const service = await startTestService()
     await claimedDevice(service)
 
@@ -207,12 +207,12 @@ describe('returning to a claimed installation', () => {
 
   it('opens the rest of the API once signed in', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.get('/api/meta')).status).toBe(200)
+    expect((await user.get('/api/meta')).status).toBe(200)
   })
 
-  it('answers a wrong password generically, and says nothing about the Owner', async () => {
+  it('answers a wrong password generically, and says nothing about the User', async () => {
     const service = await startTestService()
     await claimedDevice(service)
 
@@ -221,7 +221,7 @@ describe('returning to a claimed installation', () => {
 
     expect(response.status).toBe(401)
     expect(JSON.parse(body).error.code).toBe('invalid_credentials')
-    expect(body).not.toMatch(/owner|password verifier|argon/i)
+    expect(body).not.toMatch(/user|password verifier|argon/i)
   })
 
   it('sends the token in an HttpOnly, Secure, same-site cookie', async () => {
@@ -239,22 +239,22 @@ describe('returning to a claimed installation', () => {
 
   it('stores only a hash of the token, so a copy of the volume grants nothing', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     const stored = storedSessions(service)
 
     expect(stored).toHaveLength(1)
-    expect(owner.sessionToken).toBeDefined()
-    expect(stored[0]?.token_hash).not.toBe(owner.sessionToken)
-    expect(JSON.stringify(stored)).not.toContain(owner.sessionToken)
+    expect(user.sessionToken).toBeDefined()
+    expect(stored[0]?.token_hash).not.toBe(user.sessionToken)
+    expect(JSON.stringify(stored)).not.toContain(user.sessionToken)
   })
 
   it('issues an opaque token that carries no readable claim', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect(owner.sessionToken).toMatch(/^[A-Za-z0-9_-]{40,}$/)
-    expect(owner.sessionToken).not.toContain('.')
+    expect(user.sessionToken).toMatch(/^[A-Za-z0-9_-]{40,}$/)
+    expect(user.sessionToken).not.toContain('.')
   })
 
   it('refuses a token that was never issued', async () => {
@@ -268,11 +268,11 @@ describe('returning to a claimed installation', () => {
 
   it('survives replacing the container, because the session is on the volume', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     await service.restart()
 
-    expect((await owner.get('/api/meta')).status).toBe(200)
+    expect((await user.get('/api/meta')).status).toBe(200)
   })
 })
 
@@ -306,7 +306,7 @@ describe('a phone and a laptop', () => {
     const phone = new Device(service)
     await phone.signIn()
 
-    await laptop.changePassword(OWNER_PASSWORD, 'a-replacement-password')
+    await laptop.changePassword(USER_PASSWORD, 'a-replacement-password')
 
     expect((await phone.get('/api/meta')).status).toBe(401)
     expect((await laptop.get('/api/meta')).status).toBe(401)
@@ -317,12 +317,12 @@ describe('a phone and a laptop', () => {
 describe('signing out', () => {
   it('clears the cookie and revokes only that session', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const response = await owner.signOut()
+    const response = await user.signOut()
 
     expect(response.status).toBe(204)
-    expect(owner.sessionToken).toBeUndefined()
+    expect(user.sessionToken).toBeUndefined()
     expect(storedSessions(service)).toHaveLength(0)
   })
 
@@ -337,106 +337,106 @@ describe('signing out', () => {
 describe('changing the password', () => {
   it('needs the current password as well as a session', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const response = await owner.changePassword('not-the-current-one', 'a-replacement-password')
+    const response = await user.changePassword('not-the-current-one', 'a-replacement-password')
 
     expect(response.status).toBe(401)
     expect(await errorCode(response)).toBe('invalid_credentials')
-    expect((await owner.get('/api/meta')).status).toBe(200)
+    expect((await user.get('/api/meta')).status).toBe(200)
   })
 
   it('is closed to a caller with no session at all', async () => {
     const service = await startTestService()
     await claimedDevice(service)
 
-    const response = await new Device(service).changePassword(OWNER_PASSWORD, 'a-replacement-password')
+    const response = await new Device(service).changePassword(USER_PASSWORD, 'a-replacement-password')
 
     expect(response.status).toBe(401)
     expect(await errorCode(response)).toBe('unauthenticated')
   })
 
-  it('reports that the Owner must sign in again', async () => {
+  it('reports that the User must sign in again', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const response = await owner.changePassword(OWNER_PASSWORD, 'a-replacement-password')
+    const response = await user.changePassword(USER_PASSWORD, 'a-replacement-password')
 
     expect(response.status).toBe(200)
     expect(await status(response)).toEqual({ claimed: true, authenticated: false })
-    expect(owner.sessionToken).toBeUndefined()
+    expect(user.sessionToken).toBeUndefined()
   })
 
   it('replaces the password rather than adding one', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
-    await owner.changePassword(OWNER_PASSWORD, 'a-replacement-password')
+    const user = await claimedDevice(service)
+    await user.changePassword(USER_PASSWORD, 'a-replacement-password')
 
     expect((await new Device(service).signIn('a-replacement-password')).status).toBe(200)
-    expect((await new Device(service).signIn(OWNER_PASSWORD)).status).toBe(401)
+    expect((await new Device(service).signIn(USER_PASSWORD)).status).toBe(401)
   })
 
   it('refuses a replacement that is too short', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const response = await owner.changePassword(OWNER_PASSWORD, 'short')
+    const response = await user.changePassword(USER_PASSWORD, 'short')
 
     expect(response.status).toBe(400)
-    expect((await new Device(service).signIn(OWNER_PASSWORD)).status).toBe(200)
+    expect((await new Device(service).signIn(USER_PASSWORD)).status).toBe(200)
   })
 })
 
 describe('a session that has been left alone', () => {
   it('stays alive while the device keeps using it', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     for (let day = 0; day < 4; day += 1) {
       service.clock.advance(6 * DAY_MS)
-      expect((await owner.get('/api/meta')).status).toBe(200)
+      expect((await user.get('/api/meta')).status).toBe(200)
     }
   })
 
   it('idles out after seven untouched days', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     service.clock.advance(IDLE_TIMEOUT_MS - MINUTE_MS)
-    expect((await owner.get('/api/meta')).status).toBe(200)
+    expect((await user.get('/api/meta')).status).toBe(200)
 
     service.clock.advance(IDLE_TIMEOUT_MS)
-    expect((await owner.get('/api/meta')).status).toBe(401)
+    expect((await user.get('/api/meta')).status).toBe(401)
   })
 
   it('forgets an idled-out session rather than leaving the row behind', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     service.clock.advance(IDLE_TIMEOUT_MS)
-    await owner.get('/api/meta')
+    await user.get('/api/meta')
 
     expect(storedSessions(service)).toHaveLength(0)
   })
 
   it('expires thirty days after it was issued, however often it is used', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     for (let elapsed = 6 * DAY_MS; elapsed < ABSOLUTE_TIMEOUT_MS; elapsed += 6 * DAY_MS) {
       service.clock.advance(6 * DAY_MS)
-      expect((await owner.get('/api/meta')).status).toBe(200)
+      expect((await user.get('/api/meta')).status).toBe(200)
     }
 
     service.clock.advance(6 * DAY_MS)
-    expect((await owner.get('/api/meta')).status).toBe(401)
+    expect((await user.get('/api/meta')).status).toBe(401)
   })
 
-  it('lets the Owner sign in again afterwards', async () => {
+  it('lets the User sign in again afterwards', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     service.clock.advance(ABSOLUTE_TIMEOUT_MS)
-    await owner.get('/api/meta')
+    await user.get('/api/meta')
 
     expect((await new Device(service).signIn()).status).toBe(200)
   })
@@ -481,30 +481,30 @@ describe('resisting password guessing', () => {
     expect(service.sleeps).toEqual([250, 500, 1000, 2000])
   })
 
-  it('says how long to wait, and never locks the Owner out for good', async () => {
+  it('says how long to wait, and never locks the User out for good', async () => {
     const service = await startTestService()
     await claimedDevice(service)
     const guesser = new Device(service, { address: '203.0.113.7' })
     for (let attempt = 0; attempt < 6; attempt += 1) await guesser.signIn('a-wrong-password')
 
-    const blocked = await guesser.signIn(OWNER_PASSWORD)
+    const blocked = await guesser.signIn(USER_PASSWORD)
     const retryAfter = Number(blocked.headers.get('retry-after'))
     service.clock.advance(retryAfter * 1000 + MINUTE_MS)
 
     expect(blocked.status).toBe(429)
     expect(retryAfter).toBeGreaterThan(0)
-    expect((await guesser.signIn(OWNER_PASSWORD)).status).toBe(200)
+    expect((await guesser.signIn(USER_PASSWORD)).status).toBe(200)
   })
 
-  it('forgets a client that proves itself, so a typo does not follow the Owner around', async () => {
+  it('forgets a client that proves itself, so a typo does not follow the User around', async () => {
     const service = await startTestService()
     await claimedDevice(service)
-    const owner = new Device(service, { address: '203.0.113.7' })
-    for (let attempt = 0; attempt < 4; attempt += 1) await owner.signIn('a-wrong-password')
+    const user = new Device(service, { address: '203.0.113.7' })
+    for (let attempt = 0; attempt < 4; attempt += 1) await user.signIn('a-wrong-password')
 
-    await owner.signIn(OWNER_PASSWORD)
-    await owner.signOut()
-    await owner.signIn('a-wrong-password')
+    await user.signIn(USER_PASSWORD)
+    await user.signOut()
+    await user.signIn('a-wrong-password')
 
     expect(service.sleeps.at(-1)).toBe(250)
   })
@@ -520,14 +520,14 @@ describe('resisting password guessing', () => {
     expect(service.sleeps.at(-1)).toBe(2000)
   })
 
-  it('still lets the Owner in from a clean address, after charging the global delay', async () => {
+  it('still lets the User in from a clean address, after charging the global delay', async () => {
     const service = await startTestService()
     await claimedDevice(service)
     await saturateTheCeiling(service)
     const sleepsBeforeSignIn = service.sleeps.length
-    const owner = new Device(service, { address: '198.51.100.9' })
+    const user = new Device(service, { address: '198.51.100.9' })
 
-    expect((await owner.signIn(OWNER_PASSWORD)).status).toBe(200)
+    expect((await user.signIn(USER_PASSWORD)).status).toBe(200)
     expect(service.sleeps.slice(sleepsBeforeSignIn)).toEqual([2000])
   })
 
@@ -536,21 +536,21 @@ describe('resisting password guessing', () => {
     const guesser = new Device(service, { address: '203.0.113.7' })
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      expect((await guesser.claim(OWNER_PASSWORD, 'not-the-setup-secret')).status).toBe(401)
+      expect((await guesser.claim(USER_PASSWORD, 'not-the-setup-secret')).status).toBe(401)
     }
 
-    expect((await guesser.claim(OWNER_PASSWORD, 'not-the-setup-secret')).status).toBe(429)
+    expect((await guesser.claim(USER_PASSWORD, 'not-the-setup-secret')).status).toBe(429)
   })
 
   it('costs a wrong current password the same when changing it', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service, { address: '203.0.113.7' })
+    const user = await claimedDevice(service, { address: '203.0.113.7' })
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await owner.changePassword('not-the-current-one', 'a-replacement-password')
+      await user.changePassword('not-the-current-one', 'a-replacement-password')
     }
 
-    const blocked = await owner.changePassword('not-the-current-one', 'a-replacement-password')
+    const blocked = await user.changePassword('not-the-current-one', 'a-replacement-password')
     expect(blocked.status).toBe(429)
   })
 
@@ -597,24 +597,24 @@ describe('cross-site request forgery', () => {
 
   it('protects an authenticated mutation the same way', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
-    const forged = new Device(service, { origin: 'https://evil.example' }).present(owner.sessionToken)
+    const user = await claimedDevice(service)
+    const forged = new Device(service, { origin: 'https://evil.example' }).present(user.sessionToken)
 
-    const response = await forged.changePassword(OWNER_PASSWORD, 'a-replacement-password')
+    const response = await forged.changePassword(USER_PASSWORD, 'a-replacement-password')
 
     expect(response.status).toBe(403)
-    expect((await owner.get('/api/meta')).status).toBe(200)
+    expect((await user.get('/api/meta')).status).toBe(200)
   })
 
   it('enables no credentialed cross-origin access', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     const preflight = await service.fetch('/api/auth/session', {
       method: 'OPTIONS',
       headers: { origin: 'https://evil.example', 'access-control-request-method': 'POST' },
     })
-    const authenticated = await owner.get('/api/meta')
+    const authenticated = await user.get('/api/meta')
 
     for (const response of [preflight, authenticated]) {
       expect(response.headers.get('access-control-allow-origin')).toBeNull()
@@ -637,32 +637,32 @@ describe('what authentication reveals', () => {
 
   it('keeps authentication responses out of every cache', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    for (const response of [await owner.status(), await new Device(service).signIn('wrong-password-here')]) {
+    for (const response of [await user.status(), await new Device(service).signIn('wrong-password-here')]) {
       expect(response.headers.get('cache-control')).toBe('no-store')
     }
   })
 
   it('writes no password, setup secret, or session token to the log', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     await new Device(service).signIn('a-wrong-password')
-    await owner.changePassword(OWNER_PASSWORD, 'a-replacement-password')
+    await user.changePassword(USER_PASSWORD, 'a-replacement-password')
 
     const written = JSON.stringify(service.logs)
 
-    expect(written).not.toContain(OWNER_PASSWORD)
+    expect(written).not.toContain(USER_PASSWORD)
     expect(written).not.toContain(SETUP_SECRET)
     expect(written).not.toContain('a-replacement-password')
-    expect(written).not.toContain(owner.sessionToken ?? 'a-token-that-was-never-issued')
+    expect(written).not.toContain(user.sessionToken ?? 'a-token-that-was-never-issued')
   })
 
-  it('records the authentication events an Owner would want to see', async () => {
+  it('records the authentication events a User would want to see', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     await new Device(service).signIn('a-wrong-password')
-    await owner.signOut()
+    await user.signOut()
 
     const messages = service.logs.map((record) => record.message)
 

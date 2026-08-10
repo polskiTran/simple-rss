@@ -3,7 +3,7 @@ import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-o
 
 /**
  * Typed mirror of the tables the server queries. Migrations remain the source
- * of truth for what runs against an Owner's volume; a table earns a definition
+ * of truth for what runs against a User's volume; a table earns a definition
  * here once something reads or writes it through Drizzle.
  *
  * Drift between the two is caught by the persistence tests, which build the
@@ -20,16 +20,16 @@ export const installationSettings = sqliteTable(
   (table) => [check('installation_settings_singleton', sql`${table.id} = 1`)],
 )
 
-/** The Owner's Argon2id verifier. Its existence is what "claimed" means. */
-export const ownerAuth = sqliteTable(
-  'owner_auth',
+/** The User's Argon2id verifier. Its existence is what "claimed" means. */
+export const userAuth = sqliteTable(
+  'user_auth',
   {
     id: integer('id').primaryKey(),
     passwordHash: text('password_hash').notNull(),
     claimedAt: text('claimed_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => [check('owner_auth_singleton', sql`${table.id} = 1`)],
+  (table) => [check('user_auth_singleton', sql`${table.id} = 1`)],
 )
 
 /** One signed-in device, keyed by the hash of the token it presents. */
@@ -66,7 +66,7 @@ export const feedUrlAliases = sqliteTable(
   (table) => [index('feed_url_aliases_feed_id').on(table.feedId)],
 )
 
-/** The Owner's active choice to include a Feed in the Digest. */
+/** The User's active choice to include a Feed in the Digest. */
 export const subscriptions = sqliteTable(
   'subscriptions',
   {

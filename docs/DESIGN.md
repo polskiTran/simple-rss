@@ -198,7 +198,7 @@ answers instead.
 
 ### Motion
 
-The word the Owner presses answers instantly — the flip is the feedback:
+The word the User presses answers instantly — the flip is the feedback:
 hovers, the active tab, the save word, and every dismissal never ease.
 Motion belongs to arrivals. What a press summons, and what the machine
 answers on its own clock, enters on a breath — opacity or height, ease-out,
@@ -207,12 +207,12 @@ never a show:
 - A summoned view — a tab's screen, an opened Feed, the Reader — fades in
   over 150ms, opacity only: brief enough that the hundredth tab change
   still feels instant, present enough that the page never teleports.
-  Entrance-only; nothing the Owner does ever waits on an exit.
+  Entrance-only; nothing the User does ever waits on an exit.
 - An article arriving from extraction (or its fallback) fades in over
   200ms, opacity only. The paper and the prose hold still.
 - The unsubscribe confirmation unfolds its height over the same 200ms, so
   the items below it arrive rather than teleport. Dismissing it is the
-  Owner's act and stays instant.
+  User's act and stays instant.
 - A selected cadence day scrolls its items into view smoothly, so the jump
   reads as travel down the same list.
 

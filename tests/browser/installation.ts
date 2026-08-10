@@ -11,7 +11,7 @@ import { createRetrieval } from '../../src/server/upstream/retrieval.js'
 import { UpstreamFixtures } from '../support/upstream-fixtures.js'
 
 export const SETUP_SECRET = 'a-deployment-setup-secret'
-export const OWNER_PASSWORD = 'a-calm-reading-password'
+export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface Installation {
   /** Origin the browser loads, e.g. `http://127.0.0.1:53124`. */

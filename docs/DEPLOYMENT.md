@@ -14,8 +14,8 @@ process immediately rather than at the first request that trips over it.
 | `CLIENT_DIR` | `dist/client` beside the server | Built client assets. |
 | `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error`. |
 | `SHUTDOWN_GRACE_MS` | `10000` | How long in-flight requests may finish after `SIGTERM`. |
-| `SETUP_SECRET` | — | The one-time secret that lets the first visitor become the Owner. **Required until the installation is claimed**; ignored afterwards. At least 16 characters. |
-| `PUBLIC_ORIGIN` | — | **Required.** The canonical HTTP or HTTPS origin the Owner uses, e.g. `https://reader.up.railway.app`. Outbound retrieval refuses this origin so a Feed or Feed Item link cannot point the installation back at its own API. |
+| `SETUP_SECRET` | — | The one-time secret that lets the first visitor become the User. **Required until the installation is claimed**; ignored afterwards. At least 16 characters. |
+| `PUBLIC_ORIGIN` | — | **Required.** The canonical HTTP or HTTPS origin the User uses, e.g. `https://reader.up.railway.app`. Outbound retrieval refuses this origin so a Feed or Feed Item link cannot point the installation back at its own API. |
 | `TRUST_PROXY_HEADERS` | `true` | Whether `X-Forwarded-For` may be believed when identifying a client for rate limiting. Leave it on behind a platform proxy; set `false` if the service is exposed directly. |
 
 Generate the setup secret with something that is not a word:
@@ -145,10 +145,10 @@ itself.
    traffic back.
 3. Open the domain and claim the installation: the setup secret is in the
    service's variables, and the claim screen wants it once, together with the
-   Owner's chosen password. Setup then closes permanently.
+   User's chosen password. Setup then closes permanently.
 
 State lives on the volume, so a redeploy — same version or an upgrade — keeps
-the Owner's claim, sessions, Subscriptions, and reading history.
+the User's claim, sessions, Subscriptions, and reading history.
 
 ### Custom domain (optional)
 
@@ -161,7 +161,7 @@ structural:
    installation's own new address.
 
 Everything else already behaves: the session cookie is host-only
-(`Secure; SameSite=Strict`), so the Owner simply signs in once on the new
+(`Secure; SameSite=Strict`), so the User simply signs in once on the new
 domain; the same-origin check compares each request against its own host, the
 CSP is `'self'`-relative, and the health endpoints are unchanged.
 
@@ -212,7 +212,7 @@ piped into `jq`.
 Open the deployed URL. An unclaimed installation shows one screen: the setup
 secret and a password of at least 12 characters. Nothing else is reachable
 until it is claimed, and setup closes permanently the moment it is — the secret
-cannot make a second Owner afterwards, so it can be left in place or removed.
+cannot make a second User afterwards, so it can be left in place or removed.
 
 Sessions are cookies holding an opaque random token whose hash alone is stored.
 A device stays signed in for seven days of inactivity and at most thirty days
@@ -222,7 +222,7 @@ one device's session, while changing the password ends all of them.
 ### Losing the password
 
 There is no recovery email, no OAuth, no security question, and no second
-Owner. Recovery is a shell command on the volume:
+User. Recovery is a shell command on the volume:
 
 ```sh
 SIMPLE_RSS_NEW_PASSWORD='…' node dist/server/cli-main.js reset-password
@@ -237,7 +237,7 @@ the variable.
 
 ## Exports
 
-Settings offers two downloads, both for the signed-in Owner only:
+Settings offers two downloads, both for the signed-in User only:
 
 - **`subscriptions (OPML)`** — the active Subscriptions as an OPML 2.0
   document any other reader imports.
@@ -246,7 +246,7 @@ Settings offers two downloads, both for the signed-in Owner only:
   membership, the installation timezone, and the export and schema versions.
   It never contains the password verifier, sessions, the setup secret,
   retrieval caches, or any other operational state, so the file is safe to
-  keep anywhere the Owner keeps documents.
+  keep anywhere the User keeps documents.
 
 Exports are portability, not disaster recovery — the JSON file preserves
 reading state, but restoring an installation wholesale is what backups are for.
@@ -297,8 +297,8 @@ replaces `simple-rss.db` after every check passed. A failed restore leaves the
 data directory uninitialized and the service unready, and says why.
 
 A restored installation preserves Subscriptions and their Polling Intervals,
-retained Feed Items, Library membership, installation settings, and Owner
-access — the same password signs in, because the Owner's verifier lives in the
+retained Feed Items, Library membership, installation settings, and User
+access — the same password signs in, because the User's verifier lives in the
 database. What a backup does not carry is anything derived or in flight:
 Reader renderings and proxied images are re-fetched on demand, and Feed Items
 published between the backup and the restore arrive with the next poll.

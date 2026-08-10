@@ -8,7 +8,7 @@ import { openDatabase } from '../../src/server/persistence/database.js'
 import { applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { ManualClock } from '../support/manual-clock.js'
-import { startTestService, databasePathOf, OWNER_PASSWORD, type TestService } from '../support/service-harness.js'
+import { startTestService, databasePathOf, USER_PASSWORD, type TestService } from '../support/service-harness.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
 const RSS_URL = 'https://journal.example/feed'
@@ -197,18 +197,18 @@ describe('the restore command', () => {
 })
 
 describe('backup and restore, round-tripped through the running application', () => {
-  it('preserves Subscriptions, schedules, retained Feed Items, Library membership, settings, and Owner access', async () => {
+  it('preserves Subscriptions, schedules, retained Feed Items, Library membership, settings, and User access', async () => {
     const service = await startTestService()
     service.upstream.stub(RSS_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
-    const owner = await claimedDevice(service)
-    await owner.put('/api/settings/timezone', { timezone: 'Europe/Berlin' })
-    expect((await owner.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    await user.put('/api/settings/timezone', { timezone: 'Europe/Berlin' })
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
-    const feeds = await (await owner.get('/api/feeds')).json()
+    const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId
-    await owner.put(`/api/feeds/${feedId}/interval`, { pollingIntervalMinutes: 360 })
-    const detail = await (await owner.get(`/api/feeds/${feedId}`)).json()
-    expect((await owner.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
+    await user.put(`/api/feeds/${feedId}/interval`, { pollingIntervalMinutes: 360 })
+    const detail = await (await user.get(`/api/feeds/${feedId}`)).json()
+    expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
     await service.stop()
 
     // The derived search index is deliberately lost before the backup, so the
@@ -238,9 +238,9 @@ describe('backup and restore, round-tripped through the running application', ()
     const restored = await startTestService({ dataDir: freshDataDir })
     expect((await restored.fetch('/health/ready')).status).toBe(200)
 
-    // Owner access survives: the same password signs in on the restored copy.
+    // User access survives: the same password signs in on the restored copy.
     const device = new Device(restored)
-    expect((await device.signIn(OWNER_PASSWORD)).status).toBe(200)
+    expect((await device.signIn(USER_PASSWORD)).status).toBe(200)
 
     const restoredFeeds = await (await device.get('/api/feeds')).json()
     expect(restoredFeeds.subscriptions).toHaveLength(1)

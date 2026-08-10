@@ -2,13 +2,13 @@
 
 > Status: accepted design; implementation has not started.
 
-Simple RSS is a calm, single-owner RSS reader distributed as a portable Docker image. Railway is the first documented deployment target, but provider-specific behavior stays outside the application core.
+Simple RSS is a calm, single-user RSS reader distributed as a portable Docker image. Railway is the first documented deployment target, but provider-specific behavior stays outside the application core.
 
 The canonical domain vocabulary is defined in [`CONTEXT.md`](../CONTEXT.md). Hard-to-reverse decisions are recorded in [`docs/adr`](./adr/).
 
 ## Goals
 
-- Let one Owner use the same reader from phone and laptop browsers.
+- Let one User use the same reader from phone and laptop browsers.
 - Poll RSS and Atom Feeds reliably in the background.
 - Keep Subscriptions, Feed Item metadata, Library membership, and preferences authoritative on the server.
 - Remain inexpensive and straightforward to self-host.
@@ -76,7 +76,7 @@ Releases publish versioned public Docker images. The image:
 - Shuts down gracefully
 - Does not depend on Railway APIs for normal operation
 
-Installations never follow a mutable `latest` tag automatically. The Owner deliberately selects a new version and takes a backup before upgrading.
+Installations never follow a mutable `latest` tag automatically. The User deliberately selects a new version and takes a backup before upgrading.
 
 ### Single-instance consequences
 
@@ -115,7 +115,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Reader:** safe page retrieval, Defuddle conversion, sanitization, and retry
 - **Media:** Feed and Reader image proxying
 - **Search:** FTS indexing and queries
-- **Persistence:** connection ownership, transactions, migrations, and backups
+- **Persistence:** connection usership, transactions, migrations, and backups
 - **Operations:** scheduler, health checks, logs, cleanup, and exports
 
 These are source-code boundaries, not separate packages or services.
@@ -127,7 +127,7 @@ The initial relational model contains:
 | Record | Responsibility |
 |---|---|
 | `installation_settings` | Singleton timezone and installation preferences |
-| `owner_auth` | Singleton setup state and Argon2id password verifier |
+| `user_auth` | Singleton setup state and Argon2id password verifier |
 | `sessions` | Hashed opaque session tokens and expiry state |
 | `feeds` | External Feed identity, URL, metadata, and retrieval validators |
 | `subscriptions` | Active relationship, Polling Interval, due time, and availability state |
@@ -241,7 +241,7 @@ Article HTML and Markdown are never written to SQLite. Extraction failures prese
 
 ## Image proxy
 
-The image proxy protects the Owner from direct publisher requests and allows a strict `img-src 'self'` content security policy.
+The image proxy protects the User from direct publisher requests and allows a strict `img-src 'self'` content security policy.
 
 - Primary Feed Item images use an item-ID route.
 - Reader images use short-lived signed URLs generated during extraction.
@@ -259,9 +259,9 @@ The proxy performs no resizing or image transformation in v1.
 
 ### First-run setup
 
-The Railway template supplies a required random setup secret. Before setup completes, only setup and health routes are available. The Owner presents the setup secret and chooses a password. The server stores an Argon2id verifier and permanently disables setup after successful initialization. Missing setup configuration fails readiness closed.
+The Railway template supplies a required random setup secret. Before setup completes, only setup and health routes are available. The User presents the setup secret and chooses a password. The server stores an Argon2id verifier and permanently disables setup after successful initialization. Missing setup configuration fails readiness closed.
 
-There is no registration, email recovery, OAuth, role model, or second Owner.
+There is no registration, email recovery, OAuth, role model, or second User.
 
 Only `/health/*` and the exact paths `/api/auth/status`, `/api/auth/setup`, and `/api/auth/session` are reachable without a session. Mounting another route under `/api/auth` does not exempt it. Everything else under `/api` is closed by default — see [ADR 0004](./adr/0004-api-closed-by-default.md) — so an unclaimed installation exposes setup and health behavior and nothing more.
 
@@ -277,7 +277,7 @@ Only `/health/*` and the exact paths `/api/auth/status`, `/api/auth/setup`, and 
 - Password changes and emergency reset invalidate every session
 - Sessions past either deadline are deleted when encountered, and swept at startup
 
-An authenticated Owner can change the password normally. Emergency recovery uses a CLI command through the Railway shell; it installs a new Argon2id verifier and revokes all sessions.
+An authenticated User can change the password normally. Emergency recovery uses a CLI command through the Railway shell; it installs a new Argon2id verifier and revokes all sessions.
 
 ### Rate limiting
 
@@ -285,9 +285,9 @@ The single service uses local rate limiting and requires no Redis. Every route t
 
 A client is refused after five failed attempts in 15 minutes, and every attempt costs a progressive delay that doubles from 250 ms to a 2 s cap. Both are sliding windows over recorded failures, so waiting is always sufficient and a successful attempt clears that client.
 
-The installation-wide ceiling of twenty failures works differently on purpose: past it, **every** attempt pays the maximum delay, but no client is blocked by failures that were not its own. A hard global block would let anyone with a handful of addresses keep the Owner out of their own reader by failing twenty sign-ins every quarter of an hour — the permanent lockout this is meant to avoid. Spread-out guessing is answered by capping the rate instead, on top of a memory-hard verify and a five-attempt limit per address.
+The installation-wide ceiling of twenty failures works differently on purpose: past it, **every** attempt pays the maximum delay, but no client is blocked by failures that were not its own. A hard global block would let anyone with a handful of addresses keep the User out of their own reader by failing twenty sign-ins every quarter of an hour — the permanent lockout this is meant to avoid. Spread-out guessing is answered by capping the rate instead, on top of a memory-hard verify and a five-attempt limit per address.
 
-Limiter state is in memory. It is not persisted and not exported: losing it costs an attacker nothing they could not get by waiting out the window, and only the Owner can restart the process.
+Limiter state is in memory. It is not persisted and not exported: losing it costs an attacker nothing they could not get by waiting out the window, and only the User can restart the process.
 
 The client an attempt counts against is the **rightmost** `X-Forwarded-For` entry — the one the nearest proxy appended — falling back to the socket address. Anything further left is caller-supplied, so a forged header can only ever spend the attacker's own budget. `TRUST_PROXY_HEADERS=false` ignores the header entirely for a directly exposed deployment.
 
@@ -377,4 +377,4 @@ Each layer takes only what the one below it cannot prove. The HTTP boundary suit
 
 ## V1 acceptance boundary
 
-V1 is complete when a new Owner can deploy the Railway template, claim it safely, subscribe or import Feeds, receive background updates, browse a chronological Digest, save and search items, use Reader View with safe fallbacks, export portable state, upgrade deliberately, and restore documented backups—all from modern phone and laptop browsers.
+V1 is complete when a new User can deploy the Railway template, claim it safely, subscribe or import Feeds, receive background updates, browse a chronological Digest, save and search items, use Reader View with safe fallbacks, export portable state, upgrade deliberately, and restore documented backups—all from modern phone and laptop browsers.

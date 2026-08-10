@@ -8,7 +8,7 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 /**
- * The Owner's explicitly saved Feed Items. Membership is its own table, so a
+ * The User's explicitly saved Feed Items. Membership is its own table, so a
  * save is untouched by ingestion's metadata corrections and, later, survives
  * retention pruning and unsubscribing.
  */
@@ -47,7 +47,7 @@ export class LibraryService {
 
   /**
    * Removes one Feed Item from the Library. Unsaving the already-unsaved —
-   * or the already-pruned — simply confirms the state the Owner asked for.
+   * or the already-pruned — simply confirms the state the User asked for.
    */
   unsave(feedItemId: number): LibraryMembership {
     this.#db.delete(libraryItems).where(eq(libraryItems.feedItemId, feedItemId)).run()
@@ -89,7 +89,7 @@ export class LibraryService {
         feedId: row.feedId,
         feedTitle: row.feedTitle,
         // A save outlives its Subscription; the view says so instead of
-        // leaving the Owner to wonder whether the reader forgot.
+        // leaving the User to wonder whether the reader forgot.
         subscribed: row.subscribedFeedId !== null,
         link: row.link,
         publishedAt: row.publishedAt,

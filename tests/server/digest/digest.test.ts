@@ -30,10 +30,10 @@ describe('the chronological Digest', () => {
         item('yesterday', 'Evening notes', '2026-08-07T09:31:00.000Z'),
       ),
     )
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const digest = digestSchema.parse(await (await owner.get('/api/digest')).json())
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
     expect(digest.today).toEqual({ date: '2026-08-08', volume: 1 })
     expect(digest.groups.map(({ date, label }) => [date, label])).toEqual([
@@ -52,11 +52,11 @@ describe('the chronological Digest', () => {
     const service = await startTestService()
     // 20:00 UTC on the 7th is already the morning of the 8th in Auckland.
     stubFeed(service, rss(item('one', 'Crossing midnight', '2026-08-07T20:00:00.000Z')))
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const digest = digestSchema.parse(await (await owner.get('/api/digest')).json())
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
     expect(digest.groups.map(({ date, label }) => [date, label])).toEqual([['2026-08-08', 'today']])
     expect(digest.groups[0]?.items[0]).toMatchObject({
@@ -83,10 +83,10 @@ describe('the chronological Digest', () => {
         item('dated', 'First light', '2026-08-08T07:15:00.000Z'),
       ),
     )
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const digest = digestSchema.parse(await (await owner.get('/api/digest')).json())
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
     // All three share today: the two fallbacks group by first-seen (09:00),
     // sit above the 07:15 publication, and tie-break by newest item id.
@@ -109,11 +109,11 @@ describe('the chronological Digest', () => {
         item('second', 'Posted together, listed first', '2026-08-08T07:15:00.000Z'),
       ),
     )
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const first = await (await owner.get('/api/digest')).json()
-    const second = await (await owner.get('/api/digest')).json()
+    const first = await (await user.get('/api/digest')).json()
+    const second = await (await user.get('/api/digest')).json()
 
     expect(first.groups[0].items.map((entry: { title: string }) => entry.title)).toEqual([
       'Posted together, listed first',
@@ -125,10 +125,10 @@ describe('the chronological Digest', () => {
   it('carries no read state, ranking, or unread count anywhere in its shape', async () => {
     const service = await startTestService()
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const body = await (await owner.get('/api/digest')).text()
+    const body = await (await user.get('/api/digest')).text()
 
     expect(body).not.toMatch(/read|rank|score|badge/i)
   })

@@ -12,7 +12,7 @@ export const IMAGE_WINDOW_MS = 60_000
 export const IMAGE_REQUESTS_PER_WINDOW = 240
 
 /**
- * Map size at which expired windows are swept. Far above what one Owner's
+ * Map size at which expired windows are swept. Far above what one User's
  * devices produce, so the sweep only ever runs under address-spoofing noise.
  */
 const SWEEP_THRESHOLD = 256

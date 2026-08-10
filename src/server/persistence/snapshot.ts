@@ -121,7 +121,7 @@ export function restoreSnapshot(backupPath: string, databasePath: string, clock:
         subscriptions: countRows(db, 'subscriptions'),
         feedItems: countRows(db, 'feed_items'),
         libraryItems: countRows(db, 'library_items'),
-        claimed: countRows(db, 'owner_auth') > 0,
+        claimed: countRows(db, 'user_auth') > 0,
       }
     } finally {
       db.close()
@@ -147,7 +147,7 @@ export function restoreSnapshot(backupPath: string, databasePath: string, clock:
 
 function countRows(
   db: SqliteDatabase,
-  table: 'feeds' | 'subscriptions' | 'feed_items' | 'library_items' | 'owner_auth',
+  table: 'feeds' | 'subscriptions' | 'feed_items' | 'library_items' | 'user_auth',
 ): number {
   return (db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as { count: number }).count
 }

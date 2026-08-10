@@ -42,10 +42,10 @@ function rss(title: string): string {
 </channel></rss>`
 }
 
-/** Subscribes the Owner to `url` with a Feed that retrieves successfully. */
-async function subscribed(owner: Device, service: TestService, url: string): Promise<number> {
+/** Subscribes the User to `url` with a Feed that retrieves successfully. */
+async function subscribed(user: Device, service: TestService, url: string): Promise<number> {
   service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
-  const response = await owner.post('/api/subscriptions', { url })
+  const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
   const body = (await response.json()) as { subscription: { feedId: number } }
   return body.subscription.feedId
@@ -89,9 +89,9 @@ async function pollWhenDue(service: TestService, feedId: number): Promise<void> 
   await service.wakeScheduler()
 }
 
-/** The Feed Availability the Owner's device sees for one Subscription. */
-async function availabilityOf(owner: Device, feedId: number): Promise<FeedAvailability> {
-  const response = await owner.get('/api/feeds')
+/** The Feed Availability the User's device sees for one Subscription. */
+async function availabilityOf(user: Device, feedId: number): Promise<FeedAvailability> {
+  const response = await user.get('/api/feeds')
   expect(response.status).toBe(200)
   const body = (await response.json()) as {
     subscriptions: { feedId: number; availability: FeedAvailability }[]
@@ -104,9 +104,9 @@ async function availabilityOf(owner: Device, feedId: number): Promise<FeedAvaila
 describe('Feed Availability', () => {
   it('backs off exponentially on repeated failures and never waits past 24 hours', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: 'gone' })
 
@@ -132,23 +132,23 @@ describe('Feed Availability', () => {
 
   it('surfaces calm Feed Availability after three failures and keeps the Subscription and its Feed Items', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 503, headers: { 'content-type': 'text/plain' }, body: '' })
 
     // Two failures stay calm: nothing is surfaced yet.
     await pollWhenDue(service, feedId)
     await pollWhenDue(service, feedId)
-    expect(await availabilityOf(owner, feedId)).toMatchObject({
+    expect(await availabilityOf(user, feedId)).toMatchObject({
       state: 'available',
       consecutiveFailures: 2,
     })
 
     // The third failure is where Feed Availability begins.
     await pollWhenDue(service, feedId)
-    expect(await availabilityOf(owner, feedId)).toEqual({
+    expect(await availabilityOf(user, feedId)).toEqual({
       state: 'unavailable',
       lastCheckedAt: service.clock.now().toISOString(),
       lastSuccessAt: START,
@@ -157,7 +157,7 @@ describe('Feed Availability', () => {
     })
 
     // The Subscription is never removed and its retained Feed Items remain.
-    const digest = (await (await owner.get('/api/digest')).json()) as {
+    const digest = (await (await user.get('/api/digest')).json()) as {
       groups: { items: { title: string }[] }[]
     }
     expect(digest.groups.flatMap((group) => group.items.map((item) => item.title))).toEqual(['First light'])
@@ -166,9 +166,9 @@ describe('Feed Availability', () => {
 
   it('resets the failure state the moment a later scheduled poll succeeds', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: '' })
     await pollWhenDue(service, feedId)
@@ -178,7 +178,7 @@ describe('Feed Availability', () => {
     service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
     await pollWhenDue(service, feedId)
 
-    expect(await availabilityOf(owner, feedId)).toEqual({
+    expect(await availabilityOf(user, feedId)).toEqual({
       state: 'available',
       lastCheckedAt: service.clock.now().toISOString(),
       lastSuccessAt: service.clock.now().toISOString(),
@@ -194,9 +194,9 @@ describe('Feed Availability', () => {
 
   it('keeps the failure run and its backoff across a restart', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: '' })
     await pollWhenDue(service, feedId)
@@ -219,9 +219,9 @@ describe('Feed Availability', () => {
 
   it('lets a manual retry restore availability immediately, inside the refresh rate limit', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: '' })
     await pollWhenDue(service, feedId)
@@ -229,17 +229,17 @@ describe('Feed Availability', () => {
     await pollWhenDue(service, feedId)
 
     // Right after the failed scheduled poll the manual retry is rate-limited.
-    const tooSoon = await owner.post(`/api/feeds/${feedId}/refresh`)
+    const tooSoon = await user.post(`/api/feeds/${feedId}/refresh`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
-    expect((await availabilityOf(owner, feedId)).state).toBe('unavailable')
+    expect((await availabilityOf(user, feedId)).state).toBe('unavailable')
 
     // The publisher comes back; one manual retry restores availability at once.
     service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
     service.clock.advance(61_000)
-    const retried = await owner.post(`/api/feeds/${feedId}/refresh`)
+    const retried = await user.post(`/api/feeds/${feedId}/refresh`)
     expect(retried.status).toBe(200)
-    expect(await availabilityOf(owner, feedId)).toMatchObject({
+    expect(await availabilityOf(user, feedId)).toMatchObject({
       state: 'available',
       consecutiveFailures: 0,
       category: null,
@@ -249,9 +249,9 @@ describe('Feed Availability', () => {
 
   it('keeps liveness and readiness untouched while Feeds fail', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: '' })
     await pollWhenDue(service, feedId)
@@ -264,7 +264,7 @@ describe('Feed Availability', () => {
 
   it('records each failure mode as its own safe category', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
     const modes: readonly {
       readonly url: string
@@ -305,7 +305,7 @@ describe('Feed Availability', () => {
 
     const feedIds = new Map<string, number>()
     for (const mode of modes) {
-      feedIds.set(mode.url, await subscribed(owner, service, mode.url))
+      feedIds.set(mode.url, await subscribed(user, service, mode.url))
     }
     for (const mode of modes) {
       service.upstream.stubDynamic(mode.url, mode.respond)
@@ -323,9 +323,9 @@ describe('Feed Availability', () => {
 
   it('logs safe poll outcomes without Feed content or sensitive query strings', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed?token=super-secret-value'
-    const feedId = await subscribed(owner, service, url)
+    const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: '' })
     await pollWhenDue(service, feedId)
@@ -430,7 +430,7 @@ describe('availability categories', () => {
       availabilityCategoryOf({ kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } })
 
     expect(failure('timeout')).toBe('timeout')
-    // Both ways of taking too long are one category to the Owner: the stored
+    // Both ways of taking too long are one category to the User: the stored
     // vocabulary says what they can act on, not which clock ran out.
     expect(failure('body_timeout')).toBe('timeout')
     expect(failure('too_large')).toBe('too_large')

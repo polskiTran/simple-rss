@@ -1,10 +1,10 @@
 import type { Page } from '@playwright/test'
-import { expect, OWNER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
 
 const SESSION_COOKIE = 'simple_rss_session'
 
-/** Claims the installation the way the Owner does on first visit. */
-async function claim(page: Page, installation: Installation, password = OWNER_PASSWORD): Promise<void> {
+/** Claims the installation the way the User does on first visit. */
+async function claim(page: Page, installation: Installation, password = USER_PASSWORD): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
   await page.getByLabel('password', { exact: true }).fill(password)
@@ -13,7 +13,7 @@ async function claim(page: Page, installation: Installation, password = OWNER_PA
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
-async function signIn(page: Page, installation: Installation, password = OWNER_PASSWORD): Promise<void> {
+async function signIn(page: Page, installation: Installation, password = USER_PASSWORD): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('password').fill(password)
   await page.getByRole('button', { name: 'sign in' }).click()
@@ -21,7 +21,7 @@ async function signIn(page: Page, installation: Installation, password = OWNER_P
 
 
 test.describe('claiming an installation in a browser', () => {
-  test('takes the setup secret and lands the Owner in the reader', async ({ page, installation }) => {
+  test('takes the setup secret and lands the User in the reader', async ({ page, installation }) => {
     await page.goto(installation.url)
 
     await expect(page.getByRole('form', { name: 'Claim this installation' })).toBeVisible()
@@ -87,7 +87,7 @@ test.describe('signing back in', () => {
 })
 
 test.describe('a page on another origin', () => {
-  test('cannot change the password with a form post, even with the Owner signed in', async ({
+  test('cannot change the password with a form post, even with the User signed in', async ({
     page,
     installation,
     foreign,
@@ -96,7 +96,7 @@ test.describe('a page on another origin', () => {
     foreign.serve(`
       <form id="attack" method="POST" action="${installation.url}/api/auth/password"
             enctype="text/plain">
-        <input name="currentPassword" value="${OWNER_PASSWORD}">
+        <input name="currentPassword" value="${USER_PASSWORD}">
       </form>
       <script>document.getElementById('attack').submit()</script>
     `)

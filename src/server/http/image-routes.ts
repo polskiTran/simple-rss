@@ -16,7 +16,7 @@ export interface ImageRouteDependencies {
 }
 
 /**
- * The image proxy: the only way a Feed or Reader image reaches the Owner's
+ * The image proxy: the only way a Feed or Reader image reaches the User's
  * browser. One route accepts a Feed Item identity, the other a URL extraction
  * itself signed — an arbitrary target is never accepted, so the proxy cannot
  * be pointed anywhere the installation did not already decide to look.

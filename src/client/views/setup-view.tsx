@@ -12,8 +12,8 @@ export interface SetupViewProps {
 
 /**
  * The first screen an installation ever shows: the one chance to become its
- * Owner. It asks for the deployment's setup secret rather than offering
- * registration, because there is no second Owner to make and no sign-up flow
+ * User. It asks for the deployment's setup secret rather than offering
+ * registration, because there is no second User to make and no sign-up flow
  * this reader would ever use it for.
  */
 export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
@@ -55,7 +55,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
 
   return (
     <form className="view measure gate" aria-label="Claim this installation" onSubmit={submit}>
-      <p className="empty-note">this installation has no owner yet — claim it with its setup secret</p>
+      <p className="empty-note">this installation has no user yet — claim it with its setup secret</p>
       <Field
         label="setup secret"
         type="password"

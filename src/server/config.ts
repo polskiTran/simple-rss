@@ -51,7 +51,7 @@ const envSchema = z.object({
   /** How long in-flight requests may finish after SIGTERM. */
   SHUTDOWN_GRACE_MS: z.coerce.number().int().min(0).max(120_000).default(10_000),
   /**
-   * The one-time secret that lets the first visitor become the Owner. Required
+   * The one-time secret that lets the first visitor become the User. Required
    * until the installation is claimed, after which it does nothing.
    *
    * Deliberately optional here: an absent or unusable secret keeps readiness
@@ -60,7 +60,7 @@ const envSchema = z.object({
    */
   SETUP_SECRET: z.string().trim().min(1).optional(),
   /**
-   * The canonical origin the Owner uses to reach this installation. Required
+   * The canonical origin the User uses to reach this installation. Required
    * so outbound retrieval can always refuse a URL pointing back at the API.
    */
   PUBLIC_ORIGIN: publicOrigin,

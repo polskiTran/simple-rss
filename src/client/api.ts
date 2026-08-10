@@ -45,7 +45,7 @@ import {
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
-  /** Seconds the server asked the Owner to wait, when it asked at all. */
+  /** Seconds the server asked the User to wait, when it asked at all. */
   readonly retryAfterSeconds: number | undefined
 
   constructor(status: number, code: string, retryAfterSeconds?: number) {
@@ -79,7 +79,7 @@ const STATUS_PATH = '/api/auth/status'
 
 /**
  * The code the server uses for "you are not signed in", as opposed to
- * `invalid_credentials`, which is a password the Owner got wrong while still
+ * `invalid_credentials`, which is a password the User got wrong while still
  * holding a perfectly good session.
  */
 const UNAUTHENTICATED = 'unauthenticated'
@@ -200,7 +200,7 @@ export async function fetchDigest(): Promise<Digest> {
   return digestSchema.parse(await response.json())
 }
 
-/** Retained reading metadata matching the Owner's words, newest first. */
+/** Retained reading metadata matching the User's words, newest first. */
 export async function fetchSearchResults(query: string): Promise<SearchResults> {
   const response = await request(`/api/search?q=${encodeURIComponent(query)}`)
   return searchResultsSchema.parse(await response.json())

@@ -30,16 +30,16 @@ function rss(title: string, items: readonly FeedItemFixture[]): string {
 
 const FEED_HEADERS = { 'content-type': 'application/rss+xml; charset=utf-8' }
 
-/** Subscribes the Owner to `url`, answering with the given document. */
+/** Subscribes the User to `url`, answering with the given document. */
 async function subscribed(
-  owner: Device,
+  user: Device,
   service: TestService,
   url: string,
   xml: string,
   headers: Record<string, string> = {},
 ): Promise<number> {
   service.upstream.stub(url, { headers: { ...FEED_HEADERS, ...headers }, body: xml })
-  const response = await owner.post('/api/subscriptions', { url })
+  const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
   const body = (await response.json()) as { subscription: { feedId: number } }
   return body.subscription.feedId
@@ -84,9 +84,9 @@ function heldBody(xml: string): { body: ReadableStream<Uint8Array>; release: () 
 describe('background polling', () => {
   it('polls a due Subscription and its additions and corrections reach the Digest on another device', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    await subscribed(owner, service, url, rss('Field Notes', [
+    await subscribed(user, service, url, rss('Field Notes', [
       { guid: 'entry-1', title: 'First light', pubDate: 'Fri, 08 Aug 2026 07:15:00 GMT' },
     ]))
 
@@ -127,7 +127,7 @@ describe('background polling', () => {
 
   it('asks conditionally and a not-modified answer advances scheduling without rewriting Feed Items', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
     const xml = rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }])
 
@@ -141,7 +141,7 @@ describe('background polling', () => {
           }
         : { status: 304, headers: { etag: '"v2"' } }
     })
-    const added = await owner.post('/api/subscriptions', { url })
+    const added = await user.post('/api/subscriptions', { url })
     expect(added.status).toBe(201)
 
     service.clock.advance(3 * HOUR_MS)
@@ -175,26 +175,26 @@ describe('background polling', () => {
 
   it('changes one Subscription’s Polling Interval and recomputes the next due time predictably', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    await subscribed(owner, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
+    await subscribed(user, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
 
     // The next due time is anchored on the last completed poll — here the
     // initial import — so the same change always lands on the same instant.
-    const shortened = await owner.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
+    const shortened = await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
     expect(shortened.status).toBe(200)
     expect(await shortened.json()).toEqual({
       pollingIntervalMinutes: 30,
       nextPollAt: nextPollTime(1, 30, new Date(START)),
     })
 
-    const repeated = await owner.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
+    const repeated = await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
     expect(await repeated.json()).toEqual({
       pollingIntervalMinutes: 30,
       nextPollAt: nextPollTime(1, 30, new Date(START)),
     })
 
-    const daily = await owner.put('/api/feeds/1/interval', { pollingIntervalMinutes: 1440 })
+    const daily = await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 1440 })
     expect(await daily.json()).toEqual({
       pollingIntervalMinutes: 1440,
       nextPollAt: nextPollTime(1, 1440, new Date(START)),
@@ -202,13 +202,13 @@ describe('background polling', () => {
     expect(scheduleOf(service, 1).pollingIntervalMinutes).toBe(1440)
 
     // Only the presets exist; there is no free-form schedule to mistype.
-    expect((await owner.put('/api/feeds/1/interval', { pollingIntervalMinutes: 45 })).status).toBe(400)
-    expect((await owner.put('/api/feeds/999/interval', { pollingIntervalMinutes: 30 })).status).toBe(404)
+    expect((await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 45 })).status).toBe(400)
+    expect((await user.put('/api/feeds/999/interval', { pollingIntervalMinutes: 30 })).status).toBe(404)
     const visitor = new Device(service)
     expect((await visitor.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })).status).toBe(401)
 
     // The shortened interval is what the scheduler actually honours.
-    await owner.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
+    await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
     service.clock.advance(35 * 60_000)
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(url)).toHaveLength(2)
@@ -217,9 +217,9 @@ describe('background polling', () => {
 
   it('spreads Subscriptions sharing a preset and keeps their schedules across restarts', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
-    await subscribed(owner, service, 'https://one.example/feed', rss('One', [{ guid: 'a', title: 'A' }]))
-    await subscribed(owner, service, 'https://two.example/feed', rss('Two', [{ guid: 'b', title: 'B' }]))
+    const user = await claimedDevice(service)
+    await subscribed(user, service, 'https://one.example/feed', rss('One', [{ guid: 'a', title: 'A' }]))
+    await subscribed(user, service, 'https://two.example/feed', rss('Two', [{ guid: 'b', title: 'B' }]))
 
     const [first, second] = [scheduleOf(service, 1), scheduleOf(service, 2)]
     expect(first.nextPollAt).not.toBe(second.nextPollAt)
@@ -231,9 +231,9 @@ describe('background polling', () => {
 
   it('catches up Subscriptions that fell due while the service was down', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    await subscribed(owner, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
+    await subscribed(user, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
 
     // The container is replaced and a whole day passes before it returns.
     service.clock.advance(26 * HOUR_MS)
@@ -246,13 +246,13 @@ describe('background polling', () => {
 
   it('polls a bounded batch, oldest due first, and the rest on the next wake', async () => {
     const service = await startTestService({ scheduling: { batchLimit: 2 } })
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const urls = ['https://one.example/feed', 'https://two.example/feed', 'https://three.example/feed']
     for (const [index, url] of urls.entries()) {
-      await subscribed(owner, service, url, rss(`Feed ${index}`, [{ guid: 'a', title: 'A' }]))
+      await subscribed(user, service, url, rss(`Feed ${index}`, [{ guid: 'a', title: 'A' }]))
     }
-    await owner.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
-    await owner.put('/api/feeds/2/interval', { pollingIntervalMinutes: 60 })
+    await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
+    await user.put('/api/feeds/2/interval', { pollingIntervalMinutes: 60 })
 
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
@@ -266,10 +266,10 @@ describe('background polling', () => {
 
   it('keeps no more than four Feed retrievals in flight at once', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const urls = Array.from({ length: 6 }, (_, index) => `https://feed${index + 1}.example/feed`)
     for (const url of urls) {
-      await subscribed(owner, service, url, rss(url, [{ guid: 'a', title: 'A' }]))
+      await subscribed(user, service, url, rss(url, [{ guid: 'a', title: 'A' }]))
     }
     const creations = service.upstream.requests.length
 
@@ -294,9 +294,9 @@ describe('background polling', () => {
 
   it('coalesces a manual refresh with the running poll and never changes the Polling Interval', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    await subscribed(owner, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
+    await subscribed(user, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
 
     const { body, release } = heldBody(rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
     service.upstream.stub(url, { headers: FEED_HEADERS, body })
@@ -305,9 +305,9 @@ describe('background polling', () => {
     const wake = service.wakeScheduler()
     await vi.waitFor(() => expect(service.upstream.requestsTo(url)).toHaveLength(2))
 
-    // The Owner presses refresh while the scheduled poll is still in flight:
+    // The User presses refresh while the scheduled poll is still in flight:
     // one retrieval serves both, and the schedule is simply the poll's.
-    const refreshed = owner.post('/api/feeds/1/refresh')
+    const refreshed = user.post('/api/feeds/1/refresh')
     await new Promise((resolve) => setTimeout(resolve, 25))
     expect(service.upstream.requestsTo(url)).toHaveLength(2)
 

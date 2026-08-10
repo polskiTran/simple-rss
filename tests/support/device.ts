@@ -1,5 +1,5 @@
 import { SESSION_COOKIE } from '../../src/server/http/session-cookie.js'
-import { OWNER_PASSWORD, SETUP_SECRET, type TestService } from './service-harness.js'
+import { USER_PASSWORD, SETUP_SECRET, type TestService } from './service-harness.js'
 
 export interface DeviceOptions {
   /** The address a proxy would report for this device, for rate-limit tests. */
@@ -14,7 +14,7 @@ export interface DeviceOptions {
  *
  * Tests are written as devices rather than raw requests because the behaviour
  * being asserted is about devices — a phone and a laptop signed in at once, one
- * of them signing out, a session that idled while its owner was away.
+ * of them signing out, a session that idled while its user was away.
  */
 export class Device {
   readonly #service: TestService
@@ -57,11 +57,11 @@ export class Device {
     return this.get('/api/auth/status')
   }
 
-  claim(password: string = OWNER_PASSWORD, setupSecret: string = SETUP_SECRET): Promise<Response> {
+  claim(password: string = USER_PASSWORD, setupSecret: string = SETUP_SECRET): Promise<Response> {
     return this.post('/api/auth/setup', { setupSecret, password })
   }
 
-  signIn(password: string = OWNER_PASSWORD): Promise<Response> {
+  signIn(password: string = USER_PASSWORD): Promise<Response> {
     return this.post('/api/auth/session', { password })
   }
 

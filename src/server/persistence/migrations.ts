@@ -11,7 +11,7 @@ export interface Migration {
 /**
  * Every schema change this installation has ever made, in order. Migrations
  * are literal SQL rather than generated diffs so that a reviewer can read
- * exactly what will run against an Owner's volume, and so that the compiled
+ * exactly what will run against a User's volume, and so that the compiled
  * server carries them without shipping loose `.sql` files.
  *
  * Migrations are append-only. Correct a released migration with a new one.
@@ -42,9 +42,13 @@ export const migrations: readonly Migration[] = [
     version: 2,
     name: 'owner-authentication',
     sql: `
-      -- The Owner's single password verifier. One row, like the installation
+      -- The User's single password verifier. One row, like the installation
       -- it belongs to: its presence is what "claimed" means, so the CHECK is
-      -- what makes a second Owner unrepresentable rather than merely refused.
+      -- what makes a second User unrepresentable rather than merely refused.
+      --
+      -- Released as written, so the name and the owner_ spelling stay: this
+      -- is the record of what already ran against existing volumes, back when
+      -- the glossary called this person the Owner. Migration 7 renames it.
       CREATE TABLE owner_auth (
         id            INTEGER PRIMARY KEY CHECK (id = 1),
         password_hash TEXT    NOT NULL,
@@ -75,7 +79,7 @@ export const migrations: readonly Migration[] = [
     name: 'feeds-subscriptions-and-items',
     sql: `
       -- A Feed is publisher-owned metadata and retrieval identity. The URL the
-      -- Owner entered and the last validated redirect target are deliberately
+      -- User entered and the last validated redirect target are deliberately
       -- separate: provenance must survive an ordinary Feed migration.
       CREATE TABLE feeds (
         id           INTEGER PRIMARY KEY,
@@ -96,7 +100,7 @@ export const migrations: readonly Migration[] = [
       );
       CREATE INDEX feed_url_aliases_feed_id ON feed_url_aliases (feed_id);
 
-      -- The Owner's choice to include a Feed. It is not folded into feeds:
+      -- The User's choice to include a Feed. It is not folded into feeds:
       -- future unsubscribe must be able to stop polling without erasing Feed
       -- attribution held by a Library item.
       CREATE TABLE subscriptions (
@@ -228,6 +232,22 @@ export const migrations: readonly Migration[] = [
       INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
       SELECT feed_items.id, feed_items.title, feed_items.summary, feeds.title
       FROM feed_items JOIN feeds ON feeds.id = feed_items.feed_id;
+    `,
+  },
+  {
+    version: 7,
+    name: 'user-auth-rename',
+    sql: `
+      -- The glossary renamed the Owner to the User, and storage follows so
+      -- that a reader of the schema meets one word for one concept. Nothing
+      -- about the singleton changes: same row, same verifier, same claim.
+      --
+      -- A plain RENAME is enough. Nothing references this table — no foreign
+      -- key, trigger, or view points at it — so there is no dependent SQL for
+      -- SQLite to rewrite, and the row survives untouched rather than being
+      -- copied through a rebuild that could drop the password verifier.
+      -- The CHECK is inline and unnamed, so it carries over as it is.
+      ALTER TABLE owner_auth RENAME TO user_auth;
     `,
   },
 ]

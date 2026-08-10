@@ -1,11 +1,11 @@
 import type { Page } from '@playwright/test'
-import { expect, OWNER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(OWNER_PASSWORD)
-  await page.getByLabel('confirm password').fill(OWNER_PASSWORD)
+  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
+  await page.getByLabel('confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'claim' }).click()
   await page.getByRole('link', { name: 'feeds' }).click()
   // One sticky control searches and adds: an exact URL subscribes on enter.

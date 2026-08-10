@@ -55,7 +55,7 @@
    not invented: body prose takes the title ink, muted prose takes the metadata
    grey, and the hairline is the title ink at the same 15%.
 
-   The Owner may pin an appearance per device in Settings, carried as
+   The User may pin an appearance per device in Settings, carried as
    `data-appearance` on the document element. `system` sets no attribute and
    these media rules keep deciding; a pinned `light` opts out of them, and a
    pinned `dark` rebinds the same tokens below regardless of the device. */
@@ -255,7 +255,7 @@
     /* The pressed tab flips instantly — the flip is the feedback — and the
        view it summons fades in. 150ms and opacity only: brief enough that
        the hundredth change still feels instant, and entrance-only, so
-       nothing the Owner does ever waits on an exit
+       nothing the User does ever waits on an exit
        (`docs/DESIGN.md` §5, Motion). */
     transition: opacity 150ms ease-out;
   }
@@ -640,7 +640,7 @@
      The consequence sentence carries the weight; the buttons stay quiet.
      The unfold is literal — the reveal's grid row opens from nothing over one
      breath, so the notice and the items below arrive rather than teleport.
-     Dismissal unmounts instantly: the Owner acted, and the flip is the
+     Dismissal unmounts instantly: the User acted, and the flip is the
      feedback (`docs/DESIGN.md` §5, Motion). */
   .unsubscribe-reveal {
     display: grid;
@@ -934,9 +934,9 @@
     margin-top: 48px;
   }
 
-  /* Extraction answers on the network's clock, not the Owner's, so its
+  /* Extraction answers on the network's clock, not the User's, so its
      arrival — the article, or the fallback — enters on a breath: a 200ms
-     fade, opacity only, the paper and the prose holding still. The Owner's
+     fade, opacity only, the paper and the prose holding still. The User's
      own flips stay instant (`docs/DESIGN.md` §5, Motion). */
   .article-body,
   .reader-fallback {
@@ -1367,7 +1367,7 @@
 }
 
 /* Dark paper carries 4px more headroom, per the layout table — whether the
-   device chose dark or the Owner pinned it. */
+   device chose dark or the User pinned it. */
 @media (prefers-color-scheme: dark) and (min-width: 641px) {
   :root:not([data-appearance='light']) .paper {
     padding: 36px 56px 0;

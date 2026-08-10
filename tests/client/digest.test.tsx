@@ -243,7 +243,7 @@ describe('searching from the Digest', () => {
     expect(await screen.findByText('search is unavailable — try again in a moment')).toBeDefined()
   })
 
-  it('keeps a save made in the results when the Owner returns to the Digest', async () => {
+  it('keeps a save made in the results when the User returns to the Digest', async () => {
     stubApi()
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=first', { body: { results: [result(3, 'First light', 'today, 07:15')] } })

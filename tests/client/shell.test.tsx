@@ -6,7 +6,7 @@ import { ROUTES } from '../../src/client/routing.js'
 import { stubApi } from './stub-api.js'
 
 /**
- * Renders the shell for an Owner who is already signed in, and waits for the
+ * Renders the shell for a User who is already signed in, and waits for the
  * first status answer — the tabs are not furniture until then, because until
  * then the client does not know there is a reader to navigate.
  */

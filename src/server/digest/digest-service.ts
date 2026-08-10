@@ -7,7 +7,7 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { dateKey, dayBefore, inDigestOrder, timeLabel } from './chronology.js'
 
-/** Chronology and installation-timezone date grouping for the Owner's Digest. */
+/** Chronology and installation-timezone date grouping for the User's Digest. */
 export class DigestService {
   readonly #db: BetterSQLite3Database
   readonly #clock: Clock

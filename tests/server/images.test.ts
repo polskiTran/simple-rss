@@ -30,7 +30,7 @@ const item = (guid: string, title: string, imageUrl?: string) => `
   </item>`
 
 interface ImageSetup {
-  readonly owner: Device
+  readonly user: Device
   /** The Feed Item whose enclosure is the stubbed hero image. */
   readonly withImage: number
   /** A Feed Item that never carried an image. */
@@ -43,10 +43,10 @@ async function imageSetup(service: TestService, imageUrl: string = IMAGE_URL): P
     body: rss(item('hero', 'With a hero image', imageUrl), item('plain', 'Words alone')),
   })
 
-  const owner = await claimedDevice(service)
-  expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+  const user = await claimedDevice(service)
+  expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-  const digest = (await (await owner.get('/api/digest')).json()) as {
+  const digest = (await (await user.get('/api/digest')).json()) as {
     groups: { items: { feedItemId: number; title: string }[] }[]
   }
   const items = digest.groups.flatMap((group) => group.items)
@@ -56,7 +56,7 @@ async function imageSetup(service: TestService, imageUrl: string = IMAGE_URL): P
     return found.feedItemId
   }
 
-  return { owner, withImage: idOf('With a hero image'), plain: idOf('Words alone') }
+  return { user, withImage: idOf('With a hero image'), plain: idOf('Words alone') }
 }
 
 describe('who may ask for an image', () => {
@@ -73,9 +73,9 @@ describe('the Feed Item image route', () => {
   it('streams the stored image with private week-long caching and nosniff', async () => {
     const service = await startTestService()
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const response = await owner.get(`/api/items/${withImage}/image`)
+    const response = await user.get(`/api/items/${withImage}/image`)
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('image/png')
     expect(response.headers.get('cache-control')).toBe(`private, max-age=${IMAGE_CACHE_SECONDS}`)
@@ -90,8 +90,8 @@ describe('the Feed Item image route', () => {
   it('forwards no cookies or credentials to the publisher', async () => {
     const service = await startTestService()
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
-    expect((await owner.get(`/api/items/${withImage}/image`)).status).toBe(200)
+    const { user, withImage } = await imageSetup(service)
+    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(200)
 
     const [request] = service.upstream.requestsTo(IMAGE_URL)
     if (!request) throw new Error('the image was never requested upstream')
@@ -104,21 +104,21 @@ describe('the Feed Item image route', () => {
 
   it('answers an uncached 404 for items without an image, unknown items, and bad identities', async () => {
     const service = await startTestService()
-    const { owner, plain } = await imageSetup(service)
+    const { user, plain } = await imageSetup(service)
 
-    const noImage = await owner.get(`/api/items/${plain}/image`)
+    const noImage = await user.get(`/api/items/${plain}/image`)
     expect(noImage.status).toBe(404)
     expect(noImage.headers.get('cache-control')).toBe('no-store')
 
-    expect((await owner.get('/api/items/999/image')).status).toBe(404)
-    expect((await owner.get('/api/items/not-an-id/image')).status).toBe(404)
+    expect((await user.get('/api/items/999/image')).status).toBe(404)
+    expect((await user.get('/api/items/not-an-id/image')).status).toBe(404)
   })
 
   it('points the Digest at the proxy and never at the publisher', async () => {
     const service = await startTestService()
-    const { owner, withImage, plain } = await imageSetup(service)
+    const { user, withImage, plain } = await imageSetup(service)
 
-    const digest = await (await owner.get('/api/digest')).text()
+    const digest = await (await user.get('/api/digest')).text()
     expect(digest).toContain(`/api/items/${withImage}/image`)
     expect(digest).not.toContain(IMAGE_URL)
 
@@ -141,8 +141,8 @@ const ARTICLE_HTML = `<!doctype html>
   </html>`
 
 /** Reads the one signed image path out of an extracted article. */
-async function signedImagePath(owner: Device, feedItemId: number): Promise<string> {
-  const response = await owner.get(`/api/items/${feedItemId}/reader`)
+async function signedImagePath(user: Device, feedItemId: number): Promise<string> {
+  const response = await user.get(`/api/items/${feedItemId}/reader`)
   expect(response.status).toBe(200)
   const { markdown } = (await response.json()) as { markdown: string }
   const match = /!\[[^\]]*\]\(([^)]+)\)/.exec(markdown)
@@ -155,12 +155,12 @@ describe('the signed Reader image route', () => {
     const service = await startTestService()
     service.upstream.stub(ARTICLE_URL, { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML })
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const path = await signedImagePath(owner, withImage)
+    const path = await signedImagePath(user, withImage)
     expect(path.startsWith(`${READER_IMAGE_PATH}?`)).toBe(true)
 
-    const image = await owner.get(path)
+    const image = await user.get(path)
     expect(image.status).toBe(200)
     expect(image.headers.get('content-type')).toBe('image/png')
     expect(image.headers.get('cache-control')).toBe(`private, max-age=${IMAGE_CACHE_SECONDS}`)
@@ -169,9 +169,9 @@ describe('the signed Reader image route', () => {
   it('refuses an unsigned or arbitrary target', async () => {
     const service = await startTestService()
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner } = await imageSetup(service)
+    const { user } = await imageSetup(service)
 
-    const unsigned = await owner.get(`${READER_IMAGE_PATH}?url=${encodeURIComponent(IMAGE_URL)}`)
+    const unsigned = await user.get(`${READER_IMAGE_PATH}?url=${encodeURIComponent(IMAGE_URL)}`)
     expect(unsigned.status).toBe(404)
     expect(unsigned.headers.get('cache-control')).toBe('no-store')
     expect(service.upstream.requestsTo(IMAGE_URL)).toHaveLength(0)
@@ -181,16 +181,16 @@ describe('the signed Reader image route', () => {
     const service = await startTestService()
     service.upstream.stub(ARTICLE_URL, { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML })
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const path = await signedImagePath(owner, withImage)
+    const path = await signedImagePath(user, withImage)
     const tampered = path.replace(
       encodeURIComponent(IMAGE_URL),
       encodeURIComponent('https://somewhere-else.example/loot.png'),
     )
     expect(tampered).not.toBe(path)
 
-    expect((await owner.get(tampered)).status).toBe(404)
+    expect((await user.get(tampered)).status).toBe(404)
     expect(service.upstream.requestsTo('https://somewhere-else.example/loot.png')).toHaveLength(0)
   })
 
@@ -198,25 +198,25 @@ describe('the signed Reader image route', () => {
     const service = await startTestService()
     service.upstream.stub(ARTICLE_URL, { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML })
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const path = await signedImagePath(owner, withImage)
-    expect((await owner.get(path)).status).toBe(200)
+    const path = await signedImagePath(user, withImage)
+    expect((await user.get(path)).status).toBe(200)
 
     service.clock.advance((2 * 86_400 + 60) * 1000)
-    expect((await owner.get(path)).status).toBe(404)
+    expect((await user.get(path)).status).toBe(404)
   })
 
   it('refuses old signed paths after a restart, because the key is per process', async () => {
     const service = await startTestService()
     service.upstream.stub(ARTICLE_URL, { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML })
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
-    const path = await signedImagePath(owner, withImage)
+    const { user, withImage } = await imageSetup(service)
+    const path = await signedImagePath(user, withImage)
 
     // The session survives the restart on the volume; the signing key does not.
     await service.restart()
-    expect((await owner.get(path)).status).toBe(404)
+    expect((await user.get(path)).status).toBe(404)
   })
 })
 
@@ -233,18 +233,18 @@ async function signedInDevice(service: TestService, address: string): Promise<De
 describe('destination hardening', () => {
   it('refuses an image pointing back at this installation', async () => {
     const service = await startTestService()
-    const { owner, withImage } = await imageSetup(service, 'https://reader.test/api/auth/status')
+    const { user, withImage } = await imageSetup(service, 'https://reader.test/api/auth/status')
 
-    const response = await owner.get(`/api/items/${withImage}/image`)
+    const response = await user.get(`/api/items/${withImage}/image`)
     expect(response.status).toBe(404)
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
   it('refuses an image on a private address', async () => {
     const service = await startTestService()
-    const { owner, withImage } = await imageSetup(service, 'https://192.168.1.20/hero.png')
+    const { user, withImage } = await imageSetup(service, 'https://192.168.1.20/hero.png')
 
-    expect((await owner.get(`/api/items/${withImage}/image`)).status).toBe(404)
+    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
     expect(service.upstream.requests).not.toContainEqual(
       expect.objectContaining({ url: 'https://192.168.1.20/hero.png' }),
     )
@@ -253,9 +253,9 @@ describe('destination hardening', () => {
   it('refuses an image that redirects to a private address', async () => {
     const service = await startTestService()
     service.upstream.stub(IMAGE_URL, { status: 302, headers: { location: 'https://10.0.0.5/internal.png' } })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    expect((await owner.get(`/api/items/${withImage}/image`)).status).toBe(404)
+    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
     expect(service.upstream.requests).not.toContainEqual(
       expect.objectContaining({ url: 'https://10.0.0.5/internal.png' }),
     )
@@ -273,9 +273,9 @@ describe('destination hardening', () => {
     }
 
     const service = await startTestService({ upstream: new MovedDns() })
-    const { owner, withImage } = await imageSetup(service, 'https://moved.example/hero.png')
+    const { user, withImage } = await imageSetup(service, 'https://moved.example/hero.png')
 
-    expect((await owner.get(`/api/items/${withImage}/image`)).status).toBe(404)
+    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
     expect(service.upstream.requests).not.toContainEqual(
       expect.objectContaining({ url: 'https://moved.example/hero.png' }),
     )
@@ -289,9 +289,9 @@ describe('format validation', () => {
   ])('refuses %s', async (_name, contentType, body) => {
     const service = await startTestService()
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': contentType }, body })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const response = await owner.get(`/api/items/${withImage}/image`)
+    const response = await user.get(`/api/items/${withImage}/image`)
     expect(response.status).toBe(404)
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
@@ -302,9 +302,9 @@ describe('format validation', () => {
       headers: { 'content-type': 'image/png' },
       body: '<html>spoofed as png</html>',
     })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const response = await owner.get(`/api/items/${withImage}/image`)
+    const response = await user.get(`/api/items/${withImage}/image`)
     expect(response.status).toBe(404)
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
@@ -312,9 +312,9 @@ describe('format validation', () => {
   it('refuses a mismatch even between two allowed formats', async () => {
     const service = await startTestService()
     service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/jpeg' }, body: pngBytes() })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    expect((await owner.get(`/api/items/${withImage}/image`)).status).toBe(404)
+    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
   })
 
   it('accepts each allowed format when the bytes agree', async () => {
@@ -325,11 +325,11 @@ describe('format validation', () => {
       ['image/avif', avifBytes()],
     ]
     const service = await startTestService()
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
     for (const [contentType, bytes] of formats) {
       service.upstream.stub(IMAGE_URL, { headers: { 'content-type': contentType }, body: bytes })
-      const response = await owner.get(`/api/items/${withImage}/image`)
+      const response = await user.get(`/api/items/${withImage}/image`)
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toBe(contentType)
     }
@@ -362,9 +362,9 @@ describe('resource limits', () => {
       headers: { 'content-type': 'image/png', 'content-length': String(6 * 1024 * 1024) },
       body: pngBytes(),
     })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    expect((await owner.get(`/api/items/${withImage}/image`)).status).toBe(404)
+    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
   })
 
   it('streams by count, so a small false Content-Length does not truncate', async () => {
@@ -373,9 +373,9 @@ describe('resource limits', () => {
       headers: { 'content-type': 'image/png', 'content-length': '10' },
       body: pngBytes(64),
     })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const response = await owner.get(`/api/items/${withImage}/image`)
+    const response = await user.get(`/api/items/${withImage}/image`)
     expect(response.status).toBe(200)
     expect((await response.arrayBuffer()).byteLength).toBe(64)
   })
@@ -387,9 +387,9 @@ describe('resource limits', () => {
       headers: { 'content-type': 'image/png' },
       body: chunkedBody([pngBytes(megabyte), ...Array.from({ length: 5 }, () => new Uint8Array(megabyte))]),
     })
-    const { owner, withImage } = await imageSetup(service)
+    const { user, withImage } = await imageSetup(service)
 
-    const response = await owner.get(`/api/items/${withImage}/image`)
+    const response = await user.get(`/api/items/${withImage}/image`)
     // The headers were honest when they left; the lie is only discovered
     // mid-body, where the connection is torn down rather than completed.
     await expect(async () => {
@@ -414,7 +414,7 @@ describe('image rate limiting', () => {
     expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
     expect(refused.headers.get('cache-control')).toBe('no-store')
 
-    // The window is per client address, so the Owner's other device is not
+    // The window is per client address, so the User's other device is not
     // slowed by the greedy one.
     const other = await signedInDevice(service, '203.0.113.8')
     expect((await other.get('/api/items/999/image')).status).toBe(404)

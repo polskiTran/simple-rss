@@ -11,7 +11,7 @@ import { hash, verify, type Algorithm } from '@node-rs/argon2'
 const ARGON2ID = 2 as Algorithm
 
 /**
- * How the Owner's password becomes a stored verifier, as a dependency rather
+ * How the User's password becomes a stored verifier, as a dependency rather
  * than a direct call. Everything that touches a password goes through this
  * interface, so the algorithm lives in exactly one place.
  */

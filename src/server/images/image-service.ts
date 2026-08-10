@@ -14,7 +14,7 @@ export type ImageOutcome =
 
 /**
  * Streams Feed and Reader images through the hardened retrieval boundary, so
- * the Owner's browser never asks a publisher for anything. The boundary owns
+ * the User's browser never asks a publisher for anything. The boundary owns
  * the destination, redirect, size, and concurrency policy; this service adds
  * the one check the boundary cannot make — that the bytes really are the
  * image the publisher declared. Nothing is resized, transformed, or stored.

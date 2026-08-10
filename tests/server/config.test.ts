@@ -92,7 +92,7 @@ describe('loadConfig', () => {
   it.each([
     'reader.example.com',
     'ftp://reader.example.com',
-    'https://owner:secret@reader.example.com',
+    'https://user:secret@reader.example.com',
     'https://reader.example.com/path',
     'https://reader.example.com?token=secret',
   ])('rejects the non-origin PUBLIC_ORIGIN %j', (publicOrigin) => {

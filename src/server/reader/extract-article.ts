@@ -4,7 +4,7 @@ import type { SignImageUrl } from '../images/image-url-signature.js'
 import { articleMarkdown } from './article-markdown.js'
 
 /**
- * How fast the estimate assumes the Owner reads. One steady number: the
+ * How fast the estimate assumes the User reads. One steady number: the
  * Reader header answers "roughly how long", not "exactly how fast are you".
  */
 const WORDS_PER_MINUTE = 225

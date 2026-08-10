@@ -19,7 +19,7 @@ type DetailState =
 
 export interface FeedViewProps {
   readonly feedId: number
-  /** Told when the Owner goes back to the Feeds list. */
+  /** Told when the User goes back to the Feeds list. */
   onBack(): void
   /** Opens one Feed Item in the Reader. */
   onOpenItem(feedItemId: number): void
@@ -28,7 +28,7 @@ export interface FeedViewProps {
 /**
  * One Feed, explored through its cadence: the 26-week grid, the one-line
  * statistics beneath it, the retained Feed Items, and the polling behaviour —
- * interval, manual refresh, Feed Availability — the Owner manages here.
+ * interval, manual refresh, Feed Availability — the User manages here.
  */
 export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
   const [state, setState] = useState<DetailState>({ kind: 'loading' })
@@ -97,7 +97,7 @@ export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
   }
 
   /**
-   * The confirmed unsubscribe. Success returns the Owner to the Feeds list —
+   * The confirmed unsubscribe. Success returns the User to the Feeds list —
    * this screen describes a Subscription that no longer exists.
    */
   async function unsubscribe() {

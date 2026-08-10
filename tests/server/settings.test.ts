@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { digestSchema, installationPreferencesSchema } from '../../src/shared/api.js'
 import { claimedDevice, Device } from '../support/device.js'
-import { OWNER_PASSWORD, SETUP_SECRET, startTestService } from '../support/service-harness.js'
+import { USER_PASSWORD, SETUP_SECRET, startTestService } from '../support/service-harness.js'
 
 const FEED_URL = 'https://journal.example/feed'
 
@@ -23,7 +23,7 @@ describe('installation timezone detection at claim', () => {
 
     const claimed = await device.post('/api/auth/setup', {
       setupSecret: SETUP_SECRET,
-      password: OWNER_PASSWORD,
+      password: USER_PASSWORD,
       timezone: 'Pacific/Auckland',
     })
 
@@ -38,7 +38,7 @@ describe('installation timezone detection at claim', () => {
 
     const claimed = await device.post('/api/auth/setup', {
       setupSecret: SETUP_SECRET,
-      password: OWNER_PASSWORD,
+      password: USER_PASSWORD,
       timezone: 'Mars/Olympus_Mons',
     })
 
@@ -53,7 +53,7 @@ describe('installation timezone detection at claim', () => {
 
     const refused = await device.post('/api/auth/setup', {
       setupSecret: 'not-the-setup-secret',
-      password: OWNER_PASSWORD,
+      password: USER_PASSWORD,
       timezone: 'Pacific/Auckland',
     })
 
@@ -71,16 +71,16 @@ describe('the Settings preferences API', () => {
     expect((await stranger.put('/api/settings/timezone', { timezone: 'UTC' })).status).toBe(401)
   })
 
-  it('lets the Owner change the installation timezone, regrouping the Digest', async () => {
+  it('lets the User change the installation timezone, regrouping the Digest', async () => {
     const service = await startTestService()
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
-    const owner = await claimedDevice(service)
-    expect((await owner.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const before = digestSchema.parse(await (await owner.get('/api/digest')).json())
+    const before = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(before.groups.map(({ label }) => label)).toEqual(['yesterday'])
 
-    const changed = await owner.put('/api/settings/timezone', { timezone: 'Pacific/Auckland' })
+    const changed = await user.put('/api/settings/timezone', { timezone: 'Pacific/Auckland' })
     expect(changed.status).toBe(200)
     expect(installationPreferencesSchema.parse(await changed.json())).toEqual({
       timezone: 'Pacific/Auckland',
@@ -88,15 +88,15 @@ describe('the Settings preferences API', () => {
 
     // One installation timezone defines calendar groups across devices: the
     // same stored instant now reads as today.
-    const after = digestSchema.parse(await (await owner.get('/api/digest')).json())
+    const after = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(after.groups.map(({ label }) => label)).toEqual(['today'])
     expect(after.today).toEqual({ date: '2026-08-08', volume: 1 })
   })
 
   it('survives a restart, like any other installation state', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
-    expect((await owner.put('/api/settings/timezone', { timezone: 'Europe/Warsaw' })).status).toBe(200)
+    const user = await claimedDevice(service)
+    expect((await user.put('/api/settings/timezone', { timezone: 'Europe/Warsaw' })).status).toBe(200)
 
     await service.restart()
 
@@ -105,9 +105,9 @@ describe('the Settings preferences API', () => {
 
   it('refuses a timezone the runtime cannot resolve', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    const refused = await owner.put('/api/settings/timezone', { timezone: 'Mars/Olympus_Mons' })
+    const refused = await user.put('/api/settings/timezone', { timezone: 'Mars/Olympus_Mons' })
 
     expect(refused.status).toBe(400)
     expect(await refused.json()).toMatchObject({ error: { code: 'unknown_timezone' } })
@@ -116,9 +116,9 @@ describe('the Settings preferences API', () => {
 
   it('refuses a body that is not a timezone at all', async () => {
     const service = await startTestService()
-    const owner = await claimedDevice(service)
+    const user = await claimedDevice(service)
 
-    expect((await owner.put('/api/settings/timezone', { timezone: '' })).status).toBe(400)
-    expect((await owner.put('/api/settings/timezone', {})).status).toBe(400)
+    expect((await user.put('/api/settings/timezone', { timezone: '' })).status).toBe(400)
+    expect((await user.put('/api/settings/timezone', {})).status).toBe(400)
   })
 })

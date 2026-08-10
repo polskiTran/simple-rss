@@ -69,7 +69,7 @@ export function parseOpml(text: string): readonly OpmlFeedOutline[] {
 }
 
 /**
- * Writes the Owner's active Subscriptions as an OPML 2.0 document. Each
+ * Writes the User's active Subscriptions as an OPML 2.0 document. Each
  * outline carries `type`, `text`, `title`, and `xmlUrl` — the standard
  * metadata other readers import from — with the resolved URL, because it is
  * the endpoint that currently answers.

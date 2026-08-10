@@ -17,7 +17,7 @@ export const readinessSchema = z.discriminatedUnion('status', [
 export type Readiness = z.infer<typeof readinessSchema>
 
 /**
- * Deliberately free of Owner data: it answers "which build is running" for
+ * Deliberately free of User data: it answers "which build is running" for
  * upgrades and smoke tests, and nothing else.
  */
 export const serviceMetaSchema = z.object({
@@ -35,7 +35,7 @@ export const apiErrorSchema = z.object({
 export type ApiError = z.infer<typeof apiErrorSchema>
 
 /**
- * The shortest password the Owner may choose. There is one Owner and no
+ * The shortest password the User may choose. There is one User and no
  * password reset by email, so length is the whole policy: no character
  * classes, no expiry, nothing that pushes someone toward a worse password
  * they will write down.
@@ -94,9 +94,9 @@ export const claimRequestSchema = z.object({
 export type ClaimRequest = z.infer<typeof claimRequestSchema>
 
 /**
- * The Owner-editable installation preferences behind the Settings sheet. One
+ * The User-editable installation preferences behind the Settings sheet. One
  * timezone for the whole installation, so the Digest's calendar groups agree
- * across the Owner's devices.
+ * across the User's devices.
  */
 export const installationPreferencesSchema = z.object({
   timezone: z.string(),
@@ -158,7 +158,7 @@ const positiveIdParameterSchema = z
 export const feedIdParameterSchema = positiveIdParameterSchema
 export const feedItemIdParameterSchema = positiveIdParameterSchema
 
-/** Exact Feed endpoint submitted by the Owner; discovery is deliberately absent. */
+/** Exact Feed endpoint submitted by the User; discovery is deliberately absent. */
 export const createSubscriptionRequestSchema = z.object({
   url: z.string().min(1).max(2_048),
 })
@@ -167,7 +167,7 @@ export type CreateSubscriptionRequest = z.infer<typeof createSubscriptionRequest
 /**
  * The largest decoded Feed document a retrieval will accept, in MiB. It lives
  * in the shared contract because both sides say it out loud: the server owns
- * the ceiling, and the client tells the Owner the number they just exceeded.
+ * the ceiling, and the client tells the User the number they just exceeded.
  */
 export const MAX_FEED_SIZE_MIB = 20
 
@@ -182,7 +182,7 @@ export type ImportOpmlRequest = z.infer<typeof importOpmlRequestSchema>
 
 /**
  * What happened to one Feed the OPML listed. `reason` explains a skip or a
- * failure in the Owner's terms; an added Feed needs none.
+ * failure in the User's terms; an added Feed needs none.
  */
 export const opmlImportFeedSchema = z.object({
   url: z.string(),
@@ -206,7 +206,7 @@ export const feedSummarySchema = z.object({
 })
 export type FeedSummary = z.infer<typeof feedSummarySchema>
 
-/** Consecutive failures before Feed Availability is surfaced to the Owner. */
+/** Consecutive failures before Feed Availability is surfaced to the User. */
 export const FEED_UNAVAILABLE_AFTER_FAILURES = 3
 
 /**
@@ -290,7 +290,7 @@ export type FeedItemRow = z.infer<typeof feedItemRowSchema>
 
 /**
  * One opened Feed: identity, retained Feed Items, the cadence observations
- * behind the grid, and the polling behaviour the Owner manages there.
+ * behind the grid, and the polling behaviour the User manages there.
  * `cadence` runs oldest to newest from the first day of the grid window
  * through today, so a fixed dataset always draws the same grid.
  */
@@ -335,7 +335,7 @@ export const digestSchema = z.object({
 export type Digest = z.infer<typeof digestSchema>
 
 /**
- * One Feed Item the Owner explicitly saved, carrying its Feed attribution so
+ * One Feed Item the User explicitly saved, carrying its Feed attribution so
  * a save outlives the Digest and, later, the Subscription itself. `displayDate`
  * is the day said the way the meta row says it, like an opened Feed's items.
  */

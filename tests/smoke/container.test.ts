@@ -6,13 +6,13 @@ import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type
 
 /** The one-time secret this deployment is configured with. */
 const SETUP_SECRET = 'a-deployment-setup-secret'
-const OWNER_PASSWORD = 'a-calm-reading-password'
+const USER_PASSWORD = 'a-calm-reading-password'
 
 /**
- * Claims the installation over HTTP the way the Owner's browser does, and
+ * Claims the installation over HTTP the way the User's browser does, and
  * returns the session cookie the rest of the API needs.
  */
-async function claim(container: Container, password = OWNER_PASSWORD): Promise<string> {
+async function claim(container: Container, password = USER_PASSWORD): Promise<string> {
   const response = await container.fetch('/api/auth/setup', {
     method: 'POST',
     headers: { origin: container.url, 'content-type': 'application/json' },
@@ -237,7 +237,7 @@ describe('claiming a deployed installation', () => {
     expect(meta.status).toBe(401)
   })
 
-  it('lets the Owner claim it with the deployment secret and then read the API', async () => {
+  it('lets the User claim it with the deployment secret and then read the API', async () => {
     const { container } = await start()
 
     const cookie = await claim(container)
@@ -245,14 +245,14 @@ describe('claiming a deployed installation', () => {
     expect((await container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
   })
 
-  it('closes setup permanently once there is an Owner', async () => {
+  it('closes setup permanently once there is a User', async () => {
     const { container } = await start()
     await claim(container)
 
     const second = await container.fetch('/api/auth/setup', {
       method: 'POST',
       headers: { origin: container.url, 'content-type': 'application/json' },
-      body: JSON.stringify({ setupSecret: SETUP_SECRET, password: 'a-second-owner-password' }),
+      body: JSON.stringify({ setupSecret: SETUP_SECRET, password: 'a-second-user-password' }),
     })
 
     expect(second.status).toBe(409)
@@ -273,7 +273,7 @@ describe('emergency password reset through the platform shell', () => {
 
     expect(JSON.parse(reset.stdout)).toEqual({ passwordReset: true, sessionsRevoked: 1 })
     expect((await container.fetch('/api/meta', { headers: { cookie } })).status).toBe(401)
-    expect((await signIn(container, OWNER_PASSWORD)).status).toBe(401)
+    expect((await signIn(container, USER_PASSWORD)).status).toBe(401)
     expect((await signIn(container, 'the-recovered-password')).status).toBe(200)
   })
 
@@ -289,7 +289,7 @@ describe('emergency password reset through the platform shell', () => {
 describe('the release lifecycle', () => {
   /**
    * The whole documented journey in one pass, the way `docs/DEPLOYMENT.md`
-   * walks an Owner through it: deploy and claim, accumulate state, back up
+   * walks a User through it: deploy and claim, accumulate state, back up
    * before an upgrade, replace the container on the retained volume, and
    * recover from the snapshot onto a fresh volume.
    *
@@ -298,7 +298,7 @@ describe('the release lifecycle', () => {
    * `replacing the container` cases below.
    */
   it('claims, persists state, backs up, upgrades, and restores the backup onto a fresh volume', async () => {
-    // A new Owner deploys the template and claims the installation.
+    // A new User deploys the template and claims the installation.
     const first = await start()
     const cookie = await claim(first.container)
     await first.container.exec(['node', 'dist/server/cli-main.js', 'set-timezone', 'Europe/Berlin'])
@@ -313,7 +313,7 @@ describe('the release lifecycle', () => {
     expect(JSON.parse(backup.stdout)).toMatchObject({ backupCreated: true })
 
     // The upgrade: a new container over the retained volume. Readiness gates
-    // traffic, the Owner's session and settings ride the volume.
+    // traffic, the User's session and settings ride the volume.
     await retire(first.container)
     const upgraded = await start({ volume: first.volume })
     expect((await upgraded.container.fetch('/health/ready')).status).toBe(200)
@@ -347,7 +347,7 @@ describe('the release lifecycle', () => {
     // password in — the verifier travelled inside the snapshot.
     const recovered = await start({ volume: freshVolume })
     expect((await recovered.container.fetch('/health/ready')).status).toBe(200)
-    expect((await signIn(recovered.container, OWNER_PASSWORD)).status).toBe(200)
+    expect((await signIn(recovered.container, USER_PASSWORD)).status).toBe(200)
     const shown = await recovered.container.exec(['node', 'dist/server/cli-main.js', 'show'])
     expect(JSON.parse(shown.stdout).timezone).toBe('Europe/Berlin')
   })
@@ -394,7 +394,7 @@ describe('replacing the container', () => {
     expect(shown.stdout.trim()).toBe('null')
   })
 
-  it('keeps the Owner signed in, because the session is on the volume', async () => {
+  it('keeps the User signed in, because the session is on the volume', async () => {
     const first = await start()
     const cookie = await claim(first.container)
     await retire(first.container)
@@ -404,7 +404,7 @@ describe('replacing the container', () => {
     expect((await second.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
   })
 
-  it('does not ask the Owner to claim it again', async () => {
+  it('does not ask the User to claim it again', async () => {
     const first = await start()
     await claim(first.container)
     await retire(first.container)

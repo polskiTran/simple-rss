@@ -12,7 +12,7 @@ export type DatabaseTransaction = BetterSQLiteTransaction<EmptySchema, ExtractTa
  *
  * Returns false — writing nothing — when the Subscription is gone by the time
  * the retrieval lands. Unsubscribing takes effect immediately, so a poll that
- * was already in flight must not resurrect what the Owner let go of.
+ * was already in flight must not resurrect what the User let go of.
  */
 export function persistFeedWindow(
   db: BetterSQLite3Database,
