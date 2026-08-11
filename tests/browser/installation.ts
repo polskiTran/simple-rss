@@ -205,13 +205,9 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 export { expect } from '@playwright/test'
 
 /**
- * Asserts nothing forces the page wider than the surface it is drawn on: no
- * reading needs panning sideways.
- *
- * Measured against the body's content width rather than the viewport, because
- * `scrollbar-gutter: stable` holds a scrollbar's width out of the content area
- * at every width. Against `innerWidth` the assertion would keep a blind spot
- * exactly that wide.
+ * Nothing forces the page wider than the paper. Measured against the body, not
+ * the viewport: `scrollbar-gutter: stable` keeps a scrollbar's width out of the
+ * content area, so `innerWidth` would hide an overflow that wide.
  */
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(
