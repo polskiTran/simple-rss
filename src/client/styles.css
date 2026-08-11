@@ -321,9 +321,12 @@
 
   /* Settings deliberately leaves the item shape: a two-column sheet at 13/14px
      so preferences can never be mistaken for reading. */
+  /* `minmax(0, …)` rather than a bare `1fr`: a track's automatic minimum is
+     its widest item's min-content, and the timezone select's is the longest
+     zone the runtime knows — wide enough to push a phone's whole page sideways. */
   .sheet {
     display: grid;
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 140px minmax(0, 1fr);
     gap: 10px 24px;
     font-size: 13px;
     line-height: 1.5;
