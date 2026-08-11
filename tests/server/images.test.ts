@@ -45,6 +45,7 @@ async function imageSetup(service: TestService, imageUrl: string = IMAGE_URL): P
 
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+  await service.wakeScheduler()
 
   const digest = (await (await user.get('/api/digest')).json()) as {
     groups: { items: { feedItemId: number; title: string }[] }[]

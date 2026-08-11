@@ -157,16 +157,9 @@ Railway mounts the volume only at runtime, so migrations run during application 
 
 V1 accepts an exact RSS or Atom URL; it does not discover Feeds from website URLs.
 
-Before creating a Subscription, the server:
+Subscribing and OPML Import record the Subscription without contacting the Feed (ADR 0007). The server validates the URL shape, deduplicates against known Feed URLs, and creates the Feed and Subscription transactionally; the Subscription starts unchecked and immediately due, and the request nudges the scheduler awake. The first retrieval is an ordinary poll: it confirms RSS or Atom content, corrects the Feed's title and resolved URL, and ingests the current Feed Window. A first retrieval that reveals an already-subscribed Feed behind a different URL quietly merges the later Subscription into it.
 
-1. Validates the URL.
-2. Performs one bounded retrieval.
-3. Validates every redirect.
-4. Confirms RSS or Atom content.
-5. Parses and normalizes the current Feed Window.
-6. Creates the Feed, Subscription, and initial Feed Items transactionally after retrieval succeeds.
-
-The entered URL is preserved while a validated resolved URL may be recorded for subsequent retrievals.
+The entered URL is preserved while a validated resolved URL may be recorded for subsequent retrievals. One OPML import records at most 500 Feeds; a wake that finds a full due batch drains the next batch at once, so an import's first checks finish at the pace of the retrieval budgets rather than one batch per minute.
 
 ### Feed retrieval limits
 

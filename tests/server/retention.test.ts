@@ -25,11 +25,12 @@ const rss = (...items: string[]) => `<?xml version="1.0"?>
 const stubFeed = (service: TestService, body: string, url: string = FEED_URL) =>
   service.upstream.stub(url, { headers: FEED_HEADERS, body })
 
-/** Subscribes the User to a Feed currently exposing the given document. */
+/** Subscribes the User to a Feed currently exposing the given document, first check landed. */
 async function subscribed(user: Device, service: TestService, xml: string, url: string = FEED_URL): Promise<void> {
   stubFeed(service, xml, url)
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
+  await service.wakeScheduler()
 }
 
 interface StoredItem {
@@ -248,6 +249,9 @@ describe('history retention', () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, rss(item('a', 'First light')))
+    // The first check has landed and its refresh cooldown has passed.
+    await service.wakeScheduler()
+    service.clock.advance(60_000)
 
     // A manual refresh is mid-retrieval when the User unsubscribes.
     const { body, release } = heldBody(rss(item('a', 'First light'), item('b', 'Late arrival')))
@@ -278,12 +282,14 @@ describe('history retention', () => {
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Saved essay'])
 
     // The same URL subscribes again: the retained Feed identity is reused, the
-    // window is re-imported, and the old save is still the same saved item.
+    // window is re-imported on the next check, and the old save is still the
+    // same saved item.
     const revived = await user.post('/api/subscriptions', { url: FEED_URL })
     expect(revived.status).toBe(201)
-    const body = (await revived.json()) as { subscription: { feedId: number }; importedItems: number }
+    const body = (await revived.json()) as { subscription: { feedId: number } }
     expect(body.subscription.feedId).toBe(1)
-    expect(body.importedItems).toBe(2)
+    service.clock.advance(60_000)
+    await service.wakeScheduler()
 
     expect((await digestTitles(user)).sort()).toEqual(['Passing note', 'Saved essay'])
     expect((await library(user)).items.map((entry) => [entry.feedItemId, entry.title])).toEqual([

@@ -84,6 +84,13 @@ const STATUS_PATH = '/api/auth/status'
  */
 const UNAUTHENTICATED = 'unauthenticated'
 
+/**
+ * No API call is legitimately long-running — even an OPML import records
+ * locally and answers — so a stalled server becomes a visible error rather
+ * than a silently hung screen.
+ */
+const REQUEST_TIMEOUT_MS = 30_000
+
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {
     ...init,
@@ -91,6 +98,7 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
     // The session cookie is `SameSite=Strict`; this is the same rule stated at
     // the fetch layer, so the credential can never leave the origin.
     credentials: 'same-origin',
+    signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
   if (response.ok) return response

@@ -76,6 +76,7 @@ describe('the Settings preferences API', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const before = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(before.groups.map(({ label }) => label)).toEqual(['yesterday'])

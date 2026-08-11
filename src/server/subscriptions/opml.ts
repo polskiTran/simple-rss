@@ -2,11 +2,10 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { arrayOf, asRecord, declaresXmlEntities } from '../ingestion/xml.js'
 
 /**
- * The most Feeds one OPML import will process. Each Feed costs one bounded
- * upstream retrieval, so the ceiling keeps a single upload from turning the
- * reader into a long-running crawler.
+ * The most Feeds one OPML import will record. Recording is local (ADR 0007),
+ * so this bounds parse work and the scheduler's first-check backlog.
  */
-export const MAX_OPML_FEEDS = 200
+export const MAX_OPML_FEEDS = 500
 
 const MAX_TITLE_LENGTH = 512
 

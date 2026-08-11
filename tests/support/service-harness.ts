@@ -118,7 +118,9 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       retrieval,
       sleep: async (milliseconds) => void sleeps.push(milliseconds),
       logger,
-      ...(options.scheduling ? { scheduling: options.scheduling } : {}),
+      // Nudges are off by default so every retrieval happens at a wake the
+      // test drives; a test about the nudge itself turns them back on.
+      scheduling: { nudges: false, ...options.scheduling },
       ...(options.retention ? { retention: options.retention } : {}),
     })
     running.push(started)

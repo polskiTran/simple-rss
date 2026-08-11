@@ -29,58 +29,94 @@ function stubHealthyFeeds(service: TestService): void {
 }
 
 describe('OPML import', () => {
-  it('processes each Feed independently and reports added, skipped, and failed', async () => {
+  it('records every usable Feed without waiting on any of them answering', async () => {
     const service = await startTestService()
-    stubHealthyFeeds(service)
-    service.upstream
-      .stub('https://down.example/feed', { status: 503 })
-      .stub('https://broken.example/feed', {
-        headers: { 'content-type': 'application/rss+xml' },
-        body: '<rss><channel>',
-      })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
+    // None of these hosts are stubbed: the report cannot depend on retrieval.
     const imported = await user.post('/api/subscriptions/import', {
-      opml: opmlListing([RSS_URL, ATOM_URL, 'https://down.example/feed', 'https://broken.example/feed', 'not a url']),
+      opml: opmlListing([RSS_URL, ATOM_URL, 'https://down.example/feed', 'not a url']),
     })
 
     expect(imported.status).toBe(200)
     expect(await imported.json()).toEqual({
-      feeds: [
-        { url: RSS_URL, outcome: 'skipped', title: 'Field Notes', reason: 'already subscribed' },
-        { url: ATOM_URL, outcome: 'added', title: 'Atom Letters', reason: null },
-        {
-          url: 'https://down.example/feed',
-          outcome: 'failed',
-          title: null,
-          reason: 'The Feed could not be reached',
-        },
-        {
-          url: 'https://broken.example/feed',
-          outcome: 'failed',
-          title: null,
-          reason: 'The Feed returned malformed XML',
-        },
-        {
-          url: 'not a url',
-          outcome: 'failed',
-          title: null,
-          reason: 'Enter an exact HTTP or HTTPS Feed URL',
-        },
-      ],
+      added: 2,
+      alreadySubscribed: 1,
+      unusable: ['not a url'],
     })
 
     const feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions.map((subscription: { title: string }) => subscription.title)).toEqual([
-      'Atom Letters',
-      'Field Notes',
+    expect(feeds.subscriptions).toHaveLength(3)
+  })
+
+  it('names imported Subscriptions from the OPML until their first retrieval answers', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+
+    const opml =
+      '<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><body>' +
+      `<outline type="rss" title="Field Notes (from OPML)" xmlUrl="${RSS_URL}"/>` +
+      `<outline type="rss" xmlUrl="${ATOM_URL}"/>` +
+      '</body></opml>'
+    expect((await user.post('/api/subscriptions/import', { opml })).status).toBe(200)
+
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(
+      feeds.subscriptions.map((subscription: { title: string; availability: { state: string } }) => [
+        subscription.title,
+        subscription.availability.state,
+      ]),
+    ).toEqual([
+      ['Field Notes (from OPML)', 'unchecked'],
+      ['atom.example', 'unchecked'],
     ])
+  })
+
+  it('lets the scheduler make the first retrievals, which correct titles and fill the Digest', async () => {
+    const service = await startTestService()
+    stubHealthyFeeds(service)
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
+
+    await service.wakeScheduler()
+
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(
+      feeds.subscriptions.map((subscription: { title: string; availability: { state: string } }) => [
+        subscription.title,
+        subscription.availability.state,
+      ]),
+    ).toEqual([
+      ['Atom Letters', 'available'],
+      ['Field Notes', 'available'],
+    ])
+    const digest = await (await user.get('/api/digest')).json()
+    expect(digest.today.volume).toBe(2)
+  })
+
+  it('drains a bulk import in one wake even when it overflows the batch', async () => {
+    const service = await startTestService({ scheduling: { batchLimit: 1, concurrency: 1 } })
+    stubHealthyFeeds(service)
+    const third = 'https://third.example/feed'
+    service.upstream.stub(third, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+    const user = await claimedDevice(service)
+    expect(
+      (await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL, third]) })).status,
+    ).toBe(200)
+
+    await service.wakeScheduler()
+
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(
+      feeds.subscriptions.every(
+        (subscription: { availability: { state: string } }) => subscription.availability.state === 'available',
+      ),
+    ).toBe(true)
   })
 
   it('gives imported Subscriptions the default 2-hour Polling Interval', async () => {
     const service = await startTestService()
-    stubHealthyFeeds(service)
     const user = await claimedDevice(service)
 
     expect((await user.post('/api/subscriptions/import', { opml: opmlListing([ATOM_URL]) })).status).toBe(200)
@@ -97,21 +133,20 @@ describe('OPML import', () => {
     const opml = opmlListing([RSS_URL, ATOM_URL])
 
     const first = await (await user.post('/api/subscriptions/import', { opml })).json()
-    expect(first.feeds.map((feed: { outcome: string }) => feed.outcome)).toEqual(['added', 'added'])
+    expect(first).toEqual({ added: 2, alreadySubscribed: 0, unusable: [] })
+    await service.wakeScheduler()
 
     const second = await (await user.post('/api/subscriptions/import', { opml })).json()
-    expect(second.feeds).toEqual([
-      { url: RSS_URL, outcome: 'skipped', title: 'Field Notes', reason: 'already subscribed' },
-      { url: ATOM_URL, outcome: 'skipped', title: 'Atom Letters', reason: 'already subscribed' },
-    ])
+    expect(second).toEqual({ added: 0, alreadySubscribed: 2, unusable: [] })
+    await service.wakeScheduler()
     expect(service.database?.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
     expect(service.database?.prepare('SELECT count(*) AS count FROM feed_items').get()).toEqual({ count: 2 })
-    // The skipped Feeds were never retrieved a second time.
+    // The already-subscribed Feeds were never retrieved a second time.
     expect(service.upstream.requestsTo(RSS_URL)).toHaveLength(1)
     expect(service.upstream.requestsTo(ATOM_URL)).toHaveLength(1)
   })
 
-  it('validates the upload before touching any Feed', async () => {
+  it('validates the upload before recording any Subscription', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
 
@@ -151,6 +186,7 @@ describe('OPML export', () => {
     stubHealthyFeeds(service)
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
+    await service.wakeScheduler()
 
     const exported = await user.get('/api/subscriptions/export')
 
@@ -169,11 +205,12 @@ describe('OPML export', () => {
     stubHealthyFeeds(service)
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL, ATOM_URL]) })).status).toBe(200)
+    await service.wakeScheduler()
 
     const exported = await (await user.get('/api/subscriptions/export')).text()
     const reimported = await (await user.post('/api/subscriptions/import', { opml: exported })).json()
 
-    expect(reimported.feeds.map((feed: { outcome: string }) => feed.outcome)).toEqual(['skipped', 'skipped'])
+    expect(reimported).toEqual({ added: 0, alreadySubscribed: 2, unusable: [] })
     expect(service.database?.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
   })
 })

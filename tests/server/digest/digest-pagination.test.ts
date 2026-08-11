@@ -39,6 +39,7 @@ describe('the Digest in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const first = digestSchema.parse(await (await user.get('/api/digest')).json())
 
@@ -67,6 +68,7 @@ describe('the Digest in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
@@ -82,6 +84,7 @@ describe('the Digest in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
@@ -107,6 +110,7 @@ describe('the Digest in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const first = digestSchema.parse(await (await user.get('/api/digest')).json())
     const boundary = first.groups[0]?.items.at(-1)
@@ -139,12 +143,14 @@ describe('the Digest in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const first = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(flatTitles(first)).toEqual(titlesDown('today', 51, 2))
 
     // A second Subscription arrives while the User holds the cursor.
     expect((await user.post('/api/subscriptions', { url: LATER_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const rest = digestSchema.parse(
       await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),

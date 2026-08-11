@@ -51,6 +51,7 @@ async function readingSetup(
 
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+  await service.wakeScheduler()
 
   const items = readerItemFind(await (await user.get('/api/digest')).json(), 'First light')
   return { user, feedItemId: items }
@@ -254,6 +255,7 @@ describe('the Reader article', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const feedItemId = readerItemFind(await (await user.get('/api/digest')).json(), 'A linkless note')
 
     const response = await user.get(`/api/items/${feedItemId}/reader`)

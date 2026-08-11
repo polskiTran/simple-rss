@@ -1,5 +1,4 @@
-import { describe, expect, it } from 'vitest'
-import { MAX_FEED_SIZE_MIB } from '../../src/shared/api.js'
+import { describe, expect, it, vi } from 'vitest'
 import { claimedDevice } from '../support/device.js'
 import { startTestService } from '../support/service-harness.js'
 
@@ -24,7 +23,7 @@ const RSS = `<?xml version="1.0" encoding="UTF-8"?>
 </rss>`
 
 describe('Subscriptions', () => {
-  it('retrieves a Feed before creating its Subscription and exposes the imported Feed Window', async () => {
+  it('records the Subscription unchecked; the scheduler makes the first retrieval', async () => {
     const service = await startTestService()
     service.upstream
       .stub(ENTERED_URL, {
@@ -39,32 +38,34 @@ describe('Subscriptions', () => {
 
     const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
+    // The answer is the recorded decision, before any retrieval: named after
+    // its host, resolved nowhere yet, unchecked.
     expect(added.status).toBe(201)
     expect(await added.json()).toEqual({
       subscription: {
         feedId: 1,
-        title: 'Field Notes',
-        domain: 'feeds.example',
+        title: 'journal.example',
+        domain: 'journal.example',
         enteredUrl: ENTERED_URL,
-        resolvedUrl: RESOLVED_URL,
-        cadence: [...Array.from({ length: 29 }, () => 0), 1],
+        resolvedUrl: ENTERED_URL,
+        cadence: Array.from({ length: 30 }, () => 0),
         availability: {
-          state: 'available',
-          lastCheckedAt: '2026-08-08T09:00:00.000Z',
-          lastSuccessAt: '2026-08-08T09:00:00.000Z',
+          state: 'unchecked',
+          lastCheckedAt: null,
+          lastSuccessAt: null,
           consecutiveFailures: 0,
           category: null,
         },
       },
-      importedItems: 1,
     })
     expect(service.logs).toContainEqual(
       expect.objectContaining({
         message: 'subscriptions.subscription_created',
         enteredUrl: ENTERED_URL,
-        resolvedUrl: RESOLVED_URL,
       }),
     )
+
+    await service.wakeScheduler()
 
     const feeds = await user.get('/api/feeds')
     expect(feeds.status).toBe(200)
@@ -119,14 +120,29 @@ describe('Subscriptions', () => {
     })
   })
 
-
-  it('preserves the exact entered URL while retrieving and deduplicating its canonical endpoint', async () => {
-    const service = await startTestService()
-    const exact = 'https://journal.example:443/feed#user-fragment'
+  it('nudges the scheduler, so the first retrieval lands without waiting for a wake', async () => {
+    const service = await startTestService({ scheduling: { nudges: true } })
     service.upstream.stub(ENTERED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
       body: RSS,
     })
+    const user = await claimedDevice(service)
+
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+
+    // No wakeScheduler here: the subscribe itself set the retrieval going.
+    await vi.waitFor(async () => {
+      const feeds = await (await user.get('/api/feeds')).json()
+      expect(feeds.subscriptions[0]).toMatchObject({
+        title: 'Field Notes',
+        availability: expect.objectContaining({ state: 'available' }),
+      })
+    })
+  })
+
+  it('preserves the exact entered URL and dedupes on its canonical form', async () => {
+    const service = await startTestService()
+    const exact = 'https://journal.example:443/feed#user-fragment'
     const user = await claimedDevice(service)
 
     const added = await user.post('/api/subscriptions', { url: exact })
@@ -134,55 +150,88 @@ describe('Subscriptions', () => {
       subscription: { enteredUrl: exact, resolvedUrl: ENTERED_URL },
     })
 
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(409)
+    expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
+  })
+
+  it('quietly merges a Subscription whose first retrieval reveals an already-subscribed Feed', async () => {
+    const service = await startTestService()
+    service.upstream.stub(ENTERED_URL, {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: RSS,
+    })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    await service.wakeScheduler()
+
+    // A different entered URL that redirects to the same Feed cannot be seen
+    // through at recording time; the retrieval is what reveals it.
     const alias = 'https://alias.example/feed'
     service.upstream.stub(alias, {
       status: 301,
       headers: { location: ENTERED_URL, 'content-type': 'text/plain' },
     })
+    expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(201)
+    await service.wakeScheduler()
+
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions).toHaveLength(1)
+    expect(feeds.subscriptions[0]).toMatchObject({ title: 'Field Notes', availability: expect.objectContaining({ state: 'available' }) })
+    // The revealing URL now names the surviving Feed: subscribing it again is
+    // a duplicate at recording time, not another round of the merge.
     expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(409)
-    expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
+    expect(service.logs).toContainEqual(
+      expect.objectContaining({ message: 'subscriptions.feeds_merged', feedId: 2, intoFeedId: 1 }),
+    )
   })
-  it('returns safe failure outcomes without leaving inert or duplicate records', async () => {
+
+  it('merges a long-lived Feed that moved behind another Feed without touching items or saves', async () => {
+    const service = await startTestService()
+    const otherUrl = 'https://elsewhere.example/feed'
+    service.upstream
+      .stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+      .stub(otherUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>Elsewhere</title>
+            <item><guid>kept</guid><title>Kept essay</title><pubDate>Fri, 08 Aug 2026 06:00:00 GMT</pubDate></item>
+          </channel></rss>`,
+      })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(201)
+    await service.wakeScheduler()
+    const digest = await (await user.get('/api/digest')).json()
+    const kept = digest.groups
+      .flatMap((group: { items: { feedItemId: number; title: string }[] }) => group.items)
+      .find((item: { title: string }) => item.title === 'Kept essay')
+    expect((await user.put(`/api/library/${kept.feedItemId}`)).status).toBe(200)
+
+    // The publisher moves: the second Feed now answers from the first's URL.
+    service.upstream.stub(otherUrl, {
+      status: 301,
+      headers: { location: ENTERED_URL, 'content-type': 'text/plain' },
+    })
+    service.clock.advance(3 * 60 * 60 * 1_000)
+    await service.wakeScheduler()
+
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions.map((subscription: { title: string }) => subscription.title)).toEqual(['Field Notes'])
+    // The save and its attribution survive the merge, dormant, for Retention.
+    const library = await (await user.get('/api/library')).json()
+    expect(library.items).toMatchObject([{ title: 'Kept essay', feedTitle: 'Elsewhere', subscribed: false }])
+    // The moved URL now names the surviving Feed: subscribing it again is a
+    // duplicate at recording time.
+    expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(409)
+  })
+
+  it('refuses only what recording itself can see: a URL that is not a Feed endpoint', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
 
     const invalid = await user.post('/api/subscriptions', { url: 'not a URL' })
     expect(invalid.status).toBe(400)
     expect(await invalid.json()).toMatchObject({ error: { code: 'invalid_feed_url' } })
-
-    service.upstream.stub('https://missing.example/feed', { status: 503 })
-    const unreachable = await user.post('/api/subscriptions', { url: 'https://missing.example/feed' })
-    expect(unreachable.status).toBe(502)
-    expect(await unreachable.json()).toMatchObject({ error: { code: 'feed_unreachable' } })
-
-    const unresolvable = await user.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })
-    expect(unresolvable.status).toBe(502)
-    expect(await unresolvable.json()).toMatchObject({ error: { code: 'feed_unreachable' } })
-
-    service.upstream.stub('https://wrong.example/feed', {
-      headers: { 'content-type': 'text/html' },
-      body: '<html></html>',
-    })
-    const unsupported = await user.post('/api/subscriptions', { url: 'https://wrong.example/feed' })
-    expect(unsupported.status).toBe(415)
-    expect(await unsupported.json()).toMatchObject({ error: { code: 'unsupported_feed' } })
-
-    service.upstream.stub('https://broken.example/feed', {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: '<rss><channel>',
-    })
-    const malformed = await user.post('/api/subscriptions', { url: 'https://broken.example/feed' })
-    expect(malformed.status).toBe(422)
-    expect(await malformed.json()).toMatchObject({ error: { code: 'malformed_feed' } })
-
-    service.upstream.stub('https://huge.example/feed', {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: new Uint8Array(MAX_FEED_SIZE_MIB * 1024 * 1024 + 1),
-    })
-    const oversized = await user.post('/api/subscriptions', { url: 'https://huge.example/feed' })
-    expect(oversized.status).toBe(413)
-    expect(await oversized.json()).toMatchObject({ error: { code: 'feed_too_large' } })
-
     expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
 
     service.upstream.stub(ENTERED_URL, {
@@ -191,11 +240,41 @@ describe('Subscriptions', () => {
     })
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(409)
+    await service.wakeScheduler()
     expect(service.upstream.requestsTo(ENTERED_URL)).toHaveLength(1)
     expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
   })
 
-  it('rolls back the Feed, Subscription, and Feed Window when any persistence step fails', async () => {
+  it('answers a Feed that never answers with unchecked turning unavailable, never an error', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+
+    // The host does not resolve — a typo'd URL imported from somewhere.
+    expect((await user.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })).status).toBe(201)
+
+    await service.wakeScheduler()
+    let feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0].availability).toMatchObject({
+      state: 'unchecked',
+      consecutiveFailures: 1,
+      category: 'unreachable',
+    })
+
+    // Two more failed checks and the Subscription reads unavailable — still
+    // subscribed, still retried on its backoff, deletion the User's call.
+    for (let failures = 2; failures <= 3; failures += 1) {
+      service.clock.advance(24 * 60 * 60 * 1_000)
+      await service.wakeScheduler()
+    }
+    feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0].availability).toMatchObject({
+      state: 'unavailable',
+      consecutiveFailures: 3,
+      lastSuccessAt: null,
+    })
+  })
+
+  it('keeps a Subscription whose first persistence failed, and the next wake retries it', async () => {
     const service = await startTestService()
     service.upstream.stub(ENTERED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
@@ -210,16 +289,19 @@ describe('Subscriptions', () => {
     `)
     const user = await claimedDevice(service)
 
-    const failed = await user.post('/api/subscriptions', { url: ENTERED_URL })
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
-    expect(failed.status).toBe(500)
+    // Nothing was ingested and nothing was blamed on the Feed; the attempt
+    // simply has not completed, so the Subscription is still due.
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({ today: { volume: 0 } })
     service.database?.exec('DROP TRIGGER reject_feed_item')
-    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
-    expect(await (await user.get('/api/digest')).json()).toEqual({
-      today: { date: '2026-08-08', volume: 0 },
-      groups: [],
-      nextCursor: null,
-    })
+    service.clock.advance(60_000)
+    await service.wakeScheduler()
+
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({ today: { volume: 1 } })
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0].availability).toMatchObject({ state: 'available' })
   })
 
   it('re-ingests GUID, normalized-link, and content identities without replacing first-seen or Library state', async () => {
@@ -234,8 +316,8 @@ describe('Subscriptions', () => {
         </channel></rss>`,
     })
     const user = await claimedDevice(service)
-    const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
-    expect(await added.json()).toMatchObject({ importedItems: 3 })
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     service.database?.exec(`
       INSERT INTO library_items (feed_item_id, saved_at)
       SELECT id, '2026-08-08T09:30:00.000Z' FROM feed_items;
@@ -302,6 +384,7 @@ describe('Subscriptions', () => {
     const user = await claimedDevice(service)
 
     expect((await user.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
+    await service.wakeScheduler()
     const digest = await (await user.get('/api/digest')).json()
 
     expect(digest.groups[0]).toMatchObject({
@@ -336,6 +419,7 @@ describe('Subscriptions', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
+    await service.wakeScheduler()
 
     service.clock.advance(60 * 60 * 1_000)
     service.upstream.stub(atomUrl, {
@@ -377,6 +461,7 @@ describe('Subscriptions', () => {
 
     expect((await user.post('/api/subscriptions', { url: 'https://first.example/feed' })).status).toBe(201)
     expect((await user.post('/api/subscriptions', { url: 'https://second.example/feed' })).status).toBe(201)
+    await service.wakeScheduler()
 
     const digest = await (await user.get('/api/digest')).json()
     expect(
@@ -409,6 +494,7 @@ describe('Subscriptions', () => {
     const user = await claimedDevice(service)
 
     expect((await user.post('/api/subscriptions', { url: rssUrl })).status).toBe(201)
+    await service.wakeScheduler()
     const digest = await (await user.get('/api/digest')).json()
     expect(digest.groups[0].items[0]).toMatchObject({
       title: 'RDF item',

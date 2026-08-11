@@ -46,6 +46,8 @@ export interface AppDependencies {
   readonly subscriptions: () => SubscriptionService | undefined
   readonly refresh: () => FeedRefresh | undefined
   readonly digest: () => DigestService | undefined
+  /** Forwards a route's request for an immediate look at the due frontier. */
+  readonly nudgeScheduler: () => void
   readonly library: () => LibraryService | undefined
   readonly reader: () => ReaderService | undefined
   readonly search: () => SearchService | undefined
@@ -110,6 +112,7 @@ export function createApp(deps: AppDependencies): Hono {
       subscriptions: deps.subscriptions,
       refresh: deps.refresh,
       digest: deps.digest,
+      nudgeScheduler: deps.nudgeScheduler,
     }),
   )
 

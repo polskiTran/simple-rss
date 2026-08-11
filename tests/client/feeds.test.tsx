@@ -13,6 +13,14 @@ const AVAILABLE = {
   category: null,
 }
 
+const UNCHECKED = {
+  state: 'unchecked',
+  lastCheckedAt: null,
+  lastSuccessAt: null,
+  consecutiveFailures: 0,
+  category: null,
+}
+
 const FEED = {
   feedId: 1,
   title: 'Field Notes',
@@ -21,6 +29,15 @@ const FEED = {
   resolvedUrl: 'https://feeds.example/journal.xml',
   cadence: Array.from({ length: 30 }, () => 0),
   availability: AVAILABLE,
+}
+
+/** What the subscribe answer looks like before any retrieval: host-named, unchecked. */
+const UNCHECKED_FEED = {
+  ...FEED,
+  title: 'journal.example',
+  domain: 'journal.example',
+  resolvedUrl: FEED.enteredUrl,
+  availability: UNCHECKED,
 }
 
 const UNAVAILABLE_FEED = {
@@ -34,18 +51,47 @@ const UNAVAILABLE_FEED = {
   },
 }
 
+/** The opened-Feed answer the subscribe watch polls for the first check. */
+function feedDetail(availability: object, itemCount: number) {
+  return {
+    feedId: FEED.feedId,
+    title: FEED.title,
+    domain: FEED.domain,
+    enteredUrl: FEED.enteredUrl,
+    resolvedUrl: FEED.resolvedUrl,
+    availability,
+    schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
+    cadence: [],
+    items: Array.from({ length: itemCount }, (_, index) => ({
+      feedItemId: index + 1,
+      title: `Item ${index + 1}`,
+      link: null,
+      publishedAt: null,
+      firstSeenAt: '2026-08-08T09:00:00.000Z',
+      date: '2026-08-08',
+      displayDate: 'today',
+      saved: false,
+    })),
+  }
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('Feeds', () => {
-  it('accepts an exact Feed URL in the search/add control and shows the accepted Feed shape immediately', async () => {
-    const api = stubApi()
-      .on('GET /api/feeds', { body: { subscriptions: [] } })
-      .on('POST /api/subscriptions', {
-        status: 201,
-        body: { subscription: FEED, importedItems: 1 },
-      })
+  it('shows the recorded Subscription immediately and the first check outcome as it lands', async () => {
+    let releaseDetail: ((reply: Reply) => void) | undefined
+    const firstCheck = new Promise<Reply>((resolve) => {
+      releaseDetail = resolve
+    })
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
+    api.on('POST /api/subscriptions', () => {
+      // The first retrieval is still out; the watch waits on this reply.
+      api.on('GET /api/feeds/1', () => firstCheck)
+      api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+      return { status: 201, body: { subscription: UNCHECKED_FEED } }
+    })
     window.history.replaceState(null, '', '/feeds')
     const { container } = render(<App />)
     const user = userEvent.setup()
@@ -53,11 +99,55 @@ describe('Feeds', () => {
     await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
+    // The recorded decision is on screen at once, named after its host…
+    expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
+    expect(screen.getByText('subscribed — checking the feed…')).toBeDefined()
+    expect(screen.getByText('waiting for first check')).toBeDefined()
+
+    // …and the watch reports the first check inline, with the list corrected.
+    releaseDetail?.({ body: feedDetail(AVAILABLE, 1) })
+    expect(await screen.findByText('subscribed — 1 item in the digest')).toBeDefined()
     expect(await screen.findByText('Field Notes')).toBeDefined()
-    expect(screen.getByText('feeds.example')).toBeDefined()
-    expect(screen.getByRole('img', { name: /items from Field Notes in the last 30 days/i })).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+  })
+
+  it('says in the same breath when the first check finds the URL wrong', async () => {
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
+    api.on('POST /api/subscriptions', () => {
+      api.on('GET /api/feeds/1', {
+        body: feedDetail({ ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' }, 0),
+      })
+      api.on('GET /api/feeds', { body: { subscriptions: [{ ...UNCHECKED_FEED, availability: { ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' } }] } })
+      return { status: 201, body: { subscription: UNCHECKED_FEED } }
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('that Feed could not be reached')).toBeDefined()
+  })
+
+  it('reads a Subscription that merged away during its first check as already subscribed', async () => {
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+    api.on('POST /api/subscriptions', () => {
+      // The first retrieval revealed an already-subscribed Feed; the new
+      // Subscription quietly folded into it, so its detail is gone.
+      api.on('GET /api/feeds/2', { status: 404, body: { error: { code: 'not_found', message: 'Not found' } } })
+      return { status: 201, body: { subscription: { ...UNCHECKED_FEED, feedId: 2, enteredUrl: 'https://alias.example/feed' } } }
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), 'https://alias.example/feed')
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('already subscribed')).toBeDefined()
+    await waitFor(() => expect(screen.getAllByText('Field Notes')).toHaveLength(1))
   })
 
   it('treats a line that is not a URL as a search, never as something to submit', async () => {
@@ -98,9 +188,10 @@ describe('Feeds', () => {
     })
     stubApi()
       .on('GET /api/feeds', () => staleList)
+      .on('GET /api/feeds/1', { body: feedDetail(AVAILABLE, 1) })
       .on('POST /api/subscriptions', {
         status: 201,
-        body: { subscription: FEED, importedItems: 1 },
+        body: { subscription: FEED },
       })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
@@ -139,6 +230,17 @@ describe('Feed Availability', () => {
     render(<App />)
 
     expect(await screen.findByText('Field Notes')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull()
+    expect(screen.queryByText(/waiting for first check/i)).toBeNull()
+  })
+
+  it('notes a Subscription still waiting for its first check', async () => {
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [UNCHECKED_FEED] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
+    expect(await screen.findByText('waiting for first check')).toBeDefined()
     expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull()
   })
 
@@ -196,22 +298,10 @@ describe('Feed Availability', () => {
 describe('OPML portability', () => {
   const OPML = '<opml version="2.0"><body><outline xmlUrl="https://journal.example/feed"/></body></opml>'
 
-  it('imports an OPML file and reports each Feed as added, skipped, or failed', async () => {
-    const api = stubApi()
-      .on('POST /api/subscriptions/import', {
-        body: {
-          feeds: [
-            { url: 'https://journal.example/feed', outcome: 'added', title: 'Field Notes', reason: null },
-            { url: 'https://old.example/feed', outcome: 'skipped', title: 'Old Friend', reason: 'already subscribed' },
-            {
-              url: 'https://gone.example/feed',
-              outcome: 'failed',
-              title: null,
-              reason: 'The Feed could not be reached',
-            },
-          ],
-        },
-      })
+  it('imports an OPML file and reports the recorded counts with any unusable outlines', async () => {
+    const api = stubApi().on('POST /api/subscriptions/import', {
+      body: { added: 2, alreadySubscribed: 1, unusable: ['not a url'] },
+    })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
     const user = userEvent.setup()
@@ -220,11 +310,10 @@ describe('OPML portability', () => {
     const file = new File([OPML], 'subscriptions.opml', { type: 'text/x-opml' })
     await user.upload(await screen.findByLabelText(/import opml/i), file)
 
-    expect(await screen.findByText('imported — 1 added, 1 skipped, 1 failed')).toBeDefined()
-    expect(screen.getByText(/old friend — already subscribed/i)).toBeDefined()
-    expect(screen.getByText(/gone\.example\/feed — the feed could not be reached/i)).toBeDefined()
+    expect(await screen.findByText('imported — 2 added, 1 already subscribed')).toBeDefined()
+    expect(screen.getByText(/not a url — not a usable feed url/i)).toBeDefined()
     expect(api.requestsTo('POST /api/subscriptions/import')).toMatchObject([{ body: { opml: OPML } }])
-    // The list is refetched, so the added Subscriptions appear.
+    // The list is refetched, so the recorded Subscriptions appear.
     expect(await screen.findByText('Field Notes')).toBeDefined()
   })
 

@@ -2,9 +2,9 @@ import { MAX_FEED_SIZE_MIB, type FeedAvailabilityCategory } from '../../shared/a
 import { ApiError } from '../api.js'
 
 /**
- * The calm words both Feed screens use for retrieval going wrong. One map per
- * failure vocabulary, so the list and the opened Feed cannot describe the same
- * outcome two ways.
+ * The calm words the Feed screens use for retrieval going wrong. One table
+ * per failure vocabulary, so the list, the opened Feed, and the subscribe
+ * notice cannot describe the same outcome two ways.
  */
 
 /** One calm phrase per safe failure category the server records. */
@@ -31,6 +31,24 @@ export const SUBSCRIPTION_FAILURE_COPY: Readonly<Record<string, string>> = {
 export function subscriptionFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return 'the Feed could not be reached'
   return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
+}
+
+/**
+ * Feed Availability categories said in the subscribe voice, so a failed
+ * first check reads exactly like any other subscribe failure.
+ */
+const FIRST_CHECK_FAILURE_CODE: Readonly<Record<FeedAvailabilityCategory, string>> = {
+  unreachable: 'feed_unreachable',
+  timeout: 'feed_timeout',
+  too_large: 'feed_too_large',
+  unsupported_content: 'unsupported_feed',
+  http_error: 'feed_unreachable',
+  invalid_feed: 'malformed_feed',
+}
+
+export function firstCheckFailure(category: FeedAvailabilityCategory | null): string {
+  const code = category ? FIRST_CHECK_FAILURE_CODE[category] : undefined
+  return (code && SUBSCRIPTION_FAILURE_COPY[code]) || 'that Feed could not be added'
 }
 
 /** A retry that did not work explains itself as quietly as any other failure. */

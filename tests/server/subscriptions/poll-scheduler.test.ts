@@ -48,13 +48,13 @@ describe('poll scheduler wakes', () => {
     expect(wakes).toBe(3)
   })
 
-  it('lets a wake that lands mid-tick pass, so the batch bound stays a bound', async () => {
+  it('joins a wake that lands mid-drain: one more look at the frontier, never a second drain', async () => {
     let frontierQueries = 0
     let finishPoll!: () => void
     const subscriptions = {
       dueFeedIds: () => {
         frontierQueries += 1
-        return [1]
+        return frontierQueries === 1 ? [1] : []
       },
     } as unknown as SubscriptionService
     const refresh = {
@@ -72,10 +72,13 @@ describe('poll scheduler wakes', () => {
     })
     const first = scheduler.tick()
     const second = scheduler.tick()
+    // The joined wake did not start polling on its own: the batch bound holds.
     expect(frontierQueries).toBe(1)
 
     finishPoll()
     await Promise.all([first, second])
-    expect(frontierQueries).toBe(1)
+    // …but its request was heard: the frontier was examined once more, so a
+    // Subscription recorded mid-drain is not left waiting for the next wake.
+    expect(frontierQueries).toBe(2)
   })
 })

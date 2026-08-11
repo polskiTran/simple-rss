@@ -24,13 +24,17 @@ _Avoid_: Channel, source
 The User's decision to include a Feed in their Digest, together with preferences specific to that Feed.
 _Avoid_: Feed list, followed feed
 
+**OPML Import**:
+Recording the Subscriptions listed in an OPML file without contacting any Feed; whether each Feed answers is Feed Availability's story.
+_Avoid_: Feed migration, bulk subscribe
+
 **Polling Interval**:
 The User-selected preset controlling how often a Subscription becomes eligible to be checked for updates.
 _Avoid_: Polling rate, exact schedule
 
 **Feed Availability**:
-A calm summary of a Subscription's recent retrieval outcome, without implying that a failing Feed should be removed.
-_Avoid_: Feed health, broken Feed
+A calm summary of a Subscription's recent retrieval outcome, without implying that a failing Feed should be removed. A Subscription that has never been retrieved is unchecked.
+_Avoid_: Feed health, broken Feed, pending feed
 
 **Feed Item**:
 An entry published by a Feed, represented by its available title, link, summary, publication time, and image URL.
