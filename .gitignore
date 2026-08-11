@@ -1,6 +1,9 @@
 # agent traces
 agent-traces/
 
+# agents
+.claude/
+
 # playwright mcp
 .playwright-mcp
 
