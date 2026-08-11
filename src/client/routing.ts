@@ -33,9 +33,8 @@ export function feedIdOf(pathname: string): number | undefined {
 }
 
 /**
- * The Reader: `/reader/42` is one Feed Item opened for reading. It lives
- * outside the four tabs, the way an opened article sits over the reading
- * flow rather than inside its furniture; the Digest stays the active tab.
+ * `/reader/42` is one Feed Item open for reading. It sits outside the four
+ * tabs and borrows the section it was opened from.
  */
 export function readerPathOf(feedItemId: number): string {
   return `/reader/${feedItemId}`
@@ -52,21 +51,64 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
   return Number.isSafeInteger(id) ? id : undefined
 }
 
+/**
+ * The way back out of a nested screen: where it leads, what it is called, and
+ * the way back out of *that* screen. Kept in history state, so it survives
+ * back, forward and reload.
+ */
+export interface Origin {
+  readonly path: string
+  readonly label: string
+  readonly from: Origin | undefined
+}
+
+/** Tabs are roots: nothing sits behind them. */
+export const DIGEST_ORIGIN: Origin = { path: pathOf('digest'), label: 'digest', from: undefined }
+export const FEEDS_ORIGIN: Origin = { path: pathOf('feeds'), label: 'feeds', from: undefined }
+export const SAVED_ORIGIN: Origin = { path: pathOf('saved'), label: 'saved', from: undefined }
+
+export function feedOrigin(feedId: number, title: string, from: Origin | undefined): Origin {
+  return { path: feedPathOf(feedId), label: title, from }
+}
+
+/** Labelled `article`, never the item's title: a way back is one short word. */
+export function readerOrigin(feedItemId: number, from: Origin | undefined): Origin {
+  return { path: readerPathOf(feedItemId), label: 'article', from }
+}
+
+/** Trail depth cap, so walking in circles cannot grow history state forever. */
+const MAX_TRAIL = 6
+
+/** Parses untrusted history state, and normalises a trail before storing it. */
+function trailOf(value: unknown, depth = 0): Origin | undefined {
+  if (depth >= MAX_TRAIL || typeof value !== 'object' || value === null) return undefined
+  const { path, label, from } = value as Record<string, unknown>
+  // This application's own addresses only: a crafted entry must not turn a
+  // way back into a link elsewhere.
+  if (typeof path !== 'string' || !/^\/[a-z]+(\/[1-9]\d*)?$/.test(path)) return undefined
+  if (typeof label !== 'string' || label === '') return undefined
+  return { path, label, from: trailOf(from, depth + 1) }
+}
+
 export interface Navigation {
   readonly route: Route
   /** Set while one Feed is open inside the Feeds tab. */
   readonly feedId: number | undefined
   /** Set while one Feed Item is open in the Reader. */
   readonly readerItemId: number | undefined
+  /** Set while a nested screen is open. */
+  readonly origin: Origin | undefined
   navigate(route: Route): void
-  openFeed(feedId: number): void
-  openReader(feedItemId: number): void
+  openFeed(feedId: number, from: Origin): void
+  openReader(feedItemId: number, from: Origin): void
+  returnTo(origin: Origin): void
 }
 
 interface Location {
   readonly route: Route
   readonly feedId: number | undefined
   readonly readerItemId: number | undefined
+  readonly origin: Origin | undefined
 }
 
 /**
@@ -74,43 +116,47 @@ interface Location {
  * with one nested Feed do not justify the dependency.
  */
 export function useNavigation(): Navigation {
-  const [location, setLocation] = useState<Location>(() => locationOf(window.location.pathname))
+  const [location, setLocation] = useState<Location>(() => currentLocation())
 
   useEffect(() => {
-    const onPopState = () => setLocation(locationOf(window.location.pathname))
+    const onPopState = () => setLocation(currentLocation())
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const navigate = useCallback((next: Route) => {
-    if (window.location.pathname !== pathOf(next)) {
-      window.history.pushState(null, '', pathOf(next))
+  /**
+   * A way back is pushed like any other move rather than calling
+   * `history.back()`: after `next in the digest` the previous entry is the
+   * previous article, not the Digest the label promises.
+   */
+  const go = useCallback((path: string, from: Origin | undefined) => {
+    const origin = trailOf(from)
+    const state = origin ? { origin } : null
+    if (window.location.pathname === path) {
+      window.history.replaceState(state, '', path)
+    } else {
+      window.history.pushState(state, '', path)
     }
-    setLocation({ route: next, feedId: undefined, readerItemId: undefined })
+    setLocation(locationOf(path, origin))
   }, [])
 
-  const openFeed = useCallback((feedId: number) => {
-    if (window.location.pathname !== feedPathOf(feedId)) {
-      window.history.pushState(null, '', feedPathOf(feedId))
-    }
-    setLocation({ route: 'feeds', feedId, readerItemId: undefined })
-  }, [])
+  const navigate = useCallback((next: Route) => go(pathOf(next), undefined), [go])
+  const openFeed = useCallback((feedId: number, from: Origin) => go(feedPathOf(feedId), from), [go])
+  const openReader = useCallback((feedItemId: number, from: Origin) => go(readerPathOf(feedItemId), from), [go])
+  const returnTo = useCallback((origin: Origin) => go(origin.path, origin.from), [go])
 
-  const openReader = useCallback((feedItemId: number) => {
-    if (window.location.pathname !== readerPathOf(feedItemId)) {
-      window.history.pushState(null, '', readerPathOf(feedItemId))
-    }
-    setLocation({ route: 'digest', feedId: undefined, readerItemId: feedItemId })
-  }, [])
-
-  return { ...location, navigate, openFeed, openReader }
+  return { ...location, navigate, openFeed, openReader, returnTo }
 }
 
-function locationOf(pathname: string): Location {
-  const route = routeOf(pathname)
-  return {
-    route,
-    feedId: route === 'feeds' ? feedIdOf(pathname) : undefined,
-    readerItemId: readerItemIdOf(pathname),
-  }
+function currentLocation(): Location {
+  const state = window.history.state as { origin?: unknown } | null
+  return locationOf(window.location.pathname, trailOf(state?.origin))
+}
+
+function locationOf(pathname: string, origin: Origin | undefined): Location {
+  const readerItemId = readerItemIdOf(pathname)
+  // The Reader has no section of its own, so it borrows its origin's: the tab,
+  // the way back and the screen underneath then all name the same one.
+  const route = readerItemId !== undefined && origin ? routeOf(origin.path) : routeOf(pathname)
+  return { route, feedId: feedIdOf(pathname), readerItemId, origin }
 }

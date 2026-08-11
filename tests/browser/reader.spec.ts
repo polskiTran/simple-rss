@@ -137,6 +137,42 @@ test.describe('Reader View', () => {
     // The last item in the Digest ends calmly instead of pointing onward.
     await expect(page.getByText('next in the digest')).toHaveCount(0)
   })
+
+  test('walks Digest, Feed and Reader by attribution, and back the same way', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'digest' }).click()
+
+    // The attribution under a Digest item is the way into its Feed.
+    await page.locator('.content-meta').getByRole('link', { name: 'Field Notes' }).click()
+    await expect(page).toHaveURL(/\/feeds\/\d+$/)
+    await expect(page.getByRole('link', { name: '← digest' })).toBeVisible()
+
+    // An article opened from a Feed goes back to that Feed by name.
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page).toHaveURL(/\/reader\/\d+$/)
+    await page.getByRole('link', { name: '← Field Notes' }).click()
+
+    // The Feed still knows it was reached from the Digest, and returns there.
+    await expect(page).toHaveURL(/\/feeds\/\d+$/)
+    await page.getByRole('link', { name: '← digest' }).click()
+    await expect(page.getByRole('heading', { name: /today/ })).toBeVisible()
+  })
+
+  test('returns a saved article to the library it was opened from', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'digest' }).click()
+    await page.getByRole('button', { name: 'save First light' }).click()
+
+    await page.getByRole('link', { name: 'saved' }).click()
+    await page.getByRole('link', { name: 'First light' }).click()
+
+    await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
+    await page.getByRole('link', { name: '← saved' }).click()
+    await expect(page).toHaveURL(/\/saved$/)
+  })
 })
 
 test.describe('Reader View at phone width', () => {

@@ -91,6 +91,31 @@ test.describe('the Library', () => {
     await page.getByRole('link', { name: 'saved' }).click()
     await expect(page.getByRole('heading', { name: 'First light' })).toHaveCount(1)
   })
+
+  test('opens the Feed a save names, until the save outlives its Subscription', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'digest' }).click()
+    await page.getByRole('button', { name: 'save First light' }).click()
+    await page.getByRole('link', { name: 'saved' }).click()
+
+    // While the Subscription stands, the attribution opens the Feed, which
+    // goes back to the saves it was opened from.
+    await page.locator('.content-meta').getByRole('link', { name: 'Field Notes' }).click()
+    await expect(page).toHaveURL(/\/feeds\/\d+$/)
+    await expect(page.getByRole('link', { name: '← saved' })).toBeVisible()
+
+    // Unsubscribing keeps the save but removes what its attribution pointed at.
+    await page.getByRole('button', { name: 'unsubscribe…' }).click()
+    await page.getByRole('button', { name: 'unsubscribe', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'search or add feeds' })).toBeVisible()
+
+    await page.getByRole('link', { name: 'saved' }).click()
+    await expect(page.getByText('Field Notes · no longer subscribed')).toBeVisible()
+    await expect(page.getByRole('link', { name: /Field Notes/ })).toHaveCount(0)
+  })
 })
 
 test.describe('the Library inside the narrow paper', () => {

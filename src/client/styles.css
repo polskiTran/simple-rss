@@ -488,6 +488,7 @@
   .appearance-option:focus-visible,
   .export-link:focus-visible,
   .feed-open:focus-visible,
+  .feed-title-link:focus-visible,
   .feed-back:focus-visible {
     outline: none;
     text-decoration: underline;
@@ -1204,6 +1205,7 @@
   @media (hover: hover) and (pointer: fine) {
     .tab:hover,
     .feed-back:hover,
+    .feed-title-link:hover,
     .reader-back:hover,
     .reader-original:hover,
     .interval-option:hover,
