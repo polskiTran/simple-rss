@@ -17,6 +17,15 @@ An opinionated, opensource RSS reader: one pnpm package, one Docker image, one S
 - **Scope**: `docs/ROADMAP.md` lists what v1 deliberately excludes (read/unread state, multiple users, tags, notifications…). Check it before adding a capability.
 - **UI work**: `docs/DESIGN.md` is the design system — one repeated content shape, whitespace-only separation, accent reserved for saved state.
 
+## Writing
+
+The bar for comments, docstrings, and `docs/` prose:
+
+- **A comment earns its line by saying what the code cannot**: a constraint, a reason, a gotcha, the ADR behind a choice. One that restates its own code is a no-op; delete it.
+- **One or two lines.** If a comment needs a paragraph, the reasoning belongs in an ADR or `docs/`.
+- **Plain declarative sentences.** State the fact once and move on; if a clause can go without losing a fact, it goes.
+- **Comments describe current behavior.** When behavior changes, update its comments in the same commit; if you cannot make a comment true, delete it.
+
 ## Verify
 
 - `pnpm typecheck && pnpm test` is the default loop before calling work done. Server tests run the real service against a temporary SQLite via `tests/support/service-harness.ts` — manual clock, upstream fixtures, injected `Retrieval`. Write new server tests through the harness rather than mocking internals.
