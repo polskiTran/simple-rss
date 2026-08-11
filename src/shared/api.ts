@@ -181,19 +181,15 @@ export const importOpmlRequestSchema = z.object({
 export type ImportOpmlRequest = z.infer<typeof importOpmlRequestSchema>
 
 /**
- * What happened to one Feed the OPML listed. `reason` explains a skip or a
- * failure in the User's terms; an added Feed needs none.
+ * What one import did. Recording is local, so the report can only speak of
+ * Subscriptions: whether each listed Feed answers is Feed Availability's
+ * story, told on the Feeds list as the first retrievals land.
  */
-export const opmlImportFeedSchema = z.object({
-  url: z.string(),
-  outcome: z.enum(['added', 'skipped', 'failed']),
-  title: z.string().nullable(),
-  reason: z.string().nullable(),
-})
-export type OpmlImportFeed = z.infer<typeof opmlImportFeedSchema>
-
 export const opmlImportReportSchema = z.object({
-  feeds: z.array(opmlImportFeedSchema),
+  added: z.number().int().nonnegative(),
+  alreadySubscribed: z.number().int().nonnegative(),
+  /** Outline URLs that could not become Subscriptions, as the file wrote them. */
+  unusable: z.array(z.string()),
 })
 export type OpmlImportReport = z.infer<typeof opmlImportReportSchema>
 
@@ -225,12 +221,13 @@ export const feedAvailabilityCategorySchema = z.enum([
 export type FeedAvailabilityCategory = z.infer<typeof feedAvailabilityCategorySchema>
 
 /**
- * A calm summary of a Subscription's recent retrieval outcome. `unavailable`
- * begins at `FEED_UNAVAILABLE_AFTER_FAILURES` failures in a row; a quiet Feed
- * that simply publishes nothing stays `available`.
+ * A calm summary of a Subscription's recent retrieval outcome. `unchecked` is
+ * a Subscription no retrieval has succeeded for yet; `unavailable` begins at
+ * `FEED_UNAVAILABLE_AFTER_FAILURES` failures in a row; a quiet Feed that
+ * simply publishes nothing stays `available`.
  */
 export const feedAvailabilitySchema = z.object({
-  state: z.enum(['available', 'unavailable']),
+  state: z.enum(['unchecked', 'available', 'unavailable']),
   lastCheckedAt: z.string().nullable(),
   lastSuccessAt: z.string().nullable(),
   consecutiveFailures: z.number().int().nonnegative(),
@@ -245,9 +242,12 @@ export const subscriptionSummarySchema = feedSummarySchema.extend({
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
 
+/**
+ * The recorded Subscription, unchecked. Its first retrieval is scheduler
+ * work (ADR 0007), so the response cannot speak of items or reachability.
+ */
 export const createSubscriptionResponseSchema = z.object({
   subscription: subscriptionSummarySchema,
-  importedItems: z.number().int().nonnegative(),
 })
 export type CreateSubscriptionResponse = z.infer<typeof createSubscriptionResponseSchema>
 

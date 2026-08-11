@@ -41,6 +41,7 @@ async function subscribed(
   service.upstream.stub(url, { headers: { ...FEED_HEADERS, ...headers }, body: xml })
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
+  await service.wakeScheduler()
   const body = (await response.json()) as { subscription: { feedId: number } }
   return body.subscription.feedId
 }
@@ -143,6 +144,8 @@ describe('background polling', () => {
     })
     const added = await user.post('/api/subscriptions', { url })
     expect(added.status).toBe(201)
+    // The first check retrieves in full and stores the validators.
+    await service.wakeScheduler()
 
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
@@ -244,7 +247,7 @@ describe('background polling', () => {
     expect(scheduleOf(service, 1).nextPollAt).toBe(nextPollTime(1, 120, service.clock.now()))
   })
 
-  it('polls a bounded batch, oldest due first, and the rest on the next wake', async () => {
+  it('drains every due Subscription in one wake, oldest frontier first, batch by batch', async () => {
     const service = await startTestService({ scheduling: { batchLimit: 2 } })
     const user = await claimedDevice(service)
     const urls = ['https://one.example/feed', 'https://two.example/feed', 'https://three.example/feed']
@@ -256,12 +259,13 @@ describe('background polling', () => {
 
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
-    expect(service.upstream.requestsTo(urls[0]!)).toHaveLength(2)
-    expect(service.upstream.requestsTo(urls[1]!)).toHaveLength(2)
-    expect(service.upstream.requestsTo(urls[2]!)).toHaveLength(1)
 
-    await service.wakeScheduler()
-    expect(service.upstream.requestsTo(urls[2]!)).toHaveLength(2)
+    for (const url of urls) expect(service.upstream.requestsTo(url)).toHaveLength(2)
+    // The two most-overdue Feeds filled the first batch; the third followed
+    // in the same wake once that batch was done.
+    const polled = service.upstream.requests.slice(-3).map((request) => request.url)
+    expect([...polled.slice(0, 2)].sort()).toEqual([urls[0]!, urls[1]!].sort())
+    expect(polled[2]).toBe(urls[2]!)
   })
 
   it('keeps no more than four Feed retrievals in flight at once', async () => {

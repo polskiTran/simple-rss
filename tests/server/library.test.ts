@@ -42,6 +42,7 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
 
     const first = await user.put(`/api/library/${feedItemId}`)
@@ -67,6 +68,7 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
 
     // Never saved, unsaved anyway: the state it asked for already holds.
@@ -106,6 +108,7 @@ describe('saving Feed Items to the Library', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     // Saved oldest-publication first, to prove the list orders by the item's
     // own chronology rather than by when the User saved.
@@ -138,6 +141,7 @@ describe('saving Feed Items to the Library', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const { feedItemId, feedId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
@@ -161,11 +165,14 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
     // The publisher retitles the same entry; a manual refresh ingests it.
+    // A minute on, so the first check's refresh cooldown has passed.
     stubFeed(service, rss(item('one', 'First light, revised', '2026-08-08T07:15:00.000Z')))
+    service.clock.advance(60_000)
     expect((await user.post(`/api/feeds/1/refresh`)).status).toBe(200)
 
     const saved = await library(user)
@@ -180,6 +187,7 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
@@ -196,6 +204,7 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const phone = await claimedDevice(service)
     expect((await phone.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const laptop = new Device(service)
     expect((await laptop.signIn()).status).toBe(200)
 

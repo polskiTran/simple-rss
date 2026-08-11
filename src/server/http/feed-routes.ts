@@ -8,7 +8,6 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type FeedDetail,
-  type OpmlImportFeed,
   type OpmlImportReport,
   type PollingSchedule,
   type RefreshFeedResponse,
@@ -28,6 +27,8 @@ export interface FeedRouteDependencies {
   readonly subscriptions: () => SubscriptionService | undefined
   readonly refresh: () => FeedRefresh | undefined
   readonly digest: () => DigestService | undefined
+  /** Asks the scheduler to look at the due frontier now rather than next wake. */
+  readonly nudgeScheduler: () => void
 }
 
 /** Subscription creation, the User's Subscriptions, and the chronological Digest. */
@@ -41,13 +42,10 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, createSubscriptionRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = await service.create(body.value.url)
+    const outcome = service.create(body.value.url)
     if (outcome.kind === 'created') {
-      return c.json<CreateSubscriptionResponse>(
-        { subscription: outcome.subscription, importedItems: outcome.importedItems },
-        201,
-        NO_STORE,
-      )
+      deps.nudgeScheduler()
+      return c.json<CreateSubscriptionResponse>({ subscription: outcome.subscription }, 201, NO_STORE)
     }
     return createFailure(c, outcome)
   })
@@ -59,10 +57,11 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, importOpmlRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = await service.importOpml(body.value.opml)
+    const outcome = service.importOpml(body.value.opml)
     if (outcome.kind === 'invalid-opml') return opmlFailure(c, outcome.code)
+    if (outcome.added > 0) deps.nudgeScheduler()
     return c.json<OpmlImportReport>(
-      { feeds: outcome.entries.map((entry) => importReportLine(entry.url, entry.outcome)) },
+      { added: outcome.added, alreadySubscribed: outcome.alreadySubscribed, unusable: [...outcome.unusable] },
       200,
       NO_STORE,
     )
@@ -107,8 +106,9 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
       return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems }, 200, NO_STORE)
     }
     // The publisher confirmed nothing changed, which is a successful refresh
-    // that simply observed no Feed Items.
-    if (outcome.kind === 'not-modified') {
+    // that simply observed no Feed Items. A merge is a successful refresh of
+    // the Feed that survived, and this Feed's items live there now.
+    if (outcome.kind === 'not-modified' || outcome.kind === 'merged') {
       return c.json<RefreshFeedResponse>({ observedItems: 0 }, 200, NO_STORE)
     }
     return refreshFailure(c, outcome)
@@ -172,16 +172,12 @@ function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, {
         409,
         NO_STORE,
       )
-    case 'invalid-feed':
-      return invalidFeed(c, outcome.code)
-    case 'retrieval-failed':
-      return retrievalFailure(c, outcome.failure.code)
   }
 }
 
 function refreshFailure(
   c: Context,
-  outcome: Exclude<RefreshFeedOutcome, { kind: 'updated' } | { kind: 'not-modified' }>,
+  outcome: Exclude<RefreshFeedOutcome, { kind: 'updated' } | { kind: 'not-modified' } | { kind: 'merged' }>,
 ) {
   switch (outcome.kind) {
     case 'missing':
@@ -279,26 +275,6 @@ function seconds(ms: number): number {
 function retrievalFailure(c: Context, code: RetrievalFailureCode) {
   const answer = RETRIEVAL_ANSWERS[code]
   return c.json({ error: { code: answer.code, message: answer.message } }, answer.status, NO_STORE)
-}
-
-/**
- * One line of the import report. The reasons are the same messages the
- * single-subscription route answers with, so the two paths cannot describe
- * one failure two ways.
- */
-function importReportLine(url: string, outcome: CreateSubscriptionOutcome): OpmlImportFeed {
-  switch (outcome.kind) {
-    case 'created':
-      return { url, outcome: 'added', title: outcome.subscription.title, reason: null }
-    case 'duplicate':
-      return { url, outcome: 'skipped', title: outcome.subscription.title, reason: 'already subscribed' }
-    case 'invalid-url':
-      return { url, outcome: 'failed', title: null, reason: 'Enter an exact HTTP or HTTPS Feed URL' }
-    case 'invalid-feed':
-      return { url, outcome: 'failed', title: null, reason: feedDocumentMessage(outcome.code) }
-    case 'retrieval-failed':
-      return { url, outcome: 'failed', title: null, reason: RETRIEVAL_ANSWERS[outcome.failure.code].message }
-  }
 }
 
 function opmlFailure(c: Context, code: OpmlFailureCode) {

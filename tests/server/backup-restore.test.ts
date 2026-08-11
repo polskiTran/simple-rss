@@ -203,6 +203,7 @@ describe('backup and restore, round-tripped through the running application', ()
     const user = await claimedDevice(service)
     await user.put('/api/settings/timezone', { timezone: 'Europe/Berlin' })
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId

@@ -26,11 +26,12 @@ const rss = (title: string, ...items: string[]) => `<?xml version="1.0"?>
 const stubFeed = (service: TestService, body: string, url: string = FEED_URL) =>
   service.upstream.stub(url, { headers: FEED_HEADERS, body })
 
-/** Subscribes the User to a Feed currently exposing the given document. */
+/** Subscribes the User to a Feed currently exposing the given document, first check landed. */
 async function subscribed(user: Device, service: TestService, xml: string, url: string = FEED_URL): Promise<void> {
   stubFeed(service, xml, url)
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
+  await service.wakeScheduler()
 }
 
 async function search(user: Device, query: string): Promise<SearchResults> {
@@ -137,6 +138,7 @@ describe('searching retained reading metadata', () => {
       service,
       rss('Estuary Notes', item('a', 'Settled impressions', { summary: 'Second thoughts' })),
     )
+    service.clock.advance(60_000)
     expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
 
     expect(await foundTitles(user, 'settled')).toEqual(['Settled impressions'])
@@ -214,6 +216,7 @@ describe('searching retained reading metadata', () => {
     expect(await search(user, 'notes')).toEqual(before)
     // And the triggers keep maintaining the rebuilt index.
     stubFeed(service, rss('Field Notes', item('a', 'Morning chronology, revised', { summary: 'Tidal notes' })))
+    service.clock.advance(60_000)
     expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
     expect(await foundTitles(user, 'revised')).toEqual(['Morning chronology, revised'])
   })

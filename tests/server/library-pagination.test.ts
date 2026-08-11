@@ -31,6 +31,7 @@ describe('the Library in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     // Save every item, discovered through the paged Digest itself.
     const firstPage = digestSchema.parse(await (await user.get('/api/digest')).json())
@@ -68,6 +69,7 @@ describe('the Library in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
     const saved = digest.groups[0]?.items[0]
     expect(saved).toBeDefined()

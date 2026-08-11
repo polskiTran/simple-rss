@@ -138,6 +138,7 @@ export function createService(options: ServiceOptions): Service {
     subscriptions: () => subscriptions,
     refresh: () => refresh,
     digest: () => digest,
+    nudgeScheduler: () => scheduler?.nudge(),
     library: () => library,
     reader: () => reader,
     search: () => search,

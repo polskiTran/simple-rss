@@ -70,8 +70,10 @@ async function expectOpenFeed(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'check every 2 hours' })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: 'check every 6 hours' }).click()
   await expect(page.getByText('now checked every 6 hours')).toBeVisible()
+  // The subscribe's own first check ran moments ago, so a manual refresh is
+  // calmly asked to wait out the cooldown.
   await page.getByRole('button', { name: 'refresh now' }).click()
-  await expect(page.getByText(/refreshed — the feed shows 1 item/)).toBeVisible()
+  await expect(page.getByText('checked a moment ago — wait a little before retrying')).toBeVisible()
 
   await page.getByRole('link', { name: '← feeds' }).click()
   await expect(page.getByRole('textbox', { name: 'search or add feeds' })).toBeVisible()

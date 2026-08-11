@@ -1,11 +1,19 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { OpmlImportFeed, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
-import { ApiError, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
+import type { OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
+import { ApiError, fetchFeedDetail, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
-import { AVAILABILITY_COPY, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
+import { AVAILABILITY_COPY, firstCheckFailure, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
+
+/** How the subscribe watch paces itself: a look now, then every two seconds. */
+const FIRST_CHECK_ATTEMPTS = 8
+const FIRST_CHECK_INTERVAL_MS = 2_000
+
+/** How the list keeps up while unchecked Subscriptions resolve in background. */
+const UNCHECKED_REFRESH_MS = 3_000
+const UNCHECKED_REFRESH_ROUNDS = 20
 
 type SubscriptionState =
   | { readonly kind: 'loading' }
@@ -25,6 +33,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [importing, setImporting] = useState(false)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
+  const [refreshRound, setRefreshRound] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -48,6 +57,28 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }, [])
 
+  async function refreshList(): Promise<void> {
+    try {
+      const { subscriptions } = await fetchSubscriptions()
+      setState({ kind: 'loaded', subscriptions })
+    } catch {
+      // The list already on screen is better than an unavailable note.
+    }
+  }
+
+  // While any Subscription waits for its first check, the list keeps up with
+  // the background retrievals for a while — bounded, so a Feed that stays
+  // unchecked ends with a quiet note rather than polling forever.
+  useEffect(() => {
+    if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
+    if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
+    const timer = window.setTimeout(async () => {
+      await refreshList()
+      setRefreshRound((round) => round + 1)
+    }, UNCHECKED_REFRESH_MS)
+    return () => window.clearTimeout(timer)
+  }, [state, refreshRound])
+
   /**
    * One control searches and adds. Typing narrows the list; a line that is an
    * exact Feed URL subscribes on enter, which is the only thing a URL can
@@ -59,7 +90,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     if (!url || subscribing) return
 
     setSubscribing(true)
-    setNotice('')
+    setNotice('subscribing…')
     try {
       const created = await subscribeToFeed(url)
       setState((current) => {
@@ -70,11 +101,10 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         return { kind: 'loaded', subscriptions: [...current.subscriptions, created.subscription] }
       })
       setQuery('')
-      setNotice(
-        created.importedItems === 1
-          ? 'subscribed — 1 item added to the digest'
-          : `subscribed — ${created.importedItems} items added to the digest`,
-      )
+      setNotice('subscribed — checking the feed…')
+      setRefreshRound(0)
+      setNotice(await watchFirstCheck(created.subscription.feedId))
+      await refreshList()
     } catch (error) {
       setNotice(subscriptionFailure(error))
     } finally {
@@ -94,8 +124,8 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     try {
       const imported = await importOpml(await readFileText(file))
       setReport(imported)
-      const { subscriptions } = await fetchSubscriptions()
-      setState({ kind: 'loaded', subscriptions })
+      setRefreshRound(0)
+      await refreshList()
     } catch (error) {
       setNotice(importFailure(error))
     } finally {
@@ -158,7 +188,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         </a>
       </div>
       <p className="notice feed-notice" aria-live="polite">
-        {subscribing ? 'subscribing…' : notice}
+        {notice}
       </p>
       <ImportReport report={report} />
       <SubscriptionList
@@ -178,6 +208,39 @@ function feedUrlOf(query: string): string | undefined {
   return /^https?:\/\/\S+$/i.test(line) ? line : undefined
 }
 
+/**
+ * Watches a fresh Subscription for its first check, so a mistyped URL is
+ * caught in the same breath (ADR 0007). The server never waits for this —
+ * after the watch gives up, the list's availability note takes over.
+ */
+async function watchFirstCheck(feedId: number): Promise<string> {
+  for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
+    let detail
+    try {
+      detail = await fetchFeedDetail(feedId)
+    } catch (error) {
+      // Gone already: the first retrieval revealed an already-subscribed Feed
+      // and this Subscription quietly folded into it.
+      if (error instanceof ApiError && error.status === 404) return 'already subscribed'
+      continue
+    }
+    if (detail.availability.lastSuccessAt) {
+      return detail.items.length === 1
+        ? 'subscribed — 1 item in the digest'
+        : `subscribed — ${detail.items.length} items in the digest`
+    }
+    if (detail.availability.consecutiveFailures > 0) {
+      return firstCheckFailure(detail.availability.category)
+    }
+  }
+  return 'still checking — the feed will appear in the list'
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
 function readFileText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -188,30 +251,25 @@ function readFileText(file: File): Promise<string> {
 }
 
 /**
- * What one import did, Feed by Feed. Added Feeds appear in the list itself,
- * so only the skipped and failed ones need a line of their own.
+ * What one import recorded. The counts are the whole story the server can
+ * tell — whether each Feed answers shows up on the list as its first check
+ * lands — so only outlines that could not become Subscriptions get a line.
  */
 function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
   if (!report) return null
-  if (report.feeds.length === 0) {
+  if (report.added === 0 && report.alreadySubscribed === 0 && report.unusable.length === 0) {
     return <p className="notice import-report-summary">that OPML file lists no feeds</p>
   }
-
-  const counted = (outcome: OpmlImportFeed['outcome']) =>
-    report.feeds.filter((feed) => feed.outcome === outcome).length
-  const explained = report.feeds.filter((feed) => feed.outcome !== 'added')
 
   return (
     <div className="import-report" aria-live="polite">
       <p className="notice import-report-summary">
-        {`imported — ${counted('added')} added, ${counted('skipped')} skipped, ${counted('failed')} failed`}
+        {`imported — ${report.added} added, ${report.alreadySubscribed} already subscribed`}
       </p>
-      {explained.length > 0 ? (
+      {report.unusable.length > 0 ? (
         <ul className="import-report-details">
-          {explained.map((feed) => (
-            <li key={feed.url}>
-              {feed.title ?? feed.url} — {(feed.reason ?? 'not added').toLowerCase()}
-            </li>
+          {report.unusable.map((url) => (
+            <li key={url}>{url} — not a usable feed url</li>
           ))}
         </ul>
       ) : null}
@@ -294,6 +352,9 @@ function AvailabilityNote({
   onRetry: (feedId: number) => void
 }) {
   const { availability } = subscription
+  if (availability.state === 'unchecked') {
+    return <p className="availability-note">waiting for first check</p>
+  }
   if (availability.state !== 'unavailable') return null
 
   const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'checking is not working'

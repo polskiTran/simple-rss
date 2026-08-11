@@ -42,11 +42,12 @@ function rss(title: string): string {
 </channel></rss>`
 }
 
-/** Subscribes the User to `url` with a Feed that retrieves successfully. */
+/** Subscribes the User to `url` with a Feed that retrieves successfully, first check landed. */
 async function subscribed(user: Device, service: TestService, url: string): Promise<number> {
   service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
+  await service.wakeScheduler()
   const body = (await response.json()) as { subscription: { feedId: number } }
   return body.subscription.feedId
 }
@@ -390,7 +391,10 @@ describe('congestion at the retrieval boundary', () => {
     })
 
     try {
-      expect((await service.create(url)).kind).toBe('created')
+      expect(service.create(url).kind).toBe('created')
+      // The first check is ordinary scheduler work now; it consumes the
+      // scripted success and leaves the Feed available.
+      await service.ingest(1)
 
       // A publisher error counts against the Feed…
       clock.advance(60_000)

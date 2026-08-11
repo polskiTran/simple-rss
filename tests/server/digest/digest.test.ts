@@ -32,6 +32,7 @@ describe('the chronological Digest', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
@@ -55,6 +56,7 @@ describe('the chronological Digest', () => {
     const user = await claimedDevice(service)
     service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
@@ -85,6 +87,7 @@ describe('the chronological Digest', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
@@ -111,6 +114,7 @@ describe('the chronological Digest', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const first = await (await user.get('/api/digest')).json()
     const second = await (await user.get('/api/digest')).json()
@@ -127,6 +131,7 @@ describe('the chronological Digest', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
 
     const body = await (await user.get('/api/digest')).text()
 
