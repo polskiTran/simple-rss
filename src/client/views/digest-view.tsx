@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MAX_SEARCH_QUERY_LENGTH, type Digest, type SearchResult } from '../../shared/api.js'
 import { fetchDigest, fetchSearchResults } from '../api.js'
 import { DailyBand } from '../components/daily-band.js'
+import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
@@ -11,6 +12,8 @@ import { failureKind } from './failure.js'
 export interface DigestViewProps {
   /** Opens one Feed Item in the Reader. */
   onOpenItem(feedItemId: number): void
+  /** Opens the Feed behind an item's attribution. */
+  onOpenFeed(feedId: number): void
 }
 
 type DigestState =
@@ -50,7 +53,7 @@ function withOlderPage(digest: Digest, page: Digest): Digest {
   return { ...digest, groups, nextCursor: page.nextCursor }
 }
 
-export function DigestView({ onOpenItem }: DigestViewProps) {
+export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   const [state, setState] = useState<DigestState>({ kind: 'loading' })
   // Trying again re-runs the effect, so every attempt — the first or a retry
   // — carries the same cleanup and none can answer after unmount.
@@ -209,7 +212,7 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
                       <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
                     </h3>
                     <div className="content-meta">
-                      <span>{item.feedTitle}</span>
+                      <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
                       <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayTime}</time>
                       <SaveToggle
                         feedItemId={item.feedItemId}
@@ -231,7 +234,13 @@ export function DigestView({ onOpenItem }: DigestViewProps) {
           />
         </>
       ) : (
-        <SearchOutcome state={search} line={line} onOpenItem={onOpenItem} onSaved={setSaved} />
+        <SearchOutcome
+          state={search}
+          line={line}
+          onOpenItem={onOpenItem}
+          onOpenFeed={onOpenFeed}
+          onSaved={setSaved}
+        />
       )}
     </div>
   )
@@ -247,11 +256,13 @@ function SearchOutcome({
   state,
   line,
   onOpenItem,
+  onOpenFeed,
   onSaved,
 }: {
   state: Exclude<SearchState, { kind: 'idle' }>
   line: string
   onOpenItem: (feedItemId: number) => void
+  onOpenFeed: (feedId: number) => void
   onSaved: (feedItemId: number, saved: boolean) => void
 }) {
   if (state.kind === 'searching') {
@@ -286,7 +297,7 @@ function SearchOutcome({
             <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
           </h3>
           <div className="content-meta">
-            <span>{result.feedTitle}</span>
+            <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
             <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
             <SaveToggle
               feedItemId={result.feedItemId}

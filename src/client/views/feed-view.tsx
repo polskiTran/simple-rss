@@ -6,10 +6,11 @@ import {
 } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
+import { BackLink } from '../components/back-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { routedClick } from '../routed-link.js'
+import type { Origin } from '../routing.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
 
 type DetailState =
@@ -20,10 +21,16 @@ type DetailState =
 
 export interface FeedViewProps {
   readonly feedId: number
-  /** Told when the User goes back to the Feeds list. */
-  onBack(): void
-  /** Opens one Feed Item in the Reader. */
-  onOpenItem(feedItemId: number): void
+  /** Back to wherever this Feed was opened from: a list, or an article. */
+  readonly origin: Origin
+  onBack(origin: Origin): void
+  /**
+   * Called once the Subscription is gone. Separate from the way back, which
+   * can point at an article belonging to the Feed the User just left.
+   */
+  onUnsubscribed(): void
+  /** Opens one Feed Item in the Reader, which comes back to this Feed by name. */
+  onOpenItem(feedItemId: number, feedTitle: string): void
 }
 
 /**
@@ -31,7 +38,7 @@ export interface FeedViewProps {
  * statistics beneath it, the retained Feed Items, and the polling behaviour —
  * interval, manual refresh, Feed Availability — the User manages here.
  */
-export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
+export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
   const [state, setState] = useState<DetailState>({ kind: 'loading' })
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -107,7 +114,7 @@ export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
     setNotice('')
     try {
       await unsubscribeFromFeed(feedId)
-      onBack()
+      onUnsubscribed()
     } catch {
       setNotice('the feed could not be unsubscribed')
       setUnsubscribing(false)
@@ -147,9 +154,7 @@ export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
   return (
     <div className="view measure feed-view">
       <p className="feed-header">
-        <a className="feed-back" href="/feeds" onClick={routedClick(onBack)}>
-          ← feeds
-        </a>
+        <BackLink className="feed-back" origin={origin} onBack={onBack} />
         {state.kind === 'loaded' ? (
           <>
             <span className="feed-header-title">{state.detail.title}</span>
@@ -205,7 +210,7 @@ function OpenFeed({
   onChangeInterval: (minutes: PollingIntervalMinutes) => void
   onShowDay: (date: string) => void
   onSaved: (feedItemId: number, saved: boolean) => void
-  onOpenItem: (feedItemId: number) => void
+  onOpenItem: (feedItemId: number, feedTitle: string) => void
   confirmingUnsubscribe: boolean
   unsubscribing: boolean
   onConfirmUnsubscribe: (confirming: boolean) => void
@@ -366,7 +371,7 @@ function Items({
 }: {
   detail: FeedDetail
   onSaved: (feedItemId: number, saved: boolean) => void
-  onOpenItem: (feedItemId: number) => void
+  onOpenItem: (feedItemId: number, feedTitle: string) => void
 }) {
   if (detail.items.length === 0) {
     return <p className="empty-note feed-items-state">nothing retained from this feed yet</p>
@@ -387,7 +392,11 @@ function Items({
             {...(anchors ? { id: dayAnchor(detail.feedId, item.date), tabIndex: -1 } : {})}
           >
             <h2 className="content-item-title">
-              <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
+              <ItemTitleLink
+                feedItemId={item.feedItemId}
+                title={item.title}
+                onOpen={(feedItemId) => onOpenItem(feedItemId, detail.title)}
+              />
             </h2>
             <div className="content-meta">
               <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>

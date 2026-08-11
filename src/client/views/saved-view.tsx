@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Library } from '../../shared/api.js'
 import { fetchLibrary } from '../api.js'
+import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
@@ -10,6 +11,8 @@ import { failureKind } from './failure.js'
 export interface SavedViewProps {
   /** Opens one saved Feed Item in the Reader. */
   onOpenItem(feedItemId: number): void
+  /** Opens the Feed behind a save's attribution, when it is still subscribed. */
+  onOpenFeed(feedId: number): void
 }
 
 type LibraryState =
@@ -26,7 +29,7 @@ type LibraryState =
  * word in place; the row leaves the list on the next visit, so a misread tap
  * can be undone where it happened.
  */
-export function SavedView({ onOpenItem }: SavedViewProps) {
+export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   const [state, setState] = useState<LibraryState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
@@ -110,8 +113,13 @@ export function SavedView({ onOpenItem }: SavedViewProps) {
             </h2>
             <div className="content-meta">
               {/* A save outlives its Subscription; said as a fact, not a nudge
-                  to clean anything up. */}
-              <span>{item.subscribed ? item.feedTitle : `${item.feedTitle} · no longer subscribed`}</span>
+                  to clean anything up. Only a subscribed Feed opens: the
+                  server answers 404 for the rest, so that name stays text. */}
+              {item.subscribed ? (
+                <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
+              ) : (
+                <span>{item.feedTitle} · no longer subscribed</span>
+              )}
               <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>
               <SaveToggle
                 feedItemId={item.feedItemId}

@@ -112,12 +112,18 @@ The tile sits centred on the name's line box, which is what puts its bottom edge
 ### Tab bar
 Four words, always in order: `digest · feeds · saved · settings`. Active is ink, rest are grey. The tabs never move or change between screens or breakpoints.
 
+Exactly one word is active at a time, including while the Reader is open. The Reader has no tab of its own, so it borrows the section it was opened from: `saved` for a save, `feeds` for an item of an opened Feed, `digest` otherwise and when opened by address. That is the same section its way back names. An opened Feed always keeps `feeds`, however it was reached.
+
 ### Item
 ```
 title       300 21px/1.42  #12110F
 meta row    300 12.5px/1   #8C8B86, gap 20, margin-top 8
 ```
 Meta contents by context: digest = source · time · save; single feed = date · save (source drops out, it's redundant); feeds list = domain.
+
+The source is the way into its Feed: in the Digest, in search results, in the Library, and in the Reader's meta row. It looks no different from the plain text it replaced — meta grey, no underline at rest — and on hover it steps to ink like §5's other grey words.
+
+A save that outlived its Subscription is the exception. `The Slow Press · no longer subscribed` stays plain text, because there is no Feed left to open. Where the source does open, the link is the name alone, never the trailing clause.
 
 ### Save
 Text affordance, never an icon. `save` in `#A3A29D` (dark: `#6B6A66`); `saved` in accent. Toggle in place, same width class, no animation.
@@ -142,8 +148,12 @@ above do not state, fixed here so the stylesheet has a source:
   text cursor's role — the mark of where the keyboard is — not a third accent
   use. The stat line's "posts" is likewise this design's display copy; the
   domain vocabulary keeps saying Feed Item.
-- The opened Feed's header line (`← feeds`, name in ink, domain) sits at 14px
+- The opened Feed's header line (the way back, name in ink, domain) sits at 14px
   (13px narrow) with 40px to the content below, per §4's feed-header row.
+  The way back is named after the screen it returns to: `← feeds` from the
+  list, `← digest` from an item's source, `← article` from the Reader. The
+  Reader's topline carries the same link in the same style. A screen opened by
+  address falls back to the section it lives under.
   Retained items begin 44px below the stat block — the §4 day-group rhythm.
 - Month labels are announced where a column opens a month, but never within
   six columns of the previous label; that spacing is what produces the

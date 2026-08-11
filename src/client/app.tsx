@@ -1,7 +1,15 @@
 import { useAccess, type Gate } from './authentication.js'
 import { TabBar } from './components/tab-bar.js'
 import { Wordmark } from './components/wordmark.js'
-import { useNavigation, type Navigation } from './routing.js'
+import {
+  DIGEST_ORIGIN,
+  FEEDS_ORIGIN,
+  SAVED_ORIGIN,
+  feedOrigin,
+  readerOrigin,
+  useNavigation,
+  type Navigation,
+} from './routing.js'
 import { DigestView } from './views/digest-view.js'
 import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
@@ -15,12 +23,11 @@ import { SetupView } from './views/setup-view.js'
 /**
  * The application shell: masthead, the four tabs, and the current view.
  *
- * The structure is identical at every width and on every screen — nothing
- * reflows, reorders, or hides — so only the type scale and padding change.
+ * Nothing reflows, reorders, or hides between screens or widths; only the type
+ * scale and padding change.
  *
- * The tabs appear only once the User is in. Setup and signing in are not
- * sections of the reader, and navigation to four screens that would all refuse
- * would be furniture pretending to be a way through.
+ * The tabs render only once access is open, because until then all four
+ * sections would refuse.
  */
 export function App() {
   const navigation = useNavigation()
@@ -50,39 +57,68 @@ function viewFor(gate: Gate, navigation: Navigation) {
     case 'locked':
       return <LoginView onSignedIn={gate.adopt} />
     case 'open':
-      return readerViewFor(navigation, gate)
+      return signedInView(navigation, gate)
   }
 }
 
-function readerViewFor(navigation: Navigation, gate: Gate) {
-  // An opened Feed Item reads under the Digest tab wherever it was opened
-  // from — the Reader belongs to the reading flow it ends by returning to.
+function signedInView(navigation: Navigation, gate: Gate) {
+  // The Reader sits over whichever section it was opened from, so it is chosen
+  // before the tab switch.
   if (navigation.readerItemId !== undefined) {
+    const feedItemId = navigation.readerItemId
+    const origin = navigation.origin ?? DIGEST_ORIGIN
     return (
       <ReaderView
-        feedItemId={navigation.readerItemId}
-        onBack={() => navigation.navigate('digest')}
-        onOpenItem={navigation.openReader}
+        feedItemId={feedItemId}
+        origin={origin}
+        onBack={navigation.returnTo}
+        // Reading on keeps the same origin, so the next article leaves where this one would.
+        onOpenItem={(next) => navigation.openReader(next, origin)}
+        onOpenFeed={(feedId) => navigation.openFeed(feedId, readerOrigin(feedItemId, navigation.origin))}
       />
     )
   }
 
   switch (navigation.route) {
     case 'digest':
-      return <DigestView onOpenItem={navigation.openReader} />
-    case 'feeds':
-      return navigation.feedId === undefined ? (
-        <FeedsView onOpenFeed={navigation.openFeed} />
-      ) : (
-        <FeedView
-          feedId={navigation.feedId}
-          onBack={() => navigation.navigate('feeds')}
-          onOpenItem={navigation.openReader}
+      return (
+        <DigestView
+          onOpenItem={(feedItemId) => navigation.openReader(feedItemId, DIGEST_ORIGIN)}
+          onOpenFeed={(feedId) => navigation.openFeed(feedId, DIGEST_ORIGIN)}
         />
       )
+    case 'feeds':
+      return navigation.feedId === undefined ? (
+        <FeedsView onOpenFeed={(feedId) => navigation.openFeed(feedId, FEEDS_ORIGIN)} />
+      ) : (
+        <OpenedFeed navigation={navigation} feedId={navigation.feedId} />
+      )
     case 'saved':
-      return <SavedView onOpenItem={navigation.openReader} />
+      return (
+        <SavedView
+          onOpenItem={(feedItemId) => navigation.openReader(feedItemId, SAVED_ORIGIN)}
+          onOpenFeed={(feedId) => navigation.openFeed(feedId, SAVED_ORIGIN)}
+        />
+      )
     case 'settings':
       return <SettingsView onAccessChanged={gate.adopt} />
   }
+}
+
+/**
+ * An article opened here goes back to this Feed by name, so FeedView passes its
+ * title up with each item: the shell knows the Feed's id, not its title.
+ */
+function OpenedFeed({ navigation, feedId }: { navigation: Navigation; feedId: number }) {
+  return (
+    <FeedView
+      feedId={feedId}
+      origin={navigation.origin ?? FEEDS_ORIGIN}
+      onBack={navigation.returnTo}
+      onUnsubscribed={() => navigation.navigate('feeds')}
+      onOpenItem={(feedItemId, feedTitle) =>
+        navigation.openReader(feedItemId, feedOrigin(feedId, feedTitle, navigation.origin))
+      }
+    />
+  )
 }
