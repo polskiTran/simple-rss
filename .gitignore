@@ -1,3 +1,9 @@
+# mac os
+.DS_Store
+
+# test plug
+.test_plugs/
+
 # agent traces
 agent-traces/
 
