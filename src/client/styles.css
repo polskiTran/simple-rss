@@ -109,6 +109,7 @@
   html {
     background: var(--color-paper);
     color-scheme: light dark;
+    scrollbar-gutter: stable; /* reserve scrollbar width  */
   }
 
   /* A pinned appearance also pins the scheme the browser paints its own
