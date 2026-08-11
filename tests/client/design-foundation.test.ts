@@ -24,6 +24,11 @@ function lightOnly(): string {
   return css.replace(/@media \(prefers-color-scheme: dark\)[^}]*\{[\s\S]*?\n\}/g, '')
 }
 
+/** A CSS value made safe to drop into one of the regexes above. */
+function escaped(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function darkBlocks(): string {
   return (css.match(/@media \(prefers-color-scheme: dark\)[^}]*\{[\s\S]*?\n\}/g) ?? []).join('\n')
 }
@@ -102,13 +107,84 @@ describe('type', () => {
   it('takes the tile’s tints from the cadence ramp and its peak from the wordmark ink', () => {
     // One ramp, bound once: a second set of greys here would need a second
     // dark binding too, and would be the fifth ink level §6 rules out.
-    expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*background:\s*var\(--cadence-0\)/)
+    // Every cell paints the level it rests at, so hover and wait can both
+    // return to it without either restating the tile.
+    expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*background:\s*var\(--rest\)/)
+    expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*--rest: var\(--cadence-0\)/)
     for (const level of [1, 2, 3]) {
       expect(lightOnly()).toMatch(
-        new RegExp(`\\.wordmark-cell\\[data-level='${level}'\\]\\s*\\{[^}]*background:\\s*var\\(--cadence-${level}\\)`),
+        new RegExp(`\\.wordmark-cell\\[data-level='${level}'\\]\\s*\\{[^}]*--rest: var\\(--cadence-${level}\\)`),
       )
     }
-    expect(lightOnly()).toMatch(/\.wordmark-cell\[data-level='4'\]\s*\{[^}]*background:\s*var\(--color-ink-strong\)/)
+    expect(lightOnly()).toMatch(/\.wordmark-cell\[data-level='4'\]\s*\{[^}]*--rest: var\(--color-ink-strong\)/)
+  })
+
+  it('glints the tile only for a pointer, and only where the mark is a link', () => {
+    // Every pointer-gated block, not the first: the sheet select has one of
+    // its own, and the glint must be inside a gate wherever it is written.
+    const hover = (css.match(/@media \(hover: hover\) and \(pointer: fine\)\s*\{[\s\S]*?\n {2}\}/g) ?? []).join('\n')
+
+    // `a.wordmark`, not `.wordmark`: the tile on setup and login leads
+    // nowhere, so it stays still.
+    expect(hover).toMatch(
+      /a\.wordmark:hover \.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint 500ms cubic-bezier\(0\.23, 1, 0\.32, 1\) calc\(var\(--glint-step\) \* 60ms\)/,
+    )
+  })
+
+  it('keeps the wait on the same glint, looping, and off the masthead mark', () => {
+    // `.loading-note .wordmark-cell`, never `.wordmark-cell`: the mark in the
+    // masthead holds still while something is loading. Two marks moving at
+    // once is the product fidgeting.
+    expect(lightOnly()).toMatch(
+      /\.loading-note \.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint-loop 1200ms linear infinite calc\(var\(--glint-step\) \* 60ms\)/,
+    )
+    expect(lightOnly()).not.toMatch(/\n {2}\.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint-loop/)
+
+    // The loop holds at rest for the back two-thirds of its turn. Without
+    // that hold there is no breath between passes, and a mark with no breath
+    // is a mark flashing rather than working.
+    const keyframes = /@keyframes wordmark-glint-loop\s*\{([\s\S]*?)\n {2}\}/.exec(css)?.[1] ?? ''
+    expect(keyframes).toMatch(/0%,\s*30%,\s*100%\s*\{[^}]*background:\s*var\(--rest\)/)
+    expect(keyframes).toMatch(/12%\s*\{[^}]*background:\s*var\(--glint\)/)
+  })
+
+  it('breathes the waiting tile rather than stopping it under reduced motion', () => {
+    const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+
+    // A loader that stops moving is a loader that lies, so this one is the
+    // exception to the rule in the test above: the cells hold still and the
+    // tile as a whole keeps saying something, on opacity alone.
+    expect(reduced).toMatch(/\.loading-note \.wordmark-grid\s*\{[^}]*animation:\s*loading-mark-breathe/)
+    expect(reduced).toMatch(/@keyframes loading-mark-breathe\s*\{[^}]*50%\s*\{[^}]*opacity:\s*0\.45/)
+  })
+
+  it('sends every cell to another level of the same ramp and back', () => {
+    // The glint may not introduce a tone the mark does not already own, so
+    // each level's destination is another entry in the same ramp — and the
+    // keyframes leave both ends implicit, so the resting tile is stated once.
+    const destinations = [
+      ['.wordmark-cell', 'var(--cadence-2)'],
+      [".wordmark-cell[data-level='1']", 'var(--cadence-3)'],
+      [".wordmark-cell[data-level='2']", 'var(--color-ink-strong)'],
+      // The two loud levels step down, so the matrix reshuffles rather than
+      // merely brightening.
+      [".wordmark-cell[data-level='3']", 'var(--cadence-1)'],
+      [".wordmark-cell[data-level='4']", 'var(--cadence-2)'],
+    ] as const
+
+    for (const [selector, destination] of destinations) {
+      expect(lightOnly()).toMatch(new RegExp(`${escaped(selector)}\\s*\\{[^}]*--glint: ${escaped(destination)}`))
+    }
+
+    const keyframes = /@keyframes wordmark-glint\s*\{([\s\S]*?)\n {2}\}/.exec(css)?.[1] ?? ''
+    expect(keyframes).toMatch(/30%\s*\{[^}]*background:\s*var\(--glint\)/)
+    expect(keyframes).not.toMatch(/(^|\D)(0%|100%|from|to)/)
+  })
+
+  it('does not glint at all under reduced motion — a flicker has no gentler version', () => {
+    const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+
+    expect(reduced).toMatch(/\.wordmark-cell\s*\{[^}]*animation:\s*none/)
   })
 
   it('sets the desktop wordmark and tab sizes', () => {

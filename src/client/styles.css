@@ -196,26 +196,60 @@
     gap: 2px;
   }
 
+  /* Each level names two tones: the one it rests at and the one it glints to.
+     The quiet three step up and the loud two step down, so the matrix
+     reshuffles rather than merely brightens — and every value it passes
+     through is the ramp's own, so the glint cannot introduce a tone the mark
+     does not already own. One `background`, both animations, no third list. */
   .wordmark-cell {
     width: 3px;
     height: 3px;
-    background: var(--cadence-0);
+    background: var(--rest);
+    --rest: var(--cadence-0);
+    --glint: var(--cadence-2);
   }
 
   .wordmark-cell[data-level='1'] {
-    background: var(--cadence-1);
+    --rest: var(--cadence-1);
+    --glint: var(--cadence-3);
   }
 
   .wordmark-cell[data-level='2'] {
-    background: var(--cadence-2);
+    --rest: var(--cadence-2);
+    --glint: var(--color-ink-strong);
   }
 
   .wordmark-cell[data-level='3'] {
-    background: var(--cadence-3);
+    --rest: var(--cadence-3);
+    --glint: var(--cadence-1);
   }
 
   .wordmark-cell[data-level='4'] {
-    background: var(--color-ink-strong);
+    --rest: var(--color-ink-strong);
+    --glint: var(--cadence-2);
+  }
+
+  @keyframes wordmark-glint {
+    30% {
+      background: var(--glint);
+    }
+  }
+
+  /* The same glint, made to keep going for a wait. The shape is the hover's,
+     compressed into the front of the turn: up by 12%, back down by 30%, and
+     still for the remaining 70% — the breath between passes is what separates
+     a mark that is working from a mark that is flashing. Both ends are stated
+     here because a loop has to hold at rest rather than drift there. */
+  @keyframes wordmark-glint-loop {
+    0%,
+    30%,
+    100% {
+      background: var(--rest);
+    }
+
+    12% {
+      background: var(--glint);
+    }
   }
 
   .wordmark-name {
@@ -264,6 +298,16 @@
     .view {
       opacity: 0;
     }
+  }
+
+  .loading-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .loading-note .wordmark-cell {
+    animation: wordmark-glint-loop 1200ms linear infinite calc(var(--glint-step) * 60ms);
   }
 
   /* The calm empty state: one quiet line, no illustration, no call to action
@@ -1182,6 +1226,10 @@
       text-decoration-color: var(--color-hairline);
       text-underline-offset: 4px;
     }
+
+    a.wordmark:hover .wordmark-cell {
+      animation: wordmark-glint 500ms cubic-bezier(0.23, 1, 0.32, 1) calc(var(--glint-step) * 60ms);
+    }
   }
 }
 
@@ -1373,6 +1421,20 @@
 @media (prefers-reduced-motion: reduce) {
   .unsubscribe-reveal {
     transition-property: opacity;
+  }
+
+  .wordmark-cell {
+    animation: none;
+  }
+
+  .loading-note .wordmark-grid {
+    animation: loading-mark-breathe 1800ms ease-in-out infinite;
+  }
+
+  @keyframes loading-mark-breathe {
+    50% {
+      opacity: 0.45;
+    }
   }
 }
 

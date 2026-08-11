@@ -7,6 +7,7 @@ import {
 import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
+import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
@@ -156,7 +157,9 @@ export function FeedView({ feedId, onBack, onOpenItem }: FeedViewProps) {
           </>
         ) : null}
       </p>
-      {state.kind === 'loading' ? <p className="empty-note feed-detail-state">loading the feed</p> : null}
+      {state.kind === 'loading' ? (
+        <LoadingNote className="empty-note feed-detail-state">loading the feed</LoadingNote>
+      ) : null}
       {state.kind === 'missing' ? (
         <p className="empty-note feed-detail-state">that feed is not in your subscriptions</p>
       ) : null}

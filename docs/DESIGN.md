@@ -185,24 +185,15 @@ In the reader it thins to a four-row strip above the article.
   with `noopener noreferrer`; supported math stays TeX source in v1, italic,
   never executed.
 
-### Pointer response
-
-Hover is answered in the system's own vocabulary, instantly — the flip is the
-feedback here as everywhere: grey words step to ink the way the active tab
-sits in ink; words already set in ink take the hairline underline, the one
-rule the system allows. The save word is the exception — its colour is
-reserved for the saved state, so its hover steps through the greys, quietest
-to muted. Never a background, never a motion, and none of it on touch, where
-the platform's grey tap flash is suppressed and the word's own state change
-answers instead.
-
 ### Motion
 
-The word the User presses answers instantly — the flip is the feedback:
-hovers, the active tab, the save word, and every dismissal never ease.
-Motion belongs to arrivals. What a press summons, and what the machine
-answers on its own clock, enters on a breath — opacity or height, ease-out,
-never a show:
+The word the User presses answers instantly — the flip is the feedback: word
+hovers, the active tab, the save word, and every dismissal never ease. The
+mark is the exception, and the only one: it is not a word and has no flip to
+give, so it answers in the vocabulary it is drawn in (see the glint below).
+Otherwise motion belongs to arrivals. What a press summons, and what the
+machine answers on its own clock, enters on a breath — opacity or height,
+ease-out, never a show:
 
 - A summoned view — a tab's screen, an opened Feed, the Reader — fades in
   over 150ms, opacity only: brief enough that the hundredth tab change
@@ -215,9 +206,25 @@ never a show:
   User's act and stays instant.
 - A selected cadence day scrolls its items into view smoothly, so the jump
   reads as travel down the same list.
+- **The mark's glint.** Hovered, the mark's sixteen cells step to another
+  level of the same ramp and back — one pass along the anti-diagonal, 60ms
+  between cells, 500ms for a cell's own rise and fall, `cubic-bezier(.23,1,
+  .32,1)` — and the tile settles at its canonical levels while the pointer is
+  still on it. Only where the mark is a link: on setup and login it holds
+  still.
+- **The wait.** Every waiting line — the digest, the library, a feed, the
+  feeds list, an opening article, a running search — puts the same tile in
+  front of its words, glinting on a loop: the same shape in the front 30% of
+  a 1200ms turn, 60ms between cells, `linear`, still for the rest. The words
+  say what is being waited on; the tile says it is still happening. The
+  masthead mark stays out of it — two marks moving at once is the product
+  fidgeting.
 
 Under `prefers-reduced-motion` the unfold and the scroll go instant and the
-fades remain — gentler, not zero. Nothing else animates.
+fades remain — gentler, not zero. The glint on hover does not run at all; a
+flicker has no gentler version. The wait is the one thing that cannot stop,
+since "is anything still happening" is the only question it exists to answer,
+so its cells hold still and the tile breathes on opacity instead.
 
 ## 6. Density rules
 
