@@ -101,9 +101,7 @@ test.describe('phone Feed and Digest rendering', () => {
 
   test('keeps the same structure inside the narrow paper', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
-    // Below the breakpoint the paper stops being a centred 820px card and
-    // becomes the page: it fills the content area, whatever the reserved
-    // scrollbar gutter leaves of the viewport.
+    // Below the breakpoint the 820px cap releases: the paper is the page.
     const paper = await page.evaluate(() => ({
       width: document.querySelector('.paper')!.getBoundingClientRect().width,
       contentWidth: document.body.clientWidth,

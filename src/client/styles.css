@@ -109,9 +109,7 @@
   html {
     background: var(--color-paper);
     color-scheme: light dark;
-    /* Held at every width so a page that stops scrolling — a short Digest, a
-       search that narrows to one hit — cannot slide the centred paper
-       sideways by the scrollbar's width. */
+    /* A page that stops scrolling must not slide the centred paper sideways. */
     scrollbar-gutter: stable;
   }
 
