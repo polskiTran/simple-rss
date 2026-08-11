@@ -231,6 +231,7 @@ function boundedPlainText(value: unknown, limit: number): string | null {
       { selector: 'script', format: 'skip' },
       { selector: 'style', format: 'skip' },
       { selector: 'img', format: 'skip' },
+      { selector: 'a', options: { ignoreHref: true } },
     ],
   })
     .replace(/\s+/g, ' ')
