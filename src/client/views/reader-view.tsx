@@ -3,6 +3,7 @@ import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { ArticleMarkdown } from '../components/article-markdown.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
+import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { pathOf } from '../routing.js'
@@ -83,7 +84,7 @@ export function ReaderView({ feedItemId, onBack, onOpenItem }: ReaderViewProps) 
   }, [feedItemId, attempt])
 
   if (itemState.kind === 'loading') {
-    return <p className="view measure empty-note">opening the article</p>
+    return <LoadingNote className="view measure empty-note">opening the article</LoadingNote>
   }
   if (itemState.kind === 'unavailable' || itemState.kind === 'unreachable') {
     return (
@@ -123,7 +124,7 @@ export function ReaderView({ feedItemId, onBack, onOpenItem }: ReaderViewProps) 
       </header>
 
       {articleState.kind === 'extracting' ? (
-        <p className="empty-note reader-extracting">parsing the original page</p>
+        <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
       ) : null}
       {articleState.kind === 'ready' ? <ArticleMarkdown markdown={articleState.article.markdown} /> : null}
       {articleState.kind === 'failed' ? (

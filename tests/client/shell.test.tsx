@@ -82,12 +82,25 @@ describe('the application shell', () => {
     // The pattern is the design, so it is held here rather than left to the
     // eye: sixteen cells, row by row, in the cadence ramp's levels. The tile
     // is decoration for a screen reader, which is why it is queried by class.
-    const levels = [...container.querySelectorAll('.wordmark-cell')].map((cell) =>
+    const levels = [...container.querySelectorAll('.masthead .wordmark-cell')].map((cell) =>
       cell.getAttribute('data-level'),
     )
 
     expect(levels).toEqual(['4', '1', '3', '0', '2', '4', '0', '2', '3', '0', '4', '1', '0', '2', '1', '3'])
-    expect(container.querySelector('.wordmark-grid')?.getAttribute('aria-hidden')).toBe('true')
+    expect(container.querySelector('.masthead .wordmark-grid')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('orders the hover glint along the tile’s anti-diagonal', async () => {
+    const { container } = await renderAt('/digest')
+
+    // `row + col`, so the glint crosses against the leading diagonal the peak
+    // cells sit on. Every cell carries its turn, whether or not the pointer
+    // that would spend it exists.
+    const steps = [...container.querySelectorAll<HTMLElement>('.masthead .wordmark-cell')].map(
+      (cell) => cell.style.getPropertyValue('--glint-step'),
+    )
+
+    expect(steps).toEqual(['0', '1', '2', '3', '1', '2', '3', '4', '2', '3', '4', '5', '3', '4', '5', '6'])
   })
 
   it.each([...ROUTES])('marks %s as the current section when its path is open', async (route) => {

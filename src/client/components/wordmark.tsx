@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { routedClick } from '../routed-link.js'
 import { pathOf } from '../routing.js'
 
@@ -17,6 +18,27 @@ const TILE = [
   [0, 2, 1, 3],
 ] as const
 
+export function MarkTile() {
+  return (
+    <span className="wordmark-grid" aria-hidden="true">
+      {TILE.map((row, y) =>
+        row.map((level, x) => (
+          // The glint crosses the tile along the anti-diagonal, so `row + col`
+          // is the order a cell takes its turn — the sweep runs against the
+          // leading diagonal the peaks sit on, and the mark reads as lit
+          // across rather than filled in. The wait spends the same order.
+          <span
+            key={`${y}-${x}`}
+            className="wordmark-cell"
+            data-level={level}
+            style={{ '--glint-step': y + x } as CSSProperties}
+          />
+        )),
+      )}
+    </span>
+  )
+}
+
 export interface WordmarkProps {
   readonly onNavigate?: (() => void) | undefined
 }
@@ -24,11 +46,7 @@ export interface WordmarkProps {
 export function Wordmark({ onNavigate }: WordmarkProps) {
   const mark = (
     <>
-      <span className="wordmark-grid" aria-hidden="true">
-        {TILE.flat().map((level, index) => (
-          <span key={index} className="wordmark-cell" data-level={level} />
-        ))}
-      </span>
+      <MarkTile />
       <span className="wordmark-name">simple</span>
     </>
   )

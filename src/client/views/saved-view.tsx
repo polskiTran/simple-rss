@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Library } from '../../shared/api.js'
 import { fetchLibrary } from '../api.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
+import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { failureKind } from './failure.js'
@@ -73,7 +74,7 @@ export function SavedView({ onOpenItem }: SavedViewProps) {
   const retry = () => setAttempt((current) => current + 1)
 
   if (state.kind === 'loading') {
-    return <p className="view measure empty-note">loading the library</p>
+    return <LoadingNote className="view measure empty-note">loading the library</LoadingNote>
   }
   if (state.kind === 'unavailable' || state.kind === 'unreachable') {
     return (

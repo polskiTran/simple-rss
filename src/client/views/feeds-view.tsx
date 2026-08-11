@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import type { OpmlImportFeed, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
+import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 import { AVAILABILITY_COPY, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
@@ -231,7 +232,8 @@ function SubscriptionList({
   onRetry: (feedId: number) => void
   onOpen: (feedId: number) => void
 }) {
-  if (state.kind === 'loading') return <p className="empty-note subscription-list-state">loading feeds</p>
+  if (state.kind === 'loading')
+    return <LoadingNote className="empty-note subscription-list-state">loading feeds</LoadingNote>
   if (state.kind === 'unavailable') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
   if (state.subscriptions.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
 
