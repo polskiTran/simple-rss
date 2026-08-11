@@ -9,7 +9,7 @@
       <title>First light</title>
       <link>https://journal.example/first-light#section</link>
       <pubDate>Fri, 08 Aug 2026 07:15:00 GMT</pubDate>
-      <description><![CDATA[<p>A clear <strong>morning</strong>.</p><script>alert('no')</script>]]></description>
+      <description><![CDATA[<p>A clear <strong>morning</strong>.</p><p>The post <a href="https://journal.example/first-light">First light</a> appeared first on Field Notes.</p><script>alert('no')</script>]]></description>
       <media:content url="https://images.example/first-light.jpg" medium="image" />
     </item>
     <item>

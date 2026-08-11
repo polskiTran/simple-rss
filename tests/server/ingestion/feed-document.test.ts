@@ -27,7 +27,7 @@ describe('parseFeedDocument', () => {
         link: 'https://journal.example/first-light',
         publishedAt: '2026-08-08T07:15:00.000Z',
         imageUrl: 'https://images.example/first-light.jpg',
-        summary: 'A clear morning.',
+        summary: 'A clear morning. The post First light appeared first on Field Notes.',
       },
       {
         dedupeKey: 'link:https://feeds.example/relative-path',
