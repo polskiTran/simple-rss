@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test'
-import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import {
+  expect,
+  expectNoHorizontalOverflow,
+  USER_PASSWORD,
+  SETUP_SECRET,
+  test,
+  type Installation,
+} from './installation.js'
 
 const LIGHT_ACCENT = 'rgb(36, 56, 216)'
 const QUIET_GREY = 'rgb(163, 162, 157)'
@@ -136,8 +143,6 @@ test.describe('the Library inside the narrow paper', () => {
     // The one shape, at its narrow scale: 19px titles, 12px meta.
     await expect(title).toHaveCSS('font-size', '19px')
     await expect(page.locator('.content-meta')).toHaveCSS('font-size', '12px')
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      await page.evaluate(() => window.innerWidth),
-    )
+    await expectNoHorizontalOverflow(page)
   })
 })

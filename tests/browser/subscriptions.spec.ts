@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test'
-import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import {
+  expect,
+  expectNoHorizontalOverflow,
+  USER_PASSWORD,
+  SETUP_SECRET,
+  test,
+  type Installation,
+} from './installation.js'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
@@ -34,9 +41,7 @@ async function expectFeedAndDigest(page: Page, installation: Installation): Prom
   await expect(page.getByText('07:15')).toBeVisible()
   await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('save')
   await expect(page.locator('main')).not.toContainText(/unread/i)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-    await page.evaluate(() => window.innerWidth),
-  )
+  await expectNoHorizontalOverflow(page)
 }
 
 /** Opens the subscribed Feed and walks the cadence-focused management flow. */
@@ -62,9 +67,7 @@ async function expectOpenFeed(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.activeElement?.textContent)).toContain('First light')
   await expect(page.getByText('today, 07:15')).toBeVisible()
   await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('save')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-    await page.evaluate(() => window.innerWidth),
-  )
+  await expectNoHorizontalOverflow(page)
 
   // Managing polling behaviour: the interval presets and the manual refresh.
   await expect(page.getByRole('button', { name: 'check every 2 hours' })).toHaveAttribute('aria-pressed', 'true')
@@ -98,7 +101,14 @@ test.describe('phone Feed and Digest rendering', () => {
 
   test('keeps the same structure inside the narrow paper', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
-    await expect(page.locator('.paper')).toHaveCSS('width', '390px')
+    // Below the breakpoint the paper stops being a centred 820px card and
+    // becomes the page: it fills the content area, whatever the reserved
+    // scrollbar gutter leaves of the viewport.
+    const paper = await page.evaluate(() => ({
+      width: document.querySelector('.paper')!.getBoundingClientRect().width,
+      contentWidth: document.body.clientWidth,
+    }))
+    expect(paper.width).toBe(paper.contentWidth)
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 

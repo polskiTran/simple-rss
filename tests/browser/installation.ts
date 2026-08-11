@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { test as base } from '@playwright/test'
+import { expect, test as base, type Page } from '@playwright/test'
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger } from '../../src/server/logger.js'
 import { startService, type RunningService } from '../../src/server/server.js'
@@ -203,6 +203,22 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 })
 
 export { expect } from '@playwright/test'
+
+/**
+ * Asserts nothing forces the page wider than the surface it is drawn on: no
+ * reading needs panning sideways.
+ *
+ * Measured against the body's content width rather than the viewport, because
+ * `scrollbar-gutter: stable` holds a scrollbar's width out of the content area
+ * at every width. Against `innerWidth` the assertion would keep a blind spot
+ * exactly that wide.
+ */
+export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.body.clientWidth,
+  )
+  expect(overflow).toBeLessThanOrEqual(0)
+}
 
 function listen(server: Server): Promise<void> {
   return new Promise((resolve, reject) => {

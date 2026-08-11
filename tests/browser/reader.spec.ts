@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test'
-import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import {
+  expect,
+  expectNoHorizontalOverflow,
+  USER_PASSWORD,
+  SETUP_SECRET,
+  test,
+  type Installation,
+} from './installation.js'
 
 /** Claims the installation and subscribes to the fixture Feed, ending on Feeds. */
 async function subscribe(page: Page, installation: Installation, feedUrl = installation.feedUrl): Promise<void> {
@@ -192,9 +199,6 @@ test.describe('Reader View at phone width', () => {
     // paper is wide. Nothing forces the page wider than the phone: reading
     // needs no panning.
     await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(overflow).toBe(0)
+    await expectNoHorizontalOverflow(page)
   })
 })
