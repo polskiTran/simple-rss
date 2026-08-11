@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test'
-import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import {
+  expect,
+  expectNoHorizontalOverflow,
+  USER_PASSWORD,
+  SETUP_SECRET,
+  test,
+  type Installation,
+} from './installation.js'
 
 const LIGHT_PAPER = 'rgb(247, 247, 245)'
 const DARK_PAPER = 'rgb(18, 17, 15)'
@@ -132,8 +139,6 @@ test.describe('the Digest inside the narrow paper', () => {
     await expect(heading).toHaveCSS('font-size', '12px')
     // 114px at every width: the field is clipped, never redrawn shorter.
     await expect(page.locator('.daily-band')).toHaveCSS('height', '114px')
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      await page.evaluate(() => window.innerWidth),
-    )
+    await expectNoHorizontalOverflow(page)
   })
 })

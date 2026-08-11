@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test'
-import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import {
+  expect,
+  expectNoHorizontalOverflow,
+  USER_PASSWORD,
+  SETUP_SECRET,
+  test,
+  type Installation,
+} from './installation.js'
 
 /** Claims the installation, subscribes to both fixture Feeds, opens the Digest. */
 async function openDigest(page: Page, installation: Installation): Promise<void> {
@@ -83,8 +90,6 @@ test.describe('searching inside the narrow paper', () => {
     await expect(
       page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'Slow water' }),
     ).toBeVisible()
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      await page.evaluate(() => window.innerWidth),
-    )
+    await expectNoHorizontalOverflow(page)
   })
 })

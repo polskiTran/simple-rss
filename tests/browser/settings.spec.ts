@@ -1,4 +1,4 @@
-import { expect, SETUP_SECRET, test, USER_PASSWORD } from './installation.js'
+import { expect, expectNoHorizontalOverflow, SETUP_SECRET, test, USER_PASSWORD } from './installation.js'
 
 /**
  * The timezone select is the one control in the system sized by its content,
@@ -29,9 +29,6 @@ test.describe('Settings at phone width', () => {
     })
     expect(edges.right).toBeLessThanOrEqual(edges.contentRight)
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(overflow).toBe(0)
+    await expectNoHorizontalOverflow(page)
   })
 })

@@ -109,7 +109,10 @@
   html {
     background: var(--color-paper);
     color-scheme: light dark;
-    scrollbar-gutter: stable; /* reserve scrollbar width  */
+    /* Held at every width so a page that stops scrolling — a short Digest, a
+       search that narrows to one hit — cannot slide the centred paper
+       sideways by the scrollbar's width. */
+    scrollbar-gutter: stable;
   }
 
   /* A pinned appearance also pins the scheme the browser paints its own
