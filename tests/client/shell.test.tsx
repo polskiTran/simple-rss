@@ -58,6 +58,24 @@ describe('the application shell', () => {
     expect(screen.getByText('simple')).toBeDefined()
   })
 
+  it('returns to the digest when the mark is pressed', async () => {
+    await renderAt('/saved')
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('link', { name: 'simple' }))
+
+    expect(activeTab()).toBe('digest')
+    expect(window.location.pathname).toBe('/digest')
+  })
+
+  it('leaves the digest tab the only current one when the mark is a link', async () => {
+    await renderAt('/saved')
+
+    // `getByRole` throws on a second match: the mark must not claim the page
+    // alongside the tab that says where the User is.
+    expect(activeTab()).toBe('saved')
+  })
+
   it('draws the mark as the 4x4 cadence tile of docs/references/brand.png', async () => {
     const { container } = await renderAt('/digest')
 

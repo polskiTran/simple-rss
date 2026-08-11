@@ -1,3 +1,6 @@
+import { routedClick } from '../routed-link.js'
+import { pathOf } from '../routing.js'
+
 /**
  * A 4x4 tile of 3px squares in the five ink levels of the cadence ramp,
  * followed by the name in italic — `docs/references/brand.png`. The mark says
@@ -14,15 +17,30 @@ const TILE = [
   [0, 2, 1, 3],
 ] as const
 
-export function Wordmark() {
-  return (
-    <span className="wordmark">
+export interface WordmarkProps {
+  readonly onNavigate?: (() => void) | undefined
+}
+
+export function Wordmark({ onNavigate }: WordmarkProps) {
+  const mark = (
+    <>
       <span className="wordmark-grid" aria-hidden="true">
         {TILE.flat().map((level, index) => (
           <span key={index} className="wordmark-cell" data-level={level} />
         ))}
       </span>
       <span className="wordmark-name">simple</span>
-    </span>
+    </>
+  )
+
+  if (onNavigate === undefined) return <span className="wordmark">{mark}</span>
+
+  // A real link, like the tabs: open-in-new-tab and copy-the-address keep
+  // working. It carries no `aria-current` — the Digest tab is the one that
+  // says where the User is.
+  return (
+    <a className="wordmark" href={pathOf('digest')} onClick={routedClick(onNavigate)}>
+      {mark}
+    </a>
   )
 }

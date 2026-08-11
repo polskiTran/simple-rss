@@ -29,7 +29,7 @@ export function App() {
   return (
     <div className="paper">
       <header className="masthead">
-        <Wordmark />
+        <Wordmark onNavigate={gate.access.kind === 'open' ? () => navigation.navigate('digest') : undefined} />
         {gate.access.kind === 'open' ? <TabBar active={navigation.route} onNavigate={navigation.navigate} /> : null}
       </header>
       <main>{viewFor(gate, navigation)}</main>

@@ -113,6 +113,18 @@ describe('Reader View', () => {
     expect(await screen.findByText(/wait 21s, then retry/)).toBeDefined()
   })
 
+  it('closes back to the digest when the mark is pressed', async () => {
+    reading()
+    render(<App />)
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { level: 1, name: 'First light' })
+
+    await user.click(screen.getByRole('link', { name: 'simple' }))
+
+    expect(window.location.pathname).toBe('/digest')
+    expect(screen.queryByRole('heading', { level: 1, name: 'First light' })).toBeNull()
+  })
+
   it('opens from a Digest title and walks on via next in the digest', async () => {
     const digest = {
       today: { date: '2026-08-08', volume: 1 },

@@ -152,6 +152,16 @@ describe('coming back to a claimed installation', () => {
     expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
   })
 
+  it('leaves the mark as a mark, not a way into a reader that would refuse', async () => {
+    stubApi({ claimed: true, authenticated: false })
+
+    renderApp()
+
+    await screen.findByLabelText('password')
+    expect(screen.getByText('simple')).toBeDefined()
+    expect(screen.queryByRole('link', { name: 'simple' })).toBeNull()
+  })
+
   it('opens the reader once the password is accepted', async () => {
     stubApi({ claimed: true, authenticated: false }).on('POST /api/auth/session', {
       body: { claimed: true, authenticated: true },
