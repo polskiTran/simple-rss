@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ArticleMarkdown } from '../../src/client/components/article-markdown.js'
 
@@ -21,7 +21,7 @@ describe('article markdown rendering', () => {
   })
 
   it('renders emphasis, inline code, and hard line breaks', () => {
-    const body = bodyOf('a *calm* and **steady** `read()`\nsecond line')
+    const body = bodyOf('a *calm* and **steady** `read()`\\\nsecond line')
 
     const paragraph = body.querySelector('p')
     expect(paragraph?.querySelector('em')?.textContent).toBe('calm')
@@ -60,13 +60,43 @@ describe('article markdown rendering', () => {
     expect(body.querySelector('blockquote')?.textContent).toContain('quoted words')
   })
 
-  it('renders fenced code without interpreting its contents', () => {
+  it('renders fenced code as one element per line, without interpreting it', () => {
     const body = bodyOf('```python\ndef guard():\n    return **not bold**\n```')
 
     const code = body.querySelector('pre code')
-    expect(code?.textContent).toBe('def guard():\n    return **not bold**')
+    // Each line is its own element, which the renderer's classes make a block
+    // and number; the line carries no newline of its own.
+    const linesOfCode = code?.querySelectorAll(':scope > span') ?? []
+    expect([...linesOfCode].map((line) => line.textContent)).toEqual(['def guard():', '    return **not bold**'])
     expect(code?.querySelector('strong')).toBeNull()
-    expect(code?.className).toContain('language-python')
+    expect(body.querySelector('[data-streamdown="code-block"]')?.getAttribute('data-language')).toBe('python')
+  })
+
+  it('gives code the renderer’s own chrome, fenced and inline', () => {
+    const body = bodyOf('Run `observe()`.\n\n```python\nprint(1)\n```')
+
+    // Nothing here strips the renderer's classes any more, so a fenced block
+    // arrives as its card — framed, labelled with its language, and with the
+    // copy and download it ships — and inline code as its filled pill.
+    expect(body.querySelector('[data-streamdown="inline-code"]')?.className).toContain('bg-muted')
+    expect(body.querySelector('[data-streamdown="code-block"]')?.className).toContain('bg-sidebar')
+    expect(body.querySelector('[data-streamdown="code-block-header"]')?.textContent).toBe('python')
+    expect(body.querySelector('[data-streamdown="code-block-body"]')?.className).toContain('bg-background')
+    expect(body.querySelector('[data-streamdown="code-block-copy-button"]')).not.toBeNull()
+    expect(body.querySelector('[data-streamdown="code-block-download-button"]')).not.toBeNull()
+  })
+
+  it('colours a language it carries, and leaves one it does not', async () => {
+    const body = bodyOf('```python\ndef guard():\n    return 1\n```\n\n```brainfuck\n+[->+]\n```')
+
+    // Highlighting arrives after the grammar does, and every token carries
+    // both themes: the light colour the renderer paints with, and a
+    // `--shiki-dark` beside it for its dark classes to read.
+    await waitFor(() => {
+      const token = body.querySelector('pre code span[style*="--shiki-dark"]')
+      expect(token?.getAttribute('style')).toMatch(/--sdm-c:\s*#[0-9a-f]{6}/i)
+    })
+    expect(body.querySelectorAll('[data-language="brainfuck"] span[style*="--shiki-dark"]')).toHaveLength(0)
   })
 
   it('renders tables with a header row', () => {
@@ -78,11 +108,23 @@ describe('article markdown rendering', () => {
     expect(cells[1]?.textContent).toBe('polling')
   })
 
-  it('shows math as its TeX source', () => {
+  it('sets math with KaTeX, inline and as a display block', () => {
     const body = bodyOf('Euler wrote $e^{i\\pi} = -1$.\n\n$$\n\\int_0^1 x\\,dx\n$$')
 
-    expect(body.querySelector('.article-math')?.textContent).toBe('e^{i\\pi} = -1')
-    expect(body.querySelector('.article-math-display')?.textContent).toBe('\\int_0^1 x\\,dx')
+    expect(body.querySelector('p .katex')).not.toBeNull()
+    expect(body.querySelector('.katex-display')).not.toBeNull()
+    // The TeX the server extracted survives inside the rendering.
+    const sources = [...body.querySelectorAll('annotation')].map((source) => source.textContent)
+    expect(sources).toEqual(['e^{i\\pi} = -1', '\\int_0^1 x\\,dx'])
+  })
+
+  it('reads an escaped dollar as a dollar, not as an opening delimiter', () => {
+    // The server escapes every literal `$` in article text, which is what
+    // makes single-dollar math safe to recognise at all.
+    const body = bodyOf('a \\$5 note and a \\$9 one')
+
+    expect(body.querySelector('.katex')).toBeNull()
+    expect(body.textContent).toBe('a $5 note and a $9 one')
   })
 
   it('treats escaped syntax and raw HTML as literal text', () => {
@@ -92,6 +134,18 @@ describe('article markdown rendering', () => {
     expect(body.querySelector('h2')).toBeNull()
     expect(body.textContent).toContain('a *b* <img src=x onerror=alert(1)> c')
     expect(body.textContent).toContain('# not a heading')
+  })
+
+  it('renders no element from raw HTML, escaped or not', () => {
+    // The server escapes `<`, so the second line is not a shape this dialect
+    // can carry. It is here because the renderer's raw-HTML plugin is stubbed
+    // out at the bundler (`src/client/no-raw-html.ts`), and this is the
+    // behaviour that stub has to keep true.
+    const body = bodyOf('a \\<img src=x onerror=alert(1)> c\n\n<img src=y onerror=alert(1)>\n\n<b>bold</b>')
+
+    expect(body.querySelector('img')).toBeNull()
+    expect(body.querySelector('b')).toBeNull()
+    expect(body.textContent).toContain('a <img src=x onerror=alert(1)> c')
   })
 
   it('renders a thematic break between paragraphs', () => {

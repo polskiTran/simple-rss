@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
-import { ArticleMarkdown } from '../components/article-markdown.js'
 import { BackLink } from '../components/back-link.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
@@ -9,6 +8,18 @@ import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { failureKind } from './failure.js'
+
+/**
+ * The Markdown renderer — KaTeX, Shiki, and the parser between them — is the
+ * heaviest thing the client ships and only this screen has any use for it, so
+ * it arrives with the first article rather than with the app. It is fetched
+ * alongside an extraction that takes far longer than the chunk does.
+ */
+const ArticleMarkdown = lazy(async () => ({
+  default: (await import('../components/article-markdown.js')).ArticleMarkdown,
+}))
+
+const parsingNote = <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
 
 type ItemState =
   | { readonly kind: 'loading' }
@@ -125,10 +136,14 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </p>
       </header>
 
-      {articleState.kind === 'extracting' ? (
-        <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
+      {articleState.kind === 'extracting' ? parsingNote : null}
+      {articleState.kind === 'ready' ? (
+        // The same note covers the renderer's own arrival, so a slow chunk
+        // reads as the wait it already was rather than as a blank page.
+        <Suspense fallback={parsingNote}>
+          <ArticleMarkdown markdown={articleState.article.markdown} />
+        </Suspense>
       ) : null}
-      {articleState.kind === 'ready' ? <ArticleMarkdown markdown={articleState.article.markdown} /> : null}
       {articleState.kind === 'failed' ? (
         <Fallback item={item} waitSeconds={articleState.waitSeconds} onRetry={() => setAttempt((current) => current + 1)} />
       ) : null}

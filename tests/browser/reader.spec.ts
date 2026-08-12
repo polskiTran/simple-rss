@@ -53,6 +53,33 @@ test.describe('Reader View', () => {
     await expect(page.getByText('arrive before the light')).toBeVisible()
     await expect(page.locator('.article-body pre code')).toContainText('def observe()')
 
+    // A fenced block keeps one line per line, and Shiki colours it once the
+    // grammar has landed, carrying both themes on every token.
+    const codeLines = page.locator('.article-body pre code > span')
+    await expect(codeLines).toHaveCount(4)
+    const firstLine = await codeLines.first().boundingBox()
+    const lastLine = await codeLines.last().boundingBox()
+    expect(lastLine?.y ?? 0).toBeGreaterThan(firstLine?.y ?? 0)
+    await expect(page.locator('.article-body pre code span[style*="--shiki-dark"]').first()).toBeVisible()
+
+    // Math is set rather than quoted, inline and as a display block.
+    await expect(page.locator('.article-body .katex')).toHaveCount(2)
+
+    // A numbered equation wider than the measure scrolls in place, and its
+    // number stays clear of the formula instead of landing on top of it.
+    const equation = page.locator('.article-body .katex-display')
+    const equationLayout = await equation.evaluate((element) => {
+      const bases = [...element.querySelectorAll('.katex-html > .base')]
+      return {
+        scrolls: element.scrollWidth > element.clientWidth,
+        clear: element.querySelector('.tag')!.getBoundingClientRect().left,
+        formulaEnds: Math.max(...bases.map((base) => base.getBoundingClientRect().right)),
+      }
+    })
+    expect(equationLayout.scrolls).toBe(true)
+    expect(equationLayout.clear).toBeGreaterThan(equationLayout.formulaEnds)
+    await expectNoHorizontalOverflow(page)
+
     // The hostile parts do not: no script effect, no frames, no forms.
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     expect(await page.locator('.article-body iframe, .article-body form, .article-body script').count()).toBe(0)
@@ -78,6 +105,27 @@ test.describe('Reader View', () => {
 
     await page.getByRole('link', { name: '← digest' }).click()
     await expect(page.getByRole('heading', { name: /today · 1 post/ })).toBeVisible()
+  })
+
+  test('brings its Markdown renderer down with the first article, not with the app', async ({
+    page,
+    installation,
+  }) => {
+    // The renderer is most of the client's weight, and a chunking change can
+    // quietly attach it to the entry — a preload link is enough to do it.
+    const renderer: string[] = []
+    page.on('request', (request) => {
+      if (/article-renderer|article-markdown/.test(request.url())) renderer.push(request.url())
+    })
+
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'digest' }).click()
+    await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
+    expect(renderer).toHaveLength(0)
+
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.locator('.article-body')).toBeVisible()
+    expect(renderer.length).toBeGreaterThan(0)
   })
 
   test('saves from the Reader and the Library agrees', async ({ page, installation }) => {

@@ -230,6 +230,8 @@ Reader View is generated only when requested:
 
 Allowed output includes headings, paragraphs, lists, links, images, block quotes, tables, code, and supported math. Scripts, styles, forms, iframes, embedded media, event handlers, and arbitrary raw HTML are removed. External links use `noopener noreferrer`.
 
+The client renders that Markdown with Streamdown, KaTeX, and Shiki, and takes the renderer's own styling for the article's blocks. Raw HTML has no path through it — rehype-raw is left out of the plugin list and stubbed out at the bundler — and links and images pass through the reading surface's own components, so rendering can admit nothing the server's allowlist excluded.
+
 Article HTML and Markdown are never written to SQLite. Extraction failures preserve the Feed Item, show its stored summary and an **Open original** action, and expose a rate-limited **Retry parsing** action. Failed extraction responses are not cached.
 
 ## Image proxy

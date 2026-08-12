@@ -191,11 +191,16 @@ function blocks(container: ParentNode, context: Rendering): string[] {
   return out
 }
 
-/** One paragraph from a run of phrasing nodes, or nothing worth keeping. */
+/**
+ * One paragraph from a run of phrasing nodes, or nothing worth keeping. Every
+ * newline inside a paragraph came from a `<br>` — running text is collapsed
+ * to one line — so each is written as a hard break: a trailing `\`, which
+ * CommonMark reads as the line break the publisher wrote.
+ */
 function paragraphOf(nodes: readonly Node[], context: Rendering): string | undefined {
   const text = nodes.map((node) => inlineNode(node, context)).join('')
   const kept = lines(text)
-  return kept.length > 0 ? kept.join('\n') : undefined
+  return kept.length > 0 ? kept.join('\\\n') : undefined
 }
 
 /**

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import { clientAliases } from './vite.config.js'
 
 /**
  * Two projects, one command. Server tests run on Node against real temporary
@@ -18,6 +19,7 @@ export default defineConfig({
       },
       {
         plugins: [react()],
+        resolve: { alias: clientAliases },
         test: {
           name: 'client',
           environment: 'jsdom',

@@ -5,7 +5,7 @@
 1. **One shape, repeated.** A content item is a 21px line with a 12.5px grey line under it. Posts, feeds, saved items are all that shape. Filters differ; the object does not.
 2. **Settings is not that shape.** It drops to a 13/14px two-column sheet so preferences can never be mistaken for reading.
 3. **No dividers, no cards, no boxes.** Separation is whitespace only. The one rule in the system is the search field's underline.
-4. **Colour is reserved.** Accent appears on saved state and the text cursor. Nowhere else.
+4. **Colour is reserved.** Accent appears on saved state, the text cursor, and links inside an article — the third added when the reading surface took the Markdown renderer's standards (§5, Reader body). Nowhere else.
 5. **Cadence is the unfair advantage.** Publishing rhythm — the thing only an RSS reader knows — is drawn as dot matrices at four ink levels. No charts, no curves, no colour.
 
 ## 2. Colour
@@ -187,13 +187,28 @@ In the reader it thins to a four-row strip above the article.
 - The reference opens straight from the metadata line into the first
   paragraph, so the daily band's four-row reader strip is deferred until a
   design pass actually draws it above an article.
-- Code inside an article renders in the platform monospace stack at 0.82em.
-  Alignment is code's meaning and Literata has no mono; this is imported
-  content keeping its own voice, not a second interface typeface. Interface
-  chrome never uses it.
-- Article links and `open original` mark their departure with ↗ and leave
-  with `noopener noreferrer`; supported math stays TeX source in v1, italic,
-  never executed.
+- **The article's blocks are the Markdown renderer's, not this document's.**
+  Streamdown draws the headings, lists, quotes, tables, and code, with its own
+  classes and its own opinions: a fenced block is a framed card with its
+  language, copy, download, and line numbers, and inline code is a filled
+  pill. That is a deliberate departure from §1's "no dividers, no cards, no
+  boxes", which still governs every other screen — following one renderer's
+  standard beats maintaining a second design system against it. What this
+  system supplies is the palette those classes resolve against, bound in both
+  schemes, plus the measure and the prose type they inherit. A design pass may
+  reclaim any of it later; until then the renderer leads and this section
+  follows. Code is coloured by Shiki in Vitesse light and dark; a language the
+  reader does not carry simply stays uncoloured. Interface chrome still never
+  uses monospace.
+- Article links take the accent, underlined, which is what the renderer's own
+  link does and a third use of the accent beyond §1's two. `open original`
+  stays interface chrome and keeps the ink. Both mark their departure with ↗
+  and leave with `noopener noreferrer`; math is set with KaTeX at the size of the prose
+  around it, never executed. A display equation wider than the measure scrolls
+  in place, as the renderer's code and tables do, rather than widening the
+  paper — and a
+  numbered one keeps its number clear of the formula instead of hanging it at
+  an edge the formula has already passed.
 
 ### Motion
 
