@@ -1,28 +1,19 @@
 import type { Clock } from '../clock.js'
 
-/** How long one client's image requests count against its allowance. */
 export const IMAGE_WINDOW_MS = 60_000
 
-/**
- * Image requests one client address may make inside the window. Generous
- * enough for a Digest and an image-heavy article to load without friction —
- * every image is one request — while bounding what the proxy can be made to
- * ask publishers on someone's behalf.
- */
+// Generous enough for a Digest and an image-heavy article, while bounding what
+// the proxy can be made to ask publishers on someone's behalf.
 export const IMAGE_REQUESTS_PER_WINDOW = 240
 
-/**
- * Map size at which expired windows are swept. Far above what one User's
- * devices produce, so the sweep only ever runs under address-spoofing noise.
- */
+// Far above what one User's devices produce, so the sweep only runs under address-spoofing noise.
 const SWEEP_THRESHOLD = 256
 
 export type ImageRateVerdict = { readonly allowed: true } | { readonly allowed: false; readonly retryAfterSeconds: number }
 
 /**
- * A fixed window per client address. Unlike login limiting there is no
- * failure to distinguish from success: every proxied image costs an upstream
- * request, so every one counts.
+ * A fixed window per client address. Unlike login limiting, every request
+ * counts: each proxied image costs an upstream request.
  */
 export class ImageRateLimiter {
   readonly #clock: Clock

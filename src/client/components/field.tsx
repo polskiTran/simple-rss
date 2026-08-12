@@ -4,18 +4,14 @@ export interface FieldProps {
   readonly label: string
   readonly value: string
   readonly type?: 'text' | 'password'
-  /** Lets a password manager recognise the field it is looking at. */
   readonly autoComplete?: string
   readonly autoFocus?: boolean
   onChange(value: string): void
 }
 
-/**
- * One labelled line with the search field's underline beneath it, which
- * `docs/DESIGN.md` makes the only rule in the system. The label is a real
- * `<label>`, not placeholder text: minimalism is not a reason to leave a field
- * unnamed to a screen reader or to lose its name as soon as it is filled in.
- */
+// Underlined like the search field — the only rule `docs/DESIGN.md` allows.
+// The label is a real `<label>`, not placeholder text, so the field keeps its
+// name for screen readers and once filled in.
 export function Field({ label, value, type = 'text', autoComplete, autoFocus, onChange }: FieldProps) {
   const id = useId()
 

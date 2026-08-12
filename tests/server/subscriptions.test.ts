@@ -38,8 +38,8 @@ describe('Subscriptions', () => {
 
     const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
-    // The answer is the recorded decision, before any retrieval: named after
-    // its host, resolved nowhere yet, unchecked.
+    // The response is the recorded decision before any retrieval: title from
+    // the host, resolvedUrl unchanged, availability unchecked.
     expect(added.status).toBe(201)
     expect(await added.json()).toEqual({
       subscription: {

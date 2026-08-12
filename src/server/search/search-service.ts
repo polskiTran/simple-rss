@@ -4,12 +4,8 @@ import { dateKey, inDigestOrder, metaRowDate, plausibleHorizon } from '../digest
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 
-/**
- * The most matches one search answers with. Recovering a remembered item is a
- * narrowing gesture — a query drowning in matches wants another word, not a
- * longer page — and the bound keeps the query cheap at the ~100-Subscription
- * target.
- */
+// A query drowning in matches wants another word, not a longer page; the bound
+// keeps the query cheap at the ~100-Subscription target.
 export const SEARCH_RESULT_LIMIT = 50
 
 interface MatchRow {
@@ -24,12 +20,9 @@ interface MatchRow {
 }
 
 /**
- * Search over retained reading metadata, answered from the `feed_item_search`
- * FTS index the migration's triggers keep current. What search covers is what
- * the reader still shows: ordinary retained items of subscribed Feeds, and
- * Library items wherever their Feed went. An unsubscribed Feed's unsaved
- * items are excluded immediately — they are awaiting the sweep, and a derived
- * index must not resurrect what the User let go of.
+ * Answered from the `feed_item_search` FTS index the migration's triggers keep current.
+ * Coverage is what the reader still shows; an unsubscribed Feed's unsaved items are
+ * excluded immediately — a derived index must not resurrect what the User let go of.
  */
 export class SearchService {
   readonly #db: SqliteDatabase
@@ -50,10 +43,9 @@ export class SearchService {
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
-    // The FTS table decides what matches; the joins decide what may be shown.
-    // The LIMIT is taken newest-first under the same chronology rule the rows
-    // are later displayed in — an implausibly future-dated item falls back to
-    // first-seen here too, so it cannot hold a bound slot it will not rank at.
+    // The FTS table decides what matches; the joins decide what may be shown. The LIMIT
+    // applies under the same chronology rule the rows are displayed in, so a
+    // future-dated item cannot hold a bound slot it will not rank at.
     const rows = this.#db
       .prepare(
         `SELECT
@@ -102,21 +94,15 @@ export class SearchService {
 }
 
 /**
- * The User's line, restated in FTS5 MATCH terms it can never misparse:
- * every whitespace-separated word becomes a quoted phrase, all words must
- * match, and the last one matches as a prefix so search-as-you-type finds
- * "chronology" from "chrono". FTS5 operators — AND, NOT, `^`, column filters
- * — are deliberately not offered; a search line is words, not syntax.
- *
- * `undefined` when nothing tokenizable remains, which callers answer with the
- * empty result rather than asking the index about nothing.
+ * Every word becomes a quoted phrase — all must match, the last as a prefix for
+ * search-as-you-type. FTS5 operators are deliberately not offered: a search line
+ * is words, not syntax. `undefined` when nothing tokenizable remains.
  */
 function matchExpressionOf(query: string): string | undefined {
   const words = query
     .split(/\s+/)
     .map((word) => word.replaceAll('"', ''))
-    // A word with no letter or number tokenizes to nothing; quoting it would
-    // hand FTS5 an empty phrase instead of a term.
+    // A word with no letter or digit tokenizes to nothing; quoting it would hand FTS5 an empty phrase.
     .filter((word) => /[\p{L}\p{N}]/u.test(word))
   if (words.length === 0) return undefined
 
@@ -124,10 +110,8 @@ function matchExpressionOf(query: string): string | undefined {
 }
 
 /**
- * Drops the derived index's contents and rebuilds them from the canonical
- * tables — the recovery the FTS table's design promises. Run through the CLI
- * against the mounted volume; the triggers keep the rebuilt index current
- * from then on. Returns how many Feed Items are now indexed.
+ * Rebuilds the derived index from the canonical tables — the recovery the FTS design
+ * promises. Run through the CLI; the triggers keep it current from then on.
  */
 export function rebuildSearchIndex(db: SqliteDatabase): number {
   return db.transaction(() => {

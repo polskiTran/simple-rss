@@ -7,11 +7,9 @@ import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 import { AVAILABILITY_COPY, firstCheckFailure, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
 
-/** How the subscribe watch paces itself: a look now, then every two seconds. */
 const FIRST_CHECK_ATTEMPTS = 8
 const FIRST_CHECK_INTERVAL_MS = 2_000
 
-/** How the list keeps up while unchecked Subscriptions resolve in background. */
 const UNCHECKED_REFRESH_MS = 3_000
 const UNCHECKED_REFRESH_ROUNDS = 20
 
@@ -21,7 +19,6 @@ type SubscriptionState =
   | { readonly kind: 'unavailable' }
 
 export interface FeedsViewProps {
-  /** Told when the User opens one Feed from the list. */
   onOpenFeed(feedId: number): void
 }
 
@@ -66,9 +63,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }
 
-  // While any Subscription waits for its first check, the list keeps up with
-  // the background retrievals for a while — bounded, so a Feed that stays
-  // unchecked ends with a quiet note rather than polling forever.
+  // While any Subscription waits for its first check, keep refreshing the
+  // list — bounded, so a Feed that stays unchecked ends with a quiet note
+  // rather than polling forever.
   useEffect(() => {
     if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
     if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
@@ -79,11 +76,8 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     return () => window.clearTimeout(timer)
   }, [state, refreshRound])
 
-  /**
-   * One control searches and adds. Typing narrows the list; a line that is an
-   * exact Feed URL subscribes on enter, which is the only thing a URL can
-   * usefully mean here.
-   */
+  // One control searches and adds: typing narrows the list, an exact Feed URL
+  // subscribes on enter.
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const url = feedUrlOf(query)
@@ -133,10 +127,8 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }
 
-  /**
-   * The manual retry behind an unavailable Feed's note. Whatever the attempt
-   * finds, the list is refetched so the row reports the newest state.
-   */
+  // The manual retry behind an unavailable Feed's note; the list is refetched
+  // whatever the attempt finds.
   async function retry(feedId: number) {
     if (retryingFeedId !== undefined) return
     setRetryingFeedId(feedId)
@@ -202,17 +194,14 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   )
 }
 
-/** The entered line, when it is an exact Feed URL rather than a search. */
 function feedUrlOf(query: string): string | undefined {
   const line = query.trim()
   return /^https?:\/\/\S+$/i.test(line) ? line : undefined
 }
 
-/**
- * Watches a fresh Subscription for its first check, so a mistyped URL is
- * caught in the same breath (ADR 0007). The server never waits for this —
- * after the watch gives up, the list's availability note takes over.
- */
+// Watches a fresh Subscription's first check so a mistyped URL is caught
+// immediately (ADR 0007). The server never waits for this; after the watch
+// gives up, the list's availability note takes over.
 async function watchFirstCheck(feedId: number): Promise<string> {
   for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
@@ -220,8 +209,8 @@ async function watchFirstCheck(feedId: number): Promise<string> {
     try {
       detail = await fetchFeedDetail(feedId)
     } catch (error) {
-      // Gone already: the first retrieval revealed an already-subscribed Feed
-      // and this Subscription quietly folded into it.
+      // 404 here means the first retrieval revealed an already-subscribed
+      // Feed and this Subscription folded into it.
       if (error instanceof ApiError && error.status === 404) return 'already subscribed'
       continue
     }
@@ -250,11 +239,8 @@ function readFileText(file: File): Promise<string> {
   })
 }
 
-/**
- * What one import recorded. The counts are the whole story the server can
- * tell — whether each Feed answers shows up on the list as its first check
- * lands — so only outlines that could not become Subscriptions get a line.
- */
+// The counts are all the server can tell — whether each Feed answers shows on
+// the list as its first check lands — so only unusable outlines get a line.
 function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
   if (!report) return null
   if (report.added === 0 && report.alreadySubscribed === 0 && report.unusable.length === 0) {
@@ -328,7 +314,6 @@ function SubscriptionList({
   )
 }
 
-/** A search narrows by what the row shows: the Feed's name and its domain. */
 function matches(subscription: SubscriptionSummary, query: string): boolean {
   const line = query.trim().toLowerCase()
   if (!line || line.startsWith('http://') || line.startsWith('https://')) return true
@@ -337,11 +322,8 @@ function matches(subscription: SubscriptionSummary, query: string): boolean {
   )
 }
 
-/**
- * The calm face of a failing Feed. It appears only once checking has failed
- * three times in a row, states what is known — never the raw error — and
- * offers a retry rather than suggesting the Subscription be removed.
- */
+// Appears only once checking has failed three times in a row; states what is
+// known — never the raw error — and offers a retry, not removal.
 function AvailabilityNote({
   subscription,
   retrying,

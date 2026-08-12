@@ -53,16 +53,9 @@ export interface TestService {
   readonly sleeps: readonly number[]
   /** Same-origin request against the running service; `path` starts with `/`. */
   fetch(path: string, init?: RequestInit): Promise<Response>
-  /**
-   * One scheduler wake, driven explicitly instead of by the once-per-minute
-   * timer, so a test states when the minute passes just as the manual clock
-   * states what time it is.
-   */
+  /** One scheduler wake, driven explicitly instead of by the once-per-minute timer. */
   wakeScheduler(): Promise<void>
-  /**
-   * Stops the process and starts a new one on the same data directory —
-   * the application-level shape of replacing a container.
-   */
+  /** Stops the process and starts a new one on the same data directory — a container replacement. */
   restart(): Promise<void>
   stop(): Promise<void>
 }
@@ -72,10 +65,6 @@ const running: RunningService[] = []
 /**
  * Boots the complete service — real socket, real SQLite file in a temporary
  * directory, real migrations — with time and upstream HTTP under test control.
- *
- * This is the primary harness. Later tickets add Feed retrieval and polling
- * behind the same two seams, so their tests keep asserting on HTTP responses
- * and stored state rather than on internals.
  */
 export async function startTestService(options: HarnessOptions = {}): Promise<TestService> {
   const dataDir = options.dataDir ?? (await makeTempDataDir())

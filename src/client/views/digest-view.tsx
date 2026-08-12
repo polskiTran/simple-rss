@@ -10,36 +10,29 @@ import { SaveToggle } from '../components/save-toggle.js'
 import { failureKind } from './failure.js'
 
 export interface DigestViewProps {
-  /** Opens one Feed Item in the Reader. */
   onOpenItem(feedItemId: number): void
-  /** Opens the Feed behind an item's attribution. */
   onOpenFeed(feedId: number): void
 }
 
 type DigestState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly digest: Digest }
-  /** The server answered — with a refusal, or a body that failed to parse. */
+  /** Server answered with a refusal or unparseable body. */
   | { readonly kind: 'unavailable' }
-  /** No answer at all — the network, not the reader. */
+  /** No response at all. */
   | { readonly kind: 'unreachable' }
 
 type SearchState =
-  /** The field is empty; the Digest itself is what shows. */
   | { readonly kind: 'idle' }
   | { readonly kind: 'searching' }
   | { readonly kind: 'found'; readonly results: readonly SearchResult[] }
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'unreachable' }
 
-/** How long typing rests before the line is asked of the server. */
 const SEARCH_SETTLE_MS = 250
 
-/**
- * The loaded chronology, extended by one more page. A page may begin in the
- * day the previous one ended in; that day's two halves join under the group
- * already on screen.
- */
+// A page may begin in the day the previous one ended; that day's two halves
+// merge under the group already on screen.
 function withOlderPage(digest: Digest, page: Digest): Digest {
   const groups = [...digest.groups]
   const seam = groups.at(-1)
@@ -55,8 +48,8 @@ function withOlderPage(digest: Digest, page: Digest): Digest {
 
 export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   const [state, setState] = useState<DigestState>({ kind: 'loading' })
-  // Trying again re-runs the effect, so every attempt — the first or a retry
-  // — carries the same cleanup and none can answer after unmount.
+  // Retrying re-runs the effect, so every attempt carries the same cleanup
+  // and none can answer after unmount.
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -99,8 +92,8 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       return
     }
     let active = true
-    // Searching, immediately: the settle delay batches keystrokes into one
-    // request, and the state must not claim stale results meanwhile.
+    // Set searching immediately: the settle delay batches keystrokes, and the
+    // state must not claim stale results meanwhile.
     setSearch({ kind: 'searching' })
     const settle = window.setTimeout(() => {
       void fetchSearchResults(line)
@@ -119,7 +112,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
 
   const retry = () => setAttempt((current) => current + 1)
 
-  /** The server confirmed a membership change; the word flips in place. */
   const setSaved = (feedItemId: number, saved: boolean) => {
     setState((current) =>
       current.kind === 'loaded'
@@ -199,9 +191,8 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
               >
                 {group.label}
                 {group.label === 'today' ? (
-                  // The one number the design allows: it answers "is there
-                  // something to read", never how much is left or unread. The
-                  // whole day's volume, even when the page cuts today short.
+                  // The one count the design allows — never an unread count.
+                  // Whole-day volume, even when the page cuts today short.
                   <span className="day-heading-count"> · {countLabel(state.digest.today.volume)}</span>
                 ) : null}
               </h2>
@@ -246,12 +237,8 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   )
 }
 
-/**
- * What a non-empty search line shows in the Digest's place. Every state is a
- * said thing — searching, unreachable, nothing matched — so silence is never
- * mistaken for an answer, and results keep the one content-item shape with
- * the Feed and date that tell similar titles apart.
- */
+// Every state renders words — searching, unreachable, nothing matched — so
+// silence is never mistaken for an answer.
 function SearchOutcome({
   state,
   line,

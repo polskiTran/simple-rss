@@ -12,12 +12,9 @@ export interface SettingsRouteDependencies {
 }
 
 /**
- * The User's installation preferences. Mounted at `/api`, behind
- * `requireSession` like every non-auth route.
- *
- * An installation that was claimed before timezone detection existed — or by a
- * browser that offered none — has no settings row yet; it reads as UTC, which
- * is exactly how the Digest grouped its days all along.
+ * Installation preferences, mounted at `/api` behind `requireSession`. An
+ * installation claimed before timezone detection has no settings row and
+ * reads as UTC — exactly how the Digest grouped its days all along.
  */
 export function settingsRoutes(deps: SettingsRouteDependencies): Hono {
   const app = new Hono()
@@ -39,8 +36,8 @@ export function settingsRoutes(deps: SettingsRouteDependencies): Hono {
     try {
       settings.setTimezone(body.value.timezone, deps.clock.now())
     } catch (error) {
-      // Only the zone itself is the User's mistake; a failing write is the
-      // installation's, and belongs to the app-level error answer.
+      // Only an unknown zone is the User's mistake; a failing write belongs
+      // to the app-level error answer.
       if (!(error instanceof UnknownTimezoneError)) throw error
       return c.json(
         { error: { code: 'unknown_timezone', message: 'That is not a recognizable IANA timezone' } },

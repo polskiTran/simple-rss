@@ -1,26 +1,20 @@
 @import 'tailwindcss';
 
-/* Literata is the only typeface, self-hosted so the client makes no
-   third-party request and `font-src 'self'` can stay closed.
-   Weights 200 / 300 / 500, with italic only at 300 — the design uses italic
-   for the wordmark, past-date headings, and pull quotes, all at 300. */
+/* Literata is the only typeface, self-hosted so `font-src 'self'` stays
+   closed. Weights 200/300/500, italic only at 300. */
 @import '@fontsource/literata/latin-200.css';
 @import '@fontsource/literata/latin-300.css';
 @import '@fontsource/literata/latin-500.css';
 @import '@fontsource/literata/latin-300-italic.css';
 
-/* The Markdown renderer styles the article with its own Tailwind classes, so
-   its files are one of this stylesheet's sources. The reading surface takes
-   the renderer's chrome as it comes — code blocks, tables, lists, headings —
-   and only supplies what it leaves alone: the measure, the prose type, and
-   the tokens below. */
+/* The Markdown renderer styles articles with its own Tailwind classes, so
+   its files are one of this stylesheet's sources. */
 @source "../../node_modules/streamdown/dist/*.js";
 
-/* The renderer's classes carry `dark:` variants — Shiki's second set of token
-   colours among them. Out of the box that variant asks the device, which would
-   put dark code on light paper for a User who pinned an appearance. Rebound
-   here to the same rule the palette follows: the device decides unless the
-   document says otherwise. */
+/* The renderer's `dark:` variants (Shiki's dark token colours among them) ask
+   the device by default, which would put dark code on light paper for a User
+   who pinned an appearance. Rebound to the palette's rule: the device decides
+   unless the document says otherwise. */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
     &:where(:not([data-appearance='light'], [data-appearance='light'] *)) {
@@ -33,17 +27,9 @@
   }
 }
 
-/* Every value here is literal, from `docs/DESIGN.md`.
-
-   One surface, not two. `docs/DESIGN.md` §2 lists a light `App background
-   (canvas around cards)` of `#EDEDEA` under the `#F7F7F5` paper, but it is
-   dropped here in light as well as dark. §1's third principle is "no dividers,
-   no cards, no boxes", the reference renders in `docs/references/` are all
-   exported at the paper's own edge so none of them shows a canvas, and the
-   820 x 760 "card" of §4 is the artboard the screens were drawn on rather than
-   an object meant to float. Rendered, the second tone only ever reached the
-   screen as two vertical bands beside a full-height column — it surrounded
-   nothing. The departure is recorded in `docs/DESIGN.md` §2. */
+/* Every value here is literal, from `docs/DESIGN.md`. §2's canvas tone under
+   the paper is deliberately dropped — one surface, not two; the departure is
+   recorded in `docs/DESIGN.md` §2. */
 @theme {
   --font-serif: 'Literata', Georgia, serif;
 
@@ -56,11 +42,9 @@
   --color-accent: #2438d8;
   --color-hairline: rgb(18 17 15 / 0.15);
 
-  /* The renderer's tokens, under the names its classes ask for (shadcn's), so
-     an article's code blocks and tables are drawn in this palette rather than
-     in someone else's defaults. `muted` and `sidebar` are surfaces here, not
-     inks: they are what `bg-muted` and `bg-sidebar` fill with, washes of the
-     paper's own ink so they hold up in both schemes. */
+  /* The renderer's tokens, under the names its classes ask for (shadcn's).
+     `muted` and `sidebar` are surfaces, not inks: what `bg-muted` and
+     `bg-sidebar` fill with. */
   --color-background: var(--color-paper);
   --color-foreground: var(--color-ink);
   --color-border: var(--color-hairline);
@@ -71,8 +55,7 @@
 }
 
 :root {
-  /* Selected text is the cursor's range, so it shares the caret's accent —
-     laid on at a whisper, under the ink rather than over it. */
+  /* Selection shares the caret's accent, at low alpha. */
   --color-selection: rgb(36 56 216 / 0.12);
   --band-0: rgb(18 17 15 / 0.07);
   --band-1: rgb(18 17 15 / 0.16);
@@ -85,16 +68,9 @@
 }
 
 /* Dark rebinds the same tokens rather than declaring a second theme, so every
-   rule below is written once.
-
-   `docs/DESIGN.md` §2 names six dark roles. The remaining three are derived,
-   not invented: body prose takes the title ink, muted prose takes the metadata
-   grey, and the hairline is the title ink at the same 15%.
-
-   The User may pin an appearance per device in Settings, carried as
-   `data-appearance` on the document element. `system` sets no attribute and
-   these media rules keep deciding; a pinned `light` opts out of them, and a
-   pinned `dark` rebinds the same tokens below regardless of the device. */
+   rule below is written once. §2 names six dark roles; the other three are
+   derived from them. `system` sets no `data-appearance` and these media rules
+   decide; pinned `light` opts out, pinned `dark` rebinds below regardless. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-appearance='light']) {
     --color-paper: #12110f;
@@ -163,8 +139,7 @@
     color-scheme: dark;
   }
 
-  /* The paper is the whole field, in both schemes. Nothing else in the system
-     fills a background, so this is the only surface colour there is. */
+  /* The one surface colour in the system; nothing else fills a background. */
   body {
     margin: 0;
     background: var(--color-paper);
@@ -173,8 +148,7 @@
     font-weight: 300;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    /* A tap answers with the word's own state change, never the platform's
-       grey flash over it. */
+    /* Feedback is the word's own state change, not the platform's grey flash. */
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -189,13 +163,9 @@
 }
 
 @layer components {
-  /* Paper. 820px wide on the desktop reference, full width below the
-     breakpoint. `min-height: 100dvh` turns the reference card into a page.
-
-     It draws no background of its own: the body already carries the one
-     surface tone, so this element is a measure and a padding, not a sheet laid
-     on top of something else. Reintroducing a fill here is how the two-tone
-     banding would come back. */
+  /* Paper: 820px on desktop, full width below the breakpoint. No background
+     of its own — the body carries the one surface tone, and a fill here is
+     how the two-tone banding would come back. */
   .paper {
     max-width: 820px;
     min-height: 100dvh;
@@ -203,11 +173,9 @@
     padding: 32px 56px 0;
   }
 
-  /* Content measure. `docs/DESIGN.md` §4 drew it at 620px, but rendered, a
-     column narrower than the masthead left every screen ragged against its
-     own header on the right. The departure is recorded there: the measure is
-     the paper's content width, so lists, the reader, and the band all align
-     with the header at both edges. */
+  /* `docs/DESIGN.md` §4 drew a 620px measure, but rendered it left every
+     screen ragged against the masthead; the measure is the paper's content
+     width instead. The departure is recorded there. */
   .measure {
     max-width: none;
   }
@@ -219,13 +187,9 @@
     gap: 24px;
   }
 
-  /* Wordmark: a 4x4 tile of 3px squares, `gap:2px`, in the cadence ramp's five
-     ink levels, then the name in italic 10px away.
-
-     The tile is the cadence figure at mark size, so it takes the cadence
-     tokens rather than a second set of greys — one ramp, bound once, and dark
-     follows for free. Only the peak reads as the wordmark's own ink
-     (`--color-ink-strong`, §2), which is what the name beside it is set in. */
+  /* The tile takes the cadence tokens rather than a second set of greys —
+     one ramp, and dark follows for free. Only the peak uses
+     `--color-ink-strong` (§2), the ink the name beside it is set in. */
   .wordmark {
     display: flex;
     align-items: center;
@@ -238,11 +202,9 @@
     gap: 2px;
   }
 
-  /* Each level names two tones: the one it rests at and the one it glints to.
-     The quiet three step up and the loud two step down, so the matrix
-     reshuffles rather than merely brightens — and every value it passes
-     through is the ramp's own, so the glint cannot introduce a tone the mark
-     does not already own. One `background`, both animations, no third list. */
+  /* Each level pairs a rest tone and a glint tone, both from the ramp's own
+     values: the quiet levels step up and the loud step down, so the glint
+     reshuffles rather than brightens. */
   .wordmark-cell {
     width: 3px;
     height: 3px;
@@ -277,11 +239,9 @@
     }
   }
 
-  /* The same glint, made to keep going for a wait. The shape is the hover's,
-     compressed into the front of the turn: up by 12%, back down by 30%, and
-     still for the remaining 70% — the breath between passes is what separates
-     a mark that is working from a mark that is flashing. Both ends are stated
-     here because a loop has to hold at rest rather than drift there. */
+  /* The hover glint, looped for a wait: up by 12%, back by 30%, still for the
+     rest of the turn. Both ends are stated because a loop has to hold at rest
+     rather than drift there. */
   @keyframes wordmark-glint-loop {
     0%,
     30%,
@@ -328,11 +288,9 @@
   .view {
     padding-top: 48px;
     padding-bottom: 64px;
-    /* The pressed tab flips instantly — the flip is the feedback — and the
-       view it summons fades in. 150ms and opacity only: brief enough that
-       the hundredth change still feels instant, and entrance-only, so
-       nothing the User does ever waits on an exit
-       (`docs/DESIGN.md` §5, Motion). */
+    /* The pressed tab flips instantly; the view it summons fades in. 150ms,
+       opacity only, entrance-only, so nothing the User does ever waits on an
+       exit (`docs/DESIGN.md` §5, Motion). */
     transition: opacity 150ms ease-out;
   }
 
@@ -352,8 +310,7 @@
     animation: wordmark-glint-loop 1200ms linear infinite calc(var(--glint-step) * 60ms);
   }
 
-  /* The calm empty state: one quiet line, no illustration, no call to action
-     beyond the sentence itself. */
+  /* One quiet line; no illustration, no call to action. */
   .empty-note {
     font-weight: 300;
     font-size: 12.5px;
@@ -361,11 +318,10 @@
     color: var(--color-quiet);
   }
 
-  /* Settings deliberately leaves the item shape: a two-column sheet at 13/14px
-     so preferences can never be mistaken for reading. */
+  /* Settings leaves the item shape: a two-column sheet at 13/14px. */
   /* `minmax(0, …)` rather than a bare `1fr`: a track's automatic minimum is
-     its widest item's min-content, and the timezone select's is the longest
-     zone the runtime knows — wide enough to push a phone's whole page sideways. */
+     its widest item's min-content — here the longest timezone name, wide
+     enough to push a phone's whole page sideways. */
   .sheet {
     display: grid;
     grid-template-columns: 140px minmax(0, 1fr);
@@ -383,12 +339,11 @@
     color: var(--color-body);
   }
 
-  /* Settings' one non-text control: the timezone select, dressed as the
-     sheet's own text. The transparent rule reserves the pixels its focus
-     underline needs, so choosing a zone never shifts the sheet. */
+  /* The timezone select, dressed as the sheet's own text. The transparent
+     rule reserves the pixels its focus underline needs, so choosing a zone
+     never shifts the sheet. */
   .sheet-select {
-    /* Without this the platform dresses the select in its own border, arrow,
-       and inset padding — three boxes on a sheet that draws none. */
+    /* Without this the platform adds its own border, arrow, and inset padding. */
     appearance: none;
     max-width: 100%;
     border: 0;
@@ -401,8 +356,8 @@
     cursor: pointer;
   }
 
-  /* On approach, the underline the field speaks with — faint. The focus rule
-     below wins over it, being the later of two equal selectors. */
+  /* Faint hover underline; the focus rule below wins as the later of two
+     equal selectors. */
   @media (hover: hover) and (pointer: fine) {
     .sheet-select:hover {
       border-bottom: 2px solid var(--color-hairline);
@@ -420,8 +375,6 @@
     gap: 12px;
   }
 
-  /* The two downloads sit side by side, words like every other affordance —
-     wrapping onto a second line where the sheet's value column runs out. */
   .export-links {
     display: inline-flex;
     flex-wrap: wrap;
@@ -443,13 +396,10 @@
     color: var(--color-ink-strong);
   }
 
-  /* Setup, sign-in, and the password change. They share the sheet's 13/14px
-     scale rather than the 21px item shape, for the same reason Settings does:
-     these are not something to read. */
-  /* `docs/DESIGN.md` does not draw these screens, so the two values it does
-     not give are taken from ones it does: the gap is the sheet's 24px column
-     gap, and the width is half the 620px measure — a password is not prose and
-     should not run the width of an article. */
+  /* Setup, sign-in, and the password change share the sheet's 13/14px scale,
+     not the 21px item shape: these are not something to read. */
+  /* Not drawn in `docs/DESIGN.md`: the gap is the sheet's 24px column gap,
+     the width half the 620px measure — a password is not prose. */
   .gate {
     display: flex;
     flex-direction: column;
@@ -461,8 +411,8 @@
     margin: 0;
   }
 
-  /* Whitespace is the only separator the system has, so the password form
-     needs enough of it not to read as another row of the sheet. */
+  /* Whitespace is the only separator the system has; enough that the form
+     does not read as another sheet row. */
   .sheet + .gate {
     margin-top: 32px;
   }
@@ -480,8 +430,8 @@
     color: var(--color-meta);
   }
 
-  /* The underline is `docs/DESIGN.md`'s one rule in the system, borrowed from
-     the search field. Nothing else here draws an edge. */
+  /* The underline is `docs/DESIGN.md`'s one rule in the system, borrowed
+     from the search field. */
   .field-input {
     border: 0;
     border-bottom: 1px solid var(--color-hairline);
@@ -494,10 +444,9 @@
     caret-color: var(--color-accent);
   }
 
-  /* The browser's default ring is a box, and this system has none. Focus is
-     drawn in the language the field already speaks: the underline goes from
-     the 15% hairline to full ink and doubles in weight. Padding absorbs the
-     extra pixel so nothing below it moves. */
+  /* The default focus ring is a box, and this system has none: the underline
+     goes to full ink and doubles in weight instead. Padding absorbs the extra
+     pixel so nothing below it moves. */
   .field-input:focus-visible {
     outline: none;
     border-bottom: 2px solid var(--color-ink);
@@ -508,7 +457,7 @@
     margin: 0;
   }
 
-  /* Affordances are words, like `save` in the item row — never a filled box. */
+  /* Affordances are words, never a filled box. */
   .text-button {
     background: none;
     border: 0;
@@ -525,8 +474,7 @@
     cursor: default;
   }
 
-  /* A word cannot take an underline the way a field can, so it takes one of
-     its own — still a rule under text rather than a box around it. */
+  /* Keyboard focus on a word is an underline — a rule under text, not a box. */
   .text-button:focus-visible,
   .save-toggle:focus-visible,
   .tab:focus-visible,
@@ -540,8 +488,7 @@
     text-underline-offset: 4px;
   }
 
-  /* What went wrong, in the quietest grey the system has. An empty notice
-     still occupies its line, so answering a form does not shift it. */
+  /* An empty notice still occupies its line, so answering a form shifts nothing. */
   .notice {
     margin: 0;
     min-height: 1.6em;
@@ -550,11 +497,9 @@
     color: var(--color-quiet);
   }
 
-  /* The one search treatment, shared by the Feeds control and the Digest's
-     history search. `docs/DESIGN.md` §4 drew it sticky with the paper's tone
-     behind it; the departure is recorded there — the field scrolls away with
-     the list it searches, so nothing ever floats over the paper, and the
-     background that existed only to occlude the scroll goes with it. */
+  /* One search treatment, shared by Feeds and the Digest. §4 drew it sticky;
+     it scrolls away with its list instead, so nothing floats over the paper —
+     the departure is recorded in `docs/DESIGN.md`. */
   .search-form {
     margin: 0;
     padding: 8px 0 32px;
@@ -569,8 +514,8 @@
     opacity: 1;
   }
 
-  /* `type=search` carries the searchbox semantics; the browser ornaments it
-     brings along — the cancel cross, the decoration — are not drawn here. */
+  /* `type=search` keeps the searchbox semantics; the browser's cancel cross
+     and decoration are not drawn. */
   .search-input::-webkit-search-cancel-button,
   .search-input::-webkit-search-decoration {
     -webkit-appearance: none;
@@ -581,8 +526,7 @@
     margin-top: 8px;
   }
 
-  /* The opened Feed's header: the way back, the name, and the domain on one
-     quiet line. Header to content is 40px, per the layout table. */
+  /* Header to content is 40px, per the layout table. */
   .feed-header {
     display: flex;
     align-items: baseline;
@@ -601,9 +545,8 @@
     color: var(--color-ink-strong);
   }
 
-  /* The 26-week cadence grid: 7 rows of 11px squares, gap 3, columns oldest
-     to newest. The pitch (cell + gap) places the month labels under their
-     columns. */
+  /* Cadence grid: the pitch (cell + gap) places the month labels under
+     their columns. */
   .cadence-figure {
     --cadence-cell: 11px;
     --cadence-gap: 3px;
@@ -646,10 +589,9 @@
     cursor: pointer;
   }
 
-  /* A square cannot take a text underline, so keyboard focus is the accent
-     drawn as a rule beneath it — the cursor of keyboard navigation, which is
-     one of the accent's two uses. The height gives the border's pixels back,
-     so the grid never shifts. */
+  /* A square cannot take a text underline, so keyboard focus is an accent
+     rule beneath it. The height gives the border's pixels back, so the grid
+     never shifts. */
   .cadence-cell:focus-visible {
     outline: none;
     height: calc(var(--cadence-cell) - 2px);
@@ -679,8 +621,6 @@
     color: var(--color-muted-foreground);
   }
 
-  /* Feed actions are words: the interval presets read like the tab bar, with
-     the chosen one in ink, and the manual refresh sits at the other end. */
   .feed-controls {
     display: flex;
     align-items: baseline;
@@ -713,7 +653,6 @@
     color: var(--color-ink-strong);
   }
 
-  /* The two whole-Feed actions sit together at the row's end. */
   .feed-actions {
     display: flex;
     flex: none;
@@ -726,12 +665,9 @@
     margin-top: 44px;
   }
 
-  /* Leaving a Feed unfolds right under the controls, not a warning dialog.
-     The consequence sentence carries the weight; the buttons stay quiet.
-     The unfold is literal — the reveal's grid row opens from nothing over one
-     breath, so the notice and the items below arrive rather than teleport.
-     Dismissal unmounts instantly: the User acted, and the flip is the
-     feedback (`docs/DESIGN.md` §5, Motion). */
+  /* The reveal's grid row opens from nothing on mount, so the content below
+     arrives rather than teleports. Dismissal unmounts instantly: the flip is
+     the feedback (`docs/DESIGN.md` §5, Motion). */
   .unsubscribe-reveal {
     display: grid;
     grid-template-rows: 1fr;
@@ -770,7 +706,6 @@
     margin: 6px 0 0;
   }
 
-  /* Import and export are words too, sitting quietly under the form. */
   .opml-controls {
     display: flex;
     gap: 24px;
@@ -803,7 +738,6 @@
     text-underline-offset: 4px;
   }
 
-  /* A download is a word too, whatever format it hands over. */
   .export-link {
     color: var(--color-ink-strong);
     text-decoration: none;
@@ -834,8 +768,7 @@
     gap: 24px;
   }
 
-  /* Feed Availability, in the same quiet grey as every other notice: a fact
-     about checking, not an alarm about the Subscription. */
+  /* The same quiet grey as every other notice: a fact, not an alarm. */
   .availability-note {
     display: flex;
     align-items: baseline;
@@ -905,8 +838,8 @@
     line-height: 1;
   }
 
-  /* The word toggles inside one width class, so `save` becoming `saved`
-     moves nothing around it. No transition: the flip is the feedback. */
+  /* `save` becomes `saved` inside one min-width, moving nothing around it.
+     No transition: the flip is the feedback. */
   .save-toggle {
     min-width: 3.5em;
     border: 0;
@@ -939,21 +872,17 @@
     font-style: italic;
   }
 
-  /* Today's count, in the grey `docs/DESIGN.md` §2 reserves for counts. It
-     answers "is there something to read" — past headings never carry one. */
+  /* In the grey §2 reserves for counts; past headings never carry one. */
   .day-heading-count {
     color: var(--color-quiet);
   }
 
-  /* The way back from an unreachable or failed digest: one word under the
-     note. `docs/DESIGN.md` does not draw this screen; the 12px is the word
-     gap the interval presets already use. */
+  /* Not drawn in `docs/DESIGN.md`; the 12px is the interval presets' word gap. */
   .digest-retry {
     margin: 12px 0 0;
   }
 
-  /* A paged list's deliberate end: `older items` under what is loaded, in
-     the rhythm one more day-group would take. Absent, the list is over. */
+  /* Takes the rhythm one more day-group would. */
   .older-items {
     margin: 44px 0 0;
   }
@@ -962,9 +891,9 @@
     padding-top: 34px;
   }
 
-  /* One band, one height. The field inside is drawn at the paper's full
-     708px content width; this container clips it, so the band's length
-     follows the viewport while its 114px height never changes. */
+  /* The field inside is drawn at the paper's full 708px content width; this
+     container clips it, so the band's length follows the viewport at a fixed
+     114px height. */
   .daily-band {
     height: 114px;
     margin-bottom: 40px;
@@ -978,11 +907,9 @@
     background: var(--band-0);
   }
 
-  /* Reader. `docs/DESIGN.md` §4 drew it as its own narrower 720px paper, but
-     rendered, the swap resized the masthead between screens — and §5 holds
-     that the tabs never move or change. The departure is recorded in §4: the
-     Reader sits on the same 820px paper and the same measure as every other
-     screen, keeping only its own inner rhythm. */
+  /* Reader. §4 drew it as its own 720px paper, but the swap resized the
+     masthead between screens; it sits on the same 820px paper instead — the
+     departure is recorded in `docs/DESIGN.md` §4. */
   .reader-view {
     padding-top: 40px;
     padding-bottom: 64px;
@@ -1017,9 +944,8 @@
     margin-top: 14px;
   }
 
-  /* `open original` leaves the installation; the arrow says so before the
-     browser does. U+FE0E holds it to its text form — asked for the glyph
-     alone, a phone answers with the colour emoji. */
+  /* The departure arrow. U+FE0E holds it to its text form — asked for the
+     glyph alone, a phone answers with the colour emoji. */
   .reader-original::after {
     content: ' \2197\FE0E';
   }
@@ -1030,10 +956,8 @@
     margin-top: 48px;
   }
 
-  /* Extraction answers on the network's clock, not the User's, so its
-     arrival — the article, or the fallback — enters on a breath: a 200ms
-     fade, opacity only, the paper and the prose holding still. The User's
-     own flips stay instant (`docs/DESIGN.md` §5, Motion). */
+  /* Extraction arrives on the network's clock, so it fades in: 200ms, opacity
+     only. The User's own flips stay instant (`docs/DESIGN.md` §5, Motion). */
   .article-body,
   .reader-fallback {
     transition: opacity 200ms ease-out;
@@ -1046,23 +970,18 @@
     }
   }
 
-  /* Article body: `300 18.5px/1.74` on the body ink — the prose type, which
-     every block the renderer draws inherits from. */
+  /* The prose type; every block the renderer draws inherits from it. */
   .article-body {
     font-size: 18.5px;
     line-height: 1.74;
     color: var(--color-body);
-    /* Articles quote addresses, hashes, and identifiers no space will break.
-       On the narrow measure one of those is wider than the paper, and without
-       this it pushes the whole column sideways rather than wrapping. */
+    /* Articles quote identifiers no space will break; without this one wider
+       than the paper pushes the whole column sideways rather than wrapping. */
     overflow-wrap: break-word;
   }
 
-  /* The renderer draws the article's blocks — headings, lists, quotes, tables,
-     code — with its own classes, built from the sources named at the top of
-     this file. Nothing below restates them. What is left here is what the
-     renderer has no opinion about: the paragraph's rhythm, and the pieces this
-     reading surface owns outright, images and links and math. */
+  /* The renderer's own classes draw the article's blocks; below is only what
+     it leaves alone — paragraph rhythm, images, links, and math. */
   .article-body p {
     margin: 0 0 28px;
   }
@@ -1071,16 +990,15 @@
     margin: 0;
   }
 
-  /* KaTeX sets the formula; the paper keeps the rhythm. Display math takes a
-     paragraph's block spacing, and KaTeX's own 1.21em step is eased back so an
-     equation reads at the size of the prose it sits in. */
+  /* KaTeX's own 1.21em step eased back, so an equation reads at the size of
+     the prose it sits in. */
   .article-body .katex {
     font-size: 1.05em;
   }
 
-  /* An equation wider than the measure scrolls in place, the answer `pre` and
-     tables already get. The 2px keeps that scroller from clipping the couple
-     of pixels KaTeX hangs outside its own box. */
+  /* An equation wider than the measure scrolls in place, like `pre` and
+     tables. The 2px keeps the scroller from clipping the pixels KaTeX hangs
+     outside its own box. */
   .article-body .katex-display {
     margin: 0 0 28px;
     padding-block: 2px;
@@ -1088,18 +1006,16 @@
     overflow-y: hidden;
   }
 
-  /* A numbered equation hangs its number at the right edge of the box, which
-     puts it on top of the formula the moment the formula is wider than the
-     measure. Widening the box to the formula and reserving the number's room
-     on both sides moves it clear and leaves the equation centred. */
+  /* A numbered equation hangs its number at the box's right edge — on top of
+     any formula wider than the measure. Widening the box to the formula and
+     reserving the number's room on both sides moves it clear, centred. */
   .article-body .katex-display > .katex > .katex-html:has(> .tag) {
     min-width: 100%;
     width: max-content;
     padding-inline: 3.5em;
   }
 
-  /* Images arrive only through the same-origin proxy, sized to the measure.
-     The enclosing paragraph owns the block spacing. */
+  /* The enclosing paragraph owns the block spacing. */
   .article-body .article-image {
     display: block;
     max-width: 100%;
@@ -1113,11 +1029,9 @@
     color: var(--color-meta);
   }
 
-  /* Links inside the article all leave for someone else's page. They take the
-     accent and an underline, which is what the renderer's own link does with
-     `text-primary underline`; the departure arrow is this reader's addition
-     and goes in the same colour. A third use of the accent, alongside saved
-     state and the text cursor. */
+  /* Accent and underline match the renderer's own link (`text-primary
+     underline`); the departure arrow is this reader's addition. The accent's
+     third use, alongside saved state and the caret. */
   .article-link {
     color: var(--color-primary);
     text-decoration: underline;
@@ -1130,10 +1044,9 @@
     font-size: 0.75em;
   }
 
-  /* A publisher's figure often links to the full-size image. That link is the
-     picture, not a phrase: it keeps the image's own block and says nothing —
-     an underline and an arrow hung off a photograph read as damage. If the
-     image fails, its words take the anchor back and the marks return with them. */
+  /* A link that is an image keeps the image's own block and no underline or
+     arrow. If the image fails, its words take the anchor back and the marks
+     return with them. */
   .article-body .article-link:has(.article-image) {
     display: block;
     text-decoration: none;
@@ -1161,7 +1074,6 @@
     color: var(--color-meta);
   }
 
-  /* It ends in `next in the digest` — never a dead stop. */
   .reader-next {
     margin-top: 72px;
   }
@@ -1173,11 +1085,9 @@
     color: var(--color-quiet);
   }
 
-  /* Words answer the pointer before they are pressed. Grey words step to ink
-     the way the active tab already sits in ink; words set in ink take the
-     hairline underline — the one rule the system allows. Gated to real
-     pointers so a phone's tap never strands a word in its hover state, and
-     instant rather than eased: the flip is the feedback here too. */
+  /* Hover: grey words step to ink, ink words take the hairline underline.
+     Gated to real pointers so a phone's tap never strands a word in hover
+     state; instant rather than eased — the flip is the feedback. */
   @media (hover: hover) and (pointer: fine) {
     .tab:hover,
     .feed-back:hover,
@@ -1189,8 +1099,8 @@
       color: var(--color-ink-strong);
     }
 
-    /* The save word may only ever colour when saved, so its hover steps
-       through the greys instead — quietest up to muted. */
+    /* The save word may only colour when saved, so its hover steps through
+       the greys instead. */
     .save-toggle:not([aria-pressed='true']):hover {
       color: var(--color-muted-foreground);
     }
@@ -1211,9 +1121,8 @@
   }
 }
 
-/* The single breakpoint. `docs/DESIGN.md` designs the narrow layout at 390px;
-   the query fires wherever the 820px paper stops being comfortable, so every
-   phone-width viewport gets the scale that was drawn for it. */
+/* The single breakpoint. The narrow layout is designed at 390px; the query
+   fires wherever the 820px paper stops being comfortable. */
 @media (max-width: 640px) {
   .paper {
     padding: 28px 24px 0;
@@ -1273,8 +1182,6 @@
     font-size: 12px;
   }
 
-  /* The reader keeps its structure and steps its type down with everything
-     else on the one paper. */
   .reader-view {
     padding-top: 32px;
   }
@@ -1285,16 +1192,15 @@
     line-height: 1.24;
   }
 
-  /* Only the prose steps down here. The renderer sizes its own blocks in rem,
-     so an article's headings and code hold the scale they have on the desktop. */
+  /* Only the prose steps down; the renderer sizes its blocks in rem, so an
+     article's headings and code hold their desktop scale. */
   .article-body,
   .reader-summary {
     font-size: 17px;
     line-height: 1.7;
   }
 
-  /* Under the name, per the 390px reference: the strip sits at the left
-     margin with the domain beside it. */
+  /* Per the 390px reference: the strip at the left margin, the domain beside it. */
   .feed-row {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -1338,8 +1244,8 @@
     font-size: 13px;
   }
 
-  /* The grid keeps all 26 columns and 7 rows — nothing reflows or hides —
-     with the cells one step smaller so the columns fit the narrow paper. */
+  /* All 26 columns and 7 rows stay — nothing reflows or hides — with the
+     cells one step smaller to fit the narrow paper. */
   .cadence-figure {
     --cadence-cell: 9px;
     --cadence-gap: 2px;
@@ -1382,8 +1288,7 @@
 }
 
 /* Reduced motion: gentler, not zero. The fades stay — opacity alone unsettles
-   nothing — while the one height change goes instant, so nothing on the page
-   travels. */
+   nothing — while the one height change goes instant. */
 @media (prefers-reduced-motion: reduce) {
   .unsubscribe-reveal {
     transition-property: opacity;

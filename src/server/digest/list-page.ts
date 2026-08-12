@@ -3,19 +3,10 @@ import { sql, type SQL } from 'drizzle-orm'
 import { feedItems } from '../persistence/schema.js'
 import { plausibleHorizon } from './chronology.js'
 
-/**
- * How the Digest and the Library are served in pages: fifty Feed Items at a
- * time, resumed by a keyset cursor on the chronology those lists share. The
- * cursor names the last item a page showed — its resolved chronology instant
- * and its id, the same two keys the ordering sorts by — so a page picks up
- * exactly where the previous one ended no matter what arrived above it
- * meanwhile. An offset would drift every time polling inserted at the top.
- *
- * The client only ever echoes the cursor back; its contents are this module's
- * business alone.
- */
+// Digest and Library pages resume by keyset cursor (the last item's chronology instant
+// and id, the two sort keys); an offset would drift as polling inserts at the top.
+// The client only echoes the cursor back; its contents are this module's business alone.
 
-/** How many Feed Items one page carries, shared by the Digest and the Library. */
 export const LIST_PAGE_SIZE = 50
 
 export interface ListCursor {
@@ -28,12 +19,8 @@ export function encodeListCursor(cursor: ListCursor): string {
   return Buffer.from(JSON.stringify([cursor.chronology, cursor.feedItemId]), 'utf8').toString('base64url')
 }
 
-/**
- * The exact instant shape `encodeListCursor` writes — `toISOString()` output,
- * the normalized form every stored timestamp shares. Anything else is refused:
- * the SQL keyset filter compares instants as text, which is only a time
- * comparison between strings of this one shape.
- */
+// Exactly `toISOString()` output. The SQL keyset filter compares instants as
+// text, which is only a time comparison between strings of this one shape.
 const CURSOR_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 /** `undefined` for anything this module never issued. */
@@ -53,10 +40,7 @@ export function decodeListCursor(value: string): ListCursor | undefined {
   return { chronology, feedItemId }
 }
 
-/**
- * The page's continuation: the cursor naming its last row, or null when the
- * one-past-the-page fetch came back short and the list is over.
- */
+/** Null when the one-past-the-page fetch came back short and the list is over. */
 export function nextListCursor(
   fetchedCount: number,
   last: { readonly row: { readonly feedItemId: number }; readonly chronology: number } | undefined,
@@ -67,10 +51,8 @@ export function nextListCursor(
 }
 
 /**
- * The chronology rule as SQL, so ORDER BY and the keyset filter act before
- * the LIMIT — sorting in JavaScript would come too late to bound the page.
- * Stored instants are normalized ISO-8601 UTC, so text comparison is time
- * comparison.
+ * The chronology rule as SQL, so ORDER BY and the keyset filter act before the LIMIT.
+ * Stored instants are normalized ISO-8601 UTC, so text comparison is time comparison.
  */
 export function chronologySql(now: Date): SQL {
   return sql`CASE

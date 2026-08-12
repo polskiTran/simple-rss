@@ -1,9 +1,5 @@
-/**
- * Digest chronology, shared with anything that orders or buckets Feed Items.
- * An item orders by a valid publication time and falls back to first-seen;
- * a date more than a day ahead of now is treated as implausible and also
- * falls back, so a publisher's broken clock cannot pin an item to the top.
- */
+// Items order by publication time, falling back to first-seen. A date more than a day
+// ahead of now also falls back, so a publisher's broken clock cannot pin an item to the top.
 
 const FUTURE_TOLERANCE_MS = 24 * 60 * 60 * 1_000
 
@@ -15,19 +11,16 @@ export function chronologyTime(publishedAt: string | null, firstSeenAt: string, 
 }
 
 /**
- * The newest publication instant chronology will believe, as the ISO string
- * a SQL comparison against stored `published_at` needs — for queries that
- * must apply this file's fallback rule before a LIMIT, where sorting in
- * JavaScript would come too late.
+ * The newest publication instant chronology will believe, as ISO for SQL
+ * queries that must apply the fallback rule before a LIMIT.
  */
 export function plausibleHorizon(now: Date): string {
   return new Date(now.getTime() + FUTURE_TOLERANCE_MS).toISOString()
 }
 
 /**
- * Rows in Digest order — newest chronology first, ties to the newer row —
- * carrying each row's resolved chronology alongside it for date rendering.
- * The one ordering the Digest, the Library, and search all speak.
+ * Newest chronology first, ties to the newer row — the one ordering the
+ * Digest, the Library, and search all share.
  */
 export function inDigestOrder<Row extends { feedItemId: number; publishedAt: string | null; firstSeenAt: string }>(
   rows: readonly Row[],
@@ -59,10 +52,8 @@ export function timeLabel(date: Date, timezone: string): string {
 }
 
 /**
- * The meta-row date outside the Digest's day grouping — an opened Feed's
- * items, the Library — where the day carries the meaning the grouping would
- * otherwise give: `today, 07:15`, `yesterday, 09:31`, then `3 august`, with
- * the year only once it stops being this one.
+ * Meta-row date outside the Digest's day grouping: `today, 07:15`,
+ * `yesterday, 09:31`, then `3 august` — the year only once it is not this one.
  */
 export function metaRowDate(instant: Date, itemDate: string, today: string, timezone: string): string {
   if (itemDate === today) return `today, ${timeLabel(instant, timezone)}`
@@ -79,11 +70,7 @@ export function metaRowDate(instant: Date, itemDate: string, today: string, time
     .toLowerCase()
 }
 
-/**
- * The Reader header's date — `saturday, 8 august` — which names the weekday
- * because a single opened article has room for it, with the year only once
- * it stops being this one.
- */
+/** The Reader header's date — `saturday, 8 august` — the year only once it is not this one. */
 export function readerDate(instant: Date, today: string, timezone: string): string {
   const sameYear = dateKey(instant, timezone).slice(0, 4) === today.slice(0, 4)
   const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'long' }).format(instant)
@@ -105,9 +92,8 @@ export function dayAfter(dayKey: string): string {
 }
 
 /**
- * The UTC instant a timezone's calendar day begins, so a SQL range can count
- * one Digest day without fetching it. Two refinement rounds settle the zone
- * offset even when a transition moves it across the guess.
+ * The UTC instant a timezone's calendar day begins. Two refinement rounds
+ * settle the offset even when a DST transition moves it across the guess.
  */
 export function dayStartUtc(dayKey: string, timezone: string): Date {
   const guess = Date.parse(`${dayKey}T00:00:00.000Z`)

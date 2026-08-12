@@ -1,15 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/**
- * Browser flows for the things only a browser can prove: that the session
- * cookie really is unreadable from script, that `SameSite=Strict` and the
- * Origin check together stop a foreign page, and that a real reload keeps the
- * User signed in.
- *
- * Separated from `pnpm test` because it needs a downloaded browser and the
- * built client. Everything that can be asserted at the HTTP boundary is
- * asserted there instead, where it runs in milliseconds.
- */
+// Only what a real browser can prove (cookie attributes, cross-origin behavior,
+// reload); anything assertable at the HTTP boundary belongs in `pnpm test`.
 export default defineConfig({
   testDir: './tests/browser',
   fullyParallel: true,
@@ -18,9 +10,8 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     trace: 'retain-on-failure',
-    // Claiming seeds the installation timezone from the browser, so the
-    // browser's zone is pinned; otherwise the Digest's calendar groups would
-    // follow whatever machine runs the suite.
+    // Claiming seeds the installation timezone from the browser; pin it so the
+    // Digest's calendar groups do not follow the machine running the suite.
     timezoneId: 'UTC',
   },
 })

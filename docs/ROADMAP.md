@@ -14,6 +14,7 @@ Explicitly excluded from v1:
 
 ## v2
 - Feed autodiscovery
-- tags or folders
-- configurable retention
-- optional off-platform backups, and additional deployment guides
+- Tags or folders
+- Configurable retention
+- Optional off-platform backups
+- Additional deployment guides

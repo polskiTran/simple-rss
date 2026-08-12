@@ -2,11 +2,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { clientAliases } from './vite.config.js'
 
-/**
- * Two projects, one command. Server tests run on Node against real temporary
- * SQLite databases; client tests run in jsdom. Container smoke tests live in
- * `vitest.smoke.config.ts` because they need a Docker daemon.
- */
+// Container smoke tests live in vitest.smoke.config.ts: they need a Docker daemon.
 export default defineConfig({
   test: {
     projects: [

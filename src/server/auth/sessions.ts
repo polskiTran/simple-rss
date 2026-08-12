@@ -10,11 +10,8 @@ export const IDLE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000
 /** A session dies this long after it was created, however active it stays. */
 export const ABSOLUTE_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000
 
-/**
- * Every request could push the idle deadline forward, but a write per request
- * buys nothing: the deadline is a week away. Sliding it at most once a minute
- * keeps reading a read.
- */
+// A write per request buys nothing when the idle deadline is a week away;
+// sliding it at most once a minute keeps reading a read.
 const TOUCH_INTERVAL_MS = 60_000
 
 /** 256 bits of randomness, which is what makes the token unguessable. */
@@ -28,12 +25,9 @@ export interface IssuedSession {
 }
 
 /**
- * The signed-in devices. Sessions are opaque random tokens rather than signed
- * claims, so revocation is real: deleting the row ends the session everywhere,
- * immediately, with nothing left to honour a stale signature.
- *
- * Only `sha256(token)` is stored. A copy of the volume — a backup, a support
- * dump, a stolen disk — therefore contains no usable cookie.
+ * Sessions are opaque random tokens, not signed claims, so revocation is real: deleting
+ * the row ends the session everywhere, immediately. Only `sha256(token)` is stored, so a
+ * copy of the volume contains no usable cookie.
  */
 export class SessionStore {
   readonly #db: BetterSQLite3Database
@@ -43,8 +37,7 @@ export class SessionStore {
   }
 
   /**
-   * Creates a session only while the verifier that authenticated it is still
-   * current. The comparison and insert share a transaction, so a concurrent
+   * The verifier comparison and insert share a transaction, so a concurrent
    * password change or emergency reset cannot leave a stale login alive.
    */
   issueForPasswordHash(passwordHash: string, now: Date): IssuedSession | undefined {
@@ -74,10 +67,8 @@ export class SessionStore {
   }
 
   /**
-   * Whether the token names a live session, sliding its idle deadline if so.
-   *
-   * A session found past either deadline is deleted here rather than left for
-   * the sweep, so the row cannot outlive the access it grants.
+   * Whether the token names a live session, sliding its idle deadline if so. A session
+   * past either deadline is deleted here, so the row cannot outlive the access it grants.
    */
   touch(token: string, now: Date): boolean {
     const tokenHash = fingerprint(token)
@@ -123,9 +114,8 @@ export class SessionStore {
 }
 
 /**
- * The stored identity of a token. A single SHA-256 is the right primitive
- * here, unlike for a password: the input is 256 random bits, so there is no
- * guessable space for a slow hash to protect.
+ * A single SHA-256 is right here, unlike for a password: the input is 256
+ * random bits, so there is no guessable space for a slow hash to protect.
  */
 function fingerprint(token: string): string {
   return createHash('sha256').update(token).digest('hex')

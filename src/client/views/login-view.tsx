@@ -8,11 +8,8 @@ export interface LoginViewProps {
   onSignedIn(status: AuthStatus): void
 }
 
-/**
- * Coming back to the reader. One field, because there is one User and so
- * nobody to name — and no "forgot your password" link, because recovery is a
- * shell command rather than an email this installation could not send.
- */
+// One field: there is one User, nobody to name. No recovery link — recovery
+// is a shell command, not an email this installation could send.
 export function LoginView({ onSignedIn }: LoginViewProps) {
   const [password, setPassword] = useState('')
   const [notice, setNotice] = useState('')

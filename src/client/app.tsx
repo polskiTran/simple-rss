@@ -21,13 +21,9 @@ import { SettingsView } from './views/settings-view.js'
 import { SetupView } from './views/setup-view.js'
 
 /**
- * The application shell: masthead, the four tabs, and the current view.
- *
- * Nothing reflows, reorders, or hides between screens or widths; only the type
- * scale and padding change.
- *
- * The tabs render only once access is open, because until then all four
- * sections would refuse.
+ * Application shell. Nothing reflows, reorders, or hides between screens or
+ * widths; only type scale and padding change. Tabs render only once access is
+ * open — until then all four sections would refuse.
  */
 export function App() {
   const navigation = useNavigation()
@@ -46,8 +42,7 @@ export function App() {
 
 function viewFor(gate: Gate, navigation: Navigation) {
   switch (gate.access.kind) {
-    // Nothing, deliberately: the first answer arrives in a moment, and a flash
-    // of the wrong screen is worse than a blank one.
+    // Deliberately blank: a flash of the wrong screen is worse than a moment of nothing.
     case 'checking':
       return null
     case 'unavailable':
@@ -62,8 +57,7 @@ function viewFor(gate: Gate, navigation: Navigation) {
 }
 
 function signedInView(navigation: Navigation, gate: Gate) {
-  // The Reader sits over whichever section it was opened from, so it is chosen
-  // before the tab switch.
+  // The Reader overlays whichever section opened it, so check it before the tab switch.
   if (navigation.readerItemId !== undefined) {
     const feedItemId = navigation.readerItemId
     const origin = navigation.origin ?? DIGEST_ORIGIN
@@ -72,7 +66,7 @@ function signedInView(navigation: Navigation, gate: Gate) {
         feedItemId={feedItemId}
         origin={origin}
         onBack={navigation.returnTo}
-        // Reading on keeps the same origin, so the next article leaves where this one would.
+        // Reading on keeps the same origin, so the next article exits where this one would.
         onOpenItem={(next) => navigation.openReader(next, origin)}
         onOpenFeed={(feedId) => navigation.openFeed(feedId, readerOrigin(feedItemId, navigation.origin))}
       />
@@ -105,10 +99,8 @@ function signedInView(navigation: Navigation, gate: Gate) {
   }
 }
 
-/**
- * An article opened here goes back to this Feed by name, so FeedView passes its
- * title up with each item: the shell knows the Feed's id, not its title.
- */
+// The shell knows the Feed's id, not its title; FeedView passes the title up
+// with each item so the Reader's back link can name the Feed.
 function OpenedFeed({ navigation, feedId }: { navigation: Navigation; feedId: number }) {
   return (
     <FeedView

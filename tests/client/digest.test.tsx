@@ -196,7 +196,7 @@ describe('searching from the Digest', () => {
     expect(results.textContent).toContain('Field Notes')
     expect(results.textContent).toContain('today, 07:15')
     expect(screen.getByRole('button', { name: 'save Tide chronology' }).textContent).toBe('saved')
-    // The Digest itself has stepped aside while the search line stands.
+    // The Digest itself is not rendered while results are shown.
     expect(screen.queryByRole('heading', { name: 'today · 2 posts' })).toBeNull()
 
     // Clearing the line brings the Digest straight back, no refetch needed.
@@ -215,7 +215,7 @@ describe('searching from the Digest', () => {
 
     await user.type(await screen.findByRole('searchbox', { name: 'search your reading' }), 'driftwood')
 
-    // Between the keystroke and the answer, the state is said, not implied.
+    // The pending state is announced while the answer is out.
     expect((await screen.findByRole('status')).textContent).toBe('searching…')
     expect((await screen.findByText('nothing in your reading matches “driftwood”')).getAttribute('role')).toBe(
       'status',

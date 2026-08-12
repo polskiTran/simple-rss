@@ -38,11 +38,8 @@ function reading(): StubbedApi {
   return api
 }
 
-/**
- * Reader View loads its Markdown renderer lazily. Importing it once here means
- * these tests wait on rendering rather than on the transform of KaTeX, Shiki,
- * and the parser between them, which alone can outlast a query's timeout.
- */
+// Reader View loads its Markdown renderer lazily; importing it once here keeps
+// the KaTeX/Shiki transform, which can outlast a query's timeout, out of each test.
 beforeAll(async () => {
   await import('../../src/client/components/article-markdown.js')
 })

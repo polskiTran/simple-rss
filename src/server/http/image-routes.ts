@@ -16,15 +16,9 @@ export interface ImageRouteDependencies {
 }
 
 /**
- * The image proxy: the only way a Feed or Reader image reaches the User's
- * browser. One route accepts a Feed Item identity, the other a URL extraction
- * itself signed — an arbitrary target is never accepted, so the proxy cannot
- * be pointed anywhere the installation did not already decide to look.
- *
- * Refusals that name a wait keep their own status — 429 for the rate window,
- * 503 while the boundary is at capacity — and every other failure is the same
- * calm 404. All of them carry `no-store`, and the client draws the fallback;
- * only a success may be kept, privately, for seven days.
+ * The image proxy accepts a Feed Item identity or a URL extraction itself
+ * signed, never an arbitrary target. Refusals that name a wait keep their
+ * status (429, 503); every other failure is the same 404.
  */
 export function imageRoutes(deps: ImageRouteDependencies): Hono {
   const app = new Hono()
@@ -40,9 +34,8 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
     )
   }
 
-  // On both routes the rate window is spent before any per-request work —
-  // parsing, signature checks, lookups — so a flood costs the same whether or
-  // not its requests are well-formed.
+  // On both routes the rate window is spent before any per-request work, so a
+  // flood costs the same whether or not its requests are well-formed.
   app.get('/items/:feedItemId/image', async (c) => {
     const images = deps.images()
     if (!images) return unavailable(c)
@@ -76,8 +69,8 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
 function answer(c: Context, outcome: ImageOutcome): Response {
   switch (outcome.kind) {
     case 'image':
-      // `nosniff` is set installation-wide, but this response is the one that
-      // must never be re-interpreted, so it does not rely on the middleware.
+      // This response must never be re-interpreted, so `nosniff` is set here
+      // rather than relying on the installation-wide middleware.
       return c.body(outcome.body, 200, {
         'Content-Type': outcome.contentType,
         'Cache-Control': `private, max-age=${IMAGE_CACHE_SECONDS}`,
@@ -94,9 +87,8 @@ function answer(c: Context, outcome: ImageOutcome): Response {
 }
 
 /**
- * One answer for every way an image cannot be served — a bad signature and a
- * publisher outage look identical, because the only consumer is an `<img>`
- * tag whose fallback is the same either way.
+ * A bad signature and a publisher outage look identical: the only consumer is
+ * an `<img>` tag whose fallback is the same either way.
  */
 function imageUnavailable(c: Context): Response {
   return c.json({ error: { code: 'image_unavailable', message: 'No image is available' } }, 404, NO_STORE)

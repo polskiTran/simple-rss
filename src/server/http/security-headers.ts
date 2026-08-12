@@ -1,12 +1,9 @@
 import type { MiddlewareHandler } from 'hono'
 
 /**
- * The client is a same-origin bundle with no inline scripts, no external
- * origins, and no embedded media, so the policy can stay this narrow.
- *
- * `img-src 'self'` is what the image proxy exists to make possible: Feed and
- * Reader images are fetched by the server, never by the User's browser.
- * `data:` stays allowed for the small inline SVGs the client draws itself.
+ * The client is a same-origin bundle with no inline scripts, so the policy can
+ * stay this narrow. `img-src 'self'` is what the image proxy makes possible;
+ * `data:` covers the small inline SVGs the client draws itself.
  */
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -22,12 +19,8 @@ const CONTENT_SECURITY_POLICY = [
 ].join('; ')
 
 /**
- * One year, and safe to send unconditionally: browsers ignore the header on
- * plain HTTP, so local development is unaffected while the deployed
- * installation stops being reachable over a downgradable connection.
- *
- * No `preload` — that is a submission to a browser-vendor list, which is not
- * this service's decision to make on a User's domain.
+ * Safe to send unconditionally: browsers ignore it on plain HTTP. No `preload`
+ * — submitting a User's domain to a browser-vendor list is not this service's call.
  */
 const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
 

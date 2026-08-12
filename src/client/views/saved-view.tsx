@@ -9,26 +9,20 @@ import { SaveToggle } from '../components/save-toggle.js'
 import { failureKind } from './failure.js'
 
 export interface SavedViewProps {
-  /** Opens one saved Feed Item in the Reader. */
   onOpenItem(feedItemId: number): void
-  /** Opens the Feed behind a save's attribution, when it is still subscribed. */
   onOpenFeed(feedId: number): void
 }
 
 type LibraryState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly library: Library }
-  /** The server answered — with a refusal, or a body that failed to parse. */
+  /** Server answered with a refusal or unparseable body. */
   | { readonly kind: 'unavailable' }
-  /** No answer at all — the network, not the reader. */
+  /** No response at all. */
   | { readonly kind: 'unreachable' }
 
-/**
- * The Saved tab: the Library in the same content shape as the Digest, with
- * source attribution and the item's own chronology. Unsaving here flips the
- * word in place; the row leaves the list on the next visit, so a misread tap
- * can be undone where it happened.
- */
+// Unsaving flips the word in place; the row leaves only on the next visit,
+// so a misread tap can be undone where it happened.
 export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   const [state, setState] = useState<LibraryState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -112,9 +106,8 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
               <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
             </h2>
             <div className="content-meta">
-              {/* A save outlives its Subscription; said as a fact, not a nudge
-                  to clean anything up. Only a subscribed Feed opens: the
-                  server answers 404 for the rest, so that name stays text. */}
+              {/* A save outlives its Subscription. Only a subscribed Feed opens —
+                  the server answers 404 for the rest — so that name stays text. */}
               {item.subscribed ? (
                 <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
               ) : (

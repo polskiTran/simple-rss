@@ -66,7 +66,6 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
-/** A Feed the User is subscribed to, with its recorded Feed Availability. */
 interface SubscribedFeedRecord extends FeedRecord {
   readonly lastPolledAt: string | null
   readonly lastSuccessAt: string | null
@@ -74,7 +73,6 @@ interface SubscribedFeedRecord extends FeedRecord {
   readonly lastFailureCategory: FeedAvailabilityCategory | null
 }
 
-/** What one poll needs: where to ask, how to ask conditionally, and the schedule. */
 interface PollableFeed extends FeedRecord {
   readonly etag: string | null
   readonly lastModified: string | null
@@ -82,7 +80,7 @@ interface PollableFeed extends FeedRecord {
   readonly consecutiveFailures: number
 }
 
-/** The one shape every Feed lookup selects, mirrored by `FeedRecord`. */
+/** Keep in sync with `FeedRecord`. */
 const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
   title: feeds.title,
@@ -91,7 +89,7 @@ const FEED_RECORD_COLUMNS = {
   resolvedUrl: feeds.resolvedUrl,
 }
 
-/** `FEED_RECORD_COLUMNS` plus the Feed Availability state, as `SubscribedFeedRecord`. */
+/** Keep in sync with `SubscribedFeedRecord`. */
 const SUBSCRIBED_FEED_COLUMNS = {
   ...FEED_RECORD_COLUMNS,
   lastPolledAt: subscriptions.lastPolledAt,
@@ -121,10 +119,7 @@ export class SubscriptionService {
     this.#logger = options.logger.child({ component: 'subscriptions' })
   }
 
-  /**
-   * Records the Subscription without contacting the Feed (ADR 0007): it
-   * starts unchecked and immediately due, for the scheduler to retrieve.
-   */
+  /** Records the Subscription without contacting the Feed (ADR 0007): unchecked and immediately due. */
   create(enteredUrl: string, offeredTitle?: string | null): CreateSubscriptionOutcome {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
@@ -134,8 +129,8 @@ export class SubscriptionService {
 
     const now = this.#clock.now().toISOString()
 
-    // A Feed the Library kept after an unsubscribe: reuse its identity, so the
-    // old saves and the new Subscription describe one Feed rather than two.
+    // A Feed the Library kept after an unsubscribe: reuse its identity so old
+    // saves and the new Subscription name one Feed.
     const dormant = this.#dormantFeedByUrl(requestedUrl)
     if (dormant) return this.#resubscribe(dormant, now)
 
@@ -148,8 +143,7 @@ export class SubscriptionService {
           .insert(feeds)
           .values({
             enteredUrl,
-            // The entered endpoint stands in until the first retrieval says
-            // where the Feed actually answers from.
+            // Stand-in until the first retrieval reveals where the Feed actually answers.
             resolvedUrl: requestedUrl,
             title,
             domain,
@@ -187,9 +181,8 @@ export class SubscriptionService {
   }
 
   /**
-   * Brings a retained Feed back under a Subscription: the same Feed row —
-   * so Library items keep pointing at the identity they were saved from —
-   * with a fresh default schedule, unchecked until the scheduler retrieves it.
+   * Revives a retained Feed under the same row — so Library items keep the
+   * identity they were saved from — with a fresh default schedule.
    */
   #resubscribe(feed: FeedRecord, now: string): CreateSubscriptionOutcome {
     try {
@@ -218,9 +211,8 @@ export class SubscriptionService {
   }
 
   /**
-   * Moves another reader's OPML in through the normal Subscription creation
-   * path, one Feed at a time. Recording is local, so the whole import is one
-   * fast pass; the Feeds are then due at once for the scheduler to check.
+   * Each outline goes through the normal Subscription creation path. Recording is
+   * local, so the import is one fast pass; the Feeds are then due at once.
    */
   importOpml(opml: string): ImportOpmlOutcome {
     let outlines
@@ -250,26 +242,17 @@ export class SubscriptionService {
     return { kind: 'report', added, alreadySubscribed, unusable }
   }
 
-  /** The User's active Subscriptions as an OPML document another reader can import. */
   exportOpml(): string {
     return serializeOpml(this.#subscribedFeeds(), this.#clock.now())
   }
 
-  /**
-   * One poll of one subscribed Feed, from wherever it was asked for — the
-   * scheduler or a manual refresh.
-   */
   async ingest(feedId: number): Promise<IngestFeedOutcome> {
     const feed = this.#pollableFeed(feedId)
     if (!feed) return { kind: 'missing' }
 
     const outcome = await this.#poll(feed)
-    // Every completed attempt is recorded and advances the schedule: a
-    // success by one Polling Interval, a failure by an exponential backoff,
-    // so a struggling Feed is retried patiently rather than every minute.
-    // `missing` records nothing — the Subscription vanished mid-retrieval,
-    // so there is no schedule left to advance. A merge already recorded its
-    // success on the Feed that survived.
+    // `missing` records nothing — the Subscription vanished mid-retrieval, so no
+    // schedule is left to advance. A merge already recorded success on the surviving Feed.
     if (outcome.kind === 'missing' || outcome.kind === 'merged') return outcome
     if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.#recordSuccess(feed)
     else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
@@ -290,9 +273,8 @@ export class SubscriptionService {
     if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
 
     if (retrieved.notModified) {
-      // The publisher confirmed the stored Feed Window is current, so no Feed
-      // Item row is touched. A 304 may still rotate the validators; keeping
-      // the newest ones is what keeps later requests conditional.
+      // A 304 may still rotate the validators; keeping the newest ones keeps
+      // later requests conditional. No Feed Item row is touched.
       this.#db
         .update(feeds)
         .set({
@@ -351,10 +333,8 @@ export class SubscriptionService {
   }
 
   /**
-   * Folds a Subscription whose retrieval revealed an already-known Feed into
-   * that Feed — the state a synchronous duplicate check would have produced.
-   * Nothing retained is deleted: a duplicate with items stays dormant, like
-   * any unsubscribed Feed, and Retention judges what remains.
+   * Produces the state a synchronous duplicate check would have. Nothing retained
+   * is deleted: a duplicate with items stays dormant and Retention judges what remains.
    */
   #mergeInto(
     duplicate: PollableFeed,
@@ -377,8 +357,8 @@ export class SubscriptionService {
         .limit(1)
         .all()[0]
 
-      // The URLs that led here now name the existing Feed, so a re-import is
-      // a duplicate at recording time rather than another round of the merge.
+      // The URLs that led here now name the existing Feed, so a re-import is a
+      // duplicate at recording time, not another merge.
       tx.update(feedUrlAliases)
         .set({ feedId: existingFeedId })
         .where(eq(feedUrlAliases.feedId, duplicate.feedId))
@@ -397,8 +377,7 @@ export class SubscriptionService {
       }
     })
 
-    // The retrieval that revealed the merge is a perfectly good poll of the
-    // existing Feed; keeping it means the merge costs no extra request.
+    // Reuse the revealing retrieval as the existing Feed's poll; the merge costs no extra request.
     const existing = this.#pollableFeed(existingFeedId)
     if (existing) {
       persistFeedWindow(this.#db, {
@@ -416,10 +395,8 @@ export class SubscriptionService {
   }
 
   /**
-   * Changes one Subscription's Polling Interval. The next due time is
-   * recomputed from the last completed poll, so a shorter interval that is
-   * already overdue becomes due at the scheduler's next wake, and a longer one
-   * calmly waits out its new interval.
+   * The next due time is recomputed from the last completed poll: a shorter,
+   * already-overdue interval becomes due at the next wake; a longer one waits it out.
    */
   setPollingInterval(feedId: number, pollingIntervalMinutes: PollingIntervalMinutes): SetPollingIntervalOutcome {
     const row = this.#db
@@ -447,10 +424,8 @@ export class SubscriptionService {
   }
 
   /**
-   * Withdraws the User's Subscription and nothing else. Polling stops at
-   * once and the Feed's ordinary items leave the Digest, because both are
-   * questions only a Subscription row answers. The retained rows themselves
-   * wait for the retention sweep, which keeps saves and their attribution.
+   * Deletes only the Subscription row — polling and Digest membership hinge on it.
+   * Retained rows wait for the retention sweep, which keeps saves and their attribution.
    */
   unsubscribe(feedId: number): UnsubscribeOutcome {
     const deleted = this.#db.delete(subscriptions).where(eq(subscriptions.feedId, feedId)).run()
@@ -459,7 +434,6 @@ export class SubscriptionService {
     return { kind: 'unsubscribed' }
   }
 
-  /** Feed ids whose persisted due time has arrived, oldest frontier first. */
   dueFeedIds(limit: number): readonly number[] {
     const now = this.#clock.now().toISOString()
     return this.#db
@@ -472,7 +446,6 @@ export class SubscriptionService {
       .map((row) => row.feedId)
   }
 
-  /** A success clears the whole failure run; the Feed is simply available. */
   #recordSuccess(feed: PollableFeed): void {
     const now = this.#clock.now()
     this.#db
@@ -490,10 +463,8 @@ export class SubscriptionService {
   }
 
   /**
-   * A failure lengthens the wait before the next attempt instead of shortening
-   * it: hammering a Feed that is struggling helps nobody, and the User can
-   * always retry by hand. The Subscription itself is never touched — a failing
-   * Feed stays subscribed and its retained Feed Items stay in the Digest.
+   * A failure only lengthens the wait; the User can retry by hand. The Subscription
+   * survives — a failing Feed stays subscribed and its Feed Items stay in the Digest.
    */
   #recordFailure(feed: PollableFeed, category: FeedAvailabilityCategory): void {
     const now = this.#clock.now()
@@ -521,10 +492,8 @@ export class SubscriptionService {
   }
 
   /**
-   * The retrieval never asked the publisher anything — the installation's own
-   * boundary was saturated, or the caller gave up. That is not the Feed's
-   * failure, so its Feed Availability is left exactly as it stands and the
-   * attempt simply moves one ordinary Polling Interval on.
+   * The publisher was never asked (boundary saturated, or the caller gave up), so
+   * Feed Availability is left untouched and the attempt moves one Polling Interval on.
    */
   #recordDeferral(feed: PollableFeed, code: RetrievalFailure['code']): void {
     const now = this.#clock.now()
@@ -565,12 +534,7 @@ export class SubscriptionService {
     return this.#subscribedFeeds().map((record) => summaryOf(record, cadence))
   }
 
-  /**
-   * One opened Feed: its retained Feed Items newest first, the day-by-day
-   * cadence observations behind the 26-week grid, and the polling behaviour
-   * the User manages from there. Days and labels use the installation
-   * timezone, so the grid reads in the User's own calendar.
-   */
+  /** Days and labels use the installation timezone, so the cadence grid reads in the User's own calendar. */
   detail(feedId: number): FeedDetail | undefined {
     const record = this.#db
       .select({
@@ -662,7 +626,7 @@ export class SubscriptionService {
       .all()[0]
   }
 
-  /** A Feed still on the volume — its Library items kept it — but unsubscribed. */
+  /** Unsubscribed but still on the volume: its Library items kept it. */
   #dormantFeedByUrl(url: string): FeedRecord | undefined {
     return this.#db
       .select(FEED_RECORD_COLUMNS)
@@ -700,10 +664,7 @@ export class SubscriptionService {
   }
 }
 
-/**
- * True when this attempt never reached the publisher at all: the boundary was
- * saturated or the caller gave up. Such an attempt says nothing about the Feed.
- */
+/** The attempt never reached the publisher, so it says nothing about the Feed. */
 function wasNeverAsked(
   outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
 ): outcome is Extract<IngestFeedOutcome, { kind: 'retrieval-failed' }> {
@@ -714,19 +675,15 @@ function wasNeverAsked(
 }
 
 /**
- * The safe category one failed poll is remembered as. Retrieval, parse,
- * timeout, size, and content-type failures stay distinguishable; everything
- * the network refused to answer collapses into `unreachable`, because the
- * distinctions below that are transport detail the User cannot act on.
+ * Everything the network refused to answer collapses into `unreachable`; the
+ * finer distinctions are transport detail the User cannot act on.
  */
 export function availabilityCategoryOf(
   outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
 ): FeedAvailabilityCategory {
   if (outcome.kind === 'invalid-feed') return 'invalid_feed'
   switch (outcome.failure.code) {
-    // The stored vocabulary stays coarse on purpose: whether the publisher
-    // never answered or answered too slowly, the Feed is taking too long, and
-    // that is the whole of what the User can act on.
+    // Never answered and answered too slowly both read as `timeout`; the User cannot act on the difference.
     case 'timeout':
     case 'body_timeout':
       return 'timeout'
@@ -742,11 +699,7 @@ export function availabilityCategoryOf(
   }
 }
 
-/**
- * A brand-new Subscription's row, shared by first subscription and revival.
- * It is due immediately — the first retrieval is the scheduler's next piece
- * of work — and unchecked until that retrieval succeeds.
- */
+/** Shared by first subscription and revival: due immediately — the first retrieval is scheduler work (ADR 0007). */
 function newSubscription(feedId: number, now: string) {
   return {
     feedId,
@@ -756,7 +709,6 @@ function newSubscription(feedId: number, now: string) {
   }
 }
 
-/** The one place a stored Subscription becomes the summary the API answers with. */
 function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>): SubscriptionSummary {
   return {
     feedId: record.feedId,
@@ -769,7 +721,6 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
   }
 }
 
-/** How a Subscription's recorded state reads as calm Feed Availability. */
 function availabilityOf(record: SubscribedFeedRecord): FeedAvailability {
   return {
     state:
@@ -785,7 +736,6 @@ function availabilityOf(record: SubscribedFeedRecord): FeedAvailability {
   }
 }
 
-/** What this retrieval said to remember for the next conditional request. */
 function validatorsOf(retrieved: {
   readonly etag: string | undefined
   readonly lastModified: string | undefined
@@ -804,7 +754,7 @@ function canonicalFeedUrl(value: string): string | undefined {
   }
 }
 
-/** Diagnostics keep entered and resolved URLs apart, minus any query string. */
+/** Logged URLs drop the query string. */
 function loggableUrl(value: string): string {
   try {
     const url = new URL(value)

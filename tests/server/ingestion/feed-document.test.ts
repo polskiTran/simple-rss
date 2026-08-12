@@ -10,10 +10,8 @@ function parseFixture(name: string) {
   return parseFeedDocument(new TextEncoder().encode(readFileSync(join(FIXTURES, name), 'utf-8')), RESOLVED_URL)
 }
 
-/**
- * RSS and Atom parity, stated once against fixture documents: both formats
- * come out as the same normalized shape under the same identity contract.
- */
+// RSS and Atom parity: both formats normalize to the same shape under the
+// same identity contract.
 describe('parseFeedDocument', () => {
   it('normalizes a representative RSS document', () => {
     const parsed = parseFixture('rss-representative.xml')

@@ -1,10 +1,8 @@
 import type { MouseEvent } from 'react'
 
 /**
- * The shared onClick for real links the shell routes itself. Anything that is
- * not a plain left click — a modified click, a middle click, a default some
- * other handler already claimed — stays with the browser, so open-in-new-tab
- * and copy-the-address keep working.
+ * Shared onClick for links the shell routes itself. Anything but a plain left
+ * click — modified, middle, or already-handled — stays with the browser.
  */
 export function routedClick(navigate: () => void) {
   return (event: MouseEvent<HTMLAnchorElement>): void => {

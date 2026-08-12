@@ -9,12 +9,8 @@ import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { failureKind } from './failure.js'
 
-/**
- * The Markdown renderer — KaTeX, Shiki, and the parser between them — is the
- * heaviest thing the client ships and only this screen has any use for it, so
- * it arrives with the first article rather than with the app. It is fetched
- * alongside an extraction that takes far longer than the chunk does.
- */
+// KaTeX + Shiki are the client's heaviest chunk and only the Reader uses
+// them; load on first article, not at startup.
 const ArticleMarkdown = lazy(async () => ({
   default: (await import('../components/article-markdown.js')).ArticleMarkdown,
 }))
@@ -24,43 +20,34 @@ const parsingNote = <LoadingNote className="empty-note reader-extracting">parsin
 type ItemState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly item: ReaderItem }
-  /** The server answered — with a refusal, or a body that failed to parse. */
+  /** Server answered with a refusal or unparseable body. */
   | { readonly kind: 'unavailable' }
-  /** No answer at all — the network, not the reader. */
+  /** No response at all. */
   | { readonly kind: 'unreachable' }
 
 type ArticleState =
   | { readonly kind: 'extracting' }
   | { readonly kind: 'ready'; readonly article: ReaderArticle }
-  /**
-   * Extraction did not produce an article. The Feed Item is untouched; the
-   * view falls back to its stored summary and the original link.
-   */
+  /** Extraction failed; the Feed Item is untouched and the view falls back to its stored summary. */
   | { readonly kind: 'failed'; readonly waitSeconds: number | undefined }
 
 export interface ReaderViewProps {
   readonly feedItemId: number
-  /** Back to the screen this article was opened from. */
   readonly origin: Origin
   onBack(origin: Origin): void
-  /** Follows `next in the digest` to another Feed Item. */
   onOpenItem(feedItemId: number): void
-  /** Opens the Feed this article came from. */
   onOpenFeed(feedId: number): void
 }
 
 /**
- * Reader View: a temporary, distraction-reduced rendering of one Feed Item's
- * original page. The header is always the stored Feed Item — title, Feed,
- * date, membership — so a failed extraction changes what sits under the
- * title, never the item itself. It ends in `next in the digest`, never a
- * dead stop.
+ * The header always renders the stored Feed Item, so a failed extraction
+ * changes what sits under the title, never the item itself.
  */
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
   const [itemState, setItemState] = useState<ItemState>({ kind: 'loading' })
   const [articleState, setArticleState] = useState<ArticleState>({ kind: 'extracting' })
-  // Trying again re-runs the effect, so every attempt — the first or a retry
-  // — carries the same cleanup and none can answer after unmount.
+  // Retrying re-runs the effect, so every attempt carries the same cleanup
+  // and none can answer after unmount.
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -138,8 +125,8 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
 
       {articleState.kind === 'extracting' ? parsingNote : null}
       {articleState.kind === 'ready' ? (
-        // The same note covers the renderer's own arrival, so a slow chunk
-        // reads as the wait it already was rather than as a blank page.
+        // The same note covers the lazy chunk's arrival, so a slow chunk
+        // never shows a blank page.
         <Suspense fallback={parsingNote}>
           <ArticleMarkdown markdown={articleState.article.markdown} />
         </Suspense>
@@ -171,10 +158,6 @@ interface FallbackProps {
   onRetry(): void
 }
 
-/**
- * The calm way down: the stored summary the Digest already had, the original
- * link, and one deliberate retry. Nothing about the Feed Item changed.
- */
 function Fallback({ item, waitSeconds, onRetry }: FallbackProps) {
   return (
     <div className="reader-fallback" role="status">

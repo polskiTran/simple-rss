@@ -15,12 +15,9 @@ export interface ReaderRouteDependencies {
 }
 
 /**
- * Reader View over persisted Feed Items. Both routes identify an item by ID;
- * no route on this surface accepts an article URL from the caller.
- *
- * A successful extraction is the one API answer a browser may keep — private
- * to the User, for a day. Every failure stays uncached, so retrying is
- * always a fresh question.
+ * Reader View over persisted Feed Items; no route here accepts an article URL
+ * from the caller. Only a successful extraction may be cached — failures stay
+ * uncached so a retry is a fresh question.
  */
 export function readerRoutes(deps: ReaderRouteDependencies): Hono {
   const app = new Hono()
@@ -100,7 +97,7 @@ const UNSUPPORTED: FailureAnswer = {
   message: 'The original page is not readable HTML',
 }
 
-/** One calm answer per retrieval failure category, mirroring the Feed routes. */
+/** One answer per retrieval failure category, mirroring the Feed routes. */
 const ARTICLE_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> = {
   invalid_request: UNSAFE_LINK,
   invalid_url: UNSAFE_LINK,

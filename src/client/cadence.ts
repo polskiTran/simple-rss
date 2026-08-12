@@ -1,9 +1,8 @@
 import { CADENCE_GRID_WEEKS, type CadenceObservation } from '../shared/api.js'
 
 /**
- * The opened Feed's cadence grid, derived from the server's day-by-day
- * observations. Everything here is a pure function of that array, so a fixed
- * dataset always renders the same columns, labels, and statistics.
+ * Cadence grid derivation: pure functions of the server's day-by-day
+ * observations, so a fixed dataset always renders the same output.
  */
 
 export interface CadenceCell {
@@ -15,20 +14,15 @@ export interface CadenceCell {
 /** One week of the grid. The last column ends on today and may be short. */
 export interface CadenceColumn {
   readonly cells: readonly CadenceCell[]
-  /** The month beginning at this column, when the grid announces it. */
   readonly monthLabel: string | undefined
 }
 
 export interface CadenceGrid {
   readonly columns: readonly CadenceColumn[]
-  /** The one-line statistic under the grid. */
   readonly stats: string
 }
 
-/**
- * The four ink levels — never more. Zero is silence, and the counts between
- * the thresholds share a level so the grid reads as rhythm, not as a chart.
- */
+// Counts bucket into four ink levels so the grid reads as rhythm, not a chart.
 export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count === 0) return 0
   if (count === 1) return 1
@@ -37,10 +31,8 @@ export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
-/**
- * Columns run left (oldest) to right (newest); rows run Monday to Sunday, the
- * alignment the server's Monday-opened window guarantees.
- */
+// Columns run oldest to newest; rows Monday to Sunday, the alignment the
+// server's Monday-opened window guarantees.
 export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   const columns: { cells: CadenceCell[]; monthLabel: string | undefined }[] = []
   for (let start = 0; start < days.length; start += 7) {
@@ -50,9 +42,8 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
     })
   }
 
-  // A month is announced where a column first opens in it, but never crowded:
-  // a label keeps at least six columns from the one before, which is what
-  // spaces the reference render's `february · april · june · august`.
+  // Label a column where a month first opens in it, but keep labels at least
+  // six columns apart.
   let lastLabelled: number | undefined
   for (const [index, column] of columns.entries()) {
     const month = monthOf(column.cells[0]?.date)
@@ -66,7 +57,7 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   return { columns, stats: statsOf(days) }
 }
 
-/** A represented day, said for a screen reader: `3 posts on 3 june 2026`. */
+/** Screen-reader label: `3 posts on 3 june 2026`. */
 export function cadenceDayLabel(cell: CadenceCell): string {
   const [year, month, day] = cell.date.split('-')
   const monthName = MONTHS[Number(month) - 1] ?? ''
@@ -119,5 +110,5 @@ const MONTHS = [
   'december',
 ] as const
 
-/** Row order is the window's: columns open on Monday. */
+/** Order matches the Monday-opened window. */
 const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const

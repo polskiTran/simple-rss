@@ -2,14 +2,11 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { READER_IMAGE_PATH } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 
-/**
- * How long a signed Reader image URL stays presentable. Twice the article's
- * own browser-cache life, so every image reference inside a cached article
- * outlives the article that carries it with calm margin — and nothing more.
- */
+// Twice the article's own browser-cache life, so every image reference inside
+// a cached article outlives the article that carries it.
 export const READER_IMAGE_URL_LIFETIME_SECONDS = 2 * 86_400
 
-/** Mints the signed proxy path one approved image target travels behind. */
+/** Mints the signed same-origin proxy path for one approved image target. */
 export type SignImageUrl = (url: string) => string
 
 export type VerifiedImageUrl =
@@ -17,16 +14,14 @@ export type VerifiedImageUrl =
   | { readonly ok: false; readonly reason: 'unsigned' | 'expired' | 'tampered' }
 
 export interface ImageUrlSignature {
-  /** A same-origin signed path for one approved target, minted to expire. */
   readonly sign: SignImageUrl
   verify(query: URLSearchParams): VerifiedImageUrl
 }
 
 /**
- * Binds a Reader image target and its expiry to this installation's key, so
- * the image proxy only ever fetches what extraction itself approved. The key
- * lives for one process: worst case, a restart turns the images inside an
- * already-cached article into their visual fallback until it is re-extracted.
+ * Binds target and expiry to this installation's key, so the image proxy only fetches
+ * what extraction approved. The key lives for one process: a restart turns images in
+ * an already-cached article into their fallback until re-extraction.
  */
 export function createImageUrlSignature(options: {
   readonly key: Uint8Array
@@ -61,8 +56,7 @@ export function createImageUrlSignature(options: {
         return { ok: false, reason: 'tampered' }
       }
 
-      // Only a genuinely signed URL can be "expired"; anything else already
-      // failed above, so a forged expiry never reaches this comparison.
+      // Anything unsigned already failed above, so a forged expiry never reaches this comparison.
       if (Number(expiry) * 1000 < clock.now().getTime()) {
         return { ok: false, reason: 'expired' }
       }

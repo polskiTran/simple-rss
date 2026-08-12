@@ -2,12 +2,10 @@ import { MAX_FEED_SIZE_MIB, type FeedAvailabilityCategory } from '../../shared/a
 import { ApiError } from '../api.js'
 
 /**
- * The calm words the Feed screens use for retrieval going wrong. One table
- * per failure vocabulary, so the list, the opened Feed, and the subscribe
- * notice cannot describe the same outcome two ways.
+ * One copy table per failure vocabulary, so the list, the opened Feed, and
+ * the subscribe notice cannot describe the same outcome two ways.
  */
 
-/** One calm phrase per safe failure category the server records. */
 export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'the feed cannot be reached',
   timeout: 'the feed is taking too long to respond',
@@ -33,10 +31,8 @@ export function subscriptionFailure(error: unknown): string {
   return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
 }
 
-/**
- * Feed Availability categories said in the subscribe voice, so a failed
- * first check reads exactly like any other subscribe failure.
- */
+// Feed Availability categories mapped into the subscribe copy, so a failed
+// first check reads like any other subscribe failure.
 const FIRST_CHECK_FAILURE_CODE: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'feed_unreachable',
   timeout: 'feed_timeout',
@@ -51,7 +47,6 @@ export function firstCheckFailure(category: FeedAvailabilityCategory | null): st
   return (code && SUBSCRIPTION_FAILURE_COPY[code]) || 'that Feed could not be added'
 }
 
-/** A retry that did not work explains itself as quietly as any other failure. */
 export function retryFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return 'still unavailable — the feed could not be retrieved'
   if (error.code === 'refresh_rate_limited') return 'checked a moment ago — wait a little before retrying'

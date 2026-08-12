@@ -9,12 +9,9 @@ export interface Migration {
 }
 
 /**
- * Every schema change this installation has ever made, in order. Migrations
- * are literal SQL rather than generated diffs so that a reviewer can read
- * exactly what will run against a User's volume, and so that the compiled
- * server carries them without shipping loose `.sql` files.
- *
- * Migrations are append-only. Correct a released migration with a new one.
+ * Literal SQL rather than generated diffs, so a reviewer reads exactly what runs
+ * against a User's volume and the compiled server ships no loose `.sql` files.
+ * Append-only: correct a released migration with a new one.
  */
 export const migrations: readonly Migration[] = [
   {
@@ -270,11 +267,8 @@ export function appliedVersions(db: SqliteDatabase): number[] {
 }
 
 /**
- * Brings the database up to the latest schema and returns the versions it
- * actually applied. Each migration runs in its own transaction, so a failure
- * leaves the database at the last complete version rather than half-migrated.
- *
- * Runs before the server reports ready; a throw here must keep readiness shut.
+ * Each migration runs in its own transaction, so a failure leaves the database at the
+ * last complete version. Runs before the server reports ready; a throw keeps readiness shut.
  */
 export function applyMigrations(
   db: SqliteDatabase,

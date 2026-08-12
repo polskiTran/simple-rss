@@ -25,17 +25,11 @@ export interface RetentionServiceOptions extends RetentionLimits {
 }
 
 /**
- * Keeps ordinary history bounded without ever touching an intentional save.
- *
- * Everything a sweep decides is derived from persisted state — last-observed
- * times, Library membership, Subscription rows — and the current clock, so a
- * sweep is idempotent and a restart simply resumes where the data says. An
- * item a slow Feed still exposes keeps being re-observed by ordinary polls
- * and therefore never ages out, no matter how old its publication date is.
- *
- * The sweep cannot race an active poll into deleting fresh work: eligibility
- * is judged by last-observed time, which a completing poll advances, and both
- * sides serialize on the one SQLite connection.
+ * Bounds ordinary history without ever touching an intentional save. A sweep derives
+ * from persisted state and the clock — idempotent and restart-safe — and an item a Feed
+ * still exposes keeps being re-observed, so it never ages out. It cannot race a poll:
+ * eligibility is last-observed time, which a completing poll advances, and both sides
+ * serialize on the one SQLite connection.
  */
 export class RetentionService {
   readonly #db: BetterSQLite3Database
@@ -51,10 +45,9 @@ export class RetentionService {
   }
 
   /**
-   * One bounded cleanup pass: unsaved Feed Items not observed within the
-   * retention period, unsaved Feed Items of unsubscribed Feeds, and finally
-   * any unsubscribed Feed that no retained Feed Item references any more — a
-   * Feed with saves keeps its row, which is the attribution the Library shows.
+   * Removes unsaved Feed Items aged past retention or orphaned by unsubscribe, then
+   * unreferenced unsubscribed Feeds — a Feed with saves keeps its row, the
+   * attribution the Library shows.
    */
   sweep(): void {
     const cutoff = new Date(this.#clock.now().getTime() - RETENTION_PERIOD_MS).toISOString()
@@ -81,8 +74,8 @@ export class RetentionService {
       const doomed = [...new Set([...aged, ...orphaned].map((row) => row.id))]
       if (doomed.length > 0) tx.delete(feedItems).where(inArray(feedItems.id, doomed)).run()
 
-      // Deleting a Feed cascades into its Feed Items, so only a Feed nothing
-      // references at all — no Subscription, no retained item — may go.
+      // Deleting a Feed cascades into its Feed Items, so only a Feed with no
+      // Subscription and no retained item may go.
       const dormant = tx
         .select({ id: feeds.id })
         .from(feeds)

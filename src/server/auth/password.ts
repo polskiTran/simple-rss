@@ -1,20 +1,12 @@
 import { MAX_PASSWORD_BYTES } from '../../shared/api.js'
 import { hash, verify, type Algorithm } from '@node-rs/argon2'
 
-/**
- * `Algorithm.Argon2id`, written as its value.
- *
- * The binding's enum is an ambient `const enum`, which `verbatimModuleSyntax`
- * refuses to import as a value. The stored verifiers begin `$argon2id$`, and
- * a test holds them to that, so a wrong number here could not go unnoticed.
- */
+// `Algorithm.Argon2id` as its value: the binding's ambient `const enum` cannot be imported
+// under `verbatimModuleSyntax`. A test holds stored verifiers to `$argon2id$`, so a wrong
+// number here could not go unnoticed.
 const ARGON2ID = 2 as Algorithm
 
-/**
- * How the User's password becomes a stored verifier, as a dependency rather
- * than a direct call. Everything that touches a password goes through this
- * interface, so the algorithm lives in exactly one place.
- */
+/** Everything that touches a password goes through here, so the algorithm lives in exactly one place. */
 export interface PasswordHasher {
   /** The encoded verifier to store. Never the password. */
   hash(password: string): Promise<string>
@@ -23,9 +15,8 @@ export interface PasswordHasher {
 }
 
 /**
- * OWASP's second recommended Argon2id configuration: 19 MiB of memory, two
- * passes, one lane. Memory-hard parameters are the point — they are what makes
- * an offline attack on a stolen volume expensive.
+ * OWASP's second recommended Argon2id configuration. Memory-hard parameters are
+ * what make an offline attack on a stolen volume expensive.
  */
 export const ARGON2ID_PARAMETERS = {
   memoryCost: 19_456,
@@ -34,9 +25,8 @@ export const ARGON2ID_PARAMETERS = {
 } as const
 
 /**
- * Long inputs cost proportionally more to hash, so a bounded length keeps a
- * login attempt from becoming a way to spend the installation's CPU. The HTTP
- * boundary rejects these first; this is the backstop for every other caller.
+ * Long inputs cost proportionally more to hash, so the length bound keeps a login from
+ * spending the installation's CPU. The HTTP boundary rejects first; this is the backstop.
  */
 export function argon2idHasher(): PasswordHasher {
   const options = { ...ARGON2ID_PARAMETERS, algorithm: ARGON2ID }
@@ -52,8 +42,7 @@ export function argon2idHasher(): PasswordHasher {
       try {
         return await verify(storedHash, password)
       } catch {
-        // A verifier the algorithm cannot parse is a corrupt or foreign value,
-        // which is a failed verification rather than a request that crashed.
+        // A verifier the algorithm cannot parse is corrupt or foreign: a failed verification, not a crash.
         return false
       }
     },

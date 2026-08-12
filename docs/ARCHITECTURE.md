@@ -1,6 +1,6 @@
 # Simple RSS Architecture
 
-> Status: accepted design; implementation has not started.
+> Status: accepted design; the implementation follows this document.
 
 Simple RSS is a calm, single-user RSS reader distributed as a portable Docker image. Railway is the first documented deployment target, but provider-specific behavior stays outside the application core.
 
@@ -356,7 +356,7 @@ The service emits structured logs to stdout and exposes Feed Availability in the
 
 ## Verification strategy
 
-Implementation should include:
+The test suites cover:
 
 - Unit tests for identity, chronology, retention, and backoff rules
 - Integration tests against real temporary SQLite databases and FTS5

@@ -7,10 +7,8 @@ type ListCursorQuery =
   | { readonly ok: false; readonly response: Response }
 
 /**
- * The `cursor` query parameter as a paged list route reads it: absent means
- * the top of the list, a value the reader issued resumes it, and anything
- * else is answered 400 here so both the Digest and the Library refuse a
- * foreign cursor in the same words.
+ * Absent means the top of the list. An undecodable cursor is answered 400
+ * here, so the Digest and the Library refuse a foreign cursor in the same words.
  */
 export function readListCursor(c: Context): ListCursorQuery {
   const raw = c.req.query('cursor')

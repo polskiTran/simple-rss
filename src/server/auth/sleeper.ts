@@ -1,11 +1,6 @@
-/**
- * Deliberate delay, as a dependency.
- *
- * The login route slows down under guessing, which is a real wait in
- * production and must not be one under test — a suite that actually paused for
- * seconds would be a suite nobody runs. Tests substitute a recorder and assert
- * on the delays that were asked for.
- */
+// Deliberate delay as a dependency: the login route's guessing delays are real waits
+// in production and must not be under test. Tests substitute a recorder and assert on
+// the delays asked for.
 export type Sleeper = (milliseconds: number) => Promise<void>
 
 export const realSleeper: Sleeper = (milliseconds) =>

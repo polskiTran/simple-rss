@@ -44,10 +44,8 @@ test.describe('the masthead mark', () => {
 
     await page.getByRole('link', { name: 'simple' }).hover()
 
-    // Mid-glint the matrix is somewhere else entirely: the quiet cells have
-    // risen and the loud ones dropped. Sampled rather than asserted cell by
-    // cell — the point is that the tile is in motion, and which cell is where
-    // at 120ms is the curve's business.
+    // Mid-glint the matrix differs from rest. Sampled rather than asserted
+    // cell by cell — which cell is where at 120ms is the curve's business.
     await page.waitForTimeout(120)
     expect(await inkLevels(page)).not.toEqual(resting)
 
@@ -77,9 +75,8 @@ test.describe('the masthead mark', () => {
 
     const mastheadAtRest = await inkLevels(page)
     const frames = new Set<string>()
-    // A loop, not a single pass: over one 1200ms turn the waiting tile has to
-    // keep arriving somewhere new, or it is saying nothing after the first
-    // half second of a wait that may last much longer.
+    // A loop, not a single pass: over one 1200ms turn the waiting tile must
+    // keep changing rather than stop after the first pass.
     for (let sample = 0; sample < 8; sample++) {
       frames.add((await inkLevels(page, '.loading-note')).join())
       await page.waitForTimeout(150)
@@ -99,8 +96,7 @@ test.describe('the masthead mark', () => {
     await expect(page.getByText('loading the digest')).toBeVisible()
 
     // The cells hold still — no reshuffling — but the tile as a whole keeps
-    // saying something, because a loader that stops moving is a loader that
-    // lies about whether anything is still happening.
+    // moving on opacity: a stopped loader lies.
     const cells = await inkLevels(page, '.loading-note')
     const opacities = new Set<string>()
     for (let sample = 0; sample < 6; sample++) {

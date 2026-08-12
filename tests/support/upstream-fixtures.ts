@@ -22,12 +22,9 @@ export interface RecordedRequest {
 }
 
 /**
- * Stands in for the outside world. Every upstream retrieval — Feeds, Reader
- * pages, proxied images — goes through the injected `HttpClient`, so a test
- * declares the bytes a publisher would return and asserts on what was asked.
- *
- * An unstubbed URL throws rather than escaping to the network, which keeps the
- * suite from depending on someone else's uptime.
+ * Stands in for the outside world: every upstream retrieval — Feeds, Reader
+ * pages, proxied images — goes through the injected `HttpClient`. An unstubbed
+ * URL throws rather than escaping to the network.
  */
 export class UpstreamFixtures {
   readonly #responses = new Map<string, FixtureResponse | (() => FixtureResponse)>()
@@ -55,19 +52,16 @@ export class UpstreamFixtures {
   }
 
   /**
-   * URLs whose request was abandoned by the caller. A retrieval that gives up
-   * must tear its connection down rather than leave it running, and this is
-   * how a test sees that happen.
+   * URLs whose request the caller abandoned — how a test sees a retrieval that
+   * gave up tear its connection down.
    */
   get aborted(): readonly string[] {
     return this.#aborted
   }
 
   /**
-   * DNS for the stubbed world. A host something is stubbed for resolves to one
-   * ordinary public address; anything else resolves to nothing, so a test that
-   * forgot a stub fails as an unresolvable host rather than by asking the real
-   * resolver about a name that may or may not exist.
+   * DNS for the stubbed world: stubbed hosts resolve to one public address,
+   * anything else to nothing — a forgotten stub fails as an unresolvable host.
    */
   get resolve(): ResolveAddresses {
     return async (hostname) => {
@@ -140,10 +134,7 @@ export function chunkedBody(chunks: readonly Uint8Array[]): ReadableStream<Uint8
 export interface PacedBodyOptions {
   /** How long the publisher pauses between chunks. */
   readonly gapMs: number
-  /**
-   * Whether the body ever finishes. `false` is a publisher that answered,
-   * sent some of what it promised, and then went quiet without closing.
-   */
+  /** `false` models a publisher that sent part of the body, then went quiet without closing. */
   readonly ends?: boolean
 }
 

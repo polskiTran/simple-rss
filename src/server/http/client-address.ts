@@ -5,17 +5,9 @@ import type { Context } from 'hono'
 const UNKNOWN = 'unknown'
 
 /**
- * Which client a request should be rate-limited against.
- *
- * Behind the documented deployment every socket comes from the platform's
- * proxy, so the socket address alone would make one bucket for the whole
- * internet. `X-Forwarded-For` fixes that, but only the entry the *nearest*
- * proxy appended is trustworthy — anything further left was supplied by the
- * caller and can be invented. So the rightmost entry wins, and a forged header
- * can only ever put an attacker in their own bucket.
- *
- * With `trustProxyHeaders` off the header is ignored entirely, which is the
- * correct reading when the service is exposed directly.
+ * Behind the platform proxy every socket shares one address, so the rightmost
+ * `X-Forwarded-For` entry — the one the nearest proxy appended — wins;
+ * anything further left is caller-supplied. Untrusted deployments ignore the header.
  */
 export function clientAddress(c: Context, trustProxyHeaders: boolean): string {
   if (trustProxyHeaders) {

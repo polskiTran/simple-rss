@@ -4,20 +4,13 @@ import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { appliedVersions } from '../persistence/migrations.js'
 
-/** The marker a reader of the file uses to recognize what it is holding. */
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-/**
- * The version of this document's own shape, independent of the database
- * schema. It moves only when the export format itself changes incompatibly.
- */
+// The export format's own version, independent of the database schema; it
+// moves only when the format changes incompatibly.
 export const USER_EXPORT_VERSION = 1
 
-/**
- * One retained Feed Item as it travels. `savedAt` is Library membership;
- * `dedupeKey` and `identityKind` are included so a future import can
- * re-identify the item instead of duplicating it.
- */
+/** `dedupeKey` and `identityKind` let a future import re-identify the item instead of duplicating it. */
 export interface UserExportItem {
   readonly dedupeKey: string
   readonly identityKind: 'guid' | 'link' | 'content'
@@ -31,10 +24,7 @@ export interface UserExportItem {
   readonly savedAt: string | null
 }
 
-/**
- * One Feed with the User's relationship to it. `subscription` is null for a
- * Feed kept only because Library saves still attribute to it.
- */
+/** `subscription` is null for a Feed kept only because Library saves still attribute to it. */
 export interface UserExportFeed {
   readonly enteredUrl: string
   readonly resolvedUrl: string
@@ -49,14 +39,10 @@ export interface UserExportFeed {
 }
 
 /**
- * The User's portable reading state, complete enough to carry Subscriptions,
- * Polling Intervals, retained Feed Items, Library membership, and preferences
- * to another installation or another reader.
- *
- * What it deliberately never carries: the password verifier, session hashes,
- * the setup secret, rate-limit state, conditional-request validators, the
- * polling schedule's due times, derived search rows, and migration records.
- * Those are this installation's operational property, not the User's reading.
+ * The User's portable reading state. It deliberately never carries the password
+ * verifier, session hashes, the Setup Secret, rate-limit state, validators, due
+ * times, derived search rows, or migration records — the installation's
+ * operational property, not the User's reading.
  */
 export interface UserExport {
   readonly format: typeof USER_EXPORT_FORMAT
@@ -85,9 +71,8 @@ interface ItemRow extends Omit<UserExportItem, 'identityKind'> {
 }
 
 /**
- * Reads the whole export in one consistent snapshot. The document is built in
- * memory because Retention bounds it: at the ~100-Subscription target with 90
- * days of history it stays a few megabytes, never an unbounded stream.
+ * One consistent snapshot, built in memory: Retention bounds the document to a
+ * few megabytes at the ~100-Subscription target.
  */
 export function buildUserExport(options: {
   database: SqliteDatabase

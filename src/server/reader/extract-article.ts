@@ -3,10 +3,7 @@ import { parseHTML } from 'linkedom'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { articleMarkdown } from './article-markdown.js'
 
-/**
- * How fast the estimate assumes the User reads. One steady number: the
- * Reader header answers "roughly how long", not "exactly how fast are you".
- */
+// One steady number: the Reader header answers "roughly how long", not "exactly how fast are you".
 const WORDS_PER_MINUTE = 225
 
 export interface ExtractedArticle {
@@ -16,7 +13,7 @@ export interface ExtractedArticle {
 }
 
 export interface ExtractArticleInput {
-  /** Decoded bytes of the original page, already bounded by the boundary. */
+  /** Original page bytes, already bounded by the boundary. */
   readonly bytes: Uint8Array
   /** Character set the transport declared, when it declared one. */
   readonly charset?: string | undefined
@@ -27,20 +24,14 @@ export interface ExtractArticleInput {
 }
 
 /**
- * The temporary Reader rendering of one original page: Defuddle finds the
- * article, the Markdown allowlist keeps only safe structure. Everything here
- * lives and dies with the request — nothing is ever written anywhere.
- *
- * `undefined` means the page yielded no readable article, whatever the
- * mechanical reason; the caller falls back to the stored summary.
+ * Everything here lives and dies with the request — nothing is ever written anywhere.
+ * `undefined` means no readable article; the caller falls back to the stored summary.
  */
 export async function extractArticle(input: ExtractArticleInput): Promise<ExtractedArticle | undefined> {
   try {
-    // The page is parsed with linkedom rather than jsdom: Defuddle's clutter
-    // selectors use CSS jsdom's engine cannot parse, and a selector error
-    // there would silently keep the whole page instead of the article. The
-    // document is built here, eagerly, because Defuddle's own lazy loading
-    // of linkedom does not survive every module loader this code runs under.
+    // linkedom, not jsdom: Defuddle's clutter selectors use CSS jsdom cannot parse,
+    // and a selector error would silently keep the whole page. Built eagerly because
+    // Defuddle's lazy linkedom loading does not survive every module loader.
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
     const result = await Defuddle(document, input.url)
     const markdown = articleMarkdown(
@@ -63,9 +54,8 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
 }
 
 /**
- * A linkedom document shaped the way Defuddle expects one: the styleSheets
- * and getComputedStyle it consults exist, and `document.URL` carries the
- * final address so relative links and extractor matching resolve.
+ * Shims the styleSheets and getComputedStyle Defuddle consults; `document.URL`
+ * carries the final address so relative links and extractor matching resolve.
  */
 function articleDocument(html: string, url: string): Document {
   const { document } = parseHTML(html)
@@ -83,10 +73,8 @@ function articleDocument(html: string, url: string): Document {
 }
 
 /**
- * Bytes to text, the way a browser would order the evidence: a byte-order
- * mark outranks the transport charset, which outranks a `<meta>` declaration
- * found in the first kilobyte, and UTF-8 is the calm default. An unknown or
- * misdeclared label falls back rather than failing the article.
+ * A BOM outranks the transport charset, which outranks a `<meta>` in the first
+ * kilobyte; UTF-8 is the default. An unknown label falls back rather than failing.
  */
 function decode(bytes: Uint8Array, transportCharset: string | undefined): string {
   const label = bomCharset(bytes) ?? transportCharset ?? metaCharset(bytes) ?? 'utf-8'
@@ -112,7 +100,7 @@ function metaCharset(bytes: Uint8Array): string | undefined {
   )
 }
 
-/** Words as a reader meets them: tokens that carry at least one letter or digit. */
+/** Tokens carrying at least one letter or digit. */
 function countWords(markdown: string): number {
   return markdown.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length
 }

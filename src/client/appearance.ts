@@ -1,12 +1,7 @@
 /**
- * Light or dark, per device. Unlike the installation timezone — one calendar
- * shared by every device — appearance follows the eyes and the room, so a
- * phone can read dark in bed while the laptop stays light at a desk. The
- * choice therefore lives in this browser, not on the server.
- *
- * `system` is the default and stores nothing: the stylesheet's
- * `prefers-color-scheme` rules keep deciding, exactly as before the User
- * ever opened Settings.
+ * Appearance is per device, so it lives in this browser, not on the server
+ * (unlike the installation timezone, which every device shares). `system` is
+ * the default and stores nothing; `prefers-color-scheme` keeps deciding.
  */
 
 export type Appearance = 'system' | 'light' | 'dark'
@@ -15,7 +10,6 @@ export const APPEARANCE_OPTIONS: readonly Appearance[] = ['system', 'light', 'da
 
 const STORAGE_KEY = 'appearance'
 
-/** What this device chose, or `system` when it never chose. */
 export function storedAppearance(): Appearance {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -25,7 +19,6 @@ export function storedAppearance(): Appearance {
   }
 }
 
-/** Applies a choice to the document and remembers it on this device. */
 export function chooseAppearance(appearance: Appearance): void {
   applyAppearance(appearance)
   try {
@@ -36,10 +29,8 @@ export function chooseAppearance(appearance: Appearance): void {
   }
 }
 
-/**
- * Pins the scheme through `data-appearance` on the document element, which the
- * stylesheet's pinned-appearance rules key on. `system` removes the pin.
- */
+// The stylesheet's pinned-appearance rules key on `data-appearance`; `system`
+// removes the pin.
 export function applyAppearance(appearance: Appearance): void {
   const root = document.documentElement
   if (appearance === 'system') delete root.dataset['appearance']

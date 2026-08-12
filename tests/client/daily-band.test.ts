@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { dailyShadows } from '../../src/client/components/daily-band.js'
 
-/**
- * The band is decoration with a source, so its properties are testable: the
- * same morning always draws the same field, two mornings never repeat, and
- * the day's volume — not chance — sets how much ink it carries.
- */
+// The band is seeded decoration: the same morning always draws the same field,
+// two mornings never repeat, and the day's volume — not chance — sets its ink.
 describe('the daily band field', () => {
   it('draws one date and volume identically every time', () => {
     expect(dailyShadows('2026-08-08', 14, 708, 114)).toBe(dailyShadows('2026-08-08', 14, 708, 114))

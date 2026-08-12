@@ -24,42 +24,26 @@ export interface Installation {
   readonly longFeedUrl: string
 }
 
-/**
- * The original page behind `First light`. Long enough to extract as a real
- * article, structured enough to prove the Reader keeps structure, and armed
- * enough — script, iframe, form, event handler — to prove sanitization in a
- * real browser rather than only in jsdom.
- */
-/**
- * A figure linking to its own full-size copy, the way every newsletter
- * platform emits one.
- */
+// A figure linking to its own full-size copy, the way newsletter platforms emit one.
 const FIGURE_IMAGE_URL = 'https://cdn.publisher.example/image/fetch/$s_!9LbW!,w_424,c_limit,f_webp/valley.png'
 const FIGURE_FULL_SIZE_URL =
   'https://cdn.publisher.example/image/fetch/$s_!9LbW!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fpost-media.publisher.example%2Fpublic%2Fimages%2F22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7_996x477.png'
 
-/**
- * An address quoted in the prose, with no space in it anywhere: the shape
- * that used to push the whole reading column past the edge of a phone.
- */
+// A spaceless address quoted in prose — the shape that used to push the
+// reading column past the edge of a phone.
 const QUOTED_LONG_URL =
   'https://cdn.publisher.example/archive/2026/08/09/the-long-unbroken-address-a-publisher-quotes-in-running-prose-22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7.html'
 
-/**
- * One formula as a publisher actually ships it: KaTeX's own markup, with the
- * TeX source in the MathML annotation extraction reads it back out of.
- */
+// KaTeX markup as a publisher ships it, with the TeX source in the MathML
+// annotation extraction reads back out.
 const PUBLISHED_MATH =
   '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow>' +
   '<msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>=</mo><mo>−</mo><mn>1</mn></mrow>' +
   '<annotation encoding="application/x-tex">e^{i\\pi} = -1</annotation></semantics></math></span>' +
   '<span class="katex-html" aria-hidden="true">e</span></span>'
 
-/**
- * A numbered display equation wider than the measure — the shape a paper
- * write-up is full of, and the one that used to spill off the paper and take
- * its equation number down onto the formula.
- */
+// A numbered display equation wider than the measure — used to spill off the
+// paper and drop its equation number onto the formula.
 const PUBLISHED_DISPLAY_MATH =
   '<span class="katex-display"><span class="katex"><span class="katex-mathml">' +
   '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>L</mi></mrow>' +
@@ -75,6 +59,9 @@ const PNG_PIXEL = Buffer.from(
   'base64',
 )
 
+// The original page behind `First light`: long enough to extract as a real
+// article, structured, and armed (script, iframe, form, handler) to prove
+// sanitization in a real browser.
 const ARTICLE_HTML = `<!doctype html>
   <html lang="en">
     <head><meta charset="utf-8"><title>First light</title></head>
@@ -116,13 +103,8 @@ export interface ForeignSite {
   serve(html: string): void
 }
 
-/**
- * A whole installation on a real socket with its own empty volume, and a
- * second origin next to it.
- *
- * The service is the same `startService` the container runs, so these flows
- * exercise production wiring rather than a browser-shaped mock.
- */
+// A whole installation on a real socket with its own empty volume, plus a
+// second origin. Same `startService` the container runs — production wiring.
 export const test = base.extend<{ installation: Installation; foreign: ForeignSite }>({
   installation: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
@@ -225,8 +207,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 
     try {
       // `localhost` and `127.0.0.1` are different origins to a browser even on
-      // the same port, and different ports are different origins regardless —
-      // either way this is genuinely somebody else's site.
+      // the same port, so this is genuinely somebody else's site.
       await use({ url: `http://localhost:${port}`, serve: (html) => void (body = html) })
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -236,11 +217,9 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 
 export { expect } from '@playwright/test'
 
-/**
- * Nothing forces the page wider than the paper. Measured against the body, not
- * the viewport: `scrollbar-gutter: stable` keeps a scrollbar's width out of the
- * content area, so `innerWidth` would hide an overflow that wide.
- */
+// Measured against the body, not the viewport: `scrollbar-gutter: stable`
+// keeps the scrollbar's width out of the content, so `innerWidth` would hide
+// an overflow that wide.
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.body.clientWidth,

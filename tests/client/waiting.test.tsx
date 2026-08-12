@@ -4,11 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
 
-/**
- * Every wait in the reader says the same two things: the words for what is
- * being waited on, and the mark's own tile beside them, glinting. These tests
- * hold the second one — the part a reader of the code cannot see is missing.
- */
+// Every wait pairs its words with the mark's glinting tile; these tests hold
+// the tile — the part a reader of the code cannot see is missing.
 
 /** A route that never answers, so the wait it belongs to stands still. */
 const hangs = (): Promise<Reply> => new Promise(() => {})
@@ -54,9 +51,8 @@ describe('a wait', () => {
     const { container } = renderAt('/digest')
     await screen.findByText('loading the digest')
 
-    // Borrowed, not redrawn: the pattern and the order of the glint are the
-    // same objects the masthead uses, so the two can never disagree about
-    // what the brand looks like.
+    // Borrowed, not redrawn: the pattern and glint order are the same objects
+    // the masthead uses, so the two can never disagree.
     const read = (scope: string) =>
       [...container.querySelectorAll<HTMLElement>(`${scope} .wordmark-cell`)].map(
         (cell) => `${cell.dataset.level}@${cell.style.getPropertyValue('--glint-step')}`,
@@ -71,19 +67,17 @@ describe('a wait', () => {
     const { container } = renderAt('/digest')
     await screen.findByText('loading the digest')
 
-    // Two marks moving at once is the product fidgeting, and only one of them
-    // is about the thing the User is waiting for. Nothing in the stylesheet
-    // can loop the masthead tile, because the class that does is not on it.
+    // The masthead tile must not loop; the class that loops a tile is only on
+    // the loading note.
     const masthead = container.querySelector('.masthead')
     expect(masthead?.closest('.loading-note')).toBeNull()
     expect(masthead?.querySelector('.loading-note')).toBeNull()
   })
 
   it('announces the one wait the User asked for, and stays quiet for the rest', async () => {
-    // A search replaces something just asked for, so silence would read as
-    // nothing having happened. The others replace a screen already being
-    // looked at, and a live region on every navigation is noise.
-    // The search line only exists once there is a Digest to search.
+    // Only the search wait is a live region — it replaces something just asked
+    // for; announcing every navigation would be noise. The search line only
+    // exists once there is a Digest to search, hence the full stub.
     stubApi()
       .on('GET /api/digest', {
         body: {

@@ -6,24 +6,15 @@ export const WINDOW_MS = 15 * 60 * 1000
 /** Failed attempts one client address may make inside the window. */
 export const PER_CLIENT_FAILURES = 5
 
-/**
- * Failed attempts across every address before the installation as a whole
- * starts costing the maximum delay.
- *
- * The per-client limit alone does nothing against guessing spread over many
- * addresses, which is cheap to arrange. This ceiling is deliberately well
- * above anything the User would produce by mistyping.
- */
+// The per-client limit does nothing against guessing spread over many addresses.
+// This ceiling sits well above anything the User would produce by mistyping.
 export const GLOBAL_FAILURES = 20
 
 /** The first failure costs this long; each further one doubles it. */
 const BASE_DELAY_MS = 250
 
-/**
- * The delay stops growing here. Long enough to make automated guessing
- * pointless, short enough that a queue of held requests cannot itself become
- * the outage.
- */
+// Long enough to make automated guessing pointless, short enough that a queue
+// of held requests cannot itself become the outage.
 const MAX_DELAY_MS = 2_000
 
 export interface AllowedAttempt {
@@ -55,16 +46,10 @@ interface AttemptRecord {
 type AttemptOutcome = 'failure' | 'success' | 'cancelled'
 
 /**
- * Local, in-memory guessing resistance for the routes that check a secret. No
- * Redis, because there is one process by design.
- *
- * Pending checks reserve one of the client's five slots before the asynchronous
- * password verifier starts. A burst therefore cannot send an arbitrary number
- * of guesses through while every request still sees an empty failure history.
- *
- * The two limits deliberately work differently. Only a client's own attempts
- * can block it; the installation-wide ceiling slows everyone down but blocks
- * nobody. That asymmetry prevents strangers from locking the User out.
+ * In-memory guessing resistance — one process by design, so no Redis. Pending checks
+ * reserve a slot before the async verifier starts, so a burst cannot slip through on an
+ * empty failure history. Only a client's own attempts can block it; the global ceiling
+ * slows everyone but blocks nobody, so strangers cannot lock the User out.
  */
 export class LoginRateLimiter {
   readonly #attempts = new Map<string, AttemptRecord[]>()
@@ -76,10 +61,8 @@ export class LoginRateLimiter {
   }
 
   /**
-   * Reserves one attempt before its secret is checked.
-   *
-   * A successful attempt pays for failures and global pressure already
-   * present. A failed attempt also pays for the slot it just consumed.
+   * Reserves one attempt before its secret is checked. A success pays for pressure
+   * already present; a failure also pays for the slot it just consumed.
    */
   begin(client: string): AttemptVerdict {
     const now = this.#clock.now().getTime()

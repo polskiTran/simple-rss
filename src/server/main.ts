@@ -2,11 +2,7 @@ import { loadConfig } from './config.js'
 import { createLogger } from './logger.js'
 import { startService, type RunningService } from './server.js'
 
-/**
- * Container entrypoint. Everything interesting lives in `startService`; this
- * file only turns the process environment into configuration and translates
- * platform signals into a graceful stop.
- */
+/** Container entrypoint: environment to configuration, platform signals to a graceful stop. */
 async function main(): Promise<void> {
   const config = loadConfig()
   const logger = createLogger({ level: config.logLevel })
@@ -15,10 +11,8 @@ async function main(): Promise<void> {
 
   installSignalHandlers(service)
 
-  // Monitor fatal errors without replacing Node's default handler. The
-  // process must still exit non-zero: after an uncaught failure, continuing
-  // to serve with readiness open would claim potentially corrupted state is
-  // healthy.
+  // Monitors without replacing Node's default handler: the process must still
+  // exit non-zero rather than serve potentially corrupted state as healthy.
   process.on('uncaughtExceptionMonitor', (error, origin) => {
     const event =
       origin === 'unhandledRejection'
@@ -28,10 +22,7 @@ async function main(): Promise<void> {
   })
 }
 
-/**
- * A platform replacing this container sends SIGTERM and then SIGKILL. A second
- * signal means the operator is impatient, so it stops waiting for the drain.
- */
+/** A second signal means the operator is impatient: stop waiting for the drain. */
 function installSignalHandlers(service: RunningService): void {
   let stopping = false
 

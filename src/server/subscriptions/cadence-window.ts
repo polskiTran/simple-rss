@@ -1,10 +1,7 @@
 import { CADENCE_GRID_WEEKS } from '../../shared/api.js'
 
-/**
- * The day windows cadence is aggregated over. Both take the installation-
- * timezone date key for "today" and return date keys, so the aggregation the
- * API answers with is deterministic for a fixed dataset and timezone.
- */
+// Both windows take the installation-timezone "today" date key and return date
+// keys, so cadence aggregation is deterministic for a fixed dataset and timezone.
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
@@ -15,9 +12,8 @@ export function trailingDayKeys(todayKey: string, days: number): string[] {
 }
 
 /**
- * Date keys from the Monday that opens the grid window through `todayKey`,
- * oldest first. The window is the current week plus the 25 before it, so the
- * grid always draws `CADENCE_GRID_WEEKS` columns with today ending the last.
+ * Date keys from the Monday opening the grid window through `todayKey`, oldest
+ * first — always `CADENCE_GRID_WEEKS` columns, with today ending the last.
  */
 export function gridDayKeys(todayKey: string): string[] {
   const today = Date.parse(`${todayKey}T00:00:00.000Z`)

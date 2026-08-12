@@ -16,19 +16,12 @@ type Timezone =
   | { readonly kind: 'unavailable' }
 
 export interface SettingsViewProps {
-  /** Given the status left behind by signing out or changing the password. */
   onAccessChanged(status: AuthStatus): void
 }
 
-/**
- * Settings drops out of the item shape into a two-column sheet, so preferences
- * can never be mistaken for reading.
- *
- * It shows the running version because upgrades are deliberate here — the
- * User picks a version rather than following a moving tag — and it holds the
- * two User actions that are the only controls in the reader able to end a
- * Session.
- */
+// A two-column sheet, not the item shape, so preferences cannot be mistaken
+// for reading. The version shows because upgrades are deliberate here — the
+// User picks a version rather than following a moving tag.
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   const [version, setVersion] = useState<Version>({ kind: 'loading' })
   const [changing, setChanging] = useState(false)
@@ -101,11 +94,8 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   )
 }
 
-/**
- * The one installation timezone, editable after its detection at claim. It is
- * a select rather than a free field because the only valid values are the
- * zones this runtime already knows.
- */
+// A select, not a free field: the only valid values are the zones this
+// runtime already knows.
 function TimezoneChoice() {
   const [state, setState] = useState<Timezone>({ kind: 'loading' })
   const [notice, setNotice] = useState('')
@@ -164,17 +154,14 @@ function TimezoneChoice() {
   )
 }
 
-/** Every zone the runtime knows, always including the one already chosen. */
+// The stored zone may not be in this runtime's list; keep it selectable.
 function timezoneOptions(current: string): string[] {
   const known = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
   return known.includes(current) ? [...known] : [current, ...known]
 }
 
-/**
- * Three words, the chosen one in ink — the interval presets' shape. `system`
- * keeps following the device, so it reads as the resting state rather than a
- * third theme.
- */
+// Same shape as the interval presets. `system` keeps following the device —
+// the resting state, not a third theme.
 function AppearanceChoice() {
   const [appearance, setAppearance] = useState<Appearance>(storedAppearance)
 
@@ -200,11 +187,8 @@ function AppearanceChoice() {
   )
 }
 
-/**
- * Changing the password signs every device out, including this one. The User
- * is told that before submitting rather than after, because they may be doing
- * it from a phone with the laptop closed somewhere else.
- */
+// Changing the password signs every device out, including this one; the form
+// says so before submit, not after.
 function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): void }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')

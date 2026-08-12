@@ -14,9 +14,8 @@ export interface LibraryRouteDependencies {
 }
 
 /**
- * The Library: one idempotent save and unsave per Feed Item, and the saved
- * list. Both mutations answer with the membership state that now holds, so
- * repeating either is confirmation rather than conflict.
+ * Save and unsave are idempotent: both answer with the membership state that
+ * now holds, so repeating either is confirmation rather than conflict.
  */
 export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   const app = new Hono()

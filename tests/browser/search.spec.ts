@@ -45,7 +45,7 @@ test.describe('searching the reading history', () => {
     // The result names its Feed, so similar titles stay distinguishable.
     await expect(results).toContainText('Field Notes')
     await expect(results).toContainText('today')
-    // The Digest's own furniture has stepped aside while the line stands.
+    // The Digest itself is not rendered while results are shown.
     await expect(page.getByRole('heading', { name: 'today · 1 post' })).not.toBeVisible()
 
     // The keyboard is enough: Tab reaches the match, Enter opens the Reader.
@@ -54,7 +54,7 @@ test.describe('searching the reading history', () => {
     await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
 
-    // Back from the Reader, the Digest is itself again.
+    // Back from the Reader, the Digest renders again.
     await page.getByRole('link', { name: '← digest' }).click()
     await expect(page.getByRole('heading', { name: 'today · 1 post' })).toBeVisible()
   })

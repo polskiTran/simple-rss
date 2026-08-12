@@ -1,15 +1,11 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { arrayOf, asRecord, declaresXmlEntities } from '../ingestion/xml.js'
 
-/**
- * The most Feeds one OPML import will record. Recording is local (ADR 0007),
- * so this bounds parse work and the scheduler's first-check backlog.
- */
+/** Recording is local (ADR 0007), so this bounds parse work and the scheduler's first-check backlog. */
 export const MAX_OPML_FEEDS = 500
 
 const MAX_TITLE_LENGTH = 512
 
-/** One Feed another reader listed: the URL to retrieve and the name it gave. */
 export interface OpmlFeedOutline {
   readonly url: string
   readonly title: string | null
@@ -28,12 +24,9 @@ export class OpmlError extends Error {
 }
 
 /**
- * Extracts the Feeds an uploaded OPML document lists, in document order, with
- * one entry per distinct URL however often the document repeats it.
- *
- * Outlines without an `xmlUrl` are folders or plain links, not Feeds, and are
- * walked through rather than reported. URLs are returned as written — each one
- * goes through the normal Subscription creation path, which owns validation.
+ * Feeds the document lists, in document order, one entry per distinct URL. Outlines
+ * without `xmlUrl` are folders or plain links and are walked through, not reported.
+ * URLs are returned as written — Subscription creation owns validation.
  */
 export function parseOpml(text: string): readonly OpmlFeedOutline[] {
   if (declaresXmlEntities(text)) {
@@ -67,12 +60,7 @@ export function parseOpml(text: string): readonly OpmlFeedOutline[] {
   return [...feeds.values()]
 }
 
-/**
- * Writes the User's active Subscriptions as an OPML 2.0 document. Each
- * outline carries `type`, `text`, `title`, and `xmlUrl` — the standard
- * metadata other readers import from — with the resolved URL, because it is
- * the endpoint that currently answers.
- */
+/** Writes active Subscriptions as OPML 2.0, using the resolved URL — the endpoint that currently answers. */
 export function serializeOpml(
   subscriptions: readonly { readonly title: string; readonly resolvedUrl: string }[],
   now: Date,

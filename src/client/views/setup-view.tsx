@@ -10,12 +10,8 @@ export interface SetupViewProps {
   onAlreadyClaimed(): void
 }
 
-/**
- * The first screen an installation ever shows: the one chance to become its
- * User. It asks for the deployment's setup secret rather than offering
- * registration, because there is no second User to make and no sign-up flow
- * this reader would ever use it for.
- */
+// Asks for the deployment's setup secret rather than offering registration:
+// there is no second User to make.
 export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
   const [setupSecret, setSetupSecret] = useState('')
   const [password, setPassword] = useState('')

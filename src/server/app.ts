@@ -34,19 +34,15 @@ export interface AppDependencies {
   readonly clock: Clock
   readonly logger: Logger
   readonly readiness: Readiness
-  /**
-   * Absent while the database could not be opened. Readiness reports that
-   * rather than the process crash-looping past the operator.
-   */
+  /** Absent while the database could not be opened; readiness reports that rather than crash-looping. */
   readonly database: () => SqliteDatabase | undefined
   /** Absent for the same reason the database is. */
   readonly authentication: () => Authentication | undefined
   readonly settings: () => InstallationSettingsStore | undefined
-  /** Feed work is absent only while startup could not open the database. */
   readonly subscriptions: () => SubscriptionService | undefined
   readonly refresh: () => FeedRefresh | undefined
   readonly digest: () => DigestService | undefined
-  /** Forwards a route's request for an immediate look at the due frontier. */
+  /** Asks the scheduler for an immediate look at the due frontier. */
   readonly nudgeScheduler: () => void
   readonly library: () => LibraryService | undefined
   readonly reader: () => ReaderService | undefined
@@ -57,10 +53,9 @@ export interface AppDependencies {
 }
 
 /**
- * The whole HTTP surface: health, the JSON API, and the built client, in one
- * process. Route order is the contract — `/health` and `/api` are matched
- * before the client fallback, so they can never return HTML, and the two
- * `/api` guards are registered before any route they protect.
+ * The whole HTTP surface. Route order is the contract: `/health` and `/api`
+ * match before the client fallback so they can never return HTML, and the
+ * `/api` guards register before any route they protect.
  */
 export function createApp(deps: AppDependencies): Hono {
   const app = new Hono()
@@ -68,8 +63,7 @@ export function createApp(deps: AppDependencies): Hono {
   app.use('*', securityHeaders())
   app.use('*', requestLogging(deps.logger))
 
-  // Health answers before the guards, because a platform probe holds no
-  // session and must still be able to see why an installation is unready.
+  // Health answers before the guards: a platform probe holds no session.
   app.get('/health/live', (c) => c.json<Liveness>({ status: 'live' }))
 
   app.get('/health/ready', (c) => {
@@ -151,13 +145,9 @@ export function createApp(deps: AppDependencies): Hono {
 }
 
 /**
- * The reason readiness is closed, or `undefined` when the service can take
- * traffic. Startup state is checked first, then the volume, because a
- * mounted-but-full disk only reveals itself on a real write.
- *
- * The setup secret is checked last because it needs the database to know
- * whether it is still required, and it is checked at all because an unclaimed
- * installation with no way to claim it can serve nothing but a dead end.
+ * Startup state first, then the volume — a mounted-but-full disk only reveals
+ * itself on a real write. The Setup Secret is checked last because it needs
+ * the database to know whether it is still required.
  */
 function readinessFailure(deps: AppDependencies): string | undefined {
   const state = deps.readiness.state
@@ -180,10 +170,7 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   return authentication.setupBlocker()
 }
 
-/**
- * One record per request. Paths are logged without query strings, which can
- * carry search terms and, later, signed image URLs.
- */
+/** One record per request; query strings are omitted — they carry search terms and signed image URLs. */
 function requestLogging(logger: Logger) {
   const scoped = logger.child({ component: 'http' })
 
@@ -192,8 +179,7 @@ function requestLogging(logger: Logger) {
     await next()
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
 
-    // Platform health probes run every few seconds; at info level they would
-    // drown out everything an operator actually wants to read.
+    // Health probes run every few seconds; at info they would drown out everything else.
     const level = c.req.path.startsWith('/health/') ? 'debug' : 'info'
     scoped[level]('request.completed', {
       method: c.req.method,

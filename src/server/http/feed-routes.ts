@@ -31,7 +31,6 @@ export interface FeedRouteDependencies {
   readonly nudgeScheduler: () => void
 }
 
-/** Subscription creation, the User's Subscriptions, and the chronological Digest. */
 export function feedRoutes(deps: FeedRouteDependencies): Hono {
   const app = new Hono()
 
@@ -105,9 +104,8 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     if (outcome.kind === 'updated') {
       return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems }, 200, NO_STORE)
     }
-    // The publisher confirmed nothing changed, which is a successful refresh
-    // that simply observed no Feed Items. A merge is a successful refresh of
-    // the Feed that survived, and this Feed's items live there now.
+    // not-modified is a successful refresh with zero items; a merge means this
+    // Feed's items now live on the Feed that survived.
     if (outcome.kind === 'not-modified' || outcome.kind === 'merged') {
       return c.json<RefreshFeedResponse>({ observedItems: 0 }, 200, NO_STORE)
     }
@@ -221,18 +219,14 @@ const UNSUPPORTED_CONTENT: FailureAnswer = {
   code: 'unsupported_feed',
   message: 'The URL returned unsupported Feed content',
 }
-// A host that does not resolve is an unreachable Feed, not a badly formed
-// URL: the address was acceptable, the network simply had no answer.
+// An unresolvable host is an unreachable Feed (502), not a badly formed URL.
 const UNREACHABLE: FailureAnswer = {
   status: 502,
   code: 'feed_unreachable',
   message: 'The Feed could not be reached',
 }
 
-/**
- * The User is told the actual ceilings rather than a number copied from them,
- * so raising a limit cannot leave the explanation behind.
- */
+/** Messages quote the actual ceilings, so raising a limit cannot leave the explanation behind. */
 const FEED_PROFILE = RETRIEVAL_PROFILES.feed
 
 /** One answer per retrieval failure, shared by direct creation and OPML import. */
@@ -267,7 +261,6 @@ const RETRIEVAL_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> =
   unavailable: UNREACHABLE,
 }
 
-/** Milliseconds as the whole seconds the User is told about. */
 function seconds(ms: number): number {
   return Math.round(ms / 1_000)
 }
