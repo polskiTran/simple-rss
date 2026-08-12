@@ -77,10 +77,12 @@ describe('article structure', () => {
     expect(markdown).toBe('Euler said $e^{i\\pi} = -1$.\n\n$$\n\\int_0^1 x\\,dx\n$$')
   })
 
-  it('keeps thematic breaks and hard line breaks', () => {
+  it('keeps thematic breaks, and writes a `<br>` as a hard line break', () => {
     const markdown = articleMarkdown('<p>one<br>two</p><hr><p>three</p>', BASE)
 
-    expect(markdown).toBe('one\ntwo\n\n---\n\nthree')
+    // The trailing `\` is what makes the newline survive CommonMark, which
+    // would otherwise read it as a space between two lines of one paragraph.
+    expect(markdown).toBe('one\\\ntwo\n\n---\n\nthree')
   })
 
   it('unwraps divs, spans, sections, and figures to their content', () => {
@@ -229,7 +231,7 @@ describe('sanitization', () => {
   it('escapes text lines that would begin a markdown block', () => {
     const markdown = articleMarkdown('<p># not a heading<br>&gt; not a quote<br>- not a list<br>1. not ordered</p>', BASE)
 
-    expect(markdown).toBe('\\# not a heading\n\\> not a quote\n\\- not a list\n1\\. not ordered')
+    expect(markdown).toBe('\\# not a heading\\\n\\> not a quote\\\n\\- not a list\\\n1\\. not ordered')
   })
 
   it('never passes raw HTML through as markup', () => {

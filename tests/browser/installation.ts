@@ -45,6 +45,30 @@ const FIGURE_FULL_SIZE_URL =
 const QUOTED_LONG_URL =
   'https://cdn.publisher.example/archive/2026/08/09/the-long-unbroken-address-a-publisher-quotes-in-running-prose-22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7.html'
 
+/**
+ * One formula as a publisher actually ships it: KaTeX's own markup, with the
+ * TeX source in the MathML annotation extraction reads it back out of.
+ */
+const PUBLISHED_MATH =
+  '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow>' +
+  '<msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>=</mo><mo>−</mo><mn>1</mn></mrow>' +
+  '<annotation encoding="application/x-tex">e^{i\\pi} = -1</annotation></semantics></math></span>' +
+  '<span class="katex-html" aria-hidden="true">e</span></span>'
+
+/**
+ * A numbered display equation wider than the measure — the shape a paper
+ * write-up is full of, and the one that used to spill off the paper and take
+ * its equation number down onto the formula.
+ */
+const PUBLISHED_DISPLAY_MATH =
+  '<span class="katex-display"><span class="katex"><span class="katex-mathml">' +
+  '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>L</mi></mrow>' +
+  '<annotation encoding="application/x-tex">' +
+  "L'(N_{\\backslash E}, C_{\\backslash E}) = -\\alpha A(N_{\\backslash E} + \\omega N_{\\backslash E}^{1/3})^{-\\alpha-1}" +
+  '(1 + \\frac{\\omega}{3} N_{\\backslash E}^{-2/3}) + \\beta B\\left(\\frac{C_{\\backslash E}}{6}\\right)^{-\\beta} ' +
+  'N_{\\backslash E}^{\\beta-1} = 0 \\tag{18}' +
+  '</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">L</span></span></span>'
+
 /** A 1×1 PNG — enough to pass the proxy's magic-byte sniff and paint. */
 const PNG_PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -65,7 +89,15 @@ const ARTICLE_HTML = `<!doctype html>
         ).join('\n')}
         <h2>Field methods</h2>
         <ul><li>arrive before the light</li><li>write down what is actually there</li></ul>
-        <pre><code class="language-python">def observe():\n    return light</code></pre>
+        <p>Run <code>observe()</code> before the light, and read <code>exposure</code> back.</p>
+        <pre><code class="language-python">def observe():\n    # before the light\n\n    return light</code></pre>
+        <table>
+          <thead><tr><th>Hour</th><th>Reading</th></tr></thead>
+          <tbody><tr><td>05:40</td><td>grey</td></tr><tr><td>06:10</td><td>gold</td></tr></tbody>
+        </table>
+        <blockquote><p>The light does not wait for the camera.</p></blockquote>
+        <p>The exposure holds at ${PUBLISHED_MATH} from there.</p>
+        ${PUBLISHED_DISPLAY_MATH}
         <p>The full notes live in <a href="/notes">the notebook</a>.</p>
         <figure><a href="${FIGURE_FULL_SIZE_URL}"><img src="${FIGURE_IMAGE_URL}" alt="the valley at dawn"></a><figcaption>Dawn from the ridge.</figcaption></figure>
         <p>The plate above was filed at ${QUOTED_LONG_URL} on the morning it was made.</p>

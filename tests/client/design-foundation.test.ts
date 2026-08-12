@@ -40,7 +40,7 @@ describe('the light palette', () => {
     ['ink — body prose', '--color-body', '#26251f'],
     ['grey — metadata', '--color-meta', '#8c8b86'],
     ['grey — quietest', '--color-quiet', '#a3a29d'],
-    ['grey — muted prose', '--color-muted', '#6b6a66'],
+    ['grey — muted prose', '--color-muted-foreground', '#6b6a66'],
     ['accent', '--color-accent', '#2438d8'],
   ])('binds %s through %s to %s', (_role, property, value) => {
     expect(lightOnly()).toContain(`${property}: ${value}`)
@@ -222,12 +222,17 @@ describe('layout', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
   })
 
-  it('draws no cards or boxes — every rule in the system is an underline', () => {
-    expect(css).not.toMatch(/box-shadow|border-radius/)
+  it('draws no cards or boxes in the interface — every rule here is an underline', () => {
+    // The article body is the exception, and it is not drawn here: the
+    // Markdown renderer brings its own cards for code and tables.
+    // Everything this stylesheet draws is still whitespace and underlines.
+    const drawn = css.replace(/--[a-z-]+:[^;]+;/g, '')
+
+    expect(drawn).not.toMatch(/box-shadow|border-radius/)
 
     // An underline is the one rule `docs/DESIGN.md` allows, taken from the
     // search field. A border on any other edge would be a card sneaking in.
-    const borders = css.match(/border[a-z-]*:\s*[^;]+/g) ?? []
+    const borders = drawn.match(/border[a-z-]*:\s*[^;]+/g) ?? []
     const boxes = borders.filter((rule) => rule !== 'border: 0' && !rule.startsWith('border-bottom:'))
 
     expect(boxes).toEqual([])
@@ -338,18 +343,40 @@ describe('the Reader', () => {
     expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*color:\s*var\(--color-body\)/)
   })
 
-  it('keeps the pull quote italic in the muted prose grey, indented by whitespace', () => {
-    expect(lightOnly()).toMatch(/\.article-body blockquote\s*\{[^}]*font-style:\s*italic/)
-    expect(lightOnly()).toMatch(/\.article-body blockquote\s*\{[^}]*color:\s*var\(--color-muted\)/)
-    expect(lightOnly()).not.toMatch(/\.article-body blockquote\s*\{[^}]*border/)
+  it('leaves the article’s blocks to the Markdown renderer', () => {
+    // The renderer draws headings, quotes, lists, tables, and code
+    // with its own classes, so this stylesheet scans its files and restates
+    // none of them. Re-adding a rule here is how the two would start fighting.
+    expect(css).toContain('@source "../../node_modules/streamdown/dist/*.js"')
+    expect(lightOnly()).not.toMatch(/\.article-body (blockquote|table|th|td|hr|h[1-6]|pre|code|ul|ol)[\s,]*\{/)
   })
 
-  it('confines the monospace exception to article code', () => {
-    // The one departure from Literata `docs/DESIGN.md` §5 records: imported
-    // code keeps its own voice. It must never leak into interface chrome.
-    const monospace = css.match(/^\s*\.[^{}]*\{[^}]*ui-monospace[^}]*\}/gm) ?? []
-    expect(monospace).toHaveLength(1)
-    expect(monospace[0]).toContain('.article-body code')
+  it('binds the renderer’s tokens to this palette, in both schemes', () => {
+    // Its classes ask for shadcn's names; unbound, an article would render in
+    // someone else's defaults or with no surface at all.
+    for (const token of ['--color-background', '--color-foreground', '--color-border', '--color-primary']) {
+      expect(lightOnly()).toContain(`${token}:`)
+    }
+    // The two that are surfaces rather than inks, and so differ per scheme.
+    for (const token of ['--color-muted', '--color-muted-foreground', '--color-sidebar']) {
+      expect(lightOnly()).toContain(`${token}:`)
+      expect(darkBlocks()).toContain(`${token}:`)
+    }
+  })
+
+  it('keeps monospace out of this stylesheet — code’s own voice is the renderer’s', () => {
+    expect(css).not.toMatch(/monospace/)
+  })
+
+  it('makes the renderer’s `dark:` classes follow the pinned appearance', () => {
+    // Its Shiki colours and surfaces switch on `dark:`, which asks the device
+    // by default. Left alone, a pinned light appearance on a dark laptop would
+    // read the article's code in the dark theme on light paper.
+    const variant = /@custom-variant dark \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+
+    expect(variant).toContain('@media (prefers-color-scheme: dark)')
+    expect(variant).toContain("[data-appearance='light']")
+    expect(variant).toContain("[data-appearance='dark']")
   })
 
   it('breaks a word no space will break rather than widening the measure', () => {

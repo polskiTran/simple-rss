@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { stubApi, type StubbedApi } from './stub-api.js'
 
@@ -38,6 +38,15 @@ function reading(): StubbedApi {
   return api
 }
 
+/**
+ * Reader View loads its Markdown renderer lazily. Importing it once here means
+ * these tests wait on rendering rather than on the transform of KaTeX, Shiki,
+ * and the parser between them, which alone can outlast a query's timeout.
+ */
+beforeAll(async () => {
+  await import('../../src/client/components/article-markdown.js')
+})
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -59,7 +68,8 @@ describe('Reader View', () => {
     expect(original.getAttribute('rel')).toBe('noopener noreferrer')
 
     // `##` renders one level under the item title, which is the page's h1.
-    expect(screen.getByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+    // Awaited because the Markdown renderer arrives with the first article.
+    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
     expect(screen.getByText(/turns from grey to/)).toBeDefined()
 
     const toggle = screen.getByRole('button', { name: 'save First light' })
