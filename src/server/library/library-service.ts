@@ -15,9 +15,8 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 /**
- * The User's explicitly saved Feed Items. Membership is its own table, so a
- * save is untouched by ingestion's metadata corrections and, later, survives
- * retention pruning and unsubscribing.
+ * Membership is its own table, so a save survives ingestion's metadata
+ * corrections, retention pruning, and unsubscribing.
  */
 export class LibraryService {
   readonly #db: BetterSQLite3Database
@@ -30,11 +29,7 @@ export class LibraryService {
     this.#settings = options.settings
   }
 
-  /**
-   * Saves one Feed Item, idempotently: a repeated save answers with the
-   * membership that already exists rather than moving its saved time.
-   * `undefined` means there is no such Feed Item to save.
-   */
+  /** Idempotent: a repeated save keeps the existing saved time. `undefined` when no such Feed Item exists. */
   save(feedItemId: number): LibraryMembership | undefined {
     const exists = this.#db
       .select({ id: feedItems.id })
@@ -52,19 +47,13 @@ export class LibraryService {
     return this.#membership(feedItemId)
   }
 
-  /**
-   * Removes one Feed Item from the Library. Unsaving the already-unsaved —
-   * or the already-pruned — simply confirms the state the User asked for.
-   */
+  /** Unsaving the already-unsaved — or already-pruned — simply confirms the requested state. */
   unsave(feedItemId: number): LibraryMembership {
     this.#db.delete(libraryItems).where(eq(libraryItems.feedItemId, feedItemId)).run()
     return { feedItemId, saved: false, savedAt: null }
   }
 
-  /**
-   * One page of the Library, in the same chronology — and on the same cursor
-   * — the Digest orders by.
-   */
+  /** Same chronology and cursor as the Digest. */
   list(cursor?: ListCursor): Library {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
@@ -102,8 +91,7 @@ export class LibraryService {
         title: row.title ?? 'untitled',
         feedId: row.feedId,
         feedTitle: row.feedTitle,
-        // A save outlives its Subscription; the view says so instead of
-        // leaving the User to wonder whether the reader forgot.
+        // A save outlives its Subscription; the view says so.
         subscribed: row.subscribedFeedId !== null,
         link: row.link,
         publishedAt: row.publishedAt,

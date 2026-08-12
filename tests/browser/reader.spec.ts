@@ -150,22 +150,22 @@ test.describe('Reader View', () => {
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'Slow water' }).click()
 
-    // The Feed Item is untouched: its stored summary and the way out. The
-    // meta row and the fallback each offer the original, so two links match.
+    // The fallback shows the stored summary; the meta row and the fallback
+    // each offer the original, so two links match.
     await expect(page.getByRole('heading', { level: 1, name: 'Slow water' })).toBeVisible()
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     const originals = page.getByRole('link', { name: 'open original' })
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    // The offered retry is honest: the first click really tries again and,
-    // with the publisher still down, lands back on the same calm fallback.
+    // The first retry really refetches; with the publisher still down it
+    // lands back on the same fallback.
     await page.getByRole('button', { name: 'retry parsing' }).click()
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
 
-    // Hammering it is not: the next attempt inside the cooldown is refused
-    // with the wait rather than another retrieval.
+    // A second attempt inside the cooldown is refused with the wait, not
+    // another retrieval.
     await page.getByRole('button', { name: 'retry parsing' }).click()
     await expect(page.getByText(/wait \d+s, then retry/)).toBeVisible()
 
@@ -243,9 +243,8 @@ test.describe('Reader View at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('next in the digest')).toHaveCount(0)
 
-    // The article quotes an address with no space in it, longer than the
-    // paper is wide. Nothing forces the page wider than the phone: reading
-    // needs no panning.
+    // The article quotes a spaceless address wider than the paper; the page
+    // must not grow wider than the phone.
     await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })

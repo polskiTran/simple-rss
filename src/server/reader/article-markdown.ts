@@ -4,27 +4,20 @@ import type { SignImageUrl } from '../images/image-url-signature.js'
 
 export interface ArticleMarkdownOptions {
   /**
-   * Turns an approved image source into the same-origin signed path the
-   * markdown will carry. Absent — as in tests of pure structure — images are
-   * simply dropped, never emitted with their publisher URL.
+   * Rewrites an approved image source to the signed same-origin path. Absent,
+   * images are dropped — never emitted with their publisher URL.
    */
   readonly signImageUrl?: SignImageUrl
 }
 
-/** What every renderer below needs to know about the article being rebuilt. */
 interface Rendering extends ArticleMarkdownOptions {
   readonly baseUrl: string
 }
 
 /**
- * Turns extracted article HTML into Markdown through an explicit allowlist.
- *
- * Structure the Reader keeps — headings, paragraphs, lists, links, images,
- * block quotes, tables, code, and supported math — is rebuilt as Markdown
- * syntax; everything else either unwraps to its text or, for active and
- * embedded content, disappears with its children. No attribute and no raw
- * HTML ever reaches the output: text is escaped, so a hostile document can
- * only ever say something, never do something.
+ * Rebuilds extracted article HTML as Markdown through an explicit allowlist. No
+ * attribute and no raw HTML ever reaches the output: text is escaped, so a
+ * hostile document can only ever say something, never do something.
  */
 export function articleMarkdown(html: string, baseUrl: string, options: ArticleMarkdownOptions = {}): string {
   const dom = new JSDOM(html)
@@ -36,11 +29,8 @@ export function articleMarkdown(html: string, baseUrl: string, options: ArticleM
 }
 
 /**
- * Elements whose content must vanish with them: running one of these in a
- * reading surface is exactly what Reader View exists to prevent. `img` and
- * `picture` are absent because approved images survive — rewritten to signed
- * proxy paths — while `source` stays dropped so only the fallback `img` of a
- * `picture` speaks.
+ * Content vanishes with these elements. `img` and `picture` are absent — approved images
+ * survive as signed proxy paths — while `source` stays dropped so only a `picture`'s fallback `img` speaks.
  */
 const DROPPED = new Set([
   'script',
@@ -82,7 +72,6 @@ const DROPPED = new Set([
   'title',
 ])
 
-/** Phrasing content that joins the surrounding text rather than breaking it. */
 const INLINE = new Set([
   'a',
   'abbr',
@@ -118,7 +107,6 @@ const INLINE = new Set([
 
 const HEADINGS: Readonly<Record<string, number>> = { h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6 }
 
-/** Serializes one container's children as a sequence of Markdown blocks. */
 function blocks(container: ParentNode, context: Rendering): string[] {
   const out: string[] = []
   /** Consecutive phrasing nodes waiting to become one paragraph. */
@@ -181,8 +169,7 @@ function blocks(container: ParentNode, context: Rendering): string[] {
     } else if (tag === 'hr') {
       out.push('---')
     } else {
-      // Anything else — div, section, figure, article — is only a container
-      // here: its children speak, the wrapper itself has nothing to add.
+      // Anything else (div, section, figure…) is only a container: its children speak.
       out.push(...blocks(element, context))
     }
   }
@@ -191,22 +178,14 @@ function blocks(container: ParentNode, context: Rendering): string[] {
   return out
 }
 
-/**
- * One paragraph from a run of phrasing nodes, or nothing worth keeping. Every
- * newline inside a paragraph came from a `<br>` — running text is collapsed
- * to one line — so each is written as a hard break: a trailing `\`, which
- * CommonMark reads as the line break the publisher wrote.
- */
+/** Every newline in a run came from a `<br>`, so each is written as a CommonMark hard break (trailing `\`). */
 function paragraphOf(nodes: readonly Node[], context: Rendering): string | undefined {
   const text = nodes.map((node) => inlineNode(node, context)).join('')
   const kept = lines(text)
   return kept.length > 0 ? kept.join('\\\n') : undefined
 }
 
-/**
- * Splits rendered phrasing content into trimmed lines and escapes anything
- * that would otherwise begin a Markdown block on its own line.
- */
+/** Trims lines and escapes anything that would otherwise begin a Markdown block. */
 function lines(text: string): string[] {
   return text
     .split('\n')
@@ -261,8 +240,8 @@ function inlineNode(node: Node, context: Rendering): string {
       return destination ? `[${inner.trim()}](${destination})` : inner
     }
     case 'img': {
-      // The publisher's URL never reaches the markdown: an approved source is
-      // rewritten to the signed same-origin path, anything else disappears.
+      // The publisher's URL never reaches the markdown: approved sources become
+      // signed same-origin paths, anything else disappears.
       const source = absoluteHttpUrl(element.getAttribute('src'), context)
       if (!source || !context.signImageUrl) return ''
       const alt = escapeText(element.getAttribute('alt') ?? '').trim()
@@ -277,11 +256,7 @@ function inlineNode(node: Node, context: Rendering): string {
   }
 }
 
-/**
- * A link destination the Reader will follow: absolute after resolution
- * against the article, and plain http or https — nothing executable, nothing
- * that smuggles a document inline.
- */
+/** Absolute after resolution against the article, and plain http/https — nothing executable or inline. */
 function safeDestination(href: string | null, context: Rendering): string | undefined {
   const url = absoluteHttpUrl(href, context)
   return url === undefined ? undefined : escapeParentheses(url)
@@ -310,8 +285,7 @@ function listOf(list: Element, context: Rendering): string | undefined {
 
   for (const child of list.children) {
     if (child.localName !== 'li') continue
-    // Tight on purpose: inside an item, a nested list or second paragraph
-    // continues the item rather than opening a new block.
+    // Tight on purpose: a nested list or second paragraph continues the item, not a new block.
     const content = blocks(child, context).join('\n')
     if (!content) continue
     const marker = ordered ? `${items.length + 1}. ` : '- '
@@ -354,11 +328,7 @@ function tableOf(table: Element, context: Rendering): string | undefined {
   return [line(header), line(header.map(() => '---')), ...kept.slice(1).map(line)].join('\n')
 }
 
-/**
- * The TeX behind a normalized `<math>` element. The `$` delimiters belong to
- * the Markdown, so any that appear inside the formula are dropped rather than
- * allowed to end it early.
- */
+/** The `$` delimiters belong to the Markdown, so any inside the formula are dropped rather than ending it early. */
 function texOf(math: Element): string {
   const tex = math.getAttribute('data-latex') ?? math.textContent ?? ''
   return tex.replaceAll('$', '').replace(/\s+/g, ' ').trim()
@@ -371,8 +341,8 @@ function longestBacktickRun(text: string): number {
 }
 
 /**
- * Article text may quote Markdown syntax; it must never speak it. `<` is in
- * the set so text can never round-trip into something tag-shaped either.
+ * Article text may quote Markdown syntax, never speak it. `<` is in the set so
+ * text can never round-trip into something tag-shaped.
  */
 function escapeText(text: string): string {
   return text.replace(/\s+/g, ' ').replace(/[\\`*_[\]|$~<]/g, '\\$&')

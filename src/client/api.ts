@@ -34,18 +34,13 @@ import {
 } from '../shared/api.js'
 
 /**
- * Same-origin JSON calls, validated against the schemas the server answers
- * with. The client never trusts a response shape it has not parsed.
- *
- * Network loss surfaces as a rejected promise, which views render as an
- * explicit unavailable state — the application never pretends to be offline.
+ * Same-origin JSON calls, every response parsed against the shared schemas.
+ * Network loss rejects the promise; views render it as an unavailable state.
  */
 
-/** What the server said went wrong, so a view can say something specific. */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
-  /** Seconds the server asked the User to wait, when it asked at all. */
   readonly retryAfterSeconds: number | undefined
 
   constructor(status: number, code: string, retryAfterSeconds?: number) {
@@ -58,11 +53,8 @@ export class ApiError extends Error {
 }
 
 /**
- * Told whenever the server stops recognising this device.
- *
- * A session can end between one request and the next — it idles out, or the
- * password changes on the other device — and the shell has to notice without
- * every view learning how to handle it.
+ * A session can end between any two requests (idle timeout, password change
+ * elsewhere); the shell handles it once instead of every view.
  */
 type SessionEndedHandler = () => void
 
@@ -77,26 +69,19 @@ export function onSessionEnded(handler: SessionEndedHandler): () => void {
 
 const STATUS_PATH = '/api/auth/status'
 
-/**
- * The code the server uses for "you are not signed in", as opposed to
- * `invalid_credentials`, which is a password the User got wrong while still
- * holding a perfectly good session.
- */
+// "Not signed in" — distinct from `invalid_credentials`, a wrong password
+// while still holding a valid session.
 const UNAUTHENTICATED = 'unauthenticated'
 
-/**
- * No API call is legitimately long-running — even an OPML import records
- * locally and answers — so a stalled server becomes a visible error rather
- * than a silently hung screen.
- */
+// No API call is legitimately long-running (even OPML import records locally
+// and answers), so a stall becomes a visible error, not a hung screen.
 const REQUEST_TIMEOUT_MS = 30_000
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {
     ...init,
     headers: { accept: 'application/json', ...init.headers },
-    // The session cookie is `SameSite=Strict`; this is the same rule stated at
-    // the fetch layer, so the credential can never leave the origin.
+    // Session cookie is `SameSite=Strict`; same rule restated at the fetch layer.
     credentials: 'same-origin',
     signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
@@ -105,8 +90,7 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
 
   const code = await errorCode(response)
 
-  // The status poll asks whether there is a session, so being told there is
-  // not is its answer rather than news.
+  // For the status poll, "unauthenticated" is the answer, not a session ending.
   if (code === UNAUTHENTICATED && path !== STATUS_PATH) sessionEnded?.()
 
   throw new ApiError(response.status, code, retryAfterOf(response))
@@ -132,11 +116,8 @@ export async function claimInstallation(setupSecret: string, password: string): 
   return status(await post('/api/auth/setup', { setupSecret, password, timezone: detectedTimezone() }))
 }
 
-/**
- * The claiming device's own zone, offered once so the installation timezone is
- * detected during setup rather than defaulting to UTC. Absent rather than
- * wrong when the browser cannot say.
- */
+// Offered once at setup so the installation timezone is detected rather than
+// defaulting to UTC; undefined when the browser cannot say.
 function detectedTimezone(): string | undefined {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -167,7 +148,6 @@ export async function importOpml(opml: string): Promise<OpmlImportReport> {
   return opmlImportReportSchema.parse(await response.json())
 }
 
-/** One deliberate repeat retrieval of a Feed — the manual retry action. */
 export async function refreshFeed(feedId: number): Promise<RefreshFeedResponse> {
   const response = await post(`/api/feeds/${feedId}/refresh`, undefined)
   return refreshFeedResponseSchema.parse(await response.json())
@@ -195,39 +175,29 @@ export async function updatePollingInterval(
   return pollingScheduleSchema.parse(await response.json())
 }
 
-/**
- * Withdraws the Subscription. Polling stops and the Feed's items leave the
- * Digest; anything saved stays in the Library with its attribution.
- */
+/** Polling stops and the Feed's items leave the Digest; saved items stay in the Library. */
 export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }
 
-/**
- * One page of the Digest: the top of the chronology, or — given the cursor a
- * previous page ended with — the items that follow it.
- */
 export async function fetchDigest(cursor?: string): Promise<Digest> {
   const response = await request(cursor ? `/api/digest?cursor=${encodeURIComponent(cursor)}` : '/api/digest')
   return digestSchema.parse(await response.json())
 }
 
-/** Retained reading metadata matching the User's words, newest first. */
+/** Searches retained reading metadata only; results newest first. */
 export async function fetchSearchResults(query: string): Promise<SearchResults> {
   const response = await request(`/api/search?q=${encodeURIComponent(query)}`)
   return searchResultsSchema.parse(await response.json())
 }
 
-/** One page of the Library, on the same cursor convention as the Digest. */
+/** Same cursor convention as the Digest. */
 export async function fetchLibrary(cursor?: string): Promise<Library> {
   const response = await request(cursor ? `/api/library?cursor=${encodeURIComponent(cursor)}` : '/api/library')
   return librarySchema.parse(await response.json())
 }
 
-/**
- * Both membership mutations are idempotent on the server, so a repeated tap
- * confirms the state rather than fighting over it.
- */
+// Both membership mutations are idempotent on the server; a repeated tap is safe.
 export async function saveToLibrary(feedItemId: number): Promise<LibraryMembership> {
   const response = await request(`/api/library/${feedItemId}`, { method: 'PUT' })
   return libraryMembershipSchema.parse(await response.json())
@@ -238,16 +208,13 @@ export async function unsaveFromLibrary(feedItemId: number): Promise<LibraryMemb
   return libraryMembershipSchema.parse(await response.json())
 }
 
-/** The Reader header for one Feed Item: identity, membership, what's next. */
 export async function fetchReaderItem(feedItemId: number): Promise<ReaderItem> {
   const response = await request(`/api/items/${feedItemId}`)
   return readerItemSchema.parse(await response.json())
 }
 
-/**
- * The extracted article. A success carries `Cache-Control: private` for a
- * day, so rereading is usually the browser's copy rather than a re-parse.
- */
+// A success carries `Cache-Control: private` for a day, so rereads usually hit
+// the browser cache rather than a re-parse.
 export async function fetchReaderArticle(feedItemId: number): Promise<ReaderArticle> {
   const response = await request(`/api/items/${feedItemId}/reader`)
   return readerArticleSchema.parse(await response.json())

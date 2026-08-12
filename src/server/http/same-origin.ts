@@ -10,17 +10,9 @@ export interface SameOriginOptions {
 }
 
 /**
- * Refuses a state-changing request that did not come from this application.
- *
- * The session cookie is `SameSite=Strict`, which already stops a foreign page
- * from carrying it. This is the second lock: it does not depend on the
- * browser's cookie policy, and it also covers the case that policy has always
- * been weakest at — a same-site but different-origin page.
- *
- * A missing `Origin` is refused rather than waved through. Every caller of
- * this API is a browser making a same-origin `fetch`, and browsers always send
- * `Origin` on these methods; the exception exists only for tools that are not
- * the client.
+ * The second CSRF lock beside the `SameSite=Strict` cookie, covering what
+ * cookie policy is weakest at: a same-site but different-origin page. A
+ * missing `Origin` is refused — browsers always send it on these methods.
  */
 export function sameOrigin(options: SameOriginOptions): MiddlewareHandler {
   return async (c, next) => {
@@ -42,13 +34,9 @@ export function sameOrigin(options: SameOriginOptions): MiddlewareHandler {
 }
 
 /**
- * The scheme this request really arrived over.
- *
- * The socket is plain HTTP behind a TLS-terminating proxy, so the request URL
- * would say `http:` while the browser correctly reports `https:` — comparing
- * them directly would reject every real request. `X-Forwarded-Proto` is what
- * bridges that, and it is only believed on the same terms as the address
- * header it travels with.
+ * Behind the TLS-terminating proxy the request URL says `http:` while the
+ * browser reports `https:`; `X-Forwarded-Proto` bridges that, believed on the
+ * same terms as the address header it travels with.
  */
 function expectedProtocol(
   c: Parameters<MiddlewareHandler>[0],
@@ -61,10 +49,7 @@ function expectedProtocol(
   return forwarded ? `${forwarded.toLowerCase()}:` : new URL(c.req.url).protocol
 }
 
-/**
- * The origin as a URL, or `undefined` when it is not one at all — `Origin:
- * null`, which a sandboxed frame sends, must never match.
- */
+/** `Origin: null` — what a sandboxed frame sends — must never match. */
 function parse(origin: string | undefined): URL | undefined {
   if (!origin) return undefined
   try {

@@ -2,35 +2,27 @@ import type { Logger } from '../logger.js'
 import type { FeedRefresh } from './feed-refresh.js'
 import type { SubscriptionService } from './subscription-service.js'
 
-/** The slice of retention the scheduler drives: one bounded sweep per wake. */
+/** The scheduler drives one bounded retention sweep per wake. */
 export interface RetentionSweeper {
   sweep(): void
 }
 
-/** The scheduler sleeps this long between looks at the due-time frontier. */
 export const WAKE_INTERVAL_MS = 60_000
 
-/** How many due Subscriptions one batch polls, oldest frontier first. */
+/** Batches poll oldest due time first. */
 const DEFAULT_BATCH_LIMIT = 25
 
-/** How many of one batch are in flight at once. */
 const DEFAULT_CONCURRENCY = 4
 
-/**
- * The most batches one wake drains. A poll that cannot record its outcome
- * leaves its Feed due, so without a ceiling a persistence fault would spin
- * the drain loop; at the ceiling the backlog waits for the next wake.
- */
+// A poll that cannot record its outcome leaves its Feed due, so without a
+// ceiling a persistence fault would spin the drain loop.
 const MAX_BATCHES_PER_WAKE = 20
 
 /** Test seam: production always runs with the defaults above. */
 export interface PollSchedulerLimits {
   readonly batchLimit?: number
   readonly concurrency?: number
-  /**
-   * Whether a nudge wakes the scheduler. The test harness turns this off so
-   * every retrieval happens at an explicitly driven wake; production keeps it.
-   */
+  /** The test harness disables nudges so every retrieval happens at an explicitly driven wake. */
   readonly nudges?: boolean
 }
 
@@ -42,18 +34,11 @@ export interface PollSchedulerOptions extends PollSchedulerLimits {
 }
 
 /**
- * Background work inside the one application process: no OS cron, no queue,
- * no second service. Once a minute it asks the persisted due-time frontier
- * what has become due, polls a bounded batch of it, and then runs one bounded
- * retention sweep — after the polls, so this wake's own observations count
- * before anything is judged expired.
- *
- * Because due times are persisted rather than held as timers, work missed
- * during downtime is simply still due at the next wake — catch-up after a
- * restart is the ordinary path, not a special one.
- *
- * Polling goes through `FeedRefresh`, the same door a manual refresh uses, so
- * one Feed is never retrieved twice concurrently no matter who asked.
+ * In-process background work (no cron, no queue). Each wake polls a bounded batch of
+ * the persisted due-time frontier through `FeedRefresh` — so a Feed is never retrieved
+ * twice concurrently — then sweeps retention, after the polls so this wake's
+ * observations count before anything is judged expired. Due times are persisted, not
+ * timers, so restart catch-up is the ordinary path.
  */
 export class PollScheduler {
   readonly #subscriptions: SubscriptionService
@@ -89,19 +74,13 @@ export class PollScheduler {
     this.#timer = undefined
   }
 
-  /**
-   * Asks for a look at the due frontier right away, so a fresh Subscription's
-   * first retrieval starts within moments instead of at the next wake.
-   */
+  /** Checks the due frontier now, so a fresh Subscription's first retrieval doesn't wait out a wake. */
   nudge(): void {
     if (!this.#nudges) return
     void this.tick()
   }
 
-  /**
-   * One wake. A wake that arrives while another is draining joins it and
-   * earns one more drain, rather than compounding the batch bound.
-   */
+  /** A wake arriving while another drains joins it and earns one more drain, not a compounded batch bound. */
   tick(): Promise<void> {
     if (this.#current) {
       this.#nudged = true
@@ -114,17 +93,13 @@ export class PollScheduler {
   }
 
   async #run(): Promise<void> {
-    // A nudge can land anywhere in a run — even during the retention sweep —
-    // and must not be swallowed, or its Subscription waits out a whole wake.
+    // A nudge can land anywhere in a run — even mid-sweep — and must not be swallowed.
     do {
       await this.#drain()
     } while (this.#nudged)
   }
 
-  /**
-   * Drains the frontier batch by batch: a full batch means more is waiting,
-   * so the wake continues at once instead of trickling one batch a minute.
-   */
+  /** A full batch means more is waiting, so the wake continues instead of trickling one batch a minute. */
   async #drain(): Promise<void> {
     try {
       for (let batches = 0; batches < MAX_BATCHES_PER_WAKE; batches += 1) {
@@ -152,7 +127,7 @@ export class PollScheduler {
     }
   }
 
-  /** One Feed's poll; its failure is that Feed's alone, never the batch's. */
+  /** One Feed's poll failure never fails the batch. */
   async #poll(feedId: number): Promise<void> {
     try {
       const outcome = await this.#refresh.refresh(feedId)

@@ -9,9 +9,8 @@ export interface SearchRouteDependencies {
 }
 
 /**
- * Search over retained reading metadata. The query travels as `?q=`, which
- * request logging already omits, so what the User searched for never lands
- * in a log line.
+ * The query travels as `?q=`, which request logging already omits, so what
+ * the User searched for never lands in a log line.
  */
 export function searchRoutes(deps: SearchRouteDependencies): Hono {
   const app = new Hono()

@@ -1,11 +1,6 @@
-/** The one deliberate gesture that extends a list; nothing loads on scroll. */
+/** Paging is a deliberate action; nothing loads on scroll. */
 export type OlderState = 'idle' | 'loading' | 'failed'
 
-/**
- * A paged list's deliberate end: one quiet word that fetches the next page,
- * shown only while an older page exists. When the word is gone, the list is
- * simply over.
- */
 export function OlderItems({
   nextCursor,
   older,
@@ -14,7 +9,7 @@ export function OlderItems({
 }: {
   nextCursor: string | null
   older: OlderState
-  /** What the control calls a page's worth: `items` or `saves`. */
+  /** `items` or `saves`. */
   noun: string
   onLoadOlder: (cursor: string) => void
 }) {

@@ -517,8 +517,8 @@ describe('giving up', () => {
       body: pacedBody([new Uint8Array(8), new Uint8Array(8), new Uint8Array(8)], { gapMs: 25 }),
     }))
 
-    // Every chunk lands after the deadline for answering at all has passed:
-    // this Feed is slow to send, not silent, and the two are not the same.
+    // Every chunk lands after the answer deadline: the Feed is slow to send,
+    // not silent.
     const result = await retrieval.retrieveBytes(
       feedRequest('https://example.com/feed.xml', { timeoutMs: 20, bodyTimeoutMs: 2_000 }),
     )

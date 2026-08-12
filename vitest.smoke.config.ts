@@ -1,10 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-/**
- * Container smoke tests. Separated from `pnpm test` because they build a
- * Docker image and need a daemon; a single build/run cycle is far slower than
- * the whole in-process suite.
- */
+// Excluded from `pnpm test`: needs a Docker daemon and a full image build.
 export default defineConfig({
   test: {
     name: 'smoke',

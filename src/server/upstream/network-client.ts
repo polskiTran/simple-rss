@@ -10,39 +10,24 @@ import { HttpClientError, type HttpClient } from './http-client.js'
 /** Encodings this client can decode, and therefore the only ones it asks for. */
 const ACCEPT_ENCODING = 'gzip, deflate, br'
 
-/** Statuses defined to carry no body, which `Response` refuses to be given one. */
+/** Statuses defined to carry no body; `Response` throws if given one. */
 const BODILESS_STATUSES = new Set([204, 205, 304])
 
 export interface NetworkHttpClientOptions {
-  /**
-   * Which addresses a connection may be opened to. Defaults to the real rule;
-   * tests relax it so they can talk to a loopback origin.
-   */
+  /** Defaults to the real rule; tests relax it to reach a loopback origin. */
   readonly isAllowedAddress?: (address: string) => boolean
   /** Internal test seam for deterministic socket DNS. */
   readonly lookup?: LookupFunction
 }
 
-/**
- * Each protocol agent has a global eight-socket ceiling, including idle
- * keep-alive sockets. Together they can retain at most sixteen sockets.
- */
+/** Global per-protocol socket ceiling, idle keep-alive sockets included. */
 const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 8
 const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
 /**
- * The real outside world.
- *
- * This is deliberately not `fetch`. Two properties matter more than the
- * convenience: the address a socket connects to is checked inside the lookup
- * the connection itself uses, so a name cannot resolve to something acceptable
- * for the check and something private for the connection; and redirects are
- * never followed here, which leaves the hardened boundary above free to
- * validate each hop for itself.
- *
- * Compressed bodies are decoded here so that everything above counts the bytes
- * it will actually hold, and the headers that described the compressed form are
- * dropped rather than left to mislead.
+ * Deliberately not `fetch`: addresses are checked inside the socket's own
+ * lookup, redirects are never followed (the boundary above validates each
+ * hop), and bodies are decoded here so callers count the bytes they hold.
  */
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
@@ -63,8 +48,8 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
       throw new Error(`refusing to retrieve over ${url.protocol}`)
     }
 
-    // An address literal never reaches the resolver, so it is judged here
-    // instead. Everything else is judged inside `lookup`, below.
+    // An address literal never reaches the resolver, so it is judged here;
+    // names are judged inside `lookup`, below.
     const host = unbracket(url.hostname)
     if (isIP(host) !== 0 && !isAllowed(host)) {
       throw new HttpClientError('blocked_destination', 'socket address is not globally reachable')
@@ -105,13 +90,9 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
 }
 
 /**
- * A DNS lookup that only ever hands a connection an address it may use.
- *
- * Validating before connecting is not enough on its own: between the check and
- * the connection a name can start answering differently. Doing the check inside
- * the lookup the socket itself performs closes that window, and refusing the
- * whole name when any of its addresses is unusable stops a name that answers
- * with one public and one private address from being connected to at all.
+ * Checks addresses inside the lookup the socket itself performs, closing the
+ * re-resolution window between check and connect; one refused address refuses
+ * the whole name.
  */
 export function guardedLookup(
   isAllowed: (address: string) => boolean = isPublicAddress,
@@ -145,8 +126,8 @@ export function guardedLookup(
 }
 
 /**
- * Turns Node's response into the web `Response` the boundary above works with,
- * decoding the body and correcting the headers that described its encoded form.
+ * Node response to web `Response`, decoding the body and dropping the headers
+ * that described its encoded form.
  */
 function toResponse(request: Request, response: IncomingMessage): Response {
   const status = response.statusCode ?? 0
@@ -185,8 +166,7 @@ function toResponse(request: Request, response: IncomingMessage): Response {
 
   const headers = new Headers()
   for (const [name, value] of Object.entries(response.headers)) {
-    // Nothing here has a cookie jar, and a `Set-Cookie` that travelled any
-    // further would only be a way to carry state between retrievals.
+    // Set-Cookie is dropped: forwarding it would carry state between retrievals.
     if (value === undefined || name.toLowerCase() === 'set-cookie') continue
     for (const single of Array.isArray(value) ? value : [value]) {
       try {

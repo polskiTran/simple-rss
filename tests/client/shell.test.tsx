@@ -5,11 +5,8 @@ import { App } from '../../src/client/app.js'
 import { ROUTES } from '../../src/client/routing.js'
 import { stubApi } from './stub-api.js'
 
-/**
- * Renders the shell for a User who is already signed in, and waits for the
- * first status answer — the tabs are not furniture until then, because until
- * then the client does not know there is a reader to navigate.
- */
+// Renders the shell for a signed-in User and waits for the first status
+// answer — the tabs do not render until it lands.
 async function renderAt(path: string) {
   window.history.replaceState(null, '', path)
   const result = render(<App />)
@@ -79,9 +76,8 @@ describe('the application shell', () => {
   it('draws the mark as the 4x4 cadence tile of docs/references/brand.png', async () => {
     const { container } = await renderAt('/digest')
 
-    // The pattern is the design, so it is held here rather than left to the
-    // eye: sixteen cells, row by row, in the cadence ramp's levels. The tile
-    // is decoration for a screen reader, which is why it is queried by class.
+    // The pattern is the design: sixteen cells, row by row, in the cadence
+    // ramp's levels. The tile is aria-hidden decoration, hence the class query.
     const levels = [...container.querySelectorAll('.masthead .wordmark-cell')].map((cell) =>
       cell.getAttribute('data-level'),
     )
@@ -93,9 +89,8 @@ describe('the application shell', () => {
   it('orders the hover glint along the tile’s anti-diagonal', async () => {
     const { container } = await renderAt('/digest')
 
-    // `row + col`, so the glint crosses against the leading diagonal the peak
-    // cells sit on. Every cell carries its turn, whether or not the pointer
-    // that would spend it exists.
+    // `row + col`: the glint crosses against the leading diagonal the peak
+    // cells sit on. Every cell carries its step even without a pointer.
     const steps = [...container.querySelectorAll<HTMLElement>('.masthead .wordmark-cell')].map(
       (cell) => cell.style.getPropertyValue('--glint-step'),
     )

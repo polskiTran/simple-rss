@@ -38,11 +38,9 @@ export interface CliContext {
 }
 
 /**
- * Operational commands run through the platform shell — the shape
- * `docs/ARCHITECTURE.md` gives emergency recovery: no HTTP surface, no
- * session, just the mounted volume.
- *
- * Returns the process exit code so tests can drive it without spawning.
+ * Operational commands over the mounted volume — the emergency-recovery shape
+ * in `docs/ARCHITECTURE.md`: no HTTP surface, no Session. Returns the exit
+ * code so tests can drive it without spawning.
  */
 export async function runCli(argv: readonly string[], context: CliContext): Promise<number> {
   const [command, ...rest] = argv
@@ -52,9 +50,8 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
     return command ? 0 : 1
   }
 
-  // The snapshot commands manage database files themselves. Opening the live
-  // path first would create an empty database exactly where `restore` must
-  // refuse to find one and where `backup` must find something real.
+  // Opening the live path first would create an empty database exactly where
+  // `restore` must refuse to find one and `backup` must find something real.
   if (command === 'backup') return backup(rest[0], context)
   if (command === 'restore') return restore(rest[0], context)
 
@@ -102,10 +99,8 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
 }
 
 /**
- * The persistence layer owns the snapshot mechanics; these two commands only
- * turn arguments into paths and outcomes into the stdout report. Neither
- * message can carry a secret — a snapshot failure is about files, never about
- * what the database holds.
+ * Persistence owns the snapshot mechanics. Failure messages are about files,
+ * never about what the database holds.
  */
 function backup(destination: string | undefined, context: CliContext): number {
   if (!destination) {
@@ -145,10 +140,8 @@ function reasonOf(error: unknown): string {
 }
 
 /**
- * The recovery path an installation with one User and no identity provider
- * has to have. It asks for no current password, because whoever can run it
- * already holds the volume — but it does end every session, since an intruder
- * who provoked the reset must not keep the one they already have.
+ * Asks for no current password — whoever runs this holds the volume — but
+ * revokes every Session, so an intruder who provoked the reset keeps nothing.
  */
 async function resetPassword(
   db: SqliteDatabase,
@@ -174,9 +167,8 @@ async function resetPassword(
   const authentication = createAuthentication({
     database: db,
     clock: context.clock,
-    // The audit record goes to stderr, unlike the server's, because stdout is
-    // this command's result channel — an operator (or a test) pipes it into
-    // `jq`, and a log line interleaved with the report would break that.
+    // Audit output goes to stderr: stdout is this command's result channel,
+    // and a log line interleaved with the JSON report would break piping to `jq`.
     logger: context.logger ?? createLogger({ level: context.config.logLevel, stream: process.stderr }),
     setupSecret: context.config.setupSecret,
   })

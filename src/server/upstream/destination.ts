@@ -1,10 +1,7 @@
 import { lookup } from 'node:dns/promises'
 import { classifyAddress, unbracket } from './addresses.js'
 
-/**
- * Turns a hostname into every address it currently answers with. The signal
- * lets bounded adapters stop waiting when the retrieval deadline expires.
- */
+/** The signal lets bounded adapters stop waiting at the retrieval deadline. */
 export type ResolveAddresses = (hostname: string, signal?: AbortSignal) => Promise<readonly string[]>
 
 export interface DestinationPolicy {
@@ -13,11 +10,7 @@ export interface DestinationPolicy {
   readonly self: URL
 }
 
-/**
- * Every address the name currently answers with. All of them are asked for,
- * not just the first, because a name only has to answer with one private
- * address for a connection to reach somewhere it should not.
- */
+/** Asks for every address, not just the first: one private answer must refuse the name. */
 export const systemResolver: ResolveAddresses = async (hostname) => {
   const answers = await lookup(hostname, { all: true, verbatim: true })
   return answers.map((answer) => answer.address)
@@ -44,25 +37,15 @@ export interface RefusedDestination {
 export type DestinationVerdict = AllowedDestination | RefusedDestination
 
 /**
- * Names that never belong to a Feed but do belong to something inside the
- * deployment. Blocking them by name matters because the address behind them is
- * only discovered after a resolver has been asked, and some of them resolve
- * differently on the host than they do here.
+ * Deployment-internal name suffixes, blocked by name: some resolve differently
+ * here than on the host, so the address check alone cannot catch them.
  */
 const BLOCKED_SUFFIXES = ['localhost', 'local', 'internal', 'arpa']
 
 /**
- * Decides whether one URL may be retrieved, before any connection is opened.
- *
- * The checks run cheapest-first and each rejects on its own: the scheme, then
- * credentials, then the name, then — only for a name that survives all of
- * that — the addresses it resolves to. Every address must be public, because a
- * name that answers with one public and one private address is the ordinary
- * shape of a rebinding attempt rather than a coincidence.
- *
- * Redirects are not followed here. Each hop is a separate destination and is
- * validated by a separate call, so a public first hop cannot vouch for a
- * private second one.
+ * Validates one URL before any connection: scheme, credentials, name, then
+ * every resolved address must be public — a mixed answer is the shape of a
+ * rebinding attempt. Each redirect hop is validated by a separate call.
  */
 export async function validateDestination(
   candidate: string | URL,
@@ -97,8 +80,7 @@ export async function validateDestination(
     return { ok: false, code: 'blocked_destination', reason: 'local network name' }
   }
 
-  // An address literal is its own answer; asking a resolver about it would
-  // only add a way to be lied to.
+  // An address literal is its own answer; a resolver could only lie about it.
   const literal = classifyAddress(hostname)
   if (literal !== 'invalid') {
     return literal === 'public'
@@ -130,11 +112,7 @@ export async function validateDestination(
   return { ok: true, url, hostname, addresses }
 }
 
-/**
- * `URL` already lowercases a hostname and brackets an IPv6 literal. A trailing
- * dot is left alone, though, and `example.com.` must not slip past a rule
- * written for `example.com`.
- */
+/** `URL` leaves a trailing dot alone; `example.com.` must not slip past a rule for `example.com`. */
 function normaliseHostname(hostname: string): string {
   const host = unbracket(hostname)
   return host.endsWith('.') ? host.slice(0, -1) : host
@@ -144,11 +122,7 @@ function isBlockedName(hostname: string): boolean {
   return BLOCKED_SUFFIXES.some((suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`))
 }
 
-/**
- * Scheme is deliberately ignored because the public proxy may answer HTTPS
- * outside and HTTP inside. Hostnames are canonicalized before comparison so a
- * trailing DNS root dot cannot disguise the same installation.
- */
+/** Scheme is deliberately ignored: the public proxy may answer HTTPS outside and HTTP inside. */
 function isSelf(url: URL, self: URL): boolean {
   return (
     normaliseHostname(url.hostname) === normaliseHostname(self.hostname) &&

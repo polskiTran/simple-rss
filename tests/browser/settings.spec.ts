@@ -1,10 +1,7 @@
 import { expect, expectNoHorizontalOverflow, SETUP_SECRET, test, USER_PASSWORD } from './installation.js'
 
-/**
- * The timezone select is the one control in the system sized by its content,
- * and its content is every zone the runtime knows. Only a real browser lays
- * that out, so the width it settles on is asserted here rather than in jsdom.
- */
+// The timezone select is the one control sized by its content — every zone the
+// runtime knows. Only a real browser lays that out, hence the assertion here, not jsdom.
 test.describe('Settings at phone width', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 

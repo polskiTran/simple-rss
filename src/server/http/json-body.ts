@@ -4,11 +4,8 @@ import type { z } from 'zod'
 export type BodyResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly response: Response }
 
 /**
- * Reads and validates a JSON request body, answering `400` itself when the
- * body is not what the route agreed to accept.
- *
- * The failure message names fields and constraints and never the values that
- * failed them — one of the routes using this carries the User's password.
+ * Validates a JSON body, answering `400` itself. Failure messages name fields
+ * and constraints, never values — one route through here carries the password.
  */
 export async function readJsonBody<T>(c: Context, schema: z.ZodType<T>): Promise<BodyResult<T>> {
   let raw: unknown

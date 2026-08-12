@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-/**
- * The four places the User can be. They are fixed and always in this order —
- * `docs/DESIGN.md` treats the tab bar as furniture that never moves, so the
- * route list and the navigation are the same list.
- */
+// The tab bar renders this list verbatim; `docs/DESIGN.md` fixes its order.
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
 export type Route = (typeof ROUTES)[number]
 
@@ -14,16 +10,13 @@ export function pathOf(route: Route): string {
   return `/${route}`
 }
 
-/**
- * Reads a route out of a URL path. Anything unrecognised — including `/` —
- * lands on the Digest, so a stale link opens the reader rather than an error.
- */
+// Anything unrecognised — including `/` — lands on the Digest, so a stale
+// link opens the reader rather than an error.
 export function routeOf(pathname: string): Route {
   const first = pathname.split('/').filter(Boolean)[0]
   return ROUTES.find((route) => route === first) ?? DEFAULT_ROUTE
 }
 
-/** The one nested place: `/feeds/7` is the Feeds tab with one Feed open. */
 export function feedPathOf(feedId: number): string {
   return `/feeds/${feedId}`
 }
@@ -32,10 +25,7 @@ export function feedIdOf(pathname: string): number | undefined {
   return nestedIdOf(pathname, 'feeds')
 }
 
-/**
- * `/reader/42` is one Feed Item open for reading. It sits outside the four
- * tabs and borrows the section it was opened from.
- */
+// The Reader sits outside the four tabs and borrows the section it was opened from.
 export function readerPathOf(feedItemId: number): string {
   return `/reader/${feedItemId}`
 }
@@ -52,9 +42,8 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
 }
 
 /**
- * The way back out of a nested screen: where it leads, what it is called, and
- * the way back out of *that* screen. Kept in history state, so it survives
- * back, forward and reload.
+ * The way back out of a nested screen, recursively. Kept in history state, so
+ * it survives back, forward and reload.
  */
 export interface Origin {
   readonly path: string
@@ -71,7 +60,7 @@ export function feedOrigin(feedId: number, title: string, from: Origin | undefin
   return { path: feedPathOf(feedId), label: title, from }
 }
 
-/** Labelled `article`, never the item's title: a way back is one short word. */
+/** Labelled `article`, never the item's title: a way back stays one short word. */
 export function readerOrigin(feedItemId: number, from: Origin | undefined): Origin {
   return { path: readerPathOf(feedItemId), label: 'article', from }
 }
@@ -79,12 +68,11 @@ export function readerOrigin(feedItemId: number, from: Origin | undefined): Orig
 /** Trail depth cap, so walking in circles cannot grow history state forever. */
 const MAX_TRAIL = 6
 
-/** Parses untrusted history state, and normalises a trail before storing it. */
+// History state is untrusted input; validate and depth-cap it.
 function trailOf(value: unknown, depth = 0): Origin | undefined {
   if (depth >= MAX_TRAIL || typeof value !== 'object' || value === null) return undefined
   const { path, label, from } = value as Record<string, unknown>
-  // This application's own addresses only: a crafted entry must not turn a
-  // way back into a link elsewhere.
+  // Own addresses only: a crafted entry must not turn a way back into a link elsewhere.
   if (typeof path !== 'string' || !/^\/[a-z]+(\/[1-9]\d*)?$/.test(path)) return undefined
   if (typeof label !== 'string' || label === '') return undefined
   return { path, label, from: trailOf(from, depth + 1) }
@@ -92,9 +80,7 @@ function trailOf(value: unknown, depth = 0): Origin | undefined {
 
 export interface Navigation {
   readonly route: Route
-  /** Set while one Feed is open inside the Feeds tab. */
   readonly feedId: number | undefined
-  /** Set while one Feed Item is open in the Reader. */
   readonly readerItemId: number | undefined
   /** Set while a nested screen is open. */
   readonly origin: Origin | undefined
@@ -111,10 +97,8 @@ interface Location {
   readonly origin: Origin | undefined
 }
 
-/**
- * A history-backed router in place of a routing library. Four sibling views
- * with one nested Feed do not justify the dependency.
- */
+// Hand-rolled history router: four sibling views with one nested Feed do not
+// justify a routing library.
 export function useNavigation(): Navigation {
   const [location, setLocation] = useState<Location>(() => currentLocation())
 
@@ -124,11 +108,8 @@ export function useNavigation(): Navigation {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  /**
-   * A way back is pushed like any other move rather than calling
-   * `history.back()`: after `next in the digest` the previous entry is the
-   * previous article, not the Digest the label promises.
-   */
+  // A way back is pushed, not `history.back()`: after reading on, the
+  // previous entry is the previous article, not the screen the label promises.
   const go = useCallback((path: string, from: Origin | undefined) => {
     const origin = trailOf(from)
     const state = origin ? { origin } : null
@@ -155,8 +136,8 @@ function currentLocation(): Location {
 
 function locationOf(pathname: string, origin: Origin | undefined): Location {
   const readerItemId = readerItemIdOf(pathname)
-  // The Reader has no section of its own, so it borrows its origin's: the tab,
-  // the way back and the screen underneath then all name the same one.
+  // The Reader borrows its origin's section, so the tab, the way back, and
+  // the screen underneath all name the same one.
   const route = readerItemId !== undefined && origin ? routeOf(origin.path) : routeOf(pathname)
   return { route, feedId: feedIdOf(pathname), readerItemId, origin }
 }

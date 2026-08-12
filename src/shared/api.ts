@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
 /**
- * The contract between the client and the server. Both sides import these
- * schemas, so a route and its caller cannot drift apart silently.
+ * The client/server contract. Both sides import these schemas, so a route and
+ * its caller cannot drift apart silently.
  */
 
 export const livenessSchema = z.object({
@@ -16,10 +16,7 @@ export const readinessSchema = z.discriminatedUnion('status', [
 ])
 export type Readiness = z.infer<typeof readinessSchema>
 
-/**
- * Deliberately free of User data: it answers "which build is running" for
- * upgrades and smoke tests, and nothing else.
- */
+// Deliberately free of User data: it answers "which build is running" and nothing else.
 export const serviceMetaSchema = z.object({
   name: z.literal('simple-rss'),
   version: z.string(),
@@ -34,12 +31,8 @@ export const apiErrorSchema = z.object({
 })
 export type ApiError = z.infer<typeof apiErrorSchema>
 
-/**
- * The shortest password the User may choose. There is one User and no
- * password reset by email, so length is the whole policy: no character
- * classes, no expiry, nothing that pushes someone toward a worse password
- * they will write down.
- */
+// Length is the whole policy: no character classes, no expiry, nothing that
+// pushes someone toward a worse password they will write down.
 export const MIN_PASSWORD_LENGTH = 12
 
 /** Bound the work handed to Argon2 after UTF-8 encoding. */
@@ -54,50 +47,35 @@ export const newPasswordSchema = z
     message: `Password must be at most ${MAX_PASSWORD_BYTES} UTF-8 bytes`,
   })
 
-/**
- * Deliberately looser than `newPasswordSchema`. Validating a presented
- * password against the creation policy would reveal more than a generic
- * credential failure, but the same resource bounds still apply.
- */
+// Deliberately looser than `newPasswordSchema`: validating against the
+// creation policy would reveal it on login. The resource bounds still apply.
 const presentedPasswordSchema = z
   .string()
   .min(1)
   .max(MAX_PASSWORD_LENGTH)
   .refine((password) => utf8ByteLength(password) <= MAX_PASSWORD_BYTES)
 
-/**
- * What the client needs to decide between the setup screen, the login screen,
- * and the reader. Says nothing else about the installation.
- */
+// Only what decides between setup, login, and the reader; nothing else about
+// the installation.
 export const authStatusSchema = z.object({
   claimed: z.boolean(),
   authenticated: z.boolean(),
 })
 export type AuthStatus = z.infer<typeof authStatusSchema>
 
-/**
- * An IANA zone name as a request carries it. Whether the runtime can actually
- * resolve it is the server's question, not a shape the schema can state.
- */
+// Shape only; whether the runtime can resolve the zone is the server's check.
 const timezoneNameSchema = z.string().min(1).max(100)
 
 export const claimRequestSchema = z.object({
   setupSecret: z.string().min(1).max(1024),
   password: newPasswordSchema,
-  /**
-   * The claiming browser's own zone, offered so the installation timezone is
-   * detected during setup rather than defaulting to UTC. Optional: a claim
-   * must never fail over a calendar preference.
-   */
+  /** Optional: a claim must never fail over a calendar preference. */
   timezone: timezoneNameSchema.optional(),
 })
 export type ClaimRequest = z.infer<typeof claimRequestSchema>
 
-/**
- * The User-editable installation preferences behind the Settings sheet. One
- * timezone for the whole installation, so the Digest's calendar groups agree
- * across the User's devices.
- */
+// One timezone for the whole installation, so the Digest's calendar groups
+// agree across the User's devices.
 export const installationPreferencesSchema = z.object({
   timezone: z.string(),
 })
@@ -119,10 +97,8 @@ export const passwordChangeRequestSchema = z.object({
 })
 export type PasswordChangeRequest = z.infer<typeof passwordChangeRequestSchema>
 
-/**
- * The Polling Interval presets, in minutes. A Subscription is only ever one of
- * these; there is no free-form schedule to tune or to get wrong.
- */
+// In minutes. A Subscription is always exactly one preset; there is no
+// free-form schedule to tune or to get wrong.
 export const POLLING_INTERVAL_PRESETS = [30, 60, 120, 360, 720, 1440] as const
 export type PollingIntervalMinutes = (typeof POLLING_INTERVAL_PRESETS)[number]
 
@@ -142,7 +118,6 @@ export const updatePollingIntervalRequestSchema = z.object({
 })
 export type UpdatePollingIntervalRequest = z.infer<typeof updatePollingIntervalRequestSchema>
 
-/** One Subscription's schedule: its preset and when it next becomes due. */
 export const pollingScheduleSchema = z.object({
   pollingIntervalMinutes: pollingIntervalMinutesSchema,
   nextPollAt: z.string(),
@@ -164,31 +139,24 @@ export const createSubscriptionRequestSchema = z.object({
 })
 export type CreateSubscriptionRequest = z.infer<typeof createSubscriptionRequestSchema>
 
-/**
- * The largest decoded Feed document a retrieval will accept, in MiB. It lives
- * in the shared contract because both sides say it out loud: the server owns
- * the ceiling, and the client tells the User the number they just exceeded.
- */
+// Shared because both sides say the number: the server owns the ceiling, the
+// client tells the User the number they just exceeded.
 export const MAX_FEED_SIZE_MIB = 20
 
 /** The largest OPML upload one import accepts, in UTF-16 code units. */
 export const MAX_OPML_LENGTH = 1_048_576
 
-/** One uploaded OPML document, carried as text inside the usual JSON body. */
 export const importOpmlRequestSchema = z.object({
   opml: z.string().min(1).max(MAX_OPML_LENGTH),
 })
 export type ImportOpmlRequest = z.infer<typeof importOpmlRequestSchema>
 
-/**
- * What one import did. Recording is local, so the report can only speak of
- * Subscriptions: whether each listed Feed answers is Feed Availability's
- * story, told on the Feeds list as the first retrievals land.
- */
+// Recording is local, so the report speaks only of Subscriptions; whether
+// each listed Feed answers is Feed Availability's story.
 export const opmlImportReportSchema = z.object({
   added: z.number().int().nonnegative(),
   alreadySubscribed: z.number().int().nonnegative(),
-  /** Outline URLs that could not become Subscriptions, as the file wrote them. */
+  /** Outline URLs that could not become Subscriptions, verbatim from the file. */
   unusable: z.array(z.string()),
 })
 export type OpmlImportReport = z.infer<typeof opmlImportReportSchema>
@@ -205,11 +173,8 @@ export type FeedSummary = z.infer<typeof feedSummarySchema>
 /** Consecutive failures before Feed Availability is surfaced to the User. */
 export const FEED_UNAVAILABLE_AFTER_FAILURES = 3
 
-/**
- * The safe vocabulary for why a poll failed. Categories are deliberately
- * coarse: enough to tell a timeout from an oversized Feed from a publisher
- * error, never enough to carry a URL, a header, or response content.
- */
+// Deliberately coarse: enough to tell failures apart, never enough to carry
+// a URL, a header, or response content.
 export const feedAvailabilityCategorySchema = z.enum([
   'unreachable',
   'timeout',
@@ -220,12 +185,9 @@ export const feedAvailabilityCategorySchema = z.enum([
 ])
 export type FeedAvailabilityCategory = z.infer<typeof feedAvailabilityCategorySchema>
 
-/**
- * A calm summary of a Subscription's recent retrieval outcome. `unchecked` is
- * a Subscription no retrieval has succeeded for yet; `unavailable` begins at
- * `FEED_UNAVAILABLE_AFTER_FAILURES` failures in a row; a quiet Feed that
- * simply publishes nothing stays `available`.
- */
+// `unchecked`: no retrieval has succeeded yet. `unavailable` begins at
+// `FEED_UNAVAILABLE_AFTER_FAILURES` in a row; a Feed that simply publishes
+// nothing stays `available`.
 export const feedAvailabilitySchema = z.object({
   state: z.enum(['unchecked', 'available', 'unavailable']),
   lastCheckedAt: z.string().nullable(),
@@ -242,10 +204,8 @@ export const subscriptionSummarySchema = feedSummarySchema.extend({
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
 
-/**
- * The recorded Subscription, unchecked. Its first retrieval is scheduler
- * work (ADR 0007), so the response cannot speak of items or reachability.
- */
+// The Subscription comes back unchecked: its first retrieval is scheduler
+// work (ADR 0007), so the response cannot speak of items or reachability.
 export const createSubscriptionResponseSchema = z.object({
   subscription: subscriptionSummarySchema,
 })
@@ -261,21 +221,17 @@ export const refreshFeedResponseSchema = z.object({
 })
 export type RefreshFeedResponse = z.infer<typeof refreshFeedResponseSchema>
 
-/** How much history the opened Feed's cadence grid draws, in week columns. */
 export const CADENCE_GRID_WEEKS = 26
 
-/** One observed day of a Feed's publishing rhythm, in the installation timezone. */
+/** Days are in the installation timezone. */
 export const cadenceObservationSchema = z.object({
   date: z.string(),
   count: z.number().int().nonnegative(),
 })
 export type CadenceObservation = z.infer<typeof cadenceObservationSchema>
 
-/**
- * One retained Feed Item inside its own Feed, where the source label would be
- * redundant. `date` is the installation-timezone day the cadence grid jumps
- * to; `displayDate` is the same day said the way the meta row says it.
- */
+// `date` is the installation-timezone day the cadence grid jumps to;
+// `displayDate` is the same day in the meta row's format.
 export const feedItemRowSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -288,12 +244,8 @@ export const feedItemRowSchema = z.object({
 })
 export type FeedItemRow = z.infer<typeof feedItemRowSchema>
 
-/**
- * One opened Feed: identity, retained Feed Items, the cadence observations
- * behind the grid, and the polling behaviour the User manages there.
- * `cadence` runs oldest to newest from the first day of the grid window
- * through today, so a fixed dataset always draws the same grid.
- */
+// `cadence` runs oldest to newest from the grid window's first day through
+// today, so a fixed dataset always draws the same grid.
 export const feedDetailSchema = feedSummarySchema.extend({
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
@@ -331,20 +283,17 @@ export const digestSchema = z.object({
     volume: z.number().int().nonnegative(),
   }),
   /**
-   * One page of the chronology. A page may end mid-day; the next page repeats
-   * that day's `date` and the client joins the two halves of the group.
+   * A page may end mid-day; the next page repeats that day's `date` and the
+   * client merges the group.
    */
   groups: z.array(digestGroupSchema),
-  /** Where the next page begins — opaque — or null at the very end. */
+  /** Opaque cursor; null at the very end. */
   nextCursor: z.string().nullable(),
 })
 export type Digest = z.infer<typeof digestSchema>
 
-/**
- * One Feed Item the User explicitly saved, carrying its Feed attribution so
- * a save outlives the Digest and, later, the Subscription itself. `displayDate`
- * is the day said the way the meta row says it, like an opened Feed's items.
- */
+// Carries its Feed attribution so a save outlives the Digest and, later, the
+// Subscription itself.
 export const libraryItemSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -361,23 +310,19 @@ export const libraryItemSchema = z.object({
 export type LibraryItem = z.infer<typeof libraryItemSchema>
 
 export const librarySchema = z.object({
-  /** One page of saves, newest first in the Digest's own chronology. */
+  /** Newest first, in the Digest's own chronology. */
   items: z.array(libraryItemSchema),
-  /** Where the next page begins — opaque — or null at the very end. */
+  /** Opaque cursor; null at the very end. */
   nextCursor: z.string().nullable(),
 })
 export type Library = z.infer<typeof librarySchema>
 
-/** The longest search line one request carries; typing never nears it. */
+// A resource bound, not a UX limit; typing never nears it.
 export const MAX_SEARCH_QUERY_LENGTH = 256
 
 export const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)
 
-/**
- * One Feed Item a search found: enough to recognize it — title, Feed, date,
- * saved state — and to open it through the normal Reader navigation. There is
- * deliberately no rank or score; matches sit in Digest chronology.
- */
+// Deliberately no rank or score; matches sit in Digest chronology.
 export const searchResultSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -385,7 +330,6 @@ export const searchResultSchema = z.object({
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  /** The day said the way the meta row says it, like Library items. */
   displayDate: z.string(),
   saved: z.boolean(),
 })
@@ -402,11 +346,9 @@ export const READER_CACHE_SECONDS = 86_400
 /** How long a browser may keep a successfully proxied image, privately. */
 export const IMAGE_CACHE_SECONDS = 7 * 86_400
 
-/**
- * The one same-origin route Reader image references are rewritten to during
- * extraction. The client renders no image from anywhere else, which is what
- * lets the CSP keep `img-src` free of publisher origins.
- */
+// Extraction rewrites every Reader image reference to this same-origin route;
+// the client renders no image from anywhere else, which keeps the CSP's
+// `img-src` free of publisher origins.
 export const READER_IMAGE_PATH = '/api/reader/image'
 
 /** The Feed Item that follows in Digest order, so reading never dead-ends. */
@@ -418,11 +360,8 @@ export const readerNextSchema = z.object({
 })
 export type ReaderNext = z.infer<typeof readerNextSchema>
 
-/**
- * One Feed Item as the Reader's header and fallback need it. Kept apart from
- * the extracted article, which the browser may cache for a day: membership
- * and what comes next must always be the server's current answer.
- */
+// Kept apart from the extracted article, which the browser may cache for a
+// day: membership and what comes next must be the server's current answer.
 export const readerItemSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -431,7 +370,6 @@ export const readerItemSchema = z.object({
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  /** The day said the way the Reader header says it: `tuesday, 5 august`. */
   displayDate: z.string(),
   summary: z.string().nullable(),
   saved: z.boolean(),
@@ -439,10 +377,8 @@ export const readerItemSchema = z.object({
 })
 export type ReaderItem = z.infer<typeof readerItemSchema>
 
-/**
- * A temporary Reader rendering. Markdown generated by the server's allowlist,
- * never stored — losing it costs one re-extraction, never the Feed Item.
- */
+// Markdown from the server's allowlist, never stored — losing it costs one
+// re-extraction, never the Feed Item.
 export const readerArticleSchema = z.object({
   feedItemId: z.number().int().positive(),
   markdown: z.string(),
@@ -450,11 +386,8 @@ export const readerArticleSchema = z.object({
 })
 export type ReaderArticle = z.infer<typeof readerArticleSchema>
 
-/**
- * Whether one Feed Item is in the Library — what both mutations answer, so a
- * repeated save and an unsave of the already-unsaved describe the same state
- * instead of an error.
- */
+// Both mutations answer with this, so a repeated save or an unsave of the
+// already-unsaved describes the same state instead of an error.
 export const libraryMembershipSchema = z.object({
   feedItemId: z.number().int().positive(),
   saved: z.boolean(),

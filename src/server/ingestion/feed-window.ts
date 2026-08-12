@@ -7,12 +7,9 @@ type EmptySchema = Record<string, never>
 export type DatabaseTransaction = BetterSQLiteTransaction<EmptySchema, ExtractTablesWithRelations<EmptySchema>>
 
 /**
- * Persists one retrieved Feed Window: corrects the Feed's own metadata and
- * upserts every Feed Item under the identity `parseFeedDocument` assigned.
- *
- * Returns false — writing nothing — when the Subscription is gone by the time
- * the retrieval lands. Unsubscribing takes effect immediately, so a poll that
- * was already in flight must not resurrect what the User let go of.
+ * Returns false — writing nothing — when the Subscription is gone by the time the
+ * retrieval lands: unsubscribing takes effect immediately, and an in-flight poll
+ * must not resurrect what the User let go of.
  */
 export function persistFeedWindow(
   db: BetterSQLite3Database,
@@ -21,9 +18,8 @@ export function persistFeedWindow(
     parsed: ParsedFeedDocument
     resolvedUrl: string
     /**
-     * Validators from this retrieval, stored verbatim — including their
-     * absence, so a stale `ETag` is never replayed after a publisher stops
-     * sending one.
+     * Stored verbatim, including absence, so a stale `ETag` is never replayed
+     * after a publisher stops sending one.
      */
     validators: { etag: string | null; lastModified: string | null }
     now: string
@@ -65,10 +61,7 @@ export function persistFeedWindow(
   })
 }
 
-/**
- * Re-ingesting an identified item corrects its mutable metadata while its
- * identity, first-seen time, and any Library membership stay untouched.
- */
+/** Re-ingestion corrects mutable metadata; identity, first-seen time, and Library membership stay untouched. */
 export function upsertFeedItem(tx: DatabaseTransaction, feedId: number, item: NormalizedFeedItem, now: string): void {
   tx.insert(feedItems)
     .values({

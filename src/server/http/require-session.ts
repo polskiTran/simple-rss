@@ -11,12 +11,9 @@ export interface RequireSessionOptions {
 }
 
 /**
- * Closes the API to anyone who is not the User.
- *
- * This is the whole access model: one door, in front of everything except the
- * handful of routes that exist to get through it. An unclaimed installation
- * therefore exposes nothing but setup and health, because no session can exist
- * before there is a User to issue one to.
+ * The whole access model: one guard in front of everything except the routes
+ * that exist to get through it. An unclaimed installation therefore exposes
+ * nothing but setup and health.
  */
 export function requireSession(options: RequireSessionOptions): MiddlewareHandler {
   return async (c, next) => {

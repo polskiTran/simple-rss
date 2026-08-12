@@ -8,7 +8,6 @@ import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/sc
 import { chronologyTime, dateKey, dayAfter, dayBefore, dayStartUtc, inDigestOrder, timeLabel } from './chronology.js'
 import { beyondCursorSql, chronologySql, LIST_PAGE_SIZE, nextListCursor, type ListCursor } from './list-page.js'
 
-/** Chronology and installation-timezone date grouping for the User's Digest. */
 export class DigestService {
   readonly #db: BetterSQLite3Database
   readonly #clock: Clock
@@ -20,7 +19,6 @@ export class DigestService {
     this.#settings = options.settings
   }
 
-  /** One page of the Digest, from the top or resumed from a cursor. */
   read(cursor?: ListCursor): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
@@ -78,10 +76,7 @@ export class DigestService {
     }
   }
 
-  /**
-   * How many Feed Items today holds in total. Counted on its own because the
-   * page may end mid-today, and the daily band speaks for the whole day.
-   */
+  /** Counted separately: the page may end mid-today, and the daily band speaks for the whole day. */
   #todayVolume(chronology: SQL, today: string, timezone: string): number {
     const start = dayStartUtc(today, timezone).toISOString()
     const end = dayStartUtc(dayAfter(today), timezone).toISOString()
@@ -95,12 +90,8 @@ export class DigestService {
   }
 
   /**
-   * The Feed Item that follows one item in this chronology — what the Reader
-   * says under `next in the digest`. Answered here so the Reader and the
-   * Digest can never disagree about the order: the item's own chronology
-   * becomes a cursor, and the follower is whatever a page starting there
-   * would show first — however many pages away that is. `undefined` when the
-   * item is last, or is not in the Digest at all.
+   * The Feed Item after this one in Digest order — answered here so the Reader and
+   * the Digest can never disagree. `undefined` when the item is last, or not in the Digest.
    */
   after(feedItemId: number): DigestItem | undefined {
     const timezone = this.#settings.effectiveTimezone()
@@ -170,8 +161,7 @@ function digestItemOf(row: DigestRow, instant: Date, timezone: string): DigestIt
     link: row.link,
     publishedAt: row.publishedAt,
     displayTime: timeLabel(instant, timezone),
-    // The publisher's URL stays server-side; the client only ever hears
-    // about the same-origin proxy route for this item.
+    // The publisher's URL stays server-side; the client only hears the same-origin proxy route.
     imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
     summary: row.summary,
     firstSeenAt: row.firstSeenAt,

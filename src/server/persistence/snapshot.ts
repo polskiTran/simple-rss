@@ -5,15 +5,8 @@ import { rebuildSearchIndex } from '../search/search-service.js'
 import { assertWritable, openDatabase, type SqliteDatabase } from './database.js'
 import { applyMigrations } from './migrations.js'
 
-/**
- * The snapshot side of persistence: writing an application-consistent copy of
- * the live database, and initializing a fresh data directory from one.
- *
- * Both operations stage their work under a temporary name and rename into
- * place only once every step has passed, so a file at the final path is
- * always a finished artifact. Every failure throws with an operator-readable
- * reason after the staging files are removed.
- */
+// Both operations stage under a temporary name and rename into place only once every
+// step has passed, so a file at the final path is always a finished artifact.
 
 /** Files SQLite may hold beside a database, which travel or block as a set. */
 function sidecarsOf(path: string): string[] {
@@ -21,13 +14,9 @@ function sidecarsOf(path: string): string[] {
 }
 
 /**
- * Writes a snapshot of the database at `source` to `destination`. `VACUUM
- * INTO` produces a compacted, transaction-consistent copy even while the WAL
- * is active, which is what makes this safe where a raw file copy of an open
- * database is not.
- *
- * An existing destination is never overwritten, because the backup an
- * operator is replacing is the one they need if this run fails.
+ * `VACUUM INTO` produces a compacted, transaction-consistent copy even while the WAL is
+ * active — safe where a raw file copy of an open database is not. An existing destination
+ * is never overwritten: the backup being replaced is the one needed if this run fails.
  */
 export function writeSnapshot(source: string, destination: string): { bytes: number } {
   if (!existsSync(source)) {
@@ -71,15 +60,10 @@ export interface RestoreReport {
 }
 
 /**
- * Initializes an empty data directory from a snapshot. All verification —
- * integrity, migrations, the derived search rebuild, a real write — happens
- * on a staging copy that is renamed to `databasePath` only after everything
- * passed, so a failed restore leaves the directory uninitialized and the
- * service unready rather than serving half a database.
- *
- * Migrations run here so a backup taken on an older release comes forward to
- * the schema this build serves; the FTS index is rebuilt rather than trusted,
- * because derived state is this installation's to derive.
+ * All verification — integrity, migrations, the search rebuild, a real write — happens
+ * on a staging copy renamed into place only after everything passed, so a failed restore
+ * leaves the directory uninitialized. Migrations bring an older backup forward; the FTS
+ * index is rebuilt rather than trusted, because derived state is this installation's to derive.
  */
 export function restoreSnapshot(backupPath: string, databasePath: string, clock: Clock): RestoreReport {
   if (!existsSync(backupPath)) {
@@ -127,9 +111,8 @@ export function restoreSnapshot(backupPath: string, databasePath: string, clock:
       db.close()
     }
 
-    // Closing checkpoints the WAL and removes the sidecars. If one survived,
-    // renaming the main file alone would silently shed the migrations and
-    // rebuilt index committed above — so a leftover fails the restore instead.
+    // Closing checkpoints the WAL and removes the sidecars. A survivor means renaming
+    // the main file alone would silently shed the work committed above, so it fails the restore.
     for (const sidecar of sidecarsOf(staging)) {
       if (existsSync(sidecar)) {
         throw new Error('the staging copy left WAL sidecars behind')

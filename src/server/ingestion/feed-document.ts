@@ -36,9 +36,8 @@ export class FeedDocumentError extends Error {
 }
 
 /**
- * Turns untrusted RSS or Atom bytes into the bounded metadata Simple RSS keeps.
- * XML declarations able to introduce external entities are rejected before
- * parsing; publisher HTML is converted to plain text and never leaves here.
+ * XML declarations able to introduce external entities are rejected before parsing;
+ * publisher HTML is converted to plain text and never leaves here.
  */
 export function parseFeedDocument(bytes: Uint8Array, resolvedUrl: string): ParsedFeedDocument {
   const xml = decodeXml(bytes)
@@ -130,9 +129,8 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
   const imageUrl = normalizeHttpUrl(imageOf(record, atom), baseUrl)
   const guid = plainValue(recordField(record, atom ? ['id', 'atom:id'] : ['guid']))
 
-  // The content fingerprint deliberately leaves the summary out: it is the
-  // field publishers correct most, and hashing it would turn every correction
-  // into a new identity instead of an update to the existing Feed Item.
+  // The content fingerprint leaves the summary out: publishers correct it most, and
+  // hashing it would turn every correction into a new identity instead of an update.
   const identity = guid
     ? { kind: 'guid' as const, key: `guid:${guid}` }
     : link
@@ -218,9 +216,8 @@ function boundedPlainText(value: unknown, limit: number): string | null {
   const raw = plainValue(value)
   if (!raw) return null
 
-  // Stop nodes arrive raw. CDATA already wraps literal markup, but outside it
-  // the XML entities are still encoded — `&lt;p&gt;` is markup to interpret,
-  // not text — so they get one decode before the HTML-to-text pass.
+  // Stop nodes arrive raw. CDATA already wraps literal markup; outside it, XML entities
+  // are still encoded — `&lt;p&gt;` is markup to interpret — so decode once before the HTML-to-text pass.
   const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(raw)
   const source = cdata ? cdata[1]! : decodeXmlEntities(raw)
 

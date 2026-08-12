@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from '../persistence/database.js'
 import { userAuth, sessions } from '../persistence/schema.js'
 
-/** The one row's fixed identity — an installation has exactly one User. */
+/** An installation has exactly one User. */
 const SINGLETON_ID = 1
 
 export interface UserAuthRecord {
@@ -13,10 +13,7 @@ export interface UserAuthRecord {
   readonly updatedAt: string
 }
 
-/**
- * The User's password verifier, and therefore the answer to whether this
- * installation has been claimed at all: the row exists only after setup.
- */
+/** The row exists only after setup, so its existence answers whether the installation is claimed. */
 export class UserAuthStore {
   readonly #db: BetterSQLite3Database
 
@@ -44,13 +41,8 @@ export class UserAuthStore {
   }
 
   /**
-   * Installs the first verifier, reporting whether this call is the one that
-   * claimed the installation.
-   *
-   * Two requests can present a valid setup secret at the same time, and both
-   * will have finished hashing before either writes. The decision is therefore
-   * left to SQLite: the insert either creates the singleton row or does
-   * nothing, so exactly one caller can ever be told it won.
+   * Two racing claims both finish hashing before either writes, so SQLite decides: the
+   * insert creates the singleton row or does nothing, and exactly one caller is told it won.
    */
   claim(passwordHash: string, now: Date): boolean {
     const at = now.toISOString()
@@ -65,9 +57,8 @@ export class UserAuthStore {
   }
 
   /**
-   * Replaces a verified current password and revokes every session in the same
-   * transaction. If another request or recovery command rotated the verifier
-   * while Argon2 was running, the stale password cannot overwrite it.
+   * Replaces the verified current password and revokes every session in one transaction.
+   * A verifier rotated while Argon2 ran cannot be overwritten by the stale password.
    */
   changePassword(expectedHash: string, passwordHash: string, now: Date): number | undefined {
     const at = now.toISOString()

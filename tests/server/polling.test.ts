@@ -162,7 +162,7 @@ describe('background polling', () => {
       .all()
     expect(items).toEqual([{ title: 'First light', lastObservedAt: START }])
 
-    // Scheduling still moved on, and said so calmly.
+    // Scheduling still advanced, and logged the unchanged poll.
     expect(scheduleOf(service, 1).nextPollAt).toBe(nextPollTime(1, 120, service.clock.now()))
     expect(service.logs).toContainEqual(expect.objectContaining({ message: 'subscriptions.feed_unchanged', feedId: 1 }))
 

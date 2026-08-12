@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from './database.js'
 import { installationSettings } from './schema.js'
 
-/** The one row's fixed identity — this installation belongs to one User. */
+/** An installation belongs to one User. */
 const SINGLETON_ID = 1
 
 export interface InstallationSettings {
@@ -13,12 +13,6 @@ export interface InstallationSettings {
   readonly updatedAt: string
 }
 
-/**
- * Reads and writes the singleton installation row.
- *
- * Later tickets add the User's other preferences here; the shape that matters
- * now is that state lives on the mounted volume and survives the process.
- */
 export class InstallationSettingsStore {
   readonly #db: BetterSQLite3Database
 
@@ -41,19 +35,12 @@ export class InstallationSettingsStore {
     return row
   }
 
-  /**
-   * The zone every calendar grouping uses. An installation that never chose
-   * one — claimed before detection existed, or by a browser that offered
-   * nothing — reads as UTC, which is how its days were grouped all along.
-   */
+  /** An installation that never chose a zone reads as UTC — how its days were grouped all along. */
   effectiveTimezone(): string {
     return this.read()?.timezone ?? 'UTC'
   }
 
-  /**
-   * Seeds or updates the installation timezone. `createdAt` is written once so
-   * the age of an installation stays meaningful across later edits.
-   */
+  /** `createdAt` is written once, so the installation's age survives later edits. */
   setTimezone(timezone: string, now: Date): void {
     assertResolvableTimezone(timezone)
     const at = now.toISOString()
@@ -69,10 +56,7 @@ export class InstallationSettingsStore {
   }
 }
 
-/**
- * Typed so a route can refuse the zone itself as a bad request while letting
- * any other failure — a full volume, a closed handle — surface as what it is.
- */
+/** Typed so a route can refuse the zone as a bad request while other failures surface as what they are. */
 export class UnknownTimezoneError extends Error {
   constructor(timezone: string) {
     super(`Unknown installation timezone: ${timezone}`)
@@ -80,10 +64,7 @@ export class UnknownTimezoneError extends Error {
   }
 }
 
-/**
- * A timezone the runtime cannot resolve would silently break every Digest
- * grouping, so it is rejected at the point of entry rather than at read time.
- */
+/** An unresolvable zone would silently break every Digest grouping, so reject at entry, not at read time. */
 function assertResolvableTimezone(timezone: string): void {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone })

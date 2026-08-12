@@ -4,11 +4,7 @@ import { serve } from '@hono/node-server'
 import { createService, type Service, type ServiceOptions } from './service.js'
 
 export interface StartOptions extends ServiceOptions {
-  /**
-   * Overrides `config.port`. Tests pass 0 to take any free port; the platform
-   * contract in `config.ts` still refuses 0, because a host that injects it
-   * has misconfigured the service.
-   */
+  /** Overrides `config.port`. Tests pass 0 for any free port; `config.ts` still refuses 0 from a host. */
   readonly port?: number
 }
 
@@ -21,12 +17,11 @@ export interface RunningService extends Service {
   stop(): Promise<void>
 }
 
-/** How often the drain looks for keep-alive sockets that have gone idle. */
 const IDLE_SWEEP_MS = 20
 
 /**
- * Starts the complete service on a real socket. Used by `main.ts` and by the
- * test harness, so tests exercise the same wiring that production does.
+ * Starts the complete service on a real socket. The test harness uses this
+ * too, so tests exercise the same wiring production does.
  */
 export async function startService(options: StartOptions): Promise<RunningService> {
   const service = createService(options)
@@ -64,9 +59,8 @@ export async function startService(options: StartOptions): Promise<RunningServic
 }
 
 /**
- * `serve` can create an HTTP/2 server too, but this service never asks it to,
- * so the result is narrowed to `http.Server` — the connection-draining methods
- * the shutdown below relies on exist only there.
+ * `serve` can also create an HTTP/2 server; the result is narrowed to
+ * `http.Server` because the connection-draining methods exist only there.
  */
 function listen(app: Service['app'], port: number): Promise<Server> {
   return new Promise<Server>((resolve, reject) => {
@@ -76,12 +70,9 @@ function listen(app: Service['app'], port: number): Promise<Server> {
 }
 
 /**
- * Graceful shutdown: refuse new connections, let in-flight requests finish,
- * and only then close the database so no request observes a closed handle.
- *
- * Idle keep-alive connections are closed immediately — they hold the server
- * open but are not doing work. Anything still running after the grace period
- * is cut off, because a platform that sent SIGTERM will send SIGKILL next.
+ * Refuse new connections, let in-flight requests finish, then close the
+ * database so no request observes a closed handle. Whatever outlives the
+ * grace period is cut off — a platform that sent SIGTERM sends SIGKILL next.
  */
 async function shutdown(server: Server, service: Service, graceMs: number): Promise<void> {
   service.logger.info('server.stopping', { graceMs })
@@ -93,10 +84,8 @@ async function shutdown(server: Server, service: Service, graceMs: number): Prom
     }, graceMs)
     forceTimer.unref()
 
-    // A keep-alive socket becomes idle only once its response has flushed, so
-    // sweeping repeatedly is what actually ends the drain. Sweeping once would
-    // miss every connection that was still writing at this instant and make
-    // shutdown wait out the full grace period.
+    // A keep-alive socket goes idle only after its response flushes; a single
+    // sweep would miss connections still writing and wait out the full grace.
     const sweep = setInterval(() => server.closeIdleConnections(), IDLE_SWEEP_MS)
     sweep.unref()
 

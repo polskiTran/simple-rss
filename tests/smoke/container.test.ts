@@ -8,10 +8,7 @@ import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type
 const SETUP_SECRET = 'a-deployment-setup-secret'
 const USER_PASSWORD = 'a-calm-reading-password'
 
-/**
- * Claims the installation over HTTP the way the User's browser does, and
- * returns the session cookie the rest of the API needs.
- */
+/** Claims the installation over HTTP as a browser would; returns the session cookie. */
 async function claim(container: Container, password = USER_PASSWORD): Promise<string> {
   const response = await container.fetch('/api/auth/setup', {
     method: 'POST',
@@ -38,13 +35,8 @@ function sessionCookie(response: Response): string {
   return raw.split(';')[0]!
 }
 
-/**
- * The production image, exercised the way a platform runs it: an injected
- * port, a volume at `/app/data`, stdout logs, and SIGTERM to stop.
- *
- * These run under `pnpm test:smoke` rather than `pnpm test` because they build
- * an image; the in-process suite covers the same behaviour far faster.
- */
+// The production image, run as a platform runs it: injected port, volume at
+// `/app/data`, stdout logs, SIGTERM. Under `pnpm test:smoke` — it builds an image.
 
 const started: Container[] = []
 const volumes: string[] = []
@@ -287,16 +279,9 @@ describe('emergency password reset through the platform shell', () => {
 })
 
 describe('the release lifecycle', () => {
-  /**
-   * The whole documented journey in one pass, the way `docs/DEPLOYMENT.md`
-   * walks a User through it: deploy and claim, accumulate state, back up
-   * before an upgrade, replace the container on the retained volume, and
-   * recover from the snapshot onto a fresh volume.
-   *
-   * The replacement runs the same image twice; a version-to-version upgrade
-   * follows the identical path, with startup migrations covered by the
-   * `replacing the container` cases below.
-   */
+  // The `docs/DEPLOYMENT.md` journey in one pass: claim, back up, replace the
+  // container on the retained volume, restore onto a fresh one. The upgrade
+  // runs the same image twice; migrations are covered by `replacing the container`.
   it('claims, persists state, backs up, upgrades, and restores the backup onto a fresh volume', async () => {
     // A new User deploys the template and claims the installation.
     const first = await start()
@@ -320,9 +305,8 @@ describe('the release lifecycle', () => {
     expect((await upgraded.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
     await retire(upgraded.container)
 
-    // Disaster recovery: restore the snapshot into a fresh data directory
-    // before any server has initialized it — the CLI refuses a directory that
-    // already holds a database, so this must happen in a one-off container.
+    // The restore must land before any server initializes the directory — the
+    // CLI refuses one that already holds a database — so it runs one-off.
     const freshVolume = uniqueName('simple-rss-data')
     volumes.push(freshVolume)
     const restored = await docker([

@@ -13,10 +13,8 @@ export interface ExportRouteDependencies {
 }
 
 /**
- * The complete JSON download beside the OPML one: the User's portable
- * reading state as one attachment. Mounted at `/api`, behind `requireSession`
- * like every non-auth route, and never cached — the file is the User's data
- * at this instant, not a resource to revalidate.
+ * The complete JSON export beside the OPML one. Mounted at `/api` behind
+ * `requireSession`, never cached.
  */
 export function exportRoutes(deps: ExportRouteDependencies): Hono {
   const app = new Hono()

@@ -2,20 +2,12 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-/**
- * jsdom does not evaluate stylesheets, so the shell tests cannot see the
- * visual foundation. This reads the stylesheet itself and holds it against the
- * literal values in `docs/DESIGN.md` — enough to catch a token being edited,
- * dropped, or drifting from the design, which is what actually goes wrong.
- *
- * It is not a substitute for looking at the rendered page; it is a guard on
- * the numbers, which are the part a reviewer cannot eyeball.
- */
+// jsdom does not evaluate stylesheets, so these tests read styles.css directly
+// and hold its token values against the literals in `docs/DESIGN.md`.
 let css: string
 
 beforeAll(async () => {
-  // Resolved from the project root: under jsdom, `import.meta.url` is an
-  // http: URL and cannot be handed to the filesystem.
+  // Resolved from the project root: under jsdom, `import.meta.url` is an http: URL.
   css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
 })
 
@@ -24,7 +16,6 @@ function lightOnly(): string {
   return css.replace(/@media \(prefers-color-scheme: dark\)[^}]*\{[\s\S]*?\n\}/g, '')
 }
 
-/** A CSS value made safe to drop into one of the regexes above. */
 function escaped(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -61,14 +52,8 @@ describe('the dark palette', () => {
 })
 
 describe('the surface', () => {
-  /**
-   * `docs/DESIGN.md` §2 lists a light `App background (canvas around cards)` of
-   * `#EDEDEA` under the paper. It is deliberately not bound — see the note in
-   * that section. Against a fixed-width paper the second tone only ever reached
-   * the screen as two vertical bands beside the column, which is a box by
-   * another name (§1, principle 3). This holds the decision in place, because
-   * re-adding a fill is a one-line change that looks harmless in review.
-   */
+  // DESIGN.md §2's #EDEDEA canvas is deliberately unbound (see the note there);
+  // this keeps the fill from being re-added in a harmless-looking one-liner.
   it('is one tone in both schemes, with no canvas behind the paper', () => {
     expect(css).not.toContain('--color-canvas')
     expect(css).not.toContain('#ededea')
@@ -105,10 +90,8 @@ describe('type', () => {
   })
 
   it('takes the tile’s tints from the cadence ramp and its peak from the wordmark ink', () => {
-    // One ramp, bound once: a second set of greys here would need a second
-    // dark binding too, and would be the fifth ink level §6 rules out.
-    // Every cell paints the level it rests at, so hover and wait can both
-    // return to it without either restating the tile.
+    // A second grey set here would need its own dark binding and be the fifth
+    // ink level §6 rules out. `--rest` is the level hover and wait return to.
     expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*background:\s*var\(--rest\)/)
     expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*--rest: var\(--cadence-0\)/)
     for (const level of [1, 2, 3]) {
@@ -120,29 +103,27 @@ describe('type', () => {
   })
 
   it('glints the tile only for a pointer, and only where the mark is a link', () => {
-    // Every pointer-gated block, not the first: the sheet select has one of
-    // its own, and the glint must be inside a gate wherever it is written.
+    // Match every pointer-gated block, not the first: the sheet select has its
+    // own, and the glint must sit inside a gate wherever it is written.
     const hover = (css.match(/@media \(hover: hover\) and \(pointer: fine\)\s*\{[\s\S]*?\n {2}\}/g) ?? []).join('\n')
 
-    // `a.wordmark`, not `.wordmark`: the tile on setup and login leads
-    // nowhere, so it stays still.
+    // `a.wordmark`, not `.wordmark`: the tile on setup and login is not a link
+    // and stays still.
     expect(hover).toMatch(
       /a\.wordmark:hover \.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint 500ms cubic-bezier\(0\.23, 1, 0\.32, 1\) calc\(var\(--glint-step\) \* 60ms\)/,
     )
   })
 
   it('keeps the wait on the same glint, looping, and off the masthead mark', () => {
-    // `.loading-note .wordmark-cell`, never `.wordmark-cell`: the mark in the
-    // masthead holds still while something is loading. Two marks moving at
-    // once is the product fidgeting.
+    // `.loading-note .wordmark-cell`, never bare `.wordmark-cell`: the
+    // masthead mark must hold still while something is loading.
     expect(lightOnly()).toMatch(
       /\.loading-note \.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint-loop 1200ms linear infinite calc\(var\(--glint-step\) \* 60ms\)/,
     )
     expect(lightOnly()).not.toMatch(/\n {2}\.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint-loop/)
 
-    // The loop holds at rest for the back two-thirds of its turn. Without
-    // that hold there is no breath between passes, and a mark with no breath
-    // is a mark flashing rather than working.
+    // The loop rests for the back two-thirds of each pass; without the hold it
+    // reads as flashing.
     const keyframes = /@keyframes wordmark-glint-loop\s*\{([\s\S]*?)\n {2}\}/.exec(css)?.[1] ?? ''
     expect(keyframes).toMatch(/0%,\s*30%,\s*100%\s*\{[^}]*background:\s*var\(--rest\)/)
     expect(keyframes).toMatch(/12%\s*\{[^}]*background:\s*var\(--glint\)/)
@@ -151,23 +132,21 @@ describe('type', () => {
   it('breathes the waiting tile rather than stopping it under reduced motion', () => {
     const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
 
-    // A loader that stops moving is a loader that lies, so this one is the
-    // exception to the rule in the test above: the cells hold still and the
-    // tile as a whole keeps saying something, on opacity alone.
+    // Exception to the no-glint rule: a stopped loader lies, so the cells hold
+    // still and the tile breathes on opacity alone.
     expect(reduced).toMatch(/\.loading-note \.wordmark-grid\s*\{[^}]*animation:\s*loading-mark-breathe/)
     expect(reduced).toMatch(/@keyframes loading-mark-breathe\s*\{[^}]*50%\s*\{[^}]*opacity:\s*0\.45/)
   })
 
   it('sends every cell to another level of the same ramp and back', () => {
-    // The glint may not introduce a tone the mark does not already own, so
-    // each level's destination is another entry in the same ramp — and the
-    // keyframes leave both ends implicit, so the resting tile is stated once.
+    // The glint may only use tones the ramp already owns; the keyframes leave
+    // both ends implicit so the resting tile is stated once.
     const destinations = [
       ['.wordmark-cell', 'var(--cadence-2)'],
       [".wordmark-cell[data-level='1']", 'var(--cadence-3)'],
       [".wordmark-cell[data-level='2']", 'var(--color-ink-strong)'],
       // The two loud levels step down, so the matrix reshuffles rather than
-      // merely brightening.
+      // brightening.
       [".wordmark-cell[data-level='3']", 'var(--cadence-1)'],
       [".wordmark-cell[data-level='4']", 'var(--cadence-2)'],
     ] as const
@@ -202,10 +181,9 @@ describe('the narrow layout', () => {
     expect(narrow).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*19px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*gap:\s*18px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12px/)
-    // Both columns are released together: below the breakpoint the content
-    // measure and the authentication forms are the full width of the paper.
+    // Below the breakpoint the content measure and the authentication forms
+    // both run the full width of the paper.
     expect(narrow).toMatch(/\.measure,\s*\n\s*\.gate\s*\{[^}]*max-width:\s*none/)
-    // The OPML words tighten with the rest of the sheet scale.
     expect(narrow).toMatch(/\.opml-controls\s*\{[^}]*gap:\s*18px/)
     expect(narrow).toMatch(/\.opml-controls\s*\{[^}]*font-size:\s*12px/)
   })
@@ -214,24 +192,21 @@ describe('the narrow layout', () => {
 describe('layout', () => {
   it('holds the paper to the design width, with the measure released to it', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*max-width:\s*820px/)
-    // `docs/DESIGN.md` §4 drew a 620px measure; rendered, a column narrower
-    // than the masthead left every screen ragged against its own header. The
-    // departure is recorded in §4: content runs the paper's width, so
-    // re-tightening the measure is a decision, not a cleanup.
+    // `docs/DESIGN.md` §4 drew a 620px measure; the departure — content runs
+    // the paper's width — is recorded in §4. Re-tightening it is a decision.
     expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
   })
 
   it('draws no cards or boxes in the interface — every rule here is an underline', () => {
-    // The article body is the exception, and it is not drawn here: the
-    // Markdown renderer brings its own cards for code and tables.
-    // Everything this stylesheet draws is still whitespace and underlines.
+    // The article body is the exception: the Markdown renderer brings its own
+    // cards for code and tables. This stylesheet itself draws none.
     const drawn = css.replace(/--[a-z-]+:[^;]+;/g, '')
 
     expect(drawn).not.toMatch(/box-shadow|border-radius/)
 
-    // An underline is the one rule `docs/DESIGN.md` allows, taken from the
-    // search field. A border on any other edge would be a card sneaking in.
+    // border-bottom is the one rule `docs/DESIGN.md` allows; a border on any
+    // other edge is a card sneaking in.
     const borders = drawn.match(/border[a-z-]*:\s*[^;]+/g) ?? []
     const boxes = borders.filter((rule) => rule !== 'border: 0' && !rule.startsWith('border-bottom:'))
 
@@ -247,23 +222,21 @@ describe('layout', () => {
     const focusRules = css.match(/:focus-visible[^{]*\{[^}]*\}/g) ?? []
 
     // Every `outline: none` must sit inside a `:focus-visible` block that
-    // draws something in its place — minimalism is not a reason to make the
-    // keyboard invisible.
+    // draws a replacement.
     expect(focusRules).toHaveLength(4)
     expect(suppressions).toHaveLength(4)
     expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-ink\)/)
     expect(focusRules.join('\n')).toMatch(/text-decoration: underline/)
-    // A cadence cell cannot take an underline, so its focus is the accent
-    // drawn as a rule beneath the square.
+    // A cadence cell cannot take an underline; its focus is an accent rule
+    // beneath the square.
     expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-accent\)/)
   })
 })
 
 describe('the Feeds tab', () => {
   it('lets the search treatment scroll with the page, on the documented rhythm', () => {
-    // `docs/DESIGN.md` §4 drew the field sticky on a paper background; the
-    // departure is recorded there. Nothing floats over the paper, so no rule
-    // may pin itself — this holds the whole stylesheet, not just the form.
+    // `docs/DESIGN.md` §4 drew the field sticky; the departure is recorded
+    // there. No rule may pin itself — this holds the whole stylesheet.
     expect(css).not.toMatch(/position:\s*(sticky|fixed)/)
     expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*padding:\s*8px 0 32px/)
   })
@@ -327,10 +300,8 @@ describe('the Digest', () => {
 
 describe('the Reader', () => {
   it('shares the one paper — no second, narrower card for the article', () => {
-    // `docs/DESIGN.md` §4 drew a 720px reader paper, but rendered, the swap
-    // resized the masthead between screens — the one thing §5 says never
-    // moves. The departure is recorded in §4; this holds the narrower card
-    // from sneaking back, because it looks like a faithful revert in review.
+    // `docs/DESIGN.md` §4 drew a 720px reader paper; the swap resized the
+    // masthead (§5 says it never moves). The departure is recorded in §4.
     expect(css).not.toContain('paper-reader')
   })
 
@@ -344,16 +315,15 @@ describe('the Reader', () => {
   })
 
   it('leaves the article’s blocks to the Markdown renderer', () => {
-    // The renderer draws headings, quotes, lists, tables, and code
-    // with its own classes, so this stylesheet scans its files and restates
-    // none of them. Re-adding a rule here is how the two would start fighting.
+    // The renderer styles its own blocks via scanned classes; a rule here
+    // would fight it.
     expect(css).toContain('@source "../../node_modules/streamdown/dist/*.js"')
     expect(lightOnly()).not.toMatch(/\.article-body (blockquote|table|th|td|hr|h[1-6]|pre|code|ul|ol)[\s,]*\{/)
   })
 
   it('binds the renderer’s tokens to this palette, in both schemes', () => {
-    // Its classes ask for shadcn's names; unbound, an article would render in
-    // someone else's defaults or with no surface at all.
+    // The renderer's classes ask for shadcn token names; unbound, an article
+    // renders in someone else's defaults or with no surface at all.
     for (const token of ['--color-background', '--color-foreground', '--color-border', '--color-primary']) {
       expect(lightOnly()).toContain(`${token}:`)
     }
@@ -369,9 +339,8 @@ describe('the Reader', () => {
   })
 
   it('makes the renderer’s `dark:` classes follow the pinned appearance', () => {
-    // Its Shiki colours and surfaces switch on `dark:`, which asks the device
-    // by default. Left alone, a pinned light appearance on a dark laptop would
-    // read the article's code in the dark theme on light paper.
+    // Shiki colours switch on `dark:`, which asks the device by default; a
+    // pinned light appearance would otherwise get dark code on light paper.
     const variant = /@custom-variant dark \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
 
     expect(variant).toContain('@media (prefers-color-scheme: dark)')
@@ -380,16 +349,16 @@ describe('the Reader', () => {
   })
 
   it('breaks a word no space will break rather than widening the measure', () => {
-    // An address or a hash longer than the narrow paper is the one thing that
-    // can push the reading column sideways on a phone.
+    // An unbroken address or hash is the one thing that can push the reading
+    // column sideways on a phone.
     expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*overflow-wrap:\s*break-word/)
     expect(lightOnly()).toMatch(/\.reader-title\s*\{[^}]*overflow-wrap:\s*break-word/)
     expect(lightOnly()).toMatch(/\.reader-summary\s*\{[^}]*overflow-wrap:\s*break-word/)
   })
 
   it('holds the departure arrow to its text form, never the colour emoji', () => {
-    // Bare U+2197 is rendered by the emoji font on both mobile platforms; the
-    // U+FE0E after it asks for the typographic glyph instead.
+    // Bare U+2197 renders in the emoji font on both mobile platforms; the
+    // trailing U+FE0E forces the text glyph.
     const arrows = css.match(/content:\s*'[^']*2197[^']*'/g) ?? []
     expect(arrows.length).toBeGreaterThan(0)
     for (const arrow of arrows) expect(arrow).toContain('\\2197\\FE0E')

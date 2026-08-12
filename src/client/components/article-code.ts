@@ -3,12 +3,9 @@ import type { HighlighterCore } from 'shiki/core'
 import type { CodeHighlighterPlugin, ThemeInput } from 'streamdown'
 
 /**
- * Shiki highlighting for the languages an article is likely to quote.
- *
- * Shiki's own bundle registers 200+ grammars and their alias table up front;
- * naming a handful here keeps every other one out of the build. Nothing below
- * is imported until an article actually carries a fenced block, and then only
- * the grammar that block asked for.
+ * Shiki's full bundle registers 200+ grammars up front; naming a handful here
+ * keeps the rest out of the build, and a grammar loads only when a fenced
+ * block asks for it.
  */
 
 const GRAMMARS = {
@@ -31,7 +28,6 @@ const GRAMMARS = {
 
 type Grammar = keyof typeof GRAMMARS
 
-/** The fence labels publishers write for a grammar filed here under another name. */
 const ALIASES: Readonly<Record<string, Grammar>> = {
   console: 'bash',
   golang: 'go',
@@ -49,11 +45,8 @@ const ALIASES: Readonly<Record<string, Grammar>> = {
   zsh: 'bash',
 }
 
-/**
- * Warm and low-contrast on both sides, so highlighted code reads as part of
- * the paper rather than a terminal dropped onto it. Their names, not their
- * bodies: the highlighter registers both and resolves them by name.
- */
+// Low-contrast on both sides so code reads as part of the paper. Names only;
+// the highlighter registers the theme bodies itself and resolves by name.
 const THEMES: [ThemeInput, ThemeInput] = ['vitesse-light', 'vitesse-dark']
 
 function grammarFor(language: string): Grammar | undefined {
@@ -62,7 +55,7 @@ function grammarFor(language: string): Grammar | undefined {
   return ALIASES[name]
 }
 
-/** One highlighter for the page, and one load per grammar however many blocks want it. */
+// One highlighter per page, one load per grammar, however many blocks ask.
 let core: Promise<HighlighterCore> | undefined
 const loaded = new Map<Grammar, Promise<HighlighterCore>>()
 
@@ -76,8 +69,8 @@ async function createCore(): Promise<HighlighterCore> {
   return createHighlighterCore({
     themes: [light.default, dark.default],
     langs: [],
-    // The JavaScript engine, not Oniguruma: no WebAssembly to fetch, and
-    // `forgiving` keeps a grammar it cannot compile from failing the block.
+    // JavaScript engine, not Oniguruma: no WebAssembly to fetch, and
+    // `forgiving` keeps an uncompilable grammar from failing the block.
     engine: createJavaScriptRegexEngine({ forgiving: true }),
   })
 }
@@ -102,20 +95,16 @@ export const articleCode: CodeHighlighterPlugin = {
   getSupportedLanguages: () => Object.keys(GRAMMARS) as BundledLanguage[],
   supportsLanguage: (language) => grammarFor(language) !== undefined,
 
-  /**
-   * Always asynchronous: the first paint is the code itself, unhighlighted,
-   * and colour arrives when the grammar does. A block in a language this
-   * reader does not carry simply keeps that first paint.
-   */
+  // Always asynchronous: first paint is the unhighlighted code, colour arrives
+  // with the grammar. Unsupported languages keep the first paint.
   highlight({ code, language }, callback) {
     const grammar = grammarFor(language)
     if (!grammar || !callback) return null
 
     void ready(grammar)
       .then((highlighter) => {
-        // Both themes at once: every token carries the light colour and a
-        // `--shiki-dark` beside it, which is the shape the renderer's own
-        // `dark:` classes read.
+        // Both themes at once: tokens carry the light colour plus a
+        // `--shiki-dark`, the shape the renderer's `dark:` classes read.
         callback(highlighter.codeToTokens(code, { lang: grammar, themes: { light: THEMES[0], dark: THEMES[1] } }))
       })
       .catch(() => {

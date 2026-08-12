@@ -4,12 +4,9 @@ import type { FeedRefresh } from '../../../src/server/subscriptions/feed-refresh
 import { PollScheduler, WAKE_INTERVAL_MS } from '../../../src/server/subscriptions/poll-scheduler.js'
 import type { SubscriptionService } from '../../../src/server/subscriptions/subscription-service.js'
 
-/**
- * The full polling behaviour lives in the application tests, which drive
- * `tick()` explicitly. What only fake timers can show is the wake mechanism
- * itself: the once-per-minute cadence, and that a wake landing on a tick still
- * in flight does nothing.
- */
+// Full polling behaviour lives in the application tests via explicit `tick()`.
+// Only fake timers can show the wake itself: the once-per-minute cadence, and
+// that a wake landing on an in-flight tick does nothing.
 describe('poll scheduler wakes', () => {
   afterEach(() => {
     vi.useRealTimers()

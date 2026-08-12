@@ -29,11 +29,8 @@ export interface LoggerOptions {
 const RANK: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 }
 
 /**
- * Structured logs to stdout, which is the only place a container should write
- * them. Records are flat JSON objects so a log platform can index them.
- *
- * Callers pass event names (`server.started`) rather than sentences, and never
- * pass secrets, session tokens, Feed summaries, or Reader content.
+ * Flat JSON records to stdout. Callers pass event names (`server.started`),
+ * never secrets, session tokens, Feed summaries, or Reader content.
  */
 export function createLogger(options: LoggerOptions): Logger {
   const now = options.now ?? (() => new Date())

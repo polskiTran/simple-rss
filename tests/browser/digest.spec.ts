@@ -77,11 +77,9 @@ test.describe('the Digest presentation', () => {
     await openDigest(page, installation)
     await expect(page.getByText('07:15')).toBeVisible()
 
-    // Which calendar day 07:15 UTC falls on at Midway depends on when this
-    // suite runs, so the day-boundary flips are asserted against a fixed
-    // clock in `tests/server/settings.test.ts`. What is deterministic here is
-    // the wall time: Midway holds UTC−11 all year, so the stored instant
-    // must re-render as 20:15 the moment the installation zone changes.
+    // Day-boundary flips depend on the run date and are asserted under a fixed
+    // clock in `tests/server/settings.test.ts`. The wall time is deterministic:
+    // Midway holds UTC−11 all year, so 07:15 UTC must re-render as 20:15.
     await page.getByRole('link', { name: 'settings' }).click()
     await page.getByLabel('installation timezone').selectOption('Pacific/Midway')
     await page.getByRole('link', { name: 'digest' }).click()

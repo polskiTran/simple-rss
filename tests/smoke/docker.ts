@@ -23,15 +23,9 @@ export async function docker(args: string[]): Promise<DockerResult> {
   }
 }
 
-/**
- * Builds for the host architecture, not `linux/amd64`.
- *
- * These tests certify the image's *behaviour*, which is architecture-neutral.
- * That the released image is `linux/amd64` is asserted in CI, which runs on an
- * amd64 runner — see `.github/workflows/ci.yml`. Running this suite on an
- * arm64 machine therefore exercises an arm64 image; the Dockerfile is the same
- * either way, but the architecture claim is not proven locally.
- */
+// Builds for the host architecture, not `linux/amd64`: these tests certify
+// behaviour, which is architecture-neutral. The amd64 claim is asserted in CI
+// (`.github/workflows/ci.yml`), not locally.
 export async function buildImage(): Promise<void> {
   const result = await docker(['build', '-t', IMAGE, '.'])
   if (result.code !== 0) throw new Error(`docker build failed:\n${result.stderr}`)

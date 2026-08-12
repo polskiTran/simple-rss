@@ -23,7 +23,6 @@ The bar for comments, docstrings, and `docs/` prose:
 
 - **A comment earns its line by saying what the code cannot**: a constraint, a reason, a gotcha, the ADR behind a choice. One that restates its own code is a no-op; delete it.
 - **One or two lines.** If a comment needs a paragraph, the reasoning belongs in an ADR or `docs/`.
-- **Plain declarative sentences.** State the fact once and move on; if a clause can go without losing a fact, it goes.
 - **Comments describe current behavior.** When behavior changes, update its comments in the same commit; if you cannot make a comment true, delete it.
 
 ## Verify

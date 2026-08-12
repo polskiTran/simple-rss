@@ -1,9 +1,6 @@
 import { isIP } from 'node:net'
 
-/**
- * What an IP address is, as far as an outbound retrieval is concerned. Only
- * `public` may be connected to; every other class names a reason to refuse.
- */
+/** Only `public` may be connected to; every other class names a reason to refuse. */
 export type AddressClass =
   | 'public'
   | 'loopback'
@@ -15,18 +12,9 @@ export type AddressClass =
   | 'invalid'
 
 /**
- * Classifies one resolved address.
- *
- * The dangerous destinations are not only the obvious `127.0.0.1`: cloud
- * metadata lives on a link-local address, container networks are private, and
- * an IPv6 address can carry an IPv4 one inside it. A mapped, 6to4, or NAT64
- * address is therefore unwrapped and judged by what it really reaches, since a
- * socket opened to `::ffff:127.0.0.1` lands on the loopback interface exactly
- * as `127.0.0.1` would.
- *
- * Textual tricks (`0x7f000001`, `127.1`) are not addresses at all here. They
- * are hostnames as far as this function is concerned, and the resolver turns
- * them into real addresses that then pass through this same classification.
+ * Mapped, 6to4, and NAT64 addresses are unwrapped and judged by the IPv4 they
+ * reach: `::ffff:127.0.0.1` lands on loopback. Textual tricks (`0x7f000001`,
+ * `127.1`) count as hostnames; the resolver's answers pass back through here.
  */
 export function classifyAddress(address: string): AddressClass {
   const family = isIP(address)
@@ -41,15 +29,11 @@ export function classifyAddress(address: string): AddressClass {
   return 'invalid'
 }
 
-/**
- * A URL hostname as an address: `[::1]` is the same destination as `::1`, and
- * every rule here is written for the unbracketed form.
- */
+/** `[::1]` is the same destination as `::1`; every rule here uses the unbracketed form. */
 export function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 }
 
-/** Whether a retrieval may open a connection to this address. */
 export function isPublicAddress(address: string): boolean {
   return classifyAddress(address) === 'public'
 }
@@ -63,8 +47,7 @@ function classifyIpv4(bytes: Uint8Array): AddressClass {
   if (a === 172 && b >= 16 && b <= 31) return 'private'
   if (a === 192 && b === 168) return 'private'
   if (a === 169 && b === 254) return 'link-local'
-  // Carrier-grade NAT: shared address space that reaches the provider's
-  // network rather than the public internet.
+  // 100.64/10 — carrier-grade NAT shared address space.
   if (a === 100 && b >= 64 && b <= 127) return 'reserved'
   // IETF protocol assignments and documentation ranges.
   if (a === 192 && b === 0 && c === 0) return d === 9 || d === 10 ? 'public' : 'reserved'
@@ -74,7 +57,7 @@ function classifyIpv4(bytes: Uint8Array): AddressClass {
   if (a === 203 && b === 0 && c === 113) return 'reserved'
   if (a === 198 && (b === 18 || b === 19)) return 'reserved'
   if (a >= 224 && a <= 239) return 'multicast'
-  // 240/4, which carries the broadcast address at its top.
+  // 240/4, including the broadcast address at its top.
   if (a >= 240) return 'reserved'
 
   return 'public'
@@ -87,7 +70,7 @@ function classifyIpv6(bytes: Uint8Array): AddressClass {
   if (bytes[0] === 0xfe && ((bytes[1] ?? 0) & 0xc0) === 0x80) return 'link-local'
   if (((bytes[0] ?? 0) & 0xfe) === 0xfc) return 'private'
 
-  // ::ffff:0:0/96 — the address an IPv4 socket wears on a dual-stack host.
+  // ::ffff:0:0/96 — IPv4-mapped; judge the embedded IPv4 destination.
   if (allZero(bytes, 0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) {
     return classifyIpv4(bytes.subarray(12, 16))
   }
@@ -135,7 +118,7 @@ function allZero(bytes: Uint8Array, from: number, to: number): boolean {
   return true
 }
 
-/** Only ever called on text `isIP` has already accepted as dotted-quad. */
+/** Only called on text `isIP` has already accepted as dotted-quad. */
 function parseIpv4(address: string): Uint8Array | undefined {
   const parts = address.split('.')
   if (parts.length !== 4) return undefined
@@ -150,9 +133,8 @@ function parseIpv4(address: string): Uint8Array | undefined {
 }
 
 /**
- * Expands an IPv6 literal into its sixteen bytes, including the `::` run and a
- * trailing dotted-quad. Only ever called on text `isIP` has already accepted,
- * so this handles the shapes rather than re-validating them.
+ * Expands an IPv6 literal, including the `::` run and a trailing dotted-quad.
+ * Only called on text `isIP` has already accepted.
  */
 function parseIpv6(address: string): Uint8Array | undefined {
   const literal = withoutTrailingIpv4(address)
@@ -189,8 +171,8 @@ function parseIpv6(address: string): Uint8Array | undefined {
 }
 
 /**
- * Rewrites a trailing dotted-quad (`::ffff:127.0.0.1`) as the two hexadecimal
- * groups it stands for, so the expansion above only deals with one notation.
+ * Rewrites a trailing dotted-quad (`::ffff:127.0.0.1`) as its two hex groups,
+ * so the expansion above deals with one notation.
  */
 function withoutTrailingIpv4(address: string): string | undefined {
   if (!address.includes('.')) return address

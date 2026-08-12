@@ -1,15 +1,9 @@
 import { MIN_PASSWORD_LENGTH, newPasswordSchema } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
-/**
- * What to say when the server refuses. Shared by the three screens that ask
- * for a secret, so they cannot drift into telling the User three different
- * things about the same refusal.
- *
- * The wording says what happened and nothing more. A message that
- * distinguished "no User yet" from "wrong password" would hand someone
- * guessing exactly the hint the server's generic errors withhold.
- */
+// Shared by the three secret-asking screens so wording cannot drift.
+// Deliberately vague: distinguishing "no User yet" from "wrong password"
+// would hand a guesser the hint the server's generic errors withhold.
 export function describeFailure(error: unknown, overrides: Record<number, string> = {}): string {
   if (!(error instanceof ApiError)) return 'the reader is unavailable'
 
@@ -32,10 +26,7 @@ export function tooShort(): string {
   return `a password needs at least ${MIN_PASSWORD_LENGTH} characters`
 }
 
-/**
- * The reasons not to send a new password at all, checked here rather than at
- * the server so both forms that choose one apply the same two rules.
- */
+// Checked client-side so both forms that choose a password apply the same rules.
 export function reasonToHold(password: string, confirmation: string): string | undefined {
   if (password !== confirmation) return 'those two passwords are not the same'
   if (password.length < MIN_PASSWORD_LENGTH) return tooShort()
@@ -43,13 +34,9 @@ export function reasonToHold(password: string, confirmation: string): string | u
   return undefined
 }
 
-/**
- * Which side a failed fetch fell on. A rejected fetch is the network staying
- * silent — `unreachable`; anything else — a refusal, a body that fails its
- * schema — is the reader's problem, `unavailable`. Shared so every view tells
- * the User the same thing about the same silence, and the way back it
- * implies: check the connection, or wait for the reader.
- */
+// A rejected fetch is the network staying silent (`unreachable`); a refusal
+// or a body failing its schema is the reader's problem (`unavailable`).
+// Shared so every view describes the same failure the same way.
 export function failureKind(error: unknown): 'unreachable' | 'unavailable' {
   return error instanceof TypeError ? 'unreachable' : 'unavailable'
 }

@@ -11,13 +11,8 @@ import { feedItems, feeds, libraryItems } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
 import { extractArticle } from './extract-article.js'
 
-/**
- * How long a failing Feed Item's parse attempts stay rate-limited. Each
- * failure episode affords the automatic attempt plus one deliberate retry —
- * the fallback offers `retry parsing`, so that offer must be honest — and
- * further attempts wait out the cooldown, so a stuck publisher is never
- * hammered.
- */
+// Each failure episode affords the automatic attempt plus one deliberate retry —
+// the fallback offers `retry parsing`, so that offer must be honest.
 const RETRY_COOLDOWN_MS = 30_000
 
 /** Attempts a failure episode allows before the cooldown starts refusing. */
@@ -38,10 +33,9 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
 /**
- * Reader View: a temporary rendering derived on demand from a persisted Feed
- * Item's original link — never from a caller-supplied URL, and never written
- * back to the database. A failure here leaves the Feed Item, its summary, and
- * its Library membership exactly as they were.
+ * A temporary rendering derived from a persisted Feed Item's link — never from a
+ * caller-supplied URL, and never written back. A failure leaves the Feed Item,
+ * its summary, and its Library membership untouched.
  */
 export class ReaderService {
   readonly #db: BetterSQLite3Database
@@ -69,7 +63,6 @@ export class ReaderService {
     this.#signImageUrl = options.signImageUrl
   }
 
-  /** The header, fallback summary, and onward path for one Feed Item. */
   item(feedItemId: number): ReaderItem | undefined {
     const row = this.#db
       .select({
@@ -111,9 +104,8 @@ export class ReaderService {
   }
 
   /**
-   * The extraction itself. Concurrent readers of the same item share one
-   * retrieval, and a failed parse starts the retry cooldown — success costs
-   * nothing, because the browser holds it privately for a day.
+   * Concurrent readers of one item share one retrieval; a failed parse starts the
+   * retry cooldown. A success costs nothing — the browser holds it privately for a day.
    */
   async article(feedItemId: number): Promise<ReaderArticleOutcome> {
     const row = this.#db
@@ -129,8 +121,7 @@ export class ReaderService {
     const inFlight = this.#inFlight.get(feedItemId)
     if (inFlight) return inFlight
 
-    // An elapsed cooldown ends the episode entirely, so a later failure
-    // affords its automatic attempt and one honest retry again.
+    // An elapsed cooldown ends the episode, so a later failure affords a fresh attempt and retry.
     const now = this.#clock.now().getTime()
     for (const [id, episode] of this.#failures) {
       if (now - episode.lastAttemptAt >= RETRY_COOLDOWN_MS) this.#failures.delete(id)
@@ -184,7 +175,6 @@ export class ReaderService {
     })
   }
 
-  /** What follows this item, as the Digest itself orders it. */
   #nextInDigest(feedItemId: number): ReaderItem['nextInDigest'] {
     const next = this.#digest.after(feedItemId)
     if (!next) return null

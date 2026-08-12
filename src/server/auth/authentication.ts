@@ -8,11 +8,8 @@ import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
 import { SessionStore, type IssuedSession } from './sessions.js'
 import { realSleeper, type Sleeper } from './sleeper.js'
 
-/**
- * A setup secret shorter than this is treated as absent, because a guessable
- * one is worse than none: it looks like protection while letting a stranger
- * claim the installation.
- */
+// Shorter is treated as absent: a guessable Setup Secret looks like protection
+// while letting a stranger claim the installation.
 export const MIN_SETUP_SECRET_LENGTH = 16
 
 export interface AuthenticationOptions {
@@ -47,7 +44,6 @@ export type PasswordChangeOutcome =
   | { readonly kind: 'rejected' }
   | Throttled
 
-/** What a caller presents when it is about to spend an attempt at a secret. */
 interface Attempt {
   /** The address the attempt is rate-limited against. */
   readonly client: string
@@ -61,13 +57,9 @@ export interface AuthenticationStatus {
 }
 
 /**
- * Everything the installation knows about who its User is: claiming it,
- * returning to it, leaving it, and recovering it.
- *
- * The HTTP routes above this are deliberately thin. They translate outcomes
- * into status codes and cookies; every rule about what is allowed — the setup
- * secret, the guessing limits, which sessions survive a password change —
- * lives here, where it can be read as one piece.
+ * The HTTP routes above are deliberately thin — status codes and cookies. Every rule —
+ * the Setup Secret, the guessing limits, which sessions survive a password change —
+ * lives here, readable as one piece.
  */
 export class Authentication {
   readonly #deps: AuthenticationOptions
@@ -81,9 +73,8 @@ export class Authentication {
   }
 
   /**
-   * Why this installation cannot be claimed yet, or `undefined` when it can be
-   * — or already has been. Readiness reads this, so a deployment that forgot
-   * its setup secret never takes traffic it could not usefully answer.
+   * Why claiming is blocked, or `undefined`. Readiness reads this, so a deployment
+   * that forgot its Setup Secret never takes traffic it could not usefully answer.
    */
   setupBlocker(): string | undefined {
     if (this.#deps.user.isClaimed()) return undefined
@@ -95,11 +86,8 @@ export class Authentication {
   }
 
   /**
-   * Claims the installation for the one User and signs their device in.
-   *
-   * The password is hashed before the claim is attempted, so two simultaneous
-   * claims both reach the write with real work behind them and SQLite — not
-   * the order they arrived in — decides which one is the User.
+   * The password is hashed before the claim is attempted, so two simultaneous claims
+   * both reach the write with real work behind them and SQLite decides which is the User.
    */
   async claim(input: Attempt & { readonly setupSecret: string; readonly password: string }): Promise<ClaimOutcome> {
     const blocker = this.setupBlocker()
@@ -146,8 +134,8 @@ export class Authentication {
   }
 
   /**
-   * Signs a device in. Wrong passwords cost progressively more time and are
-   * answered identically whether or not the installation has a User yet.
+   * Wrong passwords cost progressively more time and are answered identically
+   * whether or not the installation has a User yet.
    */
   async signIn(input: Attempt & { readonly password: string }): Promise<SignInOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.sign_in_throttled')
@@ -193,9 +181,8 @@ export class Authentication {
   }
 
   /**
-   * Replaces the password for a User who knows the current one, and signs
-   * every device out — including the one asking. The compare, replacement, and
-   * revocation are tied to one verifier generation.
+   * Signs every device out — including the one asking. The compare, replacement,
+   * and revocation are tied to one verifier generation.
    */
   async changePassword(
     input: Attempt & { readonly currentPassword: string; readonly newPassword: string },
@@ -230,9 +217,8 @@ export class Authentication {
   }
 
   /**
-   * Emergency recovery, reached only through the platform shell. Knowing the
-   * current password is not required, because whoever can run this already has
-   * the volume. Returns how many sessions it ended.
+   * Emergency recovery, reached only through the platform shell: whoever can run
+   * this already has the volume, so the current password is not required.
    */
   async resetPassword(newPassword: string): Promise<number> {
     const passwordHash = await this.#deps.hasher.hash(newPassword)
@@ -281,15 +267,13 @@ export interface AuthenticationDependencies {
 }
 
 /**
- * Assembles the module against one open database. Both the running service and
- * the recovery CLI go through here, so neither can wire up a differently
- * configured hasher or forget to sweep expired sessions.
+ * Both the running service and the recovery CLI assemble through here, so neither
+ * can wire a differently configured hasher or forget to sweep expired sessions.
  */
 export function createAuthentication(deps: AuthenticationDependencies): Authentication {
   const sessions = new SessionStore(deps.database)
 
-  // Sessions that idled or aged out while nothing was running are swept here
-  // rather than left to linger until each is next presented.
+  // Sweeps sessions that idled or aged out while nothing was running.
   sessions.prune(deps.clock.now())
 
   return new Authentication({
@@ -305,9 +289,8 @@ export function createAuthentication(deps: AuthenticationDependencies): Authenti
 }
 
 /**
- * Compares two secrets without leaking how much of the presented one was
- * right. Both are digested first so the comparison length is fixed, which
- * keeps the length of the real secret out of the timing too.
+ * Timing-safe compare. Both secrets are digested first so the comparison length
+ * is fixed, keeping the real secret's length out of the timing too.
  */
 function matches(expected: string | undefined, presented: string): boolean {
   if (!expected) return false

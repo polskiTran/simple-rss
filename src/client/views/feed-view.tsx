@@ -21,23 +21,14 @@ type DetailState =
 
 export interface FeedViewProps {
   readonly feedId: number
-  /** Back to wherever this Feed was opened from: a list, or an article. */
   readonly origin: Origin
   onBack(origin: Origin): void
-  /**
-   * Called once the Subscription is gone. Separate from the way back, which
-   * can point at an article belonging to the Feed the User just left.
-   */
+  /** Not the way back: that can point at an article of the Feed just left. */
   onUnsubscribed(): void
-  /** Opens one Feed Item in the Reader, which comes back to this Feed by name. */
+  /** `feedTitle` rides along so the Reader's way back can name this Feed. */
   onOpenItem(feedItemId: number, feedTitle: string): void
 }
 
-/**
- * One Feed, explored through its cadence: the 26-week grid, the one-line
- * statistics beneath it, the retained Feed Items, and the polling behaviour —
- * interval, manual refresh, Feed Availability — the User manages here.
- */
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
   const [state, setState] = useState<DetailState>({ kind: 'loading' })
   const [notice, setNotice] = useState('')
@@ -62,11 +53,8 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     }
   }, [feedId])
 
-  /**
-   * The manual refresh, which doubles as the retry when the Feed is
-   * unavailable. Whatever the attempt finds, the detail is refetched so the
-   * grid, the items, and the availability note all report the newest state.
-   */
+  // Doubles as the retry when the Feed is unavailable; the detail is
+  // refetched whatever the attempt finds.
   async function refresh() {
     if (refreshing) return
     setRefreshing(true)
@@ -104,10 +92,8 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     }
   }
 
-  /**
-   * The confirmed unsubscribe. Success returns the User to the Feeds list —
-   * this screen describes a Subscription that no longer exists.
-   */
+  // Success leaves for the Feeds list: this screen describes a Subscription
+  // that no longer exists.
   async function unsubscribe() {
     if (unsubscribing) return
     setUnsubscribing(true)
@@ -122,7 +108,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     }
   }
 
-  /** The server confirmed a membership change; the word flips in place. */
   function setSaved(feedItemId: number, saved: boolean) {
     setState((current) =>
       current.kind === 'loaded'
@@ -139,14 +124,12 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     )
   }
 
-  /** A selected day moves focus and view to that day's Feed Items. */
   function showDay(date: string) {
     const day = document.getElementById(dayAnchor(feedId, date))
     if (!day) return
     day.focus({ preventScroll: true })
-    // Smooth, so the jump reads as travel down the same list rather than a
-    // teleport — and quieted by hand, because browsers do not quiet their
-    // own smooth scrolling under `prefers-reduced-motion`.
+    // Quieted by hand: browsers do not quiet their own smooth scrolling under
+    // `prefers-reduced-motion`.
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     day.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
   }
@@ -264,12 +247,8 @@ function OpenFeed({
   )
 }
 
-/**
- * Leaving a Feed, said plainly before it happens: checking stops and the
- * Digest lets go, while everything saved stays in the Library. It unfolds
- * right under the controls that opened it — quiet words rather than a
- * warning dialog, with the consequence sentence as the confirmation step.
- */
+// Unfolds under the controls that opened it — quiet words rather than a
+// warning dialog, with the consequence sentence as the confirmation step.
 function Unsubscribe({
   working,
   onConfirm,
@@ -280,8 +259,8 @@ function Unsubscribe({
   onUnsubscribe: () => void
 }) {
   return (
-    // The reveal carries the unfold: its grid row opens from nothing on
-    // mount, so the notice and items below arrive rather than teleport.
+    // The grid row opens from nothing on mount, so the content below arrives
+    // rather than teleports.
     <div className="unsubscribe-reveal">
       <div className="unsubscribe-controls" id="unsubscribe-confirmation">
         <p className="unsubscribe-consequences">
@@ -342,10 +321,8 @@ function Grid({
   )
 }
 
-/**
- * The same calm sentence the list shows. The retry it offers there is this
- * screen's own refresh control, sitting just below.
- */
+// Same sentence as the list's note. No retry button: this screen's refresh
+// control just below is the retry.
 function AvailabilityNote({ detail }: { detail: FeedDetail }) {
   const { availability } = detail
   if (availability.state !== 'unavailable') return null

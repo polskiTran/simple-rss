@@ -42,7 +42,7 @@ export interface Service {
   readonly logger: Logger
   readonly clock: Clock
   readonly readiness: Readiness
-  /** The one door to the outside world, shared by every later retrieval. */
+  /** The single outbound HTTP boundary (ADR 0005), shared by every retrieval. */
   readonly retrieval: Retrieval
   /** Undefined only when startup failed to open the database. */
   readonly database: SqliteDatabase | undefined
@@ -53,12 +53,9 @@ export interface Service {
 }
 
 /**
- * The composition root. Opens the database on the durable volume, migrates it,
- * and wires the HTTP app around the result.
- *
- * A startup failure is recorded rather than thrown: the process stays up and
- * answers liveness so an operator can read the reason, while readiness stays
- * closed so no traffic is routed to a half-built installation.
+ * The composition root. A startup failure is recorded rather than thrown: the
+ * process stays up to answer liveness with the reason, while readiness stays
+ * closed so no traffic reaches a half-built installation.
  */
 export function createService(options: ServiceOptions): Service {
   const { config } = options
@@ -101,8 +98,8 @@ export function createService(options: ServiceOptions): Service {
 
     digest = new DigestService({ database, clock, settings })
     library = new LibraryService({ database, clock, settings })
-    // The signing key is minted per process from the CSPRNG: nothing at rest,
-    // and a restart only costs already-cached articles their images.
+    // The signing key is minted per process: nothing at rest, and a restart
+    // only costs already-cached articles their images.
     imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
     images = new ImageService({ database, retrieval })
     reader = new ReaderService({
@@ -163,8 +160,7 @@ export function createService(options: ServiceOptions): Service {
       return scheduler
     },
     close() {
-      // The scheduler stops before the database closes, so no further wake
-      // lands on a closed handle.
+      // The scheduler stops first, so no further wake lands on a closed handle.
       scheduler?.stop()
       scheduler = undefined
       database?.close()

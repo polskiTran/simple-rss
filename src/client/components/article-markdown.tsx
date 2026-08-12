@@ -1,8 +1,7 @@
 import { createMathPlugin } from '@streamdown/math'
 import type { Element, Root, RootContent } from 'hast'
-// KaTeX's own stylesheet, self-hosted with its fonts for the same reason
-// Literata is: math renders without a third-party request. It loads with this
-// module, so a User who never opens an article never fetches it.
+// Self-hosted with its fonts so math renders without a third-party request;
+// loads with this module, so it is never fetched unless an article opens.
 import 'katex/dist/katex.min.css'
 import { type ComponentProps, useState } from 'react'
 import { Streamdown, type Components, type PluginConfig, defaultRehypePlugins } from 'streamdown'
@@ -10,15 +9,9 @@ import { READER_IMAGE_PATH } from '../../shared/api.js'
 import { articleCode } from './article-code.js'
 
 /**
- * Renders the constrained Markdown the server's Reader extraction generates.
- *
- * Streamdown parses it — CommonMark plus GFM tables, with KaTeX for the math
- * and Shiki for fenced code. What the article may *do* is still decided here
- * rather than by the parser: raw HTML has no path through (`src/server/reader/
- * article-markdown.ts` escapes it, and rehype-raw is left out below), links
- * and images pass through the components at the bottom of this file, and a
- * hostile article can therefore change what the Reader says but never what it
- * does.
+ * Raw HTML has no path through: the server escapes it and rehype-raw is left
+ * out below. Links and images pass through the components at the bottom, so a
+ * hostile article can change what the Reader says but never what it does.
  */
 export function ArticleMarkdown({ markdown }: { readonly markdown: string }) {
   return (
@@ -30,9 +23,8 @@ export function ArticleMarkdown({ markdown }: { readonly markdown: string }) {
 
 const PLUGINS: PluginConfig = {
   code: articleCode,
-  // Single-dollar inline math is safe to read as math here: the server
-  // escapes every literal `$` in article text, so an unescaped one is
-  // always a delimiter it wrote.
+  // Safe: the server escapes every literal `$` in article text, so an
+  // unescaped one is always a delimiter it wrote.
   math: createMathPlugin({ singleDollarTextMath: true }),
 }
 
@@ -40,12 +32,8 @@ const PLUGINS: PluginConfig = {
 const { raw, ...keptRehypePlugins } = defaultRehypePlugins
 const REHYPE_PLUGINS = [...Object.values(keptRehypePlugins), shiftHeadings]
 
-/**
- * The article's headings sit under the Feed Item title, which is the page's
- * one h1, so every one of them moves a level down. Rewriting the tree rather
- * than swapping components means Streamdown still draws the heading, at the
- * size that belongs to the level it now is.
- */
+// The Feed Item title is the page's one h1, so every article heading moves a
+// level down; rewriting the tree keeps Streamdown's own heading rendering.
 function shiftHeadings() {
   return (tree: Root): void => {
     visitElements(tree, (element) => {
@@ -60,25 +48,17 @@ function visitElements(node: Root | RootContent, visit: (element: Element) => vo
   if ('children' in node) for (const child of node.children) visitElements(child, visit)
 }
 
-/**
- * The elements the reading surface decides for itself: the two that carry its
- * outbound-request policy, and bold, which Streamdown draws as a styled span
- * where an article means the element. Cast because Streamdown's `Components`
- * also carries a catch-all index signature for custom tags, which no element
- * component written to its own props satisfies.
- */
+// `a` and `img` carry the outbound-request policy; `strong` because Streamdown
+// otherwise draws a styled span. Cast: `Components` has a catch-all index
+// signature no element component written to its own props satisfies.
 const COMPONENTS = {
   strong: 'strong',
   a: ArticleLink,
   img: ArticleImage,
 } as Components
 
-/**
- * Every article link leaves for someone else's page, so it is marked as a
- * departure and opened without a handle back into this one. A destination
- * that is not plain http(s) is not followed at all: its words stay, the link
- * does not.
- */
+// Opens in a new tab with no opener handle. A non-http(s) destination is not
+// followed at all: its words stay, the link does not.
 function ArticleLink({ href, children }: ComponentProps<'a'>) {
   if (!isSafeDestination(href)) return <>{children}</>
 
@@ -89,13 +69,8 @@ function ArticleLink({ href, children }: ComponentProps<'a'>) {
   )
 }
 
-/**
- * A proxied article image. Only the server's own signed proxy route may become
- * a request; any other source renders as its alt text and asks nobody for
- * anything. The stable fallback for an image that cannot load — missing,
- * expired signature, publisher gone — is that same alt text in the image's
- * place, so a broken image never becomes a broken page.
- */
+// Only the server's own signed proxy route may become a request; any other
+// src, and any load failure, renders as the alt text in the image's place.
 function ArticleImage({ src, alt = '' }: ComponentProps<'img'>) {
   const [failed, setFailed] = useState(false)
 

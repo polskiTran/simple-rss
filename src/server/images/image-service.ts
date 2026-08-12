@@ -13,11 +13,9 @@ export type ImageOutcome =
   | { readonly kind: 'image'; readonly contentType: string; readonly body: ReadableStream<Uint8Array> }
 
 /**
- * Streams Feed and Reader images through the hardened retrieval boundary, so
- * the User's browser never asks a publisher for anything. The boundary owns
- * the destination, redirect, size, and concurrency policy; this service adds
- * the one check the boundary cannot make — that the bytes really are the
- * image the publisher declared. Nothing is resized, transformed, or stored.
+ * Streams images through the hardened retrieval boundary, so the User's browser never
+ * asks a publisher for anything. This service adds the one check the boundary cannot
+ * make: that the bytes really are the declared image. Nothing is resized or stored.
  */
 export class ImageService {
   readonly #db: BetterSQLite3Database
@@ -28,7 +26,6 @@ export class ImageService {
     this.#retrieval = options.retrieval
   }
 
-  /** The primary image of one persisted Feed Item, resolved entirely server-side. */
   async itemImage(feedItemId: number, signal?: AbortSignal): Promise<ImageOutcome> {
     const row = this.#db
       .select({ imageUrl: feedItems.imageUrl })
@@ -50,8 +47,7 @@ export class ImageService {
     const result = await this.#retrieval.retrieve({ url, operation: 'image', ...(signal ? { signal } : {}) })
     if (!result.ok) return { kind: 'retrieval-failed', failure: result }
 
-    // A 304 can only answer a conditional request, and this service never
-    // sends one; treat an empty answer as the absent image it is.
+    // This service never sends conditional requests, so a 304 is an absent image.
     if (result.notModified) return { kind: 'not-image' }
 
     const sniffed = await sniffImage(result.contentType, result.body)
@@ -63,7 +59,7 @@ export class ImageService {
   }
 }
 
-/** Bytes of the file head that decide every signature below. */
+/** Enough head bytes to decide every signature below. */
 const SNIFF_LENGTH = 12
 
 type SniffResult =
@@ -71,10 +67,8 @@ type SniffResult =
   | { readonly ok: false; readonly failure?: RetrievalFailure }
 
 /**
- * Reads just enough of the body to check the file's magic bytes against the
- * declared type, then hands back a stream that replays what was peeked. The
- * declared type must match the actual bytes exactly: a publisher may not call
- * an HTML page — or any other format — a JPEG and have it streamed onward.
+ * Checks the file's magic bytes against the declared type, then replays the peek. A
+ * publisher may not call an HTML page — or anything else — a JPEG and have it streamed onward.
  */
 async function sniffImage(contentType: string, body: ReadableStream<Uint8Array>): Promise<SniffResult> {
   const matches = IMAGE_SIGNATURES[contentType]
@@ -143,9 +137,8 @@ const ascii = (head: Uint8Array, at: number, expected: string): boolean =>
   [...expected].every((char, index) => head[at + index] === char.charCodeAt(0))
 
 /**
- * One recogniser per allowed format — the same five the retrieval profile
- * accepts, and nothing else. SVG has no entry on purpose: it is a document
- * that can carry script, not a bitmap.
+ * The same five formats the retrieval profile accepts, nothing else. SVG has no
+ * entry on purpose: it is a document that can carry script, not a bitmap.
  */
 const IMAGE_SIGNATURES: Readonly<Record<string, (head: Uint8Array) => boolean>> = {
   'image/jpeg': (head) => head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff,

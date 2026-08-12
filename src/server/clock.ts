@@ -1,7 +1,6 @@
 /**
- * The service never calls `new Date()` directly. Polling due times, session
- * expiry, and Digest grouping are all time-dependent, so time arrives as a
- * dependency that tests can drive.
+ * Time arrives as a dependency, never `new Date()` directly, so tests can
+ * drive polling due times, Session expiry, and Digest grouping.
  */
 export interface Clock {
   now(): Date

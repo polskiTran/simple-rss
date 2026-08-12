@@ -1,10 +1,6 @@
 /**
- * Whether the service may take traffic.
- *
- * Liveness answers "is this process responsive"; readiness answers "has
- * startup finished and is the volume still usable". They are separate so a
- * migration failure or a full volume stops traffic without triggering a
- * restart loop that would never fix either.
+ * Separate from liveness so a migration failure or a full volume stops
+ * traffic without triggering a restart loop that would fix neither.
  */
 export type ReadinessState =
   | { readonly kind: 'starting' }

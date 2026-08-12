@@ -1,10 +1,7 @@
 /**
- * Internal transport seam for the retrieval module.
- *
- * Feature modules depend on `Retrieval`, never this adapter. A production
- * adapter validates the socket's resolved addresses, follows no redirects,
- * honours the Request signal, fully decodes declared encodings, and tears down
- * abandoned connections. Tests inside `src/server/upstream` may replace it.
+ * Internal transport seam; feature modules depend on `Retrieval`, never this.
+ * An adapter must validate resolved socket addresses, follow no redirects,
+ * honour the signal, and fully decode declared encodings.
  */
 export type HttpClient = (request: Request) => Promise<Response>
 

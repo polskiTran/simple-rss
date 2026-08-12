@@ -6,11 +6,8 @@ export interface TabBarProps {
   readonly onNavigate: (route: Route) => void
 }
 
-/**
- * Four words, always in the same order, in the same place on every screen and
- * at every width. They are real links so the browser's own affordances — open
- * in a new tab, copy the address — keep working.
- */
+// Same four links, same order, same place at every width. Real links, so
+// open-in-new-tab and copy-the-address keep working.
 export function TabBar({ active, onNavigate }: TabBarProps) {
   return (
     <nav className="tab-bar" aria-label="Sections">

@@ -2,15 +2,8 @@ import type { CSSProperties } from 'react'
 import { routedClick } from '../routed-link.js'
 import { pathOf } from '../routing.js'
 
-/**
- * A 4x4 tile of 3px squares in the five ink levels of the cadence ramp,
- * followed by the name in italic — `docs/references/brand.png`. The mark says
- * what the product is by borrowing the one figure it already draws: a matrix
- * of ink levels standing for volume over time.
- *
- * Levels are the cadence grid's own, 0 (quietest) to 4 (ink), so the mark
- * cannot drift from the ramp it quotes.
- */
+// 4x4 tile in the cadence grid's own ink levels, 0 (quietest) to 4 (ink), so
+// the mark cannot drift from the ramp it quotes — `docs/references/brand.png`.
 const TILE = [
   [4, 1, 3, 0],
   [2, 4, 0, 2],
@@ -23,10 +16,9 @@ export function MarkTile() {
     <span className="wordmark-grid" aria-hidden="true">
       {TILE.map((row, y) =>
         row.map((level, x) => (
-          // The glint crosses the tile along the anti-diagonal, so `row + col`
-          // is the order a cell takes its turn — the sweep runs against the
-          // leading diagonal the peaks sit on, and the mark reads as lit
-          // across rather than filled in. The wait spends the same order.
+          // `row + col` steps cells along the anti-diagonal — the order both
+          // the glint and the loading wait sweep, against the diagonal the
+          // peaks sit on.
           <span
             key={`${y}-${x}`}
             className="wordmark-cell"
@@ -53,8 +45,7 @@ export function Wordmark({ onNavigate }: WordmarkProps) {
 
   if (onNavigate === undefined) return <span className="wordmark">{mark}</span>
 
-  // A real link, like the tabs: open-in-new-tab and copy-the-address keep
-  // working. It carries no `aria-current` — the Digest tab is the one that
+  // A real link, like the tabs. No `aria-current`: the Digest tab is what
   // says where the User is.
   return (
     <a className="wordmark" href={pathOf('digest')} onClick={routedClick(onNavigate)}>

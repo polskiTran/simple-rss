@@ -75,9 +75,8 @@ describe('article markdown rendering', () => {
   it('gives code the renderer’s own chrome, fenced and inline', () => {
     const body = bodyOf('Run `observe()`.\n\n```python\nprint(1)\n```')
 
-    // Nothing here strips the renderer's classes any more, so a fenced block
-    // arrives as its card — framed, labelled with its language, and with the
-    // copy and download it ships — and inline code as its filled pill.
+    // The renderer's classes are kept, so a fenced block arrives as its card
+    // and inline code as its filled pill.
     expect(body.querySelector('[data-streamdown="inline-code"]')?.className).toContain('bg-muted')
     expect(body.querySelector('[data-streamdown="code-block"]')?.className).toContain('bg-sidebar')
     expect(body.querySelector('[data-streamdown="code-block-header"]')?.textContent).toBe('python')
@@ -89,9 +88,8 @@ describe('article markdown rendering', () => {
   it('colours a language it carries, and leaves one it does not', async () => {
     const body = bodyOf('```python\ndef guard():\n    return 1\n```\n\n```brainfuck\n+[->+]\n```')
 
-    // Highlighting arrives after the grammar does, and every token carries
-    // both themes: the light colour the renderer paints with, and a
-    // `--shiki-dark` beside it for its dark classes to read.
+    // Highlighting lands after the grammar loads; every token carries the
+    // light colour plus a `--shiki-dark` for the dark classes to read.
     await waitFor(() => {
       const token = body.querySelector('pre code span[style*="--shiki-dark"]')
       expect(token?.getAttribute('style')).toMatch(/--sdm-c:\s*#[0-9a-f]{6}/i)
@@ -137,10 +135,9 @@ describe('article markdown rendering', () => {
   })
 
   it('renders no element from raw HTML, escaped or not', () => {
-    // The server escapes `<`, so the second line is not a shape this dialect
-    // can carry. It is here because the renderer's raw-HTML plugin is stubbed
-    // out at the bundler (`src/client/no-raw-html.ts`), and this is the
-    // behaviour that stub has to keep true.
+    // The server escapes `<`, so unescaped HTML cannot normally arrive; this
+    // pins the bundler stub (`src/client/no-raw-html.ts`) that keeps the
+    // renderer's raw-HTML plugin out.
     const body = bodyOf('a \\<img src=x onerror=alert(1)> c\n\n<img src=y onerror=alert(1)>\n\n<b>bold</b>')
 
     expect(body.querySelector('img')).toBeNull()
@@ -171,7 +168,7 @@ describe('article images', () => {
       '![leak](https://tracker.example/pixel.png) then ![wrong route](/api/items/1/image)',
     )
 
-    // The alt text still speaks; the foreign request is simply never made.
+    // The alt text remains as text; the foreign request is never made.
     expect(body.querySelector('img')).toBeNull()
     expect(body.textContent).toContain('leak')
     expect(body.textContent).toContain('wrong route')
@@ -189,10 +186,9 @@ describe('article images', () => {
   })
 
   it('renders an image a publisher linked as one linked image', () => {
-    // A figure wrapped in a link to its full-size self — Substack and most
-    // newsletter platforms emit this. Reading the link text to the first `]`
-    // ended it inside the image and spilled the rest of the destination into
-    // the article as a long unbreakable line of literal text.
+    // A figure linked to its full-size self, as newsletter platforms emit it.
+    // Reading link text only to the first `]` used to spill the destination
+    // into the article as an unbreakable line of literal text.
     const body = bodyOf(`[![Zero-Mem](${SIGNED})](https://press.example/full/a.jpg)`)
 
     const link = body.querySelector('a')

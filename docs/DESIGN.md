@@ -24,20 +24,14 @@
 | Accent (saved, cursor) | `#2438D8` |
 | Hairline (search underline) | `rgba(18,17,15,.15)` |
 
-**Implementation note — one surface, not two.** The `#EDEDEA` app background is
-not drawn. It was carried into this table as a role without a picture behind
-it: every reference render in `docs/references/` is exported at the paper's own
-edge, so none of them shows a canvas, and §4's 820 × 760 "card" is the artboard
-the screens were drawn on rather than an object meant to float. Rendered
-against a real viewport, the second tone appeared only as two vertical bands
-beside a full-height 820px column — it surrounded nothing, and a strip of
-another colour along an edge is a box by another name, which §1's third
-principle forbids. Dark already collapsed the two roles into one; light now
-does the same. The paper is the whole field, edge to edge, in both schemes.
-
-Restoring the canvas means answering what it is *around* — vertical margin, a
-radius, or a shadow, all of which §1 rules out — so it is a design change, not
-a stylesheet fix.
+**Implementation note — one surface, not two.** The `#EDEDEA` app background
+is not drawn. Every reference render in `docs/references/` is exported at the
+paper's edge — §4's 820 × 760 "card" is the artboard, not an object meant to
+float — so against a real viewport the canvas appeared only as two vertical
+bands beside the column: a box by another name, which §1 forbids. The paper is
+the whole field, edge to edge, in both schemes. Restoring the canvas means
+deciding what it is *around* (margin, radius, or shadow, all ruled out by §1),
+so it is a design change, not a stylesheet fix.
 
 ### Dark (dark paper)
 

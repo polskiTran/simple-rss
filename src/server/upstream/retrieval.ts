@@ -11,15 +11,12 @@ import {
 import { HttpClientError, type HttpClient } from './http-client.js'
 import { createNetworkHttpClient } from './network-client.js'
 
-/** No retrieval may follow more than five redirects. */
 export const MAX_REDIRECTS = 5
 
 const DEFAULT_CAPACITY: RetrievalCapacity = { maxConcurrent: 6, maxQueued: 32 }
 
-/** The three intentional reasons Simple RSS retrieves outside content. */
 export type RetrievalOperation = 'feed' | 'reader' | 'image'
 
-/** Total active and waiting work allowed through one concurrency gate. */
 export interface RetrievalCapacity {
   readonly maxConcurrent: number
   readonly maxQueued: number
@@ -28,32 +25,19 @@ export interface RetrievalCapacity {
 export interface RetrievalProfile {
   readonly accept: readonly string[]
   readonly maxBytes: number
-  /**
-   * How long the publisher has to answer at all: resolution, connection, every
-   * redirect hop, and the response headers of the last one.
-   */
+  /** Covers resolution, connection, every redirect hop, and the final response headers. */
   readonly timeoutMs: number
-  /**
-   * How long the answer then has to finish arriving. Separate from the wait
-   * for the answer because the two failures are different: a publisher that
-   * never replies is unreachable, while one sending a large body slowly is
-   * working exactly as intended and only needs to be given the time.
-   */
+  /** Separate from timeoutMs: a slow large body is not an unreachable host. */
   readonly bodyTimeoutMs: number
   readonly maxRedirects: number
   readonly capacity: RetrievalCapacity
 }
 
-/**
- * Safety policy belongs here rather than at each caller. A caller names its
- * operation and may ask for a stricter limit, but can never broaden a profile.
- */
+/** Safety policy lives here, not at callers: a caller may tighten a profile, never broaden it. */
 export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
   feed: {
     accept: ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml'],
-    // Full-text Feeds are ordinary now: a busy Substack or a complete archive
-    // runs to several MiB, and refusing them would refuse the Feeds whose
-    // publishers put the most into them.
+    // Full-text Feeds routinely run to several MiB.
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
     timeoutMs: 10_000,
     bodyTimeoutMs: 60_000,
@@ -78,10 +62,7 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
   },
 }
 
-/**
- * Optional limits can only make the selected operation profile stricter.
- * Non-finite values are rejected instead of defeating comparisons.
- */
+/** Can only tighten the operation profile; non-finite values are rejected. */
 export interface RetrievalLimits {
   readonly maxBytes?: number
   readonly timeoutMs?: number
@@ -90,9 +71,8 @@ export interface RetrievalLimits {
 }
 
 /**
- * The only request headers that reach a publisher. Everything else — the
- * User's Session cookie, an `Authorization` header, the Setup Secret, and the
- * page they came from — belongs to this installation and stays here.
+ * The only request headers that reach a publisher; the User's Session cookie,
+ * `Authorization`, the Setup Secret, and `Referer` never do.
  */
 const FORWARDABLE_HEADERS: Readonly<Record<string, true>> = {
   'accept-language': true,
@@ -102,10 +82,8 @@ const FORWARDABLE_HEADERS: Readonly<Record<string, true>> = {
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
-/** How this reader identifies itself, so an operator can recognise its traffic. */
 const USER_AGENT = `simple-rss/${VERSION}`
 
-/** Why a retrieval did not produce bytes. One category per caller response. */
 export type RetrievalFailureCode =
   | 'invalid_request'
   | 'invalid_url'
@@ -120,7 +98,7 @@ export type RetrievalFailureCode =
   | 'http_error'
   /** The publisher never answered. */
   | 'timeout'
-  /** The publisher answered, then did not finish sending what it promised. */
+  /** Answered, but the body did not finish arriving. */
   | 'body_timeout'
   | 'cancelled'
   | 'busy'
@@ -128,11 +106,9 @@ export type RetrievalFailureCode =
 
 export interface RetrievalRequest {
   readonly url: string | URL
-  /** Selects the module-owned content, resource, redirect, and capacity policy. */
   readonly operation: RetrievalOperation
   /** Filtered to `FORWARDABLE_HEADERS`; anything else is dropped. */
   readonly headers?: Readonly<Record<string, string>>
-  /** Lets the caller abandon work whose answer nobody is waiting for. */
   readonly signal?: AbortSignal
   /** Optional stricter limits; values above the profile are clamped. */
   readonly limits?: RetrievalLimits
@@ -141,19 +117,15 @@ export interface RetrievalRequest {
 export interface RetrievalSuccess {
   readonly ok: true
   readonly status: number
-  /** Where the bytes came from, which is the last hop rather than what was asked for. */
+  /** The final redirect hop, not the URL that was asked for. */
   readonly url: string
   readonly contentType: string
-  /** The `charset` parameter the publisher declared alongside it, if any. */
   readonly charset: string | undefined
   readonly etag: string | undefined
   readonly lastModified: string | undefined
   /** True when a conditional request was answered `304` and there is no body. */
   readonly notModified: boolean
-  /**
-   * Decoded bytes, bounded by the selected profile. Reading past the ceiling
-   * errors the stream with a `RetrievalError` and closes the connection.
-   */
+  /** Reading past the profile's byte ceiling errors the stream with a `RetrievalError`. */
   readonly body: ReadableStream<Uint8Array>
 }
 
@@ -175,9 +147,8 @@ export interface RetrievalBytes extends Omit<RetrievalSuccess, 'body'> {
 export type RetrievalBytesResult = RetrievalBytes | RetrievalFailure
 
 export interface Retrieval {
-  /** Streams the body. The caller must consume or cancel it, which frees the slot. */
+  /** The caller must consume or cancel the body; that frees the capacity slot. */
   retrieve(request: RetrievalRequest): Promise<RetrievalResult>
-  /** Buffers the body up to the selected profile's ceiling. */
   retrieveBytes(request: RetrievalRequest): Promise<RetrievalBytesResult>
 }
 
@@ -186,7 +157,7 @@ interface RetrievalOptions {
   readonly logger: Logger
   /** Internal test seam; production uses the system resolver. */
   readonly resolve?: ResolveAddresses
-  /** The installation's required canonical public origin. */
+  /** The installation's canonical public origin. */
   readonly self: URL
   /** Internal test seam; production uses `DEFAULT_CAPACITY`. */
   readonly capacity?: RetrievalCapacity
@@ -206,11 +177,8 @@ export class RetrievalError extends Error {
 }
 
 /**
- * The one door to the outside world.
- *
- * Callers state whether they need a Feed, Reader, or image retrieval. This
- * module owns each operation's content, resource, redirect, and capacity
- * policy, plus the checks shared by every operation.
+ * The single outbound HTTP boundary (ADR 0005). Callers name an operation;
+ * the module owns its content, size, redirect, and capacity policy.
  */
 export function createRetrieval(options: RetrievalOptions): Retrieval {
   const logger = options.logger.child({ component: 'upstream' })
@@ -247,10 +215,8 @@ export function createNetworkRetrieval(options: { readonly logger: Logger; reado
   })
 }
 
-/** Why a retrieval stopped without an answer of its own. */
 type Abandonment = 'timeout' | 'body_timeout' | 'cancelled'
 
-/** The safe sentence each abandonment is logged and reported as. */
 function abandonmentReason(kind: Abandonment): string {
   if (kind === 'timeout') return 'no answer in time'
   if (kind === 'body_timeout') return 'the answer did not finish arriving in time'
@@ -274,8 +240,8 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const bodyTimeoutMs = limits?.bodyTimeoutMs ?? profile.bodyTimeoutMs
   const headers = forwardableHeaders(request.headers, profile.accept)
 
-  // One controller ends everything: either deadline, the caller giving up, and
-  // a body that grows past its ceiling all abort the same in-flight request.
+  // One controller: both deadlines, caller cancellation, and the byte ceiling
+  // all abort the same in-flight request.
   const controller = new AbortController()
   let abandoned: Abandonment | undefined
   const abort = (kind: Abandonment, message: string) => {
@@ -285,13 +251,8 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
   let timer = setTimeout(() => abort('timeout', `no answer within ${timeoutMs}ms`), timeoutMs)
 
-  /**
-   * Once the answer is in hand the question changes, and so does the clock.
-   * Waiting for a publisher to say anything at all and waiting for a large
-   * body to finish arriving are different amounts of patience, and running
-   * them off one timer meant a Feed too slow to download reported itself as a
-   * Feed that never answered.
-   */
+  // The body gets its own deadline: on one timer, a slow download reported
+  // itself as a host that never answered.
   const startBodyDeadline = (): void => {
     clearTimeout(timer)
     timer = setTimeout(() => abort('body_timeout', `body unfinished after ${bodyTimeoutMs}ms`), bodyTimeoutMs)
@@ -303,7 +264,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   let entered = 0
   let settled = false
 
-  /** Runs once, whether the retrieval failed early or its body finished later. */
   const settle = (): void => {
     if (settled) return
     settled = true
@@ -391,7 +351,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       continue
     }
 
-    // What every log record about this answer says, minus the query string.
+    // Shared log fields; the query string is deliberately omitted.
     const answered = { host: url.host, path: url.pathname, status: response.status, redirects }
 
     if (response.status === 304) {
@@ -462,7 +422,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
 interface BoundedBodyOptions {
   readonly maxBytes: number
-  /** Aborted by either deadline, the caller, or the ceiling. */
+  /** Aborted by either deadline, the caller, or the byte ceiling. */
   readonly signal: AbortSignal
   readonly abandonedKind: () => Abandonment | undefined
   readonly abort: (error: RetrievalError) => void
@@ -470,10 +430,8 @@ interface BoundedBodyOptions {
 }
 
 /**
- * Counts decoded bytes as they arrive and tears the connection down the moment
- * the ceiling is passed. A `Content-Length` is only a hint — a compressed body
- * expands past it and a hostile one lies outright — so the count, not the
- * header, is what stops the read.
+ * Counts decoded bytes and tears the connection down past the ceiling.
+ * `Content-Length` is only a hint: compressed bodies expand and hostile ones lie.
  */
 function boundedBody(response: Response, options: BoundedBodyOptions): ReadableStream<Uint8Array> {
   const source = response.body
@@ -487,14 +445,8 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
   let done = false
   let sink: ReadableStreamDefaultController<Uint8Array> | undefined
 
-  /**
-   * Ends the read once, and errors the stream when it ended badly.
-   *
-   * Erroring rather than closing is what keeps a partial body from passing for
-   * a whole one: cancelling the source resolves the read already in flight as
-   * though the publisher had finished, so a caller left to infer the outcome
-   * from the stream alone would parse a truncated Feed as a complete one.
-   */
+  // Error the stream rather than close it: a closed stream would let a
+  // truncated body pass for a complete one.
   const stop = (error: RetrievalError | undefined): void => {
     if (done) return
     done = true
@@ -541,10 +493,8 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
     },
   })
 
-  // The body deadline can pass while nobody is reading, and a stream that is
-  // never pulled would otherwise hold its slot until someone remembered it.
-  // Watched only once the sink exists, so a deadline that has already gone
-  // has somewhere to put the failure.
+  // The body deadline can fire while nobody is pulling; without this a stream
+  // that is never read would hold its slot forever.
   const abandon = (): void => {
     const reason = options.signal.reason
     stop(
@@ -559,7 +509,7 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
   return stream
 }
 
-/** Buffers a streamed success, turning a stream failure back into a category. */
+/** Turns a mid-stream failure back into a `RetrievalFailure` code. */
 async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
   if (!result.ok) return result
 
@@ -590,10 +540,7 @@ async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
   return { ...rest, bytes }
 }
 
-/**
- * Keeps only headers a publisher has any business seeing. The operation
- * profile owns `Accept`, and the module owns its identity.
- */
+/** Only `FORWARDABLE_HEADERS` pass through; `Accept` and `User-Agent` are module-owned. */
 function forwardableHeaders(
   supplied: Readonly<Record<string, string>> | undefined,
   acceptedTypes: readonly string[],
@@ -609,12 +556,10 @@ function forwardableHeaders(
   return headers
 }
 
-/** The media type without its parameters: `text/html; charset=utf-8` is `text/html`. */
 function mediaType(contentType: string | null): string {
   return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
 }
 
-/** The declared text encoding, for callers that must decode what they read. */
 function charsetOf(contentType: string | null): string | undefined {
   const charset = /;\s*charset\s*=\s*"?([\w-]+)"?/i.exec(contentType ?? '')?.[1]
   return charset?.toLowerCase()
@@ -625,7 +570,7 @@ function accepted(contentType: string, accept: readonly string[]): boolean {
   return accept.some((allowed) => allowed.trim().toLowerCase() === contentType)
 }
 
-/** Releases a response nobody will read, so the socket does not linger. */
+/** Cancels an unread body so the socket does not linger. */
 async function discard(response: Response): Promise<void> {
   try {
     await response.body?.cancel()
@@ -648,11 +593,8 @@ function describe(error: unknown): string {
 }
 
 /**
- * Bounded in-flight work with a bounded queue behind it.
- *
- * The queue matters as much as the limit: without it a burst of polls would
- * pile up holding deadlines, timers, and memory for answers nobody is waiting
- * for any more. Past the queue the honest answer is that the boundary is busy.
+ * Bounded in-flight work with a bounded queue: without the queue cap, a burst
+ * of polls would pile up timers and memory for answers nobody waits for.
  */
 class ConcurrencyGate {
   readonly #limit: number
@@ -668,7 +610,7 @@ class ConcurrencyGate {
     this.#queueLimit = queueLimit
   }
 
-  /** Resolves true holding a slot, false when the boundary is full or the caller gave up. */
+  /** Resolves true holding a slot; false when full or the caller aborted. */
   async enter(signal: AbortSignal): Promise<boolean> {
     if (this.#active < this.#limit) {
       this.#active += 1
@@ -690,7 +632,7 @@ class ConcurrencyGate {
     })
   }
 
-  /** Hands the slot to whoever is next rather than releasing and re-taking it. */
+  /** Hands the slot to the next waiter rather than releasing and re-taking it. */
   leave(): void {
     const next = this.#waiting.shift()
     if (next) next(true)
@@ -744,9 +686,8 @@ function gateFor(capacity: RetrievalCapacity): ConcurrencyGate {
 }
 
 /**
- * A caller stops waiting at its deadline, while the DNS gate remains occupied
- * until the underlying lookup actually settles. A broken resolver therefore
- * cannot create an unbounded pile of abandoned operating-system lookups.
+ * The DNS gate stays occupied until the OS lookup settles, even after the
+ * caller's deadline: a broken resolver cannot pile up unbounded lookups.
  */
 class BoundedResolver {
   readonly #resolve: ResolveAddresses

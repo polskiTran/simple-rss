@@ -223,8 +223,8 @@ describe('the Reader article', () => {
 
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
 
-    // The fallback offers `retry parsing`; the offer is honest, so the first
-    // deliberate retry really retrieves rather than being told to wait.
+    // The fallback offers `retry parsing`; the first deliberate retry really
+    // retrieves rather than being told to wait.
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
 
