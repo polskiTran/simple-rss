@@ -9,6 +9,7 @@ agent-traces/
 
 # agents
 .claude/
+.agents/
 
 # playwright mcp
 .playwright-mcp
