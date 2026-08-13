@@ -14,7 +14,6 @@ An opinionated, opensource RSS reader: one pnpm package, one Docker image, one S
 - **pnpm only**, Node ≥ 22. Scripts live in `package.json`.
 - **Vocabulary**: use `CONTEXT.md` terms verbatim in code, tests, issues, and commits — each entry lists the synonyms to avoid.
 - **ADRs are binding**: read the ones in `docs/adr/` touching your area before designing; if your work contradicts one, surface it rather than silently overriding. The one every feature hits: all outbound HTTP (feed polling, Reader extraction, image proxy) goes through the hardened `Retrieval` module in `src/server/upstream/` (ADR 0005) — callers state an operation, never touch the raw adapter.
-- **Scope**: `docs/ROADMAP.md` lists what v1 deliberately excludes (read/unread state, multiple users, tags, notifications…). Check it before adding a capability.
 - **UI work**: `docs/DESIGN.md` is the design system — one repeated content shape, whitespace-only separation, accent reserved for saved state.
 
 ## Writing

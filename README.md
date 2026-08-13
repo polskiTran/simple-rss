@@ -18,8 +18,6 @@ Simple RSS is an opinionated RSS reader for intentional reading. It is designed 
 - **Reader**: Read your feed item right here (powered by [defuddle](https://github.com/kepano/defuddle))
 - **One user, one installation.**
 
-see the roadmap over at [roadmap doc](docs/ROADMAP.md)
-
 ## Architecture
 
 Simple RSS is a server-authoritative application packaged as one portable Docker image:
