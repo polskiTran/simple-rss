@@ -146,6 +146,13 @@ describe('parseFeedDocument', () => {
     },
   )
 
+  it('reads no home page from a Feed declaring the URL it was reached by before a redirect', () => {
+    const entered = 'https://feedproxy.example/feed'
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0"><channel><title>Proxied</title><link>${entered}</link></channel></rss>`
+    expect(parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL, [entered]).homePageUrl).toBeNull()
+  })
+
   it('gives entries without any stable ID the same content fingerprint in both formats', () => {
     const [rssItem] = parseFixture('rss-missing-optional.xml').items
     const [atomItem] = parseFixture('atom-missing-optional.xml').items

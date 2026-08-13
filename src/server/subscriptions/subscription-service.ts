@@ -297,7 +297,9 @@ export class SubscriptionService {
 
     let parsed
     try {
-      parsed = parseFeedDocument(retrieved.bytes, retrieved.url)
+      // The entered and requested URLs ride along so a declared site that names a
+      // pre-redirect address of this Feed is rejected as its own URL.
+      parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
     } catch (error) {
       if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
       throw error
