@@ -40,8 +40,15 @@ export class FeedDocumentError extends Error {
 /**
  * XML declarations able to introduce external entities are rejected before parsing;
  * publisher HTML is converted to plain text and never leaves here.
+ *
+ * `priorUrls` are the other URLs this retrieval was reached through — entered and
+ * requested — so a declared site naming a pre-redirect address is still the Feed itself.
  */
-export function parseFeedDocument(bytes: Uint8Array, resolvedUrl: string): ParsedFeedDocument {
+export function parseFeedDocument(
+  bytes: Uint8Array,
+  resolvedUrl: string,
+  priorUrls: readonly string[] = [],
+): ParsedFeedDocument {
   const xml = decodeXml(bytes)
   if (declaresXmlEntities(xml)) {
     throw new FeedDocumentError('unsupported_feed', 'Feed DOCTYPE and ENTITY declarations are unsupported')
@@ -76,39 +83,40 @@ export function parseFeedDocument(bytes: Uint8Array, resolvedUrl: string): Parse
   }
 
   const root = asRecord(document)
+  const feedUrls = [resolvedUrl, ...priorUrls]
   const rss = recordField(root, ['rss'])
-  if (rss) return parseRss(rss, resolvedUrl)
+  if (rss) return parseRss(rss, resolvedUrl, feedUrls)
 
   const atom = recordField(root, ['feed', 'atom:feed'])
-  if (atom) return parseAtom(atom, resolvedUrl)
+  if (atom) return parseAtom(atom, resolvedUrl, feedUrls)
 
   const rdf = recordField(root, ['rdf:RDF', 'RDF'])
-  if (rdf) return parseRdf(rdf, resolvedUrl)
+  if (rdf) return parseRdf(rdf, resolvedUrl, feedUrls)
 
   throw new FeedDocumentError('unsupported_feed', 'The document is not an RSS or Atom Feed')
 }
 
-function parseRss(root: unknown, baseUrl: string): ParsedFeedDocument {
+function parseRss(root: unknown, baseUrl: string, feedUrls: readonly string[]): ParsedFeedDocument {
   const channel = recordField(asRecord(root), ['channel'])
   if (!channel) throw new FeedDocumentError('malformed_feed', 'RSS is missing its channel')
 
   const record = asRecord(channel)
   const title = requiredFeedTitle(recordField(record, ['title']), baseUrl)
-  const homePageUrl = homePageUrlOf(recordField(record, ['link']), baseUrl)
+  const homePageUrl = homePageUrlOf(recordField(record, ['link']), baseUrl, feedUrls)
   const items = arrayOf(recordField(record, ['item'])).map((item) => normalizeItem(asRecord(item), baseUrl, false))
   return { title, homePageUrl, items }
 }
 
-function parseAtom(root: unknown, baseUrl: string): ParsedFeedDocument {
+function parseAtom(root: unknown, baseUrl: string, feedUrls: readonly string[]): ParsedFeedDocument {
   const record = asRecord(root)
   const title = requiredFeedTitle(recordField(record, ['title', 'atom:title']), baseUrl)
-  const homePageUrl = homePageUrlOf(atomLink(record, 'alternate'), baseUrl)
+  const homePageUrl = homePageUrlOf(atomLink(record, 'alternate'), baseUrl, feedUrls)
   const entries = recordField(record, ['entry', 'atom:entry'])
   const items = arrayOf(entries).map((entry) => normalizeItem(asRecord(entry), baseUrl, true))
   return { title, homePageUrl, items }
 }
 
-function parseRdf(root: unknown, baseUrl: string): ParsedFeedDocument {
+function parseRdf(root: unknown, baseUrl: string, feedUrls: readonly string[]): ParsedFeedDocument {
   const record = asRecord(root)
   const channel = asRecord(recordField(record, ['channel']))
   if (Object.keys(channel).length === 0) {
@@ -116,7 +124,7 @@ function parseRdf(root: unknown, baseUrl: string): ParsedFeedDocument {
   }
 
   const title = requiredFeedTitle(recordField(channel, ['title']), baseUrl)
-  const homePageUrl = homePageUrlOf(recordField(channel, ['link']), baseUrl)
+  const homePageUrl = homePageUrlOf(recordField(channel, ['link']), baseUrl, feedUrls)
   const items = arrayOf(recordField(record, ['item'])).map((item) => normalizeItem(asRecord(item), baseUrl, false))
   return { title, homePageUrl, items }
 }
@@ -124,12 +132,13 @@ function parseRdf(root: unknown, baseUrl: string): ParsedFeedDocument {
 /**
  * A Feed whose declared site is its own URL has declared nothing — the `rel="self"`
  * mistake, common enough that linking to it would send the User back to the XML.
- * Matched loosely, because a Feed that moved is likely to still name the URL it
- * was pasted from: the same page over http, or with a trailing slash.
+ * Matched loosely and against every URL the Feed was reached by, because a Feed
+ * that moved is likely to still name the URL it was pasted from: the same page
+ * over http, with a trailing slash, or before the redirect that led here.
  */
-function homePageUrlOf(value: unknown, baseUrl: string): string | null {
+function homePageUrlOf(value: unknown, baseUrl: string, feedUrls: readonly string[]): string | null {
   const url = normalizeHttpUrl(value, baseUrl)
-  return url && samePage(url, baseUrl) ? null : url
+  return url && feedUrls.some((feedUrl) => samePage(url, feedUrl)) ? null : url
 }
 
 function samePage(left: string, right: string): boolean {

@@ -168,6 +168,29 @@ describe('Subscriptions', () => {
     })
   })
 
+  it('falls back to the answering host for a Feed that declares the URL its redirect left behind', async () => {
+    const service = await startTestService()
+    service.upstream
+      .stub(ENTERED_URL, { status: 301, headers: { location: RESOLVED_URL, 'content-type': 'text/plain' } })
+      .stub(RESOLVED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: RSS.replace('<link>https://journal.example/</link>', `<link>${ENTERED_URL}</link>`),
+      })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+
+    await service.wakeScheduler()
+
+    // The declared site is the entered URL the redirect moved away from — still
+    // the Feed itself, so linking there would hand the User the XML.
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0]).toMatchObject({
+      title: 'Field Notes',
+      domain: 'feeds.example',
+      homePageUrl: null,
+    })
+  })
+
   it('preserves the exact entered URL and dedupes on its canonical form', async () => {
     const service = await startTestService()
     const exact = 'https://journal.example:443/feed#user-fragment'
