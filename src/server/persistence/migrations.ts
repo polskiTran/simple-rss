@@ -247,6 +247,28 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE owner_auth RENAME TO user_auth;
     `,
   },
+  {
+    version: 8,
+    name: 'feed-home-page-url',
+    sql: `
+      -- Nullable and left empty: the value comes from the Feed document, and
+      -- every subscribed Feed rewrites its own row on the next successful poll.
+      -- Backfilling from the Feed URL would only re-state what 'domain' holds.
+      ALTER TABLE feeds ADD COLUMN home_page_url TEXT;
+    `,
+  },
+  {
+    version: 9,
+    name: 'refetch-feeds-for-home-page',
+    sql: `
+      -- Version 8 left home_page_url to the next successful poll, but a Feed
+      -- with stored validators answers 304 and no document is parsed, so the
+      -- column would stay empty until the publisher happened to post again.
+      --
+      -- Dropping the validators costs one unconditional fetch per Feed, once.
+      UPDATE feeds SET etag = NULL, last_modified = NULL;
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

@@ -62,6 +62,7 @@ interface FeedRecord {
   readonly feedId: number
   readonly title: string
   readonly domain: string
+  readonly homePageUrl: string | null
   readonly enteredUrl: string
   readonly resolvedUrl: string
 }
@@ -85,6 +86,7 @@ const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
   title: feeds.title,
   domain: feeds.domain,
+  homePageUrl: feeds.homePageUrl,
   enteredUrl: feeds.enteredUrl,
   resolvedUrl: feeds.resolvedUrl,
 }
@@ -134,6 +136,8 @@ export class SubscriptionService {
     const dormant = this.#dormantFeedByUrl(requestedUrl)
     if (dormant) return this.#resubscribe(dormant, now)
 
+    // Both stand in for what the Feed document will say: nothing has been
+    // retrieved yet (ADR 0007), so the Feed URL is all there is to go on.
     const domain = new URL(requestedUrl).hostname
     const title = offeredTitle?.trim() || domain
     let created: SubscribedFeedRecord
@@ -159,6 +163,7 @@ export class SubscriptionService {
           feedId,
           title,
           domain,
+          homePageUrl: null,
           enteredUrl,
           resolvedUrl: requestedUrl,
           lastPolledAt: null,
@@ -590,6 +595,7 @@ export class SubscriptionService {
       feedId: record.feedId,
       title: record.title,
       domain: record.domain,
+      homePageUrl: record.homePageUrl,
       enteredUrl: record.enteredUrl,
       resolvedUrl: record.resolvedUrl,
       availability: availabilityOf(record),
@@ -714,6 +720,7 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
     feedId: record.feedId,
     title: record.title,
     domain: record.domain,
+    homePageUrl: record.homePageUrl,
     enteredUrl: record.enteredUrl,
     resolvedUrl: record.resolvedUrl,
     cadence: cadence.get(record.feedId) ?? emptyCadence(),

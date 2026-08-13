@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Self Referential Letters</title>
+  <link rel="self" href="https://feeds.example/feed.xml"/>
+  <entry>
+    <id>tag:feeds.example,2026:one</id>
+    <title>Only entry</title>
+    <link rel="alternate" href="https://feeds.example/only-entry"/>
+  </entry>
+</feed>

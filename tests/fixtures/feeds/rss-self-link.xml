@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Self Referential</title>
+    <link>https://feeds.example/feed.xml</link>
+    <description>A channel link pasted from the address bar</description>
+    <item>
+      <guid isPermaLink="false">entry-1</guid>
+      <title>Only entry</title>
+      <link>https://feeds.example/only-entry</link>
+    </item>
+  </channel>
+</rss>

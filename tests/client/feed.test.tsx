@@ -16,7 +16,8 @@ const AVAILABLE = {
 const DETAIL = {
   feedId: 1,
   title: 'Field Notes',
-  domain: 'feeds.example',
+  domain: 'journal.example',
+  homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
   resolvedUrl: 'https://feeds.example/journal.xml',
   availability: AVAILABLE,
@@ -49,7 +50,8 @@ const DETAIL = {
 const LIST_FEED = {
   feedId: 1,
   title: 'Field Notes',
-  domain: 'feeds.example',
+  domain: DETAIL.domain,
+  homePageUrl: DETAIL.homePageUrl,
   enteredUrl: DETAIL.enteredUrl,
   resolvedUrl: DETAIL.resolvedUrl,
   cadence: Array.from({ length: 30 }, () => 0),
@@ -74,7 +76,7 @@ describe('opening one Feed', () => {
     expect(await screen.findByRole('group', { name: /26 weeks of publishing cadence for Field Notes/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
     expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
-    expect(screen.getByText('feeds.example')).toBeDefined()
+    expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
 
     // 26 columns × 7 rows, minus the day after a Saturday today.
     expect(container.querySelectorAll('.cadence-cell')).toHaveLength(181)

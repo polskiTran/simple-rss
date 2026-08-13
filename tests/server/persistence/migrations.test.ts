@@ -131,6 +131,42 @@ describe('migrations', () => {
     db.close()
   })
 
+  it('leaves a Feed recorded before the home page column ready to fill it in on the next poll', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version < 8),
+    )
+    db.prepare(
+      `INSERT INTO feeds (entered_url, resolved_url, title, domain, etag, last_modified, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'https://journal.example/feed',
+      'https://journal.example/feed',
+      'Field Notes',
+      'journal.example',
+      '"v1"',
+      'Fri, 08 Aug 2026 07:00:00 GMT',
+      '2026-01-01T00:00:00.000Z',
+      '2026-01-01T00:00:00.000Z',
+    )
+
+    const applied = applyMigrations(db)
+
+    expect(applied).toEqual([8, 9])
+    // Nothing is invented at upgrade time; the validators go instead, so the
+    // next poll retrieves a document to read the home page from rather than
+    // being answered 304.
+    expect(db.prepare('SELECT domain, home_page_url, etag, last_modified FROM feeds').get()).toEqual({
+      domain: 'journal.example',
+      home_page_url: null,
+      etag: null,
+      last_modified: null,
+    })
+    db.close()
+  })
+
   it('carries an already-claimed volume through the rename to user_auth', async () => {
     const db = await openFreshDatabase()
     applyMigrations(
@@ -145,7 +181,11 @@ describe('migrations', () => {
       '2026-01-01T00:00:00.000Z',
     )
 
-    const applied = applyMigrations(db)
+    const applied = applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version <= 7),
+    )
 
     expect(applied).toEqual([7])
     const row = db.prepare('SELECT password_hash, claimed_at FROM user_auth').get() as {

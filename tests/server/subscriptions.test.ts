@@ -38,14 +38,16 @@ describe('Subscriptions', () => {
 
     const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
-    // The response is the recorded decision before any retrieval: title from
-    // the host, resolvedUrl unchanged, availability unchecked.
+    // The response is the recorded decision before any retrieval: title and
+    // domain from the host, no home page yet, resolvedUrl unchanged,
+    // availability unchecked.
     expect(added.status).toBe(201)
     expect(await added.json()).toEqual({
       subscription: {
         feedId: 1,
         title: 'journal.example',
         domain: 'journal.example',
+        homePageUrl: null,
         enteredUrl: ENTERED_URL,
         resolvedUrl: ENTERED_URL,
         cadence: Array.from({ length: 30 }, () => 0),
@@ -74,7 +76,10 @@ describe('Subscriptions', () => {
         {
           feedId: 1,
           title: 'Field Notes',
-          domain: 'feeds.example',
+          // The Feed answers on feeds.example but declares journal.example as
+          // its site, and the site is what the User is shown.
+          domain: 'journal.example',
+          homePageUrl: 'https://journal.example/',
           enteredUrl: ENTERED_URL,
           resolvedUrl: RESOLVED_URL,
           cadence: [...Array.from({ length: 29 }, () => 0), 1],
@@ -137,6 +142,29 @@ describe('Subscriptions', () => {
         title: 'Field Notes',
         availability: expect.objectContaining({ state: 'available' }),
       })
+    })
+  })
+
+  it('falls back to the answering host for a Feed that declares only its own URL as its site', async () => {
+    const service = await startTestService()
+    service.upstream
+      .stub(ENTERED_URL, { status: 301, headers: { location: RESOLVED_URL, 'content-type': 'text/plain' } })
+      .stub(RESOLVED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: RSS.replace('<link>https://journal.example/</link>', `<link>${RESOLVED_URL}</link>`),
+      })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+
+    await service.wakeScheduler()
+
+    // Nothing to link and nothing to name the publisher by, so the host that
+    // answers stands in — which is the pre-home-page behaviour.
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0]).toMatchObject({
+      title: 'Field Notes',
+      domain: 'feeds.example',
+      homePageUrl: null,
     })
   })
 
@@ -483,7 +511,10 @@ describe('Subscriptions', () => {
         <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
                  xmlns="http://purl.org/rss/1.0/"
                  xmlns:dc="http://purl.org/dc/elements/1.1/">
-          <channel rdf:about="${rssUrl}"><title>RDF Notes</title></channel>
+          <channel rdf:about="${rssUrl}">
+            <title>RDF Notes</title>
+            <link>https://rdf.example/journal</link>
+          </channel>
           <item rdf:about="https://rdf.example/one">
             <title>RDF item</title>
             <link>https://rdf.example/one</link>
@@ -501,5 +532,9 @@ describe('Subscriptions', () => {
       link: 'https://rdf.example/one',
       publishedAt: '2026-08-08T06:00:00.000Z',
     })
+
+    // RSS 1.0 declares its site in the same place, and it reads the same way.
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0]).toMatchObject({ homePageUrl: 'https://rdf.example/journal' })
   })
 })

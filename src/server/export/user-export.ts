@@ -30,6 +30,7 @@ export interface UserExportFeed {
   readonly resolvedUrl: string
   readonly title: string
   readonly domain: string
+  readonly homePageUrl: string | null
   readonly createdAt: string
   readonly subscription: {
     readonly pollingIntervalMinutes: number
@@ -61,6 +62,7 @@ interface FeedRow {
   resolvedUrl: string
   title: string
   domain: string
+  homePageUrl: string | null
   createdAt: string
   pollingIntervalMinutes: number | null
   subscribedAt: string | null
@@ -90,6 +92,7 @@ export function buildUserExport(options: {
            feeds.resolved_url                     AS resolvedUrl,
            feeds.title                            AS title,
            feeds.domain                           AS domain,
+           feeds.home_page_url                    AS homePageUrl,
            feeds.created_at                       AS createdAt,
            subscriptions.polling_interval_minutes AS pollingIntervalMinutes,
            subscriptions.created_at               AS subscribedAt
@@ -123,6 +126,7 @@ export function buildUserExport(options: {
         resolvedUrl: feed.resolvedUrl,
         title: feed.title,
         domain: feed.domain,
+        homePageUrl: feed.homePageUrl,
         createdAt: feed.createdAt,
         subscription:
           feed.pollingIntervalMinutes === null || feed.subscribedAt === null

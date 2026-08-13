@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import type { OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
+import { HomePageLink } from '../components/home-page-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
@@ -301,7 +302,7 @@ function SubscriptionList({
             <CadenceStrip counts={subscription.cadence} title={subscription.title} />
           </div>
           <div className="content-meta">
-            <span>{subscription.domain}</span>
+            <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
           </div>
           <AvailabilityNote
             subscription={subscription}

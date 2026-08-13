@@ -20,6 +20,8 @@ export interface NormalizedFeedItem {
 
 export interface ParsedFeedDocument {
   readonly title: string
+  /** The site the Feed points at, absent when it declares nothing but its own URL. */
+  readonly homePageUrl: string | null
   readonly items: readonly NormalizedFeedItem[]
 }
 
@@ -92,16 +94,18 @@ function parseRss(root: unknown, baseUrl: string): ParsedFeedDocument {
 
   const record = asRecord(channel)
   const title = requiredFeedTitle(recordField(record, ['title']), baseUrl)
+  const homePageUrl = homePageUrlOf(recordField(record, ['link']), baseUrl)
   const items = arrayOf(recordField(record, ['item'])).map((item) => normalizeItem(asRecord(item), baseUrl, false))
-  return { title, items }
+  return { title, homePageUrl, items }
 }
 
 function parseAtom(root: unknown, baseUrl: string): ParsedFeedDocument {
   const record = asRecord(root)
   const title = requiredFeedTitle(recordField(record, ['title', 'atom:title']), baseUrl)
+  const homePageUrl = homePageUrlOf(atomLink(record, 'alternate'), baseUrl)
   const entries = recordField(record, ['entry', 'atom:entry'])
   const items = arrayOf(entries).map((entry) => normalizeItem(asRecord(entry), baseUrl, true))
-  return { title, items }
+  return { title, homePageUrl, items }
 }
 
 function parseRdf(root: unknown, baseUrl: string): ParsedFeedDocument {
@@ -112,8 +116,30 @@ function parseRdf(root: unknown, baseUrl: string): ParsedFeedDocument {
   }
 
   const title = requiredFeedTitle(recordField(channel, ['title']), baseUrl)
+  const homePageUrl = homePageUrlOf(recordField(channel, ['link']), baseUrl)
   const items = arrayOf(recordField(record, ['item'])).map((item) => normalizeItem(asRecord(item), baseUrl, false))
-  return { title, items }
+  return { title, homePageUrl, items }
+}
+
+/**
+ * A Feed whose declared site is its own URL has declared nothing — the `rel="self"`
+ * mistake, common enough that linking to it would send the User back to the XML.
+ * Matched loosely, because a Feed that moved is likely to still name the URL it
+ * was pasted from: the same page over http, or with a trailing slash.
+ */
+function homePageUrlOf(value: unknown, baseUrl: string): string | null {
+  const url = normalizeHttpUrl(value, baseUrl)
+  return url && samePage(url, baseUrl) ? null : url
+}
+
+function samePage(left: string, right: string): boolean {
+  return pageKey(left) === pageKey(right)
+}
+
+/** Everything that identifies the page, minus the parts a redirect rewrites. */
+function pageKey(value: string): string {
+  const url = new URL(value)
+  return `${url.host}${url.pathname.replace(/\/$/, '')}${url.search}`
 }
 
 function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: boolean): NormalizedFeedItem {
