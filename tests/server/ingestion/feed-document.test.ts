@@ -17,6 +17,7 @@ describe('parseFeedDocument', () => {
     const parsed = parseFixture('rss-representative.xml')
 
     expect(parsed.title).toBe('Field Notes')
+    expect(parsed.homePageUrl).toBe('https://journal.example/')
     expect(parsed.items).toEqual([
       {
         dedupeKey: 'guid:entry-1',
@@ -43,6 +44,8 @@ describe('parseFeedDocument', () => {
     const parsed = parseFixture('atom-representative.xml')
 
     expect(parsed.title).toBe('Atom Letters')
+    // The alternate link wins over the self link sitting beside it.
+    expect(parsed.homePageUrl).toBe('https://atom.example/')
     expect(parsed.items).toEqual([
       {
         dedupeKey: 'guid:tag:atom.example,2026:one',
@@ -80,6 +83,7 @@ describe('parseFeedDocument', () => {
     const parsed = parseFixture('atom-namespaced.xml')
 
     expect(parsed.title).toBe('Prefixed Letters')
+    expect(parsed.homePageUrl).toBe('https://prefixed.example/')
     expect(parsed.items).toEqual([
       {
         dedupeKey: 'guid:tag:prefixed.example,2026:one',
@@ -110,6 +114,35 @@ describe('parseFeedDocument', () => {
         summary: null,
       })
       expect(parsed.items[0]?.dedupeKey).toMatch(/^content:[0-9a-f]{64}$/)
+    },
+  )
+
+  it.each(['rss-self-link.xml', 'atom-self-link.xml'])(
+    'reads no home page from %s, which declares only the Feed URL itself',
+    (name) => {
+      expect(parseFixture(name).homePageUrl).toBeNull()
+    },
+  )
+
+  it.each(['rss-missing-optional.xml', 'atom-missing-optional.xml'])(
+    'reads no home page from %s, which declares none',
+    (name) => {
+      expect(parseFixture(name).homePageUrl).toBeNull()
+    },
+  )
+
+  it('resolves a relative home page against the resolved Feed URL', () => {
+    expect(parseFixture('rss-relative-home-page.xml').homePageUrl).toBe('https://feeds.example/about')
+  })
+
+  // A Feed that moved keeps naming the URL it was pasted from, so the same page
+  // over http, or with a trailing slash, is still the Feed and still no site.
+  it.each(['http://feeds.example/feed.xml', 'https://feeds.example/feed.xml/'])(
+    'reads no home page from a Feed declaring %s, a redirect variant of its own URL',
+    (declared) => {
+      const xml = `<?xml version="1.0"?>
+        <rss version="2.0"><channel><title>Moved</title><link>${declared}</link></channel></rss>`
+      expect(parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL).homePageUrl).toBeNull()
     },
   )
 

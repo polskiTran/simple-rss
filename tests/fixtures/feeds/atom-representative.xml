@@ -2,6 +2,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>Atom Letters</title>
   <link rel="self" href="https://atom.example/feed.xml"/>
+  <link rel="alternate" href="https://atom.example/"/>
   <entry>
     <id>tag:atom.example,2026:one</id>
     <title type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">One <em>letter</em></div></title>

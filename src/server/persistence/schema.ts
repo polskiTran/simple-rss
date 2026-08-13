@@ -43,7 +43,10 @@ export const feeds = sqliteTable('feeds', {
   enteredUrl: text('entered_url').notNull().unique(),
   resolvedUrl: text('resolved_url').notNull().unique(),
   title: text('title').notNull(),
+  /** The host shown for the Feed: the home page's when it declares one, else the Feed URL's. */
   domain: text('domain').notNull(),
+  /** Null until a retrieval finds a site link that is not the Feed URL itself. */
+  homePageUrl: text('home_page_url'),
   /** Validators from the last successful retrieval, for conditional requests. */
   etag: text('etag'),
   lastModified: text('last_modified'),

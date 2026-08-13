@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Relative Home</title>
+    <link>/about</link>
+    <description>A channel link written relative to the Feed</description>
+    <item>
+      <guid isPermaLink="false">entry-1</guid>
+      <title>Only entry</title>
+      <link>/only-entry</link>
+    </item>
+  </channel>
+</rss>

@@ -24,7 +24,8 @@ const UNCHECKED = {
 const FEED = {
   feedId: 1,
   title: 'Field Notes',
-  domain: 'feeds.example',
+  domain: 'journal.example',
+  homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
   resolvedUrl: 'https://feeds.example/journal.xml',
   cadence: Array.from({ length: 30 }, () => 0),
@@ -35,7 +36,7 @@ const FEED = {
 const UNCHECKED_FEED = {
   ...FEED,
   title: 'journal.example',
-  domain: 'journal.example',
+  homePageUrl: null,
   resolvedUrl: FEED.enteredUrl,
   availability: UNCHECKED,
 }
@@ -57,6 +58,7 @@ function feedDetail(availability: object, itemCount: number) {
     feedId: FEED.feedId,
     title: FEED.title,
     domain: FEED.domain,
+    homePageUrl: FEED.homePageUrl,
     enteredUrl: FEED.enteredUrl,
     resolvedUrl: FEED.resolvedUrl,
     availability,
@@ -110,6 +112,22 @@ describe('Feeds', () => {
     expect(await screen.findByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+  })
+
+  it('links the domain to the Feed’s home page, and leaves it plain text without one', async () => {
+    const api = stubApi().on('GET /api/feeds', {
+      body: {
+        subscriptions: [FEED, { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example', homePageUrl: null }],
+      },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    const link = await screen.findByRole('link', { name: 'journal.example' })
+    expect(link.getAttribute('href')).toBe('https://journal.example/')
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(screen.getByText('wire.example').tagName).toBe('SPAN')
+    expect(api.requestsTo('GET /api/feeds')).toHaveLength(1)
   })
 
   it('says in the same breath when the first check finds the URL wrong', async () => {

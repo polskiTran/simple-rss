@@ -152,6 +152,7 @@ describe('the JSON export', () => {
       'createdAt',
       'domain',
       'enteredUrl',
+      'homePageUrl',
       'items',
       'resolvedUrl',
       'subscription',

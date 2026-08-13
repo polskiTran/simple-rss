@@ -34,7 +34,8 @@ const DIGEST = {
 const DETAIL = {
   feedId: 1,
   title: 'Field Notes',
-  domain: 'feeds.example',
+  domain: 'journal.example',
+  homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
   resolvedUrl: 'https://feeds.example/journal.xml',
   availability: {
@@ -129,7 +130,7 @@ function activeTab() {
   return screen.getByRole('link', { current: 'page' }).textContent
 }
 
-const openedFeed = () => screen.findByText('feeds.example')
+const openedFeed = () => screen.findByText('journal.example')
 const openedArticle = () => screen.findByRole('heading', { level: 1, name: 'First light' })
 
 afterEach(() => {

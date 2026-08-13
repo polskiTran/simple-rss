@@ -119,6 +119,8 @@ The source is the way into its Feed: in the Digest, in search results, in the Li
 
 A save that outlived its Subscription is the exception. `The Slow Press · no longer subscribed` stays plain text, because there is no Feed left to open. Where the source does open, the link is the name alone, never the trailing clause.
 
+The domain is the way out to the publisher's site, on the feeds list and in the opened Feed's header. It takes the source's grey-to-ink treatment, and because it leaves the installation it also takes §5's departure ↗ and `noopener noreferrer` — the mark is what tells the two apart, one row to the next. A Feed that declares no site of its own, or has not been retrieved yet, keeps the same words as plain text, unmarked.
+
 ### Save
 Text affordance, never an icon. `save` in `#A3A29D` (dark: `#6B6A66`); `saved` in accent. Toggle in place, same width class, no animation.
 

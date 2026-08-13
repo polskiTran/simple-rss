@@ -14,7 +14,7 @@ const item = (guid: string, title: string, pubDate: string) => `
   </item>`
 
 const rss = (...items: string[]) => `<?xml version="1.0"?>
-  <rss version="2.0"><channel><title>Field Notes</title>${items.join('')}</channel></rss>`
+  <rss version="2.0"><channel><title>Field Notes</title><link>https://journal.example/</link>${items.join('')}</channel></rss>`
 
 describe('one opened Feed', () => {
   it('answers with identity, retained Feed Items, cadence observations, schedule, and availability', async () => {
@@ -40,6 +40,7 @@ describe('one opened Feed', () => {
       feedId: 1,
       title: 'Field Notes',
       domain: 'journal.example',
+      homePageUrl: 'https://journal.example/',
       availability: { state: 'available', consecutiveFailures: 0 },
       schedule: { pollingIntervalMinutes: 120 },
     })

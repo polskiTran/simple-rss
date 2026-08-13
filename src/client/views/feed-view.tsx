@@ -7,6 +7,7 @@ import {
 import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { BackLink } from '../components/back-link.js'
+import { HomePageLink } from '../components/home-page-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
@@ -141,7 +142,11 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         {state.kind === 'loaded' ? (
           <>
             <span className="feed-header-title">{state.detail.title}</span>
-            <span className="feed-header-domain">{state.detail.domain}</span>
+            <HomePageLink
+              className="feed-header-domain"
+              domain={state.detail.domain}
+              homePageUrl={state.detail.homePageUrl}
+            />
           </>
         ) : null}
       </p>

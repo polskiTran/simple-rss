@@ -40,6 +40,10 @@ _Avoid_: Feed health, broken Feed, pending feed
 An entry published by a Feed, represented by its available title, link, summary, publication time, and image URL.
 _Avoid_: Post, article
 
+**Feed Home Page**:
+The site a Feed declares as its own, read from the Feed document and absent when the Feed names only its own URL. It supplies the host shown beside a Feed and the link behind it, so the Feeds list names the publisher rather than whichever host serves the XML.
+_Avoid_: Site URL, website, channel link
+
 **Feed Window**:
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch

@@ -164,7 +164,10 @@ export type OpmlImportReport = z.infer<typeof opmlImportReportSchema>
 export const feedSummarySchema = z.object({
   feedId: z.number().int().positive(),
   title: z.string(),
+  /** Host of the home page when the Feed declares one, else host of the Feed URL. */
   domain: z.string(),
+  /** The publisher's site, for linking the domain. Null until a retrieval finds one. */
+  homePageUrl: z.string().nullable(),
   enteredUrl: z.string(),
   resolvedUrl: z.string(),
 })
