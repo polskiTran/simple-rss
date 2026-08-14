@@ -51,14 +51,12 @@ describe('the Saved tab', () => {
     expect(screen.getByText('today, 07:15')).toBeDefined()
     expect(screen.getByText('3 june')).toBeDefined()
 
-    // Every row already holds membership, so each toggle says `saved`.
     for (const title of ['First light', 'A June letter']) {
       const toggle = screen.getByRole('button', { name: `save ${title}` })
       expect(toggle.textContent).toBe('saved')
       expect(toggle.getAttribute('aria-pressed')).toBe('true')
     }
 
-    // Saving is membership, never progress: no counts, no completion.
     expect(container.querySelector('main')?.textContent).not.toMatch(/unread|mark|archive|\d+ (posts|items)/i)
   })
 
@@ -76,7 +74,6 @@ describe('the Saved tab', () => {
 
     await waitFor(() => expect(toggle.textContent).toBe('save'))
     expect(api.requestsTo('DELETE /api/library/3')).toHaveLength(1)
-    // The row stays where it was, still readable, until the next visit.
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
 
     await user.click(toggle)
@@ -92,8 +89,6 @@ describe('the Saved tab', () => {
     const { container } = render(<App />)
 
     expect(await screen.findByText('The Slow Press · no longer subscribed')).toBeDefined()
-    // The still-subscribed source carries no such note, and nothing suggests
-    // the unsubscribed save needs tidying away.
     expect(screen.getByText('Field Notes').textContent).toBe('Field Notes')
     expect(container.querySelector('main')?.textContent).not.toMatch(/remove|delete|clean/i)
   })

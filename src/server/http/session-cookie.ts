@@ -5,10 +5,6 @@ import type { IssuedSession } from '../auth/sessions.js'
 /** The only place the session token is named; prefixed against collisions on a shared host. */
 export const SESSION_COOKIE = 'simple_rss_session'
 
-/**
- * `Strict` costs nothing here: only same-origin `fetch` needs the cookie, and
- * the cross-site navigation `Strict` withholds it from fetches a public shell.
- */
 const COOKIE_ATTRIBUTES = {
   httpOnly: true,
   secure: true,
@@ -20,10 +16,7 @@ export function readSessionCookie(c: Context): string | undefined {
   return getCookie(c, SESSION_COOKIE)
 }
 
-/**
- * The cookie lifetime is the session's absolute deadline; the shorter idle
- * deadline is enforced server-side, the only side that can be trusted to measure it.
- */
+/** The cookie lifetime is the session's absolute deadline. */
 export function writeSessionCookie(c: Context, session: IssuedSession, now: Date): void {
   const maxAge = Math.max(0, Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000))
   setCookie(c, SESSION_COOKIE, session.token, { ...COOKIE_ATTRIBUTES, maxAge })

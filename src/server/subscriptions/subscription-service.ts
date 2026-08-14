@@ -81,7 +81,6 @@ interface PollableFeed extends FeedRecord {
   readonly consecutiveFailures: number
 }
 
-/** Keep in sync with `FeedRecord`. */
 const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
   title: feeds.title,
@@ -91,7 +90,6 @@ const FEED_RECORD_COLUMNS = {
   resolvedUrl: feeds.resolvedUrl,
 }
 
-/** Keep in sync with `SubscribedFeedRecord`. */
 const SUBSCRIBED_FEED_COLUMNS = {
   ...FEED_RECORD_COLUMNS,
   lastPolledAt: subscriptions.lastPolledAt,
@@ -131,8 +129,6 @@ export class SubscriptionService {
 
     const now = this.#clock.now().toISOString()
 
-    // A Feed the Library kept after an unsubscribe: reuse its identity so old
-    // saves and the new Subscription name one Feed.
     const dormant = this.#dormantFeedByUrl(requestedUrl)
     if (dormant) return this.#resubscribe(dormant, now)
 
@@ -147,7 +143,6 @@ export class SubscriptionService {
           .insert(feeds)
           .values({
             enteredUrl,
-            // Stand-in until the first retrieval reveals where the Feed actually answers.
             resolvedUrl: requestedUrl,
             title,
             domain,
@@ -215,10 +210,6 @@ export class SubscriptionService {
     }
   }
 
-  /**
-   * Each outline goes through the normal Subscription creation path. Recording is
-   * local, so the import is one fast pass; the Feeds are then due at once.
-   */
   importOpml(opml: string): ImportOpmlOutcome {
     let outlines
     try {
@@ -256,8 +247,6 @@ export class SubscriptionService {
     if (!feed) return { kind: 'missing' }
 
     const outcome = await this.#poll(feed)
-    // `missing` records nothing — the Subscription vanished mid-retrieval, so no
-    // schedule is left to advance. A merge already recorded success on the surviving Feed.
     if (outcome.kind === 'missing' || outcome.kind === 'merged') return outcome
     if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.#recordSuccess(feed)
     else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
@@ -297,8 +286,6 @@ export class SubscriptionService {
 
     let parsed
     try {
-      // The entered and requested URLs ride along so a declared site that names a
-      // pre-redirect address of this Feed is rejected as its own URL.
       parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
     } catch (error) {
       if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
@@ -339,10 +326,6 @@ export class SubscriptionService {
       .all()[0]?.feedId
   }
 
-  /**
-   * Produces the state a synchronous duplicate check would have. Nothing retained
-   * is deleted: a duplicate with items stays dormant and Retention judges what remains.
-   */
   #mergeInto(
     duplicate: PollableFeed,
     existingFeedId: number,
@@ -364,8 +347,6 @@ export class SubscriptionService {
         .limit(1)
         .all()[0]
 
-      // The URLs that led here now name the existing Feed, so a re-import is a
-      // duplicate at recording time, not another merge.
       tx.update(feedUrlAliases)
         .set({ feedId: existingFeedId })
         .where(eq(feedUrlAliases.feedId, duplicate.feedId))
@@ -384,7 +365,6 @@ export class SubscriptionService {
       }
     })
 
-    // Reuse the revealing retrieval as the existing Feed's poll; the merge costs no extra request.
     const existing = this.#pollableFeed(existingFeedId)
     if (existing) {
       persistFeedWindow(this.#db, {
@@ -634,7 +614,6 @@ export class SubscriptionService {
       .all()[0]
   }
 
-  /** Unsubscribed but still on the volume: its Library items kept it. */
   #dormantFeedByUrl(url: string): FeedRecord | undefined {
     return this.#db
       .select(FEED_RECORD_COLUMNS)
@@ -672,7 +651,6 @@ export class SubscriptionService {
   }
 }
 
-/** The attempt never reached the publisher, so it says nothing about the Feed. */
 function wasNeverAsked(
   outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
 ): outcome is Extract<IngestFeedOutcome, { kind: 'retrieval-failed' }> {
@@ -691,7 +669,6 @@ export function availabilityCategoryOf(
 ): FeedAvailabilityCategory {
   if (outcome.kind === 'invalid-feed') return 'invalid_feed'
   switch (outcome.failure.code) {
-    // Never answered and answered too slowly both read as `timeout`; the User cannot act on the difference.
     case 'timeout':
     case 'body_timeout':
       return 'timeout'
@@ -763,7 +740,6 @@ function canonicalFeedUrl(value: string): string | undefined {
   }
 }
 
-/** Logged URLs drop the query string. */
 function loggableUrl(value: string): string {
   try {
     const url = new URL(value)

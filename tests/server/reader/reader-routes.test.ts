@@ -3,7 +3,6 @@ import { readerRoutes } from '../../../src/server/http/reader-routes.js'
 import type { ReaderArticleOutcome } from '../../../src/server/reader/reader-service.js'
 import type { RetrievalFailureCode } from '../../../src/server/upstream/retrieval.js'
 
-/** The routes with the service answering a scripted outcome. */
 function appAnswering(outcome: ReaderArticleOutcome) {
   return readerRoutes({
     reader: () => ({
@@ -17,11 +16,6 @@ function failed(code: RetrievalFailureCode): ReaderArticleOutcome {
   return { kind: 'retrieval-failed', failure: { ok: false, code, reason: 'scripted' } }
 }
 
-/**
- * One calm answer per failure the boundary can report. The slow cases —
- * a 10-second timeout, a redirect chase — are scripted here because the
- * application tests cannot afford to live through them.
- */
 describe('Reader failure answers', () => {
   it.each([
     ['timeout', 504, 'article_timeout'],

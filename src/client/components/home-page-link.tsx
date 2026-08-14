@@ -5,9 +5,6 @@ export interface HomePageLinkProps {
   readonly homePageUrl: string | null
 }
 
-// The domain reads the same either way — meta grey, no underline at rest, per
-// `docs/DESIGN.md` §5 — so a Feed that declares no home page simply does not
-// become clickable.
 export function HomePageLink({ className, domain, homePageUrl }: HomePageLinkProps) {
   if (!homePageUrl) return <span className={className}>{domain}</span>
   return (

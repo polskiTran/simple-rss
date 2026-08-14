@@ -8,8 +8,6 @@ import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
 import { SessionStore, type IssuedSession } from './sessions.js'
 import { realSleeper, type Sleeper } from './sleeper.js'
 
-// Shorter is treated as absent: a guessable Setup Secret looks like protection
-// while letting a stranger claim the installation.
 export const MIN_SETUP_SECRET_LENGTH = 16
 
 export interface AuthenticationOptions {
@@ -24,7 +22,6 @@ export interface AuthenticationOptions {
   readonly setupSecret: string | undefined
 }
 
-/** Every route that checks a secret can be told to come back later. */
 type Throttled = { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number }
 
 export type ClaimOutcome =
@@ -45,7 +42,6 @@ export type PasswordChangeOutcome =
   | Throttled
 
 interface Attempt {
-  /** The address the attempt is rate-limited against. */
   readonly client: string
 }
 
@@ -56,11 +52,6 @@ export interface AuthenticationStatus {
   readonly authenticated: boolean
 }
 
-/**
- * The HTTP routes above are deliberately thin — status codes and cookies. Every rule —
- * the Setup Secret, the guessing limits, which sessions survive a password change —
- * lives here, readable as one piece.
- */
 export class Authentication {
   readonly #deps: AuthenticationOptions
 
@@ -72,10 +63,7 @@ export class Authentication {
     return { claimed: this.#deps.user.isClaimed(), authenticated: this.authenticate(token) }
   }
 
-  /**
-   * Why claiming is blocked, or `undefined`. Readiness reads this, so a deployment
-   * that forgot its Setup Secret never takes traffic it could not usefully answer.
-   */
+  /** Why claiming is blocked, or `undefined`. */
   setupBlocker(): string | undefined {
     if (this.#deps.user.isClaimed()) return undefined
 
@@ -85,10 +73,6 @@ export class Authentication {
     return undefined
   }
 
-  /**
-   * The password is hashed before the claim is attempted, so two simultaneous claims
-   * both reach the write with real work behind them and SQLite decides which is the User.
-   */
   async claim(input: Attempt & { readonly setupSecret: string; readonly password: string }): Promise<ClaimOutcome> {
     const blocker = this.setupBlocker()
     if (blocker) {
@@ -120,7 +104,6 @@ export class Authentication {
       attempt.recordSuccess()
 
       if (!session) {
-        // Recovery rotated the password between the claim and session issue.
         this.#deps.logger.warn('auth.claim_session_stale')
         return { kind: 'already-claimed' }
       }
@@ -133,10 +116,6 @@ export class Authentication {
     }
   }
 
-  /**
-   * Wrong passwords cost progressively more time and are answered identically
-   * whether or not the installation has a User yet.
-   */
   async signIn(input: Attempt & { readonly password: string }): Promise<SignInOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.sign_in_throttled')
     if ('kind' in attempt) return attempt
@@ -180,10 +159,7 @@ export class Authentication {
     this.#deps.logger.info('auth.signed_out')
   }
 
-  /**
-   * Signs every device out — including the one asking. The compare, replacement,
-   * and revocation are tied to one verifier generation.
-   */
+  /** Signs every device out — including the one asking. */
   async changePassword(
     input: Attempt & { readonly currentPassword: string; readonly newPassword: string },
   ): Promise<PasswordChangeOutcome> {
@@ -199,27 +175,23 @@ export class Authentication {
 
       const passwordHash = await this.#deps.hasher.hash(input.newPassword)
       await this.#delaySuccess(attempt)
-      const revoked = this.#deps.user.changePassword(currentHash, passwordHash, this.#deps.clock.now())
+      const outcome = this.#deps.user.changePassword(currentHash, passwordHash, this.#deps.clock.now())
 
-      if (revoked === undefined) {
+      if (outcome.kind === 'stale-verifier') {
         attempt.cancel()
         this.#deps.logger.warn('auth.password_change_stale', { client: input.client })
         return { kind: 'rejected' }
       }
 
       attempt.recordSuccess()
-      this.#deps.logger.info('auth.password_changed', { sessionsRevoked: revoked })
-      return { kind: 'changed', revoked }
+      this.#deps.logger.info('auth.password_changed', { sessionsRevoked: outcome.revoked })
+      return { kind: 'changed', revoked: outcome.revoked }
     } catch (error) {
       attempt.cancel()
       throw error
     }
   }
 
-  /**
-   * Emergency recovery, reached only through the platform shell: whoever can run
-   * this already has the volume, so the current password is not required.
-   */
   async resetPassword(newPassword: string): Promise<number> {
     const passwordHash = await this.#deps.hasher.hash(newPassword)
     const revoked = this.#deps.user.resetPassword(passwordHash, this.#deps.clock.now())
@@ -227,14 +199,12 @@ export class Authentication {
     return revoked
   }
 
-  /** The verifier generation this password proved, or nothing on a mismatch. */
   async #verifiedPasswordHash(password: string): Promise<string | undefined> {
     const record = this.#deps.user.read()
     if (!record) return undefined
     return (await this.#deps.hasher.verify(record.passwordHash, password)) ? record.passwordHash : undefined
   }
 
-  /** Reserves an attempt, or returns the rate-limit response it must receive. */
   async #beginAttempt(client: string, event: string): Promise<AllowedAttempt | Throttled> {
     const verdict = this.#deps.limiter.begin(client)
     if (verdict.allowed) return verdict
@@ -244,14 +214,12 @@ export class Authentication {
     return { kind: 'rate-limited', retryAfterSeconds: verdict.retryAfterSeconds }
   }
 
-  /** Records a wrong secret and holds the answer back for its reserved cost. */
   async #reject(attempt: AllowedAttempt, client: string, event: string): Promise<void> {
     const delayMs = attempt.recordFailure()
     this.#deps.logger.warn(event, { client })
     if (delayMs > 0) await this.#deps.sleep(delayMs)
   }
 
-  /** Applies progressive and global pressure to a successful secret check too. */
   async #delaySuccess(attempt: AllowedAttempt): Promise<void> {
     if (attempt.successDelayMs > 0) await this.#deps.sleep(attempt.successDelayMs)
   }
@@ -262,18 +230,12 @@ export interface AuthenticationDependencies {
   readonly clock: Clock
   readonly logger: Logger
   readonly setupSecret: string | undefined
-  /** Overridden by tests so progressive delays cost no wall-clock time. */
   readonly sleep?: Sleeper
 }
 
-/**
- * Both the running service and the recovery CLI assemble through here, so neither
- * can wire a differently configured hasher or forget to sweep expired sessions.
- */
 export function createAuthentication(deps: AuthenticationDependencies): Authentication {
   const sessions = new SessionStore(deps.database)
 
-  // Sweeps sessions that idled or aged out while nothing was running.
   sessions.prune(deps.clock.now())
 
   return new Authentication({
@@ -288,10 +250,6 @@ export function createAuthentication(deps: AuthenticationDependencies): Authenti
   })
 }
 
-/**
- * Timing-safe compare. Both secrets are digested first so the comparison length
- * is fixed, keeping the real secret's length out of the timing too.
- */
 function matches(expected: string | undefined, presented: string): boolean {
   if (!expected) return false
   return timingSafeEqual(digest(expected), digest(presented))

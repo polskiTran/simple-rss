@@ -145,7 +145,6 @@ function samePage(left: string, right: string): boolean {
   return pageKey(left) === pageKey(right)
 }
 
-/** Everything that identifies the page, minus the parts a redirect rewrites. */
 function pageKey(value: string): string {
   const url = new URL(value)
   return `${url.host}${url.pathname.replace(/\/$/, '')}${url.search}`
@@ -209,7 +208,6 @@ function atomLink(record: Record<string, unknown>, relationship: string): unknow
   return asRecord(selected)['@_href'] ?? selected
 }
 
-/** The whole `<link>` element, for callers that need its other attributes. */
 function atomLinkElement(record: Record<string, unknown>, relationship: string): unknown {
   const links = arrayOf(recordField(record, ['link', 'atom:link']))
   return (
@@ -281,7 +279,6 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   amp: '&',
 }
 
-/** The five XML entities plus numeric references; anything else stays as written. */
 function decodeXmlEntities(text: string): string {
   return text.replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g, (entity, hex, decimal, named) => {
     if (typeof named === 'string') return NAMED_ENTITIES[named] ?? entity

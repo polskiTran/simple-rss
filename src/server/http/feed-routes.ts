@@ -104,8 +104,6 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     if (outcome.kind === 'updated') {
       return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems }, 200, NO_STORE)
     }
-    // not-modified is a successful refresh with zero items; a merge means this
-    // Feed's items now live on the Feed that survived.
     if (outcome.kind === 'not-modified' || outcome.kind === 'merged') {
       return c.json<RefreshFeedResponse>({ observedItems: 0 }, 200, NO_STORE)
     }
@@ -219,17 +217,14 @@ const UNSUPPORTED_CONTENT: FailureAnswer = {
   code: 'unsupported_feed',
   message: 'The URL returned unsupported Feed content',
 }
-// An unresolvable host is an unreachable Feed (502), not a badly formed URL.
 const UNREACHABLE: FailureAnswer = {
   status: 502,
   code: 'feed_unreachable',
   message: 'The Feed could not be reached',
 }
 
-/** Messages quote the actual ceilings, so raising a limit cannot leave the explanation behind. */
 const FEED_PROFILE = RETRIEVAL_PROFILES.feed
 
-/** One answer per retrieval failure, shared by direct creation and OPML import. */
 const RETRIEVAL_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> = {
   invalid_request: UNSAFE_URL,
   invalid_url: UNSAFE_URL,

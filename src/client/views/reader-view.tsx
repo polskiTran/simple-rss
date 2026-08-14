@@ -9,8 +9,6 @@ import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { failureKind } from './failure.js'
 
-// KaTeX + Shiki are the client's heaviest chunk and only the Reader uses
-// them; load on first article, not at startup.
 const ArticleMarkdown = lazy(async () => ({
   default: (await import('../components/article-markdown.js')).ArticleMarkdown,
 }))
@@ -20,15 +18,12 @@ const parsingNote = <LoadingNote className="empty-note reader-extracting">parsin
 type ItemState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly item: ReaderItem }
-  /** Server answered with a refusal or unparseable body. */
   | { readonly kind: 'unavailable' }
-  /** No response at all. */
   | { readonly kind: 'unreachable' }
 
 type ArticleState =
   | { readonly kind: 'extracting' }
   | { readonly kind: 'ready'; readonly article: ReaderArticle }
-  /** Extraction failed; the Feed Item is untouched and the view falls back to its stored summary. */
   | { readonly kind: 'failed'; readonly waitSeconds: number | undefined }
 
 export interface ReaderViewProps {
@@ -39,15 +34,9 @@ export interface ReaderViewProps {
   onOpenFeed(feedId: number): void
 }
 
-/**
- * The header always renders the stored Feed Item, so a failed extraction
- * changes what sits under the title, never the item itself.
- */
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
   const [itemState, setItemState] = useState<ItemState>({ kind: 'loading' })
   const [articleState, setArticleState] = useState<ArticleState>({ kind: 'extracting' })
-  // Retrying re-runs the effect, so every attempt carries the same cleanup
-  // and none can answer after unmount.
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -125,8 +114,6 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
 
       {articleState.kind === 'extracting' ? parsingNote : null}
       {articleState.kind === 'ready' ? (
-        // The same note covers the lazy chunk's arrival, so a slow chunk
-        // never shows a blank page.
         <Suspense fallback={parsingNote}>
           <ArticleMarkdown markdown={articleState.article.markdown} />
         </Suspense>
@@ -153,7 +140,6 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
 
 interface FallbackProps {
   readonly item: ReaderItem
-  /** Set when the server asked for a wait before the next parse. */
   readonly waitSeconds: number | undefined
   onRetry(): void
 }

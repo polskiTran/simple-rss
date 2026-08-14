@@ -50,7 +50,6 @@ describe('service lifecycle', () => {
 
   it('drains an established keep-alive connection instead of waiting out the grace period', async () => {
     const service = await startTestService({ env: { SHUTDOWN_GRACE_MS: '30000' } })
-    // Leaves a keep-alive socket open, which is what a real client holds.
     await (await service.fetch('/api/meta')).text()
 
     const startedAt = Date.now()
@@ -62,7 +61,6 @@ describe('service lifecycle', () => {
 
   it('closes readiness when the volume stops accepting writes', async () => {
     const service = await startTestService()
-    // Standing in for a full or read-only volume: the probe write now fails.
     service.database!.exec('DROP TABLE write_probe')
 
     const response = await service.fetch('/health/ready')

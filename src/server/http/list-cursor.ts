@@ -6,10 +6,7 @@ type ListCursorQuery =
   | { readonly ok: true; readonly cursor: ListCursor | undefined }
   | { readonly ok: false; readonly response: Response }
 
-/**
- * Absent means the top of the list. An undecodable cursor is answered 400
- * here, so the Digest and the Library refuse a foreign cursor in the same words.
- */
+/** Absent means the top of the list. An undecodable cursor is answered 400 here. */
 export function readListCursor(c: Context): ListCursorQuery {
   const raw = c.req.query('cursor')
   if (raw === undefined) return { ok: true, cursor: undefined }

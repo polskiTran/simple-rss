@@ -13,7 +13,6 @@ describe('article markdown rendering', () => {
   it('renders headings one level under the article title', () => {
     const body = bodyOf('# Top\n\n## Section\n\nProse.')
 
-    // The page h1 is the Feed Item title, so article headings start at h2.
     expect(body.querySelector('h1')).toBeNull()
     expect(body.querySelectorAll('h2')[0]?.textContent).toBe('Top')
     expect(body.querySelectorAll('h3')[0]?.textContent).toBe('Section')
@@ -64,8 +63,6 @@ describe('article markdown rendering', () => {
     const body = bodyOf('```python\ndef guard():\n    return **not bold**\n```')
 
     const code = body.querySelector('pre code')
-    // Each line is its own element, which the renderer's classes make a block
-    // and number; the line carries no newline of its own.
     const linesOfCode = code?.querySelectorAll(':scope > span') ?? []
     expect([...linesOfCode].map((line) => line.textContent)).toEqual(['def guard():', '    return **not bold**'])
     expect(code?.querySelector('strong')).toBeNull()
@@ -75,8 +72,6 @@ describe('article markdown rendering', () => {
   it('gives code the renderer’s own chrome, fenced and inline', () => {
     const body = bodyOf('Run `observe()`.\n\n```python\nprint(1)\n```')
 
-    // The renderer's classes are kept, so a fenced block arrives as its card
-    // and inline code as its filled pill.
     expect(body.querySelector('[data-streamdown="inline-code"]')?.className).toContain('bg-muted')
     expect(body.querySelector('[data-streamdown="code-block"]')?.className).toContain('bg-sidebar')
     expect(body.querySelector('[data-streamdown="code-block-header"]')?.textContent).toBe('python')
@@ -88,8 +83,6 @@ describe('article markdown rendering', () => {
   it('colours a language it carries, and leaves one it does not', async () => {
     const body = bodyOf('```python\ndef guard():\n    return 1\n```\n\n```brainfuck\n+[->+]\n```')
 
-    // Highlighting lands after the grammar loads; every token carries the
-    // light colour plus a `--shiki-dark` for the dark classes to read.
     await waitFor(() => {
       const token = body.querySelector('pre code span[style*="--shiki-dark"]')
       expect(token?.getAttribute('style')).toMatch(/--sdm-c:\s*#[0-9a-f]{6}/i)
@@ -111,14 +104,11 @@ describe('article markdown rendering', () => {
 
     expect(body.querySelector('p .katex')).not.toBeNull()
     expect(body.querySelector('.katex-display')).not.toBeNull()
-    // The TeX the server extracted survives inside the rendering.
     const sources = [...body.querySelectorAll('annotation')].map((source) => source.textContent)
     expect(sources).toEqual(['e^{i\\pi} = -1', '\\int_0^1 x\\,dx'])
   })
 
   it('reads an escaped dollar as a dollar, not as an opening delimiter', () => {
-    // The server escapes every literal `$` in article text, which is what
-    // makes single-dollar math safe to recognise at all.
     const body = bodyOf('a \\$5 note and a \\$9 one')
 
     expect(body.querySelector('.katex')).toBeNull()
@@ -135,9 +125,6 @@ describe('article markdown rendering', () => {
   })
 
   it('renders no element from raw HTML, escaped or not', () => {
-    // The server escapes `<`, so unescaped HTML cannot normally arrive; this
-    // pins the bundler stub (`src/client/no-raw-html.ts`) that keeps the
-    // renderer's raw-HTML plugin out.
     const body = bodyOf('a \\<img src=x onerror=alert(1)> c\n\n<img src=y onerror=alert(1)>\n\n<b>bold</b>')
 
     expect(body.querySelector('img')).toBeNull()
@@ -168,7 +155,6 @@ describe('article images', () => {
       '![leak](https://tracker.example/pixel.png) then ![wrong route](/api/items/1/image)',
     )
 
-    // The alt text remains as text; the foreign request is never made.
     expect(body.querySelector('img')).toBeNull()
     expect(body.textContent).toContain('leak')
     expect(body.textContent).toContain('wrong route')
@@ -186,9 +172,6 @@ describe('article images', () => {
   })
 
   it('renders an image a publisher linked as one linked image', () => {
-    // A figure linked to its full-size self, as newsletter platforms emit it.
-    // Reading link text only to the first `]` used to spill the destination
-    // into the article as an unbreakable line of literal text.
     const body = bodyOf(`[![Zero-Mem](${SIGNED})](https://press.example/full/a.jpg)`)
 
     const link = body.querySelector('a')

@@ -45,9 +45,7 @@ const ALIASES: Readonly<Record<string, Grammar>> = {
   zsh: 'bash',
 }
 
-// Low-contrast on both sides so code reads as part of the paper. Names only;
-// the highlighter registers the theme bodies itself and resolves by name.
-const THEMES: [ThemeInput, ThemeInput] = ['vitesse-light', 'vitesse-dark']
+const THEMES: [light: ThemeInput, dark: ThemeInput] = ['vitesse-light', 'vitesse-dark']
 
 function grammarFor(language: string): Grammar | undefined {
   const name = language.trim().toLowerCase()
@@ -55,7 +53,6 @@ function grammarFor(language: string): Grammar | undefined {
   return ALIASES[name]
 }
 
-// One highlighter per page, one load per grammar, however many blocks ask.
 let core: Promise<HighlighterCore> | undefined
 const loaded = new Map<Grammar, Promise<HighlighterCore>>()
 
@@ -108,7 +105,6 @@ export const articleCode: CodeHighlighterPlugin = {
         callback(highlighter.codeToTokens(code, { lang: grammar, themes: { light: THEMES[0], dark: THEMES[1] } }))
       })
       .catch(() => {
-        // Highlighting is decoration; the block already reads without it.
       })
     return null
   },

@@ -14,7 +14,6 @@ describe('the cadence grid', () => {
 
     expect(grid.columns).toHaveLength(26)
     expect(grid.columns.slice(0, 25).every((column) => column.cells.length === 7)).toBe(true)
-    // Today is a Saturday, so the newest column holds six days and stops.
     expect(grid.columns.at(-1)?.cells).toHaveLength(6)
     expect(grid.columns[0]?.cells[0]).toMatchObject({ date: '2026-02-09', count: 0, level: 0 })
     expect(grid.columns.at(-1)?.cells.at(-1)).toMatchObject({ date: '2026-08-08', count: 2, level: 2 })
@@ -46,7 +45,6 @@ describe('the one-line statistics', () => {
       cadenceWindow({ '2026-06-03': 2, '2026-08-06': 1, '2026-08-07': 1, '2026-08-08': 1 }),
     )
 
-    // 2026-06-03 is a Wednesday; the quiet stretch is Feb 9 through Jun 2.
     expect(stats).toBe('5 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days')
   })
 

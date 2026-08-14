@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 
-// The tab bar renders this list verbatim; `docs/DESIGN.md` fixes its order.
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
 export type Route = (typeof ROUTES)[number]
 
@@ -10,8 +9,6 @@ export function pathOf(route: Route): string {
   return `/${route}`
 }
 
-// Anything unrecognised — including `/` — lands on the Digest, so a stale
-// link opens the reader rather than an error.
 export function routeOf(pathname: string): Route {
   const first = pathname.split('/').filter(Boolean)[0]
   return ROUTES.find((route) => route === first) ?? DEFAULT_ROUTE
@@ -25,7 +22,6 @@ export function feedIdOf(pathname: string): number | undefined {
   return nestedIdOf(pathname, 'feeds')
 }
 
-// The Reader sits outside the four tabs and borrows the section it was opened from.
 export function readerPathOf(feedItemId: number): string {
   return `/reader/${feedItemId}`
 }
@@ -51,7 +47,6 @@ export interface Origin {
   readonly from: Origin | undefined
 }
 
-/** Tabs are roots: nothing sits behind them. */
 export const DIGEST_ORIGIN: Origin = { path: pathOf('digest'), label: 'digest', from: undefined }
 export const FEEDS_ORIGIN: Origin = { path: pathOf('feeds'), label: 'feeds', from: undefined }
 export const SAVED_ORIGIN: Origin = { path: pathOf('saved'), label: 'saved', from: undefined }
@@ -60,19 +55,15 @@ export function feedOrigin(feedId: number, title: string, from: Origin | undefin
   return { path: feedPathOf(feedId), label: title, from }
 }
 
-/** Labelled `article`, never the item's title: a way back stays one short word. */
 export function readerOrigin(feedItemId: number, from: Origin | undefined): Origin {
   return { path: readerPathOf(feedItemId), label: 'article', from }
 }
 
-/** Trail depth cap, so walking in circles cannot grow history state forever. */
 const MAX_TRAIL = 6
 
-// History state is untrusted input; validate and depth-cap it.
 function trailOf(value: unknown, depth = 0): Origin | undefined {
   if (depth >= MAX_TRAIL || typeof value !== 'object' || value === null) return undefined
   const { path, label, from } = value as Record<string, unknown>
-  // Own addresses only: a crafted entry must not turn a way back into a link elsewhere.
   if (typeof path !== 'string' || !/^\/[a-z]+(\/[1-9]\d*)?$/.test(path)) return undefined
   if (typeof label !== 'string' || label === '') return undefined
   return { path, label, from: trailOf(from, depth + 1) }
@@ -97,8 +88,6 @@ interface Location {
   readonly origin: Origin | undefined
 }
 
-// Hand-rolled history router: four sibling views with one nested Feed do not
-// justify a routing library.
 export function useNavigation(): Navigation {
   const [location, setLocation] = useState<Location>(() => currentLocation())
 
@@ -108,8 +97,6 @@ export function useNavigation(): Navigation {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  // A way back is pushed, not `history.back()`: after reading on, the
-  // previous entry is the previous article, not the screen the label promises.
   const go = useCallback((path: string, from: Origin | undefined) => {
     const origin = trailOf(from)
     const state = origin ? { origin } : null
@@ -136,8 +123,6 @@ function currentLocation(): Location {
 
 function locationOf(pathname: string, origin: Origin | undefined): Location {
   const readerItemId = readerItemIdOf(pathname)
-  // The Reader borrows its origin's section, so the tab, the way back, and
-  // the screen underneath all name the same one.
   const route = readerItemId !== undefined && origin ? routeOf(origin.path) : routeOf(pathname)
   return { route, feedId: feedIdOf(pathname), readerItemId, origin }
 }

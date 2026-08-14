@@ -10,7 +10,6 @@ export type HttpClientFailureCode =
   | 'unresolvable_host'
   | 'unsupported_content_encoding'
 
-/** A safe, typed transport failure the retrieval module can return unchanged. */
 export class HttpClientError extends Error {
   readonly code: HttpClientFailureCode
 

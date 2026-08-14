@@ -25,14 +25,12 @@ const USAGE = `simple-rss <command>
                           which keeps the password out of the shell history.
 `
 
-/** Where `reset-password` looks when it is not handed the password directly. */
 export const NEW_PASSWORD_VARIABLE = 'SIMPLE_RSS_NEW_PASSWORD'
 
 export interface CliContext {
   readonly config: Config
   readonly clock: Clock
   readonly out: (line: string) => void
-  /** The process environment, so a reset can take the password from it. */
   readonly env?: NodeJS.ProcessEnv
   readonly logger?: Logger
 }
@@ -98,10 +96,6 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
   }
 }
 
-/**
- * Persistence owns the snapshot mechanics. Failure messages are about files,
- * never about what the database holds.
- */
 function backup(destination: string | undefined, context: CliContext): number {
   if (!destination) {
     context.out('backup needs a destination path for the snapshot')
@@ -139,10 +133,6 @@ function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/**
- * Asks for no current password — whoever runs this holds the volume — but
- * revokes every Session, so an intruder who provoked the reset keeps nothing.
- */
 async function resetPassword(
   db: SqliteDatabase,
   argument: string | undefined,

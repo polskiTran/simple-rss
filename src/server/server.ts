@@ -19,10 +19,6 @@ export interface RunningService extends Service {
 
 const IDLE_SWEEP_MS = 20
 
-/**
- * Starts the complete service on a real socket. The test harness uses this
- * too, so tests exercise the same wiring production does.
- */
 export async function startService(options: StartOptions): Promise<RunningService> {
   const service = createService(options)
   const server = await listen(service.app, options.port ?? options.config.port)

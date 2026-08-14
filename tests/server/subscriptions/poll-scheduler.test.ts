@@ -4,9 +4,6 @@ import type { FeedRefresh } from '../../../src/server/subscriptions/feed-refresh
 import { PollScheduler, WAKE_INTERVAL_MS } from '../../../src/server/subscriptions/poll-scheduler.js'
 import type { SubscriptionService } from '../../../src/server/subscriptions/subscription-service.js'
 
-// Full polling behaviour lives in the application tests via explicit `tick()`.
-// Only fake timers can show the wake itself: the once-per-minute cadence, and
-// that a wake landing on an in-flight tick does nothing.
 describe('poll scheduler wakes', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -69,13 +66,10 @@ describe('poll scheduler wakes', () => {
     })
     const first = scheduler.tick()
     const second = scheduler.tick()
-    // The joined wake did not start polling on its own: the batch bound holds.
     expect(frontierQueries).toBe(1)
 
     finishPoll()
     await Promise.all([first, second])
-    // …but its request was heard: the frontier was examined once more, so a
-    // Subscription recorded mid-drain is not left waiting for the next wake.
     expect(frontierQueries).toBe(2)
   })
 })

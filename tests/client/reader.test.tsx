@@ -38,8 +38,6 @@ function reading(): StubbedApi {
   return api
 }
 
-// Reader View loads its Markdown renderer lazily; importing it once here keeps
-// the KaTeX/Shiki transform, which can outlast a query's timeout, out of each test.
 beforeAll(async () => {
   await import('../../src/client/components/article-markdown.js')
 })
@@ -54,7 +52,6 @@ describe('Reader View', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { level: 1, name: 'First light' })).toBeDefined()
-    // Twice: the meta row and the next-in-digest attribution.
     expect(screen.getAllByText('Field Notes').length).toBeGreaterThan(0)
     expect(screen.getByText('saturday, 8 august')).toBeDefined()
     await screen.findByText('4 min')
@@ -64,15 +61,12 @@ describe('Reader View', () => {
     expect(original.getAttribute('target')).toBe('_blank')
     expect(original.getAttribute('rel')).toBe('noopener noreferrer')
 
-    // `##` renders one level under the item title, which is the page's h1.
-    // Awaited because the Markdown renderer arrives with the first article.
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
     expect(screen.getByText(/turns from grey to/)).toBeDefined()
 
     const toggle = screen.getByRole('button', { name: 'save First light' })
     expect(toggle.textContent).toBe('save')
 
-    // It ends in the digest's next item, never a dead stop.
     expect(screen.getByText('next in the digest')).toBeDefined()
     expect(screen.getByRole('link', { name: 'Evening notes' }).getAttribute('href')).toBe('/reader/4')
   })
@@ -100,7 +94,6 @@ describe('Reader View', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    // The item is untouched: title, summary, and the way to the original.
     expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
     expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
 
@@ -179,7 +172,6 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Evening notes' })).toBeDefined()
     expect(window.location.pathname).toBe('/reader/4')
 
-    // The last item has nothing after it; the reader simply ends calmly.
     expect(screen.queryByText('next in the digest')).toBeNull()
   })
 })

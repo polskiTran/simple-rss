@@ -5,18 +5,13 @@ import { rebuildSearchIndex } from '../search/search-service.js'
 import { assertWritable, openDatabase, type SqliteDatabase } from './database.js'
 import { applyMigrations } from './migrations.js'
 
-// Both operations stage under a temporary name and rename into place only once every
-// step has passed, so a file at the final path is always a finished artifact.
-
-/** Files SQLite may hold beside a database, which travel or block as a set. */
 function sidecarsOf(path: string): string[] {
   return [`${path}-wal`, `${path}-shm`]
 }
 
 /**
  * `VACUUM INTO` produces a compacted, transaction-consistent copy even while the WAL is
- * active — safe where a raw file copy of an open database is not. An existing destination
- * is never overwritten: the backup being replaced is the one needed if this run fails.
+ * active — safe where a raw file copy of an open database is not.
  */
 export function writeSnapshot(source: string, destination: string): { bytes: number } {
   if (!existsSync(source)) {
@@ -61,9 +56,7 @@ export interface RestoreReport {
 
 /**
  * All verification — integrity, migrations, the search rebuild, a real write — happens
- * on a staging copy renamed into place only after everything passed, so a failed restore
- * leaves the directory uninitialized. Migrations bring an older backup forward; the FTS
- * index is rebuilt rather than trusted, because derived state is this installation's to derive.
+ * on a staging copy renamed into place only after everything passed.
  */
 export function restoreSnapshot(backupPath: string, databasePath: string, clock: Clock): RestoreReport {
   if (!existsSync(backupPath)) {
@@ -111,8 +104,7 @@ export function restoreSnapshot(backupPath: string, databasePath: string, clock:
       db.close()
     }
 
-    // Closing checkpoints the WAL and removes the sidecars. A survivor means renaming
-    // the main file alone would silently shed the work committed above, so it fails the restore.
+    // Closing checkpoints the WAL and removes the sidecars.
     for (const sidecar of sidecarsOf(staging)) {
       if (existsSync(sidecar)) {
         throw new Error('the staging copy left WAL sidecars behind')

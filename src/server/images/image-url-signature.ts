@@ -2,8 +2,6 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { READER_IMAGE_PATH } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 
-// Twice the article's own browser-cache life, so every image reference inside
-// a cached article outlives the article that carries it.
 export const READER_IMAGE_URL_LIFETIME_SECONDS = 2 * 86_400
 
 /** Mints the signed same-origin proxy path for one approved image target. */
@@ -18,11 +16,6 @@ export interface ImageUrlSignature {
   verify(query: URLSearchParams): VerifiedImageUrl
 }
 
-/**
- * Binds target and expiry to this installation's key, so the image proxy only fetches
- * what extraction approved. The key lives for one process: a restart turns images in
- * an already-cached article into their fallback until re-extraction.
- */
 export function createImageUrlSignature(options: {
   readonly key: Uint8Array
   readonly clock: Clock
@@ -56,7 +49,6 @@ export function createImageUrlSignature(options: {
         return { ok: false, reason: 'tampered' }
       }
 
-      // Anything unsigned already failed above, so a forged expiry never reaches this comparison.
       if (Number(expiry) * 1000 < clock.now().getTime()) {
         return { ok: false, reason: 'expired' }
       }

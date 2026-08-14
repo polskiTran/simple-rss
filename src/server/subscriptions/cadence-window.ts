@@ -1,8 +1,5 @@
 import { CADENCE_GRID_WEEKS } from '../../shared/api.js'
 
-// Both windows take the installation-timezone "today" date key and return date
-// keys, so cadence aggregation is deterministic for a fixed dataset and timezone.
-
 const DAY_MS = 24 * 60 * 60 * 1_000
 
 /** The `days` most recent date keys ending with `todayKey`, oldest first. */

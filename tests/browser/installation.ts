@@ -14,36 +14,25 @@ export const SETUP_SECRET = 'a-deployment-setup-secret'
 export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface Installation {
-  /** Origin the browser loads, e.g. `http://127.0.0.1:53124`. */
   readonly url: string
-  /** Exact Feed URL served by the controllable publisher fixture. */
   readonly feedUrl: string
-  /** A second Feed whose one item's original page always answers 500. */
   readonly brokenArticleFeedUrl: string
-  /** A Feed of 55 items — more than one Digest page, so the list ends early. */
   readonly longFeedUrl: string
 }
 
-// A figure linking to its own full-size copy, the way newsletter platforms emit one.
 const FIGURE_IMAGE_URL = 'https://cdn.publisher.example/image/fetch/$s_!9LbW!,w_424,c_limit,f_webp/valley.png'
 const FIGURE_FULL_SIZE_URL =
   'https://cdn.publisher.example/image/fetch/$s_!9LbW!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fpost-media.publisher.example%2Fpublic%2Fimages%2F22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7_996x477.png'
 
-// A spaceless address quoted in prose — the shape that used to push the
-// reading column past the edge of a phone.
 const QUOTED_LONG_URL =
   'https://cdn.publisher.example/archive/2026/08/09/the-long-unbroken-address-a-publisher-quotes-in-running-prose-22a60ecb-ebf1-4dad-b91f-6d2c864d8fe7.html'
 
-// KaTeX markup as a publisher ships it, with the TeX source in the MathML
-// annotation extraction reads back out.
 const PUBLISHED_MATH =
   '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow>' +
   '<msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>=</mo><mo>−</mo><mn>1</mn></mrow>' +
   '<annotation encoding="application/x-tex">e^{i\\pi} = -1</annotation></semantics></math></span>' +
   '<span class="katex-html" aria-hidden="true">e</span></span>'
 
-// A numbered display equation wider than the measure — used to spill off the
-// paper and drop its equation number onto the formula.
 const PUBLISHED_DISPLAY_MATH =
   '<span class="katex-display"><span class="katex"><span class="katex-mathml">' +
   '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>L</mi></mrow>' +
@@ -53,15 +42,11 @@ const PUBLISHED_DISPLAY_MATH =
   'N_{\\backslash E}^{\\beta-1} = 0 \\tag{18}' +
   '</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">L</span></span></span>'
 
-/** A 1×1 PNG — enough to pass the proxy's magic-byte sniff and paint. */
 const PNG_PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
 )
 
-// The original page behind `First light`: long enough to extract as a real
-// article, structured, and armed (script, iframe, form, handler) to prove
-// sanitization in a real browser.
 const ARTICLE_HTML = `<!doctype html>
   <html lang="en">
     <head><meta charset="utf-8"><title>First light</title></head>
@@ -97,25 +82,18 @@ const ARTICLE_HTML = `<!doctype html>
   </html>`
 
 export interface ForeignSite {
-  /** A different origin, for proving what a foreign page cannot do. */
   readonly url: string
-  /** Serves `html` at `/`, with the installation's origin substituted in. */
   serve(html: string): void
 }
 
-// A whole installation on a real socket with its own empty volume, plus a
-// second origin. Same `startService` the container runs — production wiring.
 export const test = base.extend<{ installation: Installation; foreign: ForeignSite }>({
   installation: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
     const feedUrl = 'https://publisher.example/feed.xml'
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
     const longFeedUrl = 'https://publisher.example/meadow.xml'
-    // Today at 07:15 UTC, so the item lands in the Digest's "today" group on
-    // any run date (chronology tolerates a publication up to a day ahead).
     const publishedAt = new Date()
     publishedAt.setUTCHours(7, 15, 0, 0)
-    // The second Feed's item is older, so `next in the digest` is stable.
     const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
     const upstream = new UpstreamFixtures()
       .stub(feedUrl, {

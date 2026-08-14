@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ARGON2ID_PARAMETERS, argon2idHasher } from '../../../src/server/auth/password.js'
 
-/**
- * The one rule the application boundary cannot see: what a stored verifier is
- * actually made of. Everything else about passwords is asserted through HTTP.
- */
 describe('the password hasher', () => {
   it('produces an Argon2id verifier with the documented parameters', async () => {
     const stored = await argon2idHasher().hash('a-calm-reading-password')

@@ -5,8 +5,6 @@ import { App } from '../../src/client/app.js'
 import { ROUTES } from '../../src/client/routing.js'
 import { stubApi } from './stub-api.js'
 
-// Renders the shell for a signed-in User and waits for the first status
-// answer — the tabs do not render until it lands.
 async function renderAt(path: string) {
   window.history.replaceState(null, '', path)
   const result = render(<App />)
@@ -15,8 +13,6 @@ async function renderAt(path: string) {
 }
 
 function tabNames() {
-  // Scoped to the tab bar: a view behind it may hold links of its own, like
-  // the Settings export downloads.
   const sections = screen.getByRole('navigation', { name: 'Sections' })
   return within(sections).getAllByRole('link').map((tab) => tab.textContent)
 }
@@ -68,16 +64,12 @@ describe('the application shell', () => {
   it('leaves the digest tab the only current one when the mark is a link', async () => {
     await renderAt('/saved')
 
-    // `getByRole` throws on a second match: the mark must not claim the page
-    // alongside the tab that says where the User is.
     expect(activeTab()).toBe('saved')
   })
 
   it('draws the mark as the 4x4 cadence tile of docs/references/brand.png', async () => {
     const { container } = await renderAt('/digest')
 
-    // The pattern is the design: sixteen cells, row by row, in the cadence
-    // ramp's levels. The tile is aria-hidden decoration, hence the class query.
     const levels = [...container.querySelectorAll('.masthead .wordmark-cell')].map((cell) =>
       cell.getAttribute('data-level'),
     )
@@ -89,8 +81,6 @@ describe('the application shell', () => {
   it('orders the hover glint along the tile’s anti-diagonal', async () => {
     const { container } = await renderAt('/digest')
 
-    // `row + col`: the glint crosses against the leading diagonal the peak
-    // cells sit on. Every cell carries its step even without a pointer.
     const steps = [...container.querySelectorAll<HTMLElement>('.masthead .wordmark-cell')].map(
       (cell) => cell.style.getPropertyValue('--glint-step'),
     )
@@ -182,8 +172,6 @@ describe('the resting state', () => {
   ])('gives %s a single calm line', async (path, note) => {
     await renderAt(path)
 
-    // The note appears once the section's own fetch settles, which the
-    // navigation landmark `renderAt` waits for does not guarantee.
     expect(await screen.findByText(note)).toBeDefined()
   })
 

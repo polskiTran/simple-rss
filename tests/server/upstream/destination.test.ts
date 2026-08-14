@@ -5,7 +5,6 @@ import {
   type ResolveAddresses,
 } from '../../../src/server/upstream/destination.js'
 
-/** A resolver that answers from a table and refuses anything it has not been told about. */
 function resolver(table: Record<string, readonly string[]>): ResolveAddresses {
   return async (hostname) => table[hostname] ?? []
 }

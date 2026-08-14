@@ -8,7 +8,6 @@ import {
   type Installation,
 } from './installation.js'
 
-/** Claims the installation and subscribes to the fixture Feed, ending on Feeds. */
 async function subscribe(page: Page, installation: Installation, feedUrl = installation.feedUrl): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
@@ -38,7 +37,6 @@ test.describe('Reader View', () => {
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page).toHaveURL(/\/reader\/\d+$/)
 
-    // The accepted layout: title, Feed, date, reading time, save, original.
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     const meta = page.locator('.reader-meta')
     await expect(meta).toContainText('Field Notes')
@@ -48,13 +46,10 @@ test.describe('Reader View', () => {
     await expect(original).toHaveAttribute('rel', 'noopener noreferrer')
     await expect(original).toHaveAttribute('target', '_blank')
 
-    // Structure survives: headings, lists, code.
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('arrive before the light')).toBeVisible()
     await expect(page.locator('.article-body pre code')).toContainText('def observe()')
 
-    // A fenced block keeps one line per line, and Shiki colours it once the
-    // grammar has landed, carrying both themes on every token.
     const codeLines = page.locator('.article-body pre code > span')
     await expect(codeLines).toHaveCount(4)
     const firstLine = await codeLines.first().boundingBox()
@@ -62,11 +57,8 @@ test.describe('Reader View', () => {
     expect(lastLine?.y ?? 0).toBeGreaterThan(firstLine?.y ?? 0)
     await expect(page.locator('.article-body pre code span[style*="--shiki-dark"]').first()).toBeVisible()
 
-    // Math is set rather than quoted, inline and as a display block.
     await expect(page.locator('.article-body .katex')).toHaveCount(2)
 
-    // A numbered equation wider than the measure scrolls in place, and its
-    // number stays clear of the formula instead of landing on top of it.
     const equation = page.locator('.article-body .katex-display')
     const equationLayout = await equation.evaluate((element) => {
       const bases = [...element.querySelectorAll('.katex-html > .base')]
@@ -80,26 +72,20 @@ test.describe('Reader View', () => {
     expect(equationLayout.clear).toBeGreaterThan(equationLayout.formulaEnds)
     await expectNoHorizontalOverflow(page)
 
-    // The hostile parts do not: no script effect, no frames, no forms.
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     expect(await page.locator('.article-body iframe, .article-body form, .article-body script').count()).toBe(0)
     await expect(page.getByText('Subscribe now')).toHaveCount(0)
 
-    // Article links leave for the publisher, resolved and marked external.
     const noteLink = page.getByRole('link', { name: /the notebook/ })
     await expect(noteLink).toHaveAttribute('href', 'https://publisher.example/notes')
     await expect(noteLink).toHaveAttribute('rel', 'noopener noreferrer')
 
-    // The article's figure arrives through the signed same-origin proxy and
-    // actually paints — one that failed would leave its alt text behind.
     const figureImage = page.locator('.article-body img.article-image')
     await expect(figureImage).toHaveAttribute('src', /^\/api\/reader\/image\?/)
     await expect(figureImage).toHaveAttribute('alt', 'the valley at dawn')
     await expect(figureImage).toHaveJSProperty('naturalWidth', 1)
-    // Its publisher address stays out of the prose, as an address or as text.
     await expect(page.locator('.article-body')).not.toContainText('fl_progressive')
 
-    // A reload lands straight back in the article — the route is real.
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
 
@@ -111,8 +97,6 @@ test.describe('Reader View', () => {
     page,
     installation,
   }) => {
-    // The renderer is most of the client's weight, and a chunking change can
-    // quietly attach it to the entry — a preload link is enough to do it.
     const renderer: string[] = []
     page.on('request', (request) => {
       if (/article-renderer|article-markdown/.test(request.url())) renderer.push(request.url())
@@ -150,26 +134,19 @@ test.describe('Reader View', () => {
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'Slow water' }).click()
 
-    // The fallback shows the stored summary; the meta row and the fallback
-    // each offer the original, so two links match.
     await expect(page.getByRole('heading', { level: 1, name: 'Slow water' })).toBeVisible()
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     const originals = page.getByRole('link', { name: 'open original' })
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    // The first retry really refetches; with the publisher still down it
-    // lands back on the same fallback.
     await page.getByRole('button', { name: 'retry parsing' }).click()
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
 
-    // A second attempt inside the cooldown is refused with the wait, not
-    // another retrieval.
     await page.getByRole('button', { name: 'retry parsing' }).click()
     await expect(page.getByText(/wait \d+s, then retry/)).toBeVisible()
 
-    // Nothing about the item changed: still in the Digest, still unsaved.
     await page.getByRole('link', { name: '← digest' }).click()
     await expect(page.getByRole('link', { name: 'Slow water' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'save Slow water' })).toHaveText('save')
@@ -189,7 +166,6 @@ test.describe('Reader View', () => {
 
     await expect(page).toHaveURL(/\/reader\/\d+$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Slow water' })).toBeVisible()
-    // The last item in the Digest ends calmly instead of pointing onward.
     await expect(page.getByText('next in the digest')).toHaveCount(0)
   })
 
@@ -200,17 +176,14 @@ test.describe('Reader View', () => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
 
-    // The attribution under a Digest item is the way into its Feed.
     await page.locator('.content-meta').getByRole('link', { name: 'Field Notes' }).click()
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
     await expect(page.getByRole('link', { name: '← digest' })).toBeVisible()
 
-    // An article opened from a Feed goes back to that Feed by name.
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page).toHaveURL(/\/reader\/\d+$/)
     await page.getByRole('link', { name: '← Field Notes' }).click()
 
-    // The Feed still knows it was reached from the Digest, and returns there.
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
     await page.getByRole('link', { name: '← digest' }).click()
     await expect(page.getByRole('heading', { name: /today/ })).toBeVisible()
@@ -243,8 +216,6 @@ test.describe('Reader View at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('next in the digest')).toHaveCount(0)
 
-    // The article quotes a spaceless address wider than the paper; the page
-    // must not grow wider than the phone.
     await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })

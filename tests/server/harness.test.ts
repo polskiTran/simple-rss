@@ -3,8 +3,6 @@ import { startTestService } from '../support/service-harness.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { UpstreamFixtures } from '../support/upstream-fixtures.js'
 
-// The harness's two controls — time and upstream HTTP — are tested here
-// rather than discovered broken by the first Feed polling test.
 describe('the test harness', () => {
   it('drives the time the service records', async () => {
     const clock = new ManualClock('2026-08-08T09:00:00.000Z')

@@ -89,7 +89,6 @@ describe('the Settings appearance', () => {
     expect(screen.getByRole('button', { name: 'dark' }).getAttribute('aria-pressed')).toBe('true')
     expect(document.documentElement.dataset['appearance']).toBe('dark')
     expect(localStorage.getItem('appearance')).toBe('dark')
-    // Appearance is a device preference; no request carried it anywhere.
     expect(api.requests.filter(({ method }) => method !== 'GET')).toEqual([])
   })
 

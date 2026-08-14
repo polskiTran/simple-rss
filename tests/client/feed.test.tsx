@@ -78,19 +78,15 @@ describe('opening one Feed', () => {
     expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
     expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
 
-    // 26 columns × 7 rows, minus the day after a Saturday today.
     expect(container.querySelectorAll('.cadence-cell')).toHaveLength(181)
     expect(container.querySelectorAll('.cadence-cell[data-level="2"]')).toHaveLength(1)
     const months = [...container.querySelectorAll('.cadence-month')].map((label) => label.textContent)
     expect(months).toEqual(['february', 'april', 'june', 'august'])
     expect(screen.getByText('3 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days')).toBeDefined()
 
-    // The retained items keep the shared content shape, minus the redundant
-    // source label — everything on this screen is Field Notes.
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByText('today, 07:15')).toBeDefined()
     expect(screen.getByText('3 june')).toBeDefined()
-    // Saved state arrives with the detail: the affordance is the word itself.
     expect(screen.getByRole('button', { name: /save First light/i }).textContent).toBe('save')
     expect(screen.getByRole('button', { name: /save A June letter/i }).textContent).toBe('saved')
     for (const meta of container.querySelectorAll('.feed-items .content-meta')) {
@@ -203,7 +199,6 @@ describe('managing one Feed', () => {
     await user.click(await screen.findByRole('button', { name: 'refresh now' }))
 
     expect(await screen.findByText('refreshed — the feed shows 2 items')).toBeDefined()
-    // The grid reports the newest observations once the detail is refetched.
     expect(await screen.findByText(/4 posts in 26 weeks/)).toBeDefined()
     expect(api.requestsTo('POST /api/feeds/1/refresh')).toHaveLength(1)
   })
@@ -255,7 +250,6 @@ describe('managing one Feed', () => {
 
     await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
 
-    // The consequences appear as words; nothing has been asked of the server.
     expect(
       screen.getByText('this stops checking the feed and its items leave the digest — anything saved stays in your library'),
     ).toBeDefined()
@@ -311,7 +305,6 @@ describe('the quiet states of one Feed', () => {
 
     expect(await screen.findByText('no posts in 26 weeks')).toBeDefined()
     expect(screen.getByText('nothing retained from this feed yet')).toBeDefined()
-    // Quiet is drawn as silence, never as a card, a chart, or a count of unread.
     expect(container.querySelectorAll('button.cadence-cell')).toHaveLength(0)
     await waitFor(() => expect(container.textContent).not.toMatch(/unread/i))
   })

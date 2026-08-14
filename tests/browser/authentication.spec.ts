@@ -3,7 +3,6 @@ import { expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './
 
 const SESSION_COOKIE = 'simple_rss_session'
 
-/** Claims the installation the way the User does on first visit. */
 async function claim(page: Page, installation: Installation, password = USER_PASSWORD): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)

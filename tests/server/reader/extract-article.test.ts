@@ -3,7 +3,6 @@ import { extractArticle } from '../../../src/server/reader/extract-article.js'
 
 const URL = 'https://publisher.example/writing/prompt-injection'
 
-/** A page with the chrome a real publisher wraps around long-form writing. */
 function page(article: string, head = ''): Uint8Array {
   return new TextEncoder().encode(
     `<!doctype html>
@@ -35,7 +34,6 @@ describe('extractArticle', () => {
     expect(article?.markdown).toContain('## What holds up')
     expect(article?.markdown).toContain('```python')
     expect(article?.markdown).toContain('| Mitigation | Holds |')
-    // The publisher's chrome is not part of the article.
     expect(article?.markdown).not.toContain('Archive')
     expect(article?.markdown).not.toContain('newsletter')
   })

@@ -11,11 +11,8 @@ import { feedItems, feeds, libraryItems } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
 import { extractArticle } from './extract-article.js'
 
-// Each failure episode affords the automatic attempt plus one deliberate retry —
-// the fallback offers `retry parsing`, so that offer must be honest.
 const RETRY_COOLDOWN_MS = 30_000
 
-/** Attempts a failure episode allows before the cooldown starts refusing. */
 const ATTEMPTS_BEFORE_COOLDOWN = 2
 
 interface FailureEpisode {
@@ -28,15 +25,9 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'no-link' }
   | { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number }
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
-  /** The page arrived but yielded no readable article. */
   | { readonly kind: 'unreadable' }
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
-/**
- * A temporary rendering derived from a persisted Feed Item's link — never from a
- * caller-supplied URL, and never written back. A failure leaves the Feed Item,
- * its summary, and its Library membership untouched.
- */
 export class ReaderService {
   readonly #db: BetterSQLite3Database
   readonly #clock: Clock
@@ -103,10 +94,6 @@ export class ReaderService {
     }
   }
 
-  /**
-   * Concurrent readers of one item share one retrieval; a failed parse starts the
-   * retry cooldown. A success costs nothing — the browser holds it privately for a day.
-   */
   async article(feedItemId: number): Promise<ReaderArticleOutcome> {
     const row = this.#db
       .select({ link: feedItems.link })
@@ -121,7 +108,6 @@ export class ReaderService {
     const inFlight = this.#inFlight.get(feedItemId)
     if (inFlight) return inFlight
 
-    // An elapsed cooldown ends the episode, so a later failure affords a fresh attempt and retry.
     const now = this.#clock.now().getTime()
     for (const [id, episode] of this.#failures) {
       if (now - episode.lastAttemptAt >= RETRY_COOLDOWN_MS) this.#failures.delete(id)

@@ -5,7 +5,6 @@ import { USER_PASSWORD, SETUP_SECRET, startTestService } from '../support/servic
 
 const FEED_URL = 'https://journal.example/feed'
 
-// 20:00 UTC on the 7th: yesterday in UTC, already today in Auckland.
 const RSS = `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>Field Notes</title>
     <item>
@@ -87,8 +86,6 @@ describe('the Settings preferences API', () => {
       timezone: 'Pacific/Auckland',
     })
 
-    // One installation timezone defines calendar groups across devices: the
-    // same stored instant now reads as today.
     const after = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(after.groups.map(({ label }) => label)).toEqual(['today'])
     expect(after.today).toEqual({ date: '2026-08-08', volume: 1 })

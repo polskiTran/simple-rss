@@ -16,13 +16,11 @@ const item = (guid: string, title: string, pubDate: string) => `
 const rss = (title: string, ...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>${title}</title>${items.join('')}</channel></rss>`
 
-/** Feed Items published one minute apart, so their Digest order is exact. */
 const minuteItems = (day: string, prefix: string, count: number) =>
   Array.from({ length: count }, (_, index) =>
     item(`${prefix}-${index}`, `${prefix}-${index}`, `${day}T00:${String(index).padStart(2, '0')}:00.000Z`),
   )
 
-/** Titles `prefix-from` down through `prefix-to`, the newest-first order. */
 const titlesDown = (prefix: string, from: number, to: number) =>
   Array.from({ length: from - to + 1 }, (_, index) => `${prefix}-${from - index}`)
 
@@ -32,7 +30,6 @@ const flatTitles = (digest: { groups: readonly { items: readonly { title: string
 describe('the Digest in pages', () => {
   it('serves fifty items at a time, joined by an opaque cursor, splitting a day where the page ends', async () => {
     const service = await startTestService()
-    // 55 items today and 10 yesterday: the first page must end mid-today.
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
       body: rss('Field Notes', ...minuteItems('2026-08-08', 'today', 55), ...minuteItems('2026-08-07', 'past', 10)),
@@ -51,7 +48,6 @@ describe('the Digest in pages', () => {
       await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
     )
 
-    // The split day continues under its own date, then yesterday follows.
     expect(rest.groups.map(({ date, label }) => [date, label])).toEqual([
       ['2026-08-08', 'today'],
       ['2026-08-07', 'yesterday'],
@@ -116,11 +112,9 @@ describe('the Digest in pages', () => {
     const boundary = first.groups[0]?.items.at(-1)
     expect(boundary?.title).toBe('today-2')
 
-    // The Reader's `next in the digest` reaches past the page the item is on.
     const reader = await (await user.get(`/api/items/${boundary?.feedItemId}`)).json()
     expect(reader).toMatchObject({ nextInDigest: { title: 'today-1' } })
 
-    // And the very last item of the whole chronology has nothing after it.
     const rest = digestSchema.parse(
       await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
     )
@@ -148,7 +142,6 @@ describe('the Digest in pages', () => {
     const first = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(flatTitles(first)).toEqual(titlesDown('today', 51, 2))
 
-    // A second Subscription arrives while the User holds the cursor.
     expect((await user.post('/api/subscriptions', { url: LATER_URL })).status).toBe(201)
     await service.wakeScheduler()
 
@@ -156,11 +149,9 @@ describe('the Digest in pages', () => {
       await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
     )
 
-    // Nothing repeats and nothing is skipped: the pages still meet exactly.
     expect(flatTitles(rest)).toEqual(['today-1', 'today-0'])
     expect(rest.nextCursor).toBeNull()
 
-    // The newcomer waits at the top of a fresh first page.
     const fresh = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(flatTitles(fresh).slice(0, 3)).toEqual(['A newer letter', 'today-51', 'today-50'])
   })

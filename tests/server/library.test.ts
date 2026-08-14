@@ -24,7 +24,6 @@ const rss = (...items: string[]) => `<?xml version="1.0"?>
 const stubFeed = (service: TestService, body: string) =>
   service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body })
 
-/** The Digest's view of one Feed Item, found by title, so tests speak titles. */
 async function digestItem(user: Device, title: string) {
   const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
   const found = digest.groups.flatMap((group) => group.items).find((entry) => entry.title === title)
@@ -50,8 +49,6 @@ describe('saving Feed Items to the Library', () => {
     const membership = libraryMembershipSchema.parse(await first.json())
     expect(membership).toEqual({ feedItemId, saved: true, savedAt: '2026-08-08T09:00:00.000Z' })
 
-    // An hour later the User's other device repeats the save. The membership
-    // it answers with is the original one, not a fresh save.
     service.clock.advance(60 * 60 * 1_000)
     const repeat = await user.put(`/api/library/${feedItemId}`)
     expect(repeat.status).toBe(200)
@@ -71,7 +68,6 @@ describe('saving Feed Items to the Library', () => {
     await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
 
-    // Never saved, unsaved anyway: the state it asked for already holds.
     const unsaved = await user.delete(`/api/library/${feedItemId}`)
     expect(unsaved.status).toBe(200)
     expect(libraryMembershipSchema.parse(await unsaved.json())).toEqual({
@@ -110,8 +106,6 @@ describe('saving Feed Items to the Library', () => {
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    // Saved oldest-publication first, to prove the list orders by the item's
-    // own chronology rather than by when the User saved.
     for (const title of ['A June letter', 'First light', 'Evening notes']) {
       const { feedItemId } = await digestItem(user, title)
       expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
@@ -169,8 +163,6 @@ describe('saving Feed Items to the Library', () => {
     const { feedItemId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
-    // The publisher retitles the same entry; a manual refresh ingests it.
-    // A minute on, so the first check's refresh cooldown has passed.
     stubFeed(service, rss(item('one', 'First light, revised', '2026-08-08T07:15:00.000Z')))
     service.clock.advance(60_000)
     expect((await user.post(`/api/feeds/1/refresh`)).status).toBe(200)

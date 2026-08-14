@@ -12,10 +12,8 @@ import { ManualClock } from './manual-clock.js'
 import { makeTempDataDir } from './temp-dir.js'
 import { UpstreamFixtures } from './upstream-fixtures.js'
 
-/** The setup secret a test installation is deployed with. */
 export const SETUP_SECRET = 'a-deployment-setup-secret'
 
-/** The password the User picks when a test claims an installation. */
 export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface HarnessOptions {
@@ -42,9 +40,7 @@ export interface TestService {
   /** The service's own hardened boundary, wired from its configuration. */
   readonly retrieval: Retrieval
   readonly settings: InstallationSettingsStore | undefined
-  /** The live connection, for assertions SQL states better than HTTP does. */
   readonly database: SqliteDatabase | undefined
-  /** Every structured log record the service wrote. */
   readonly logs: readonly LogRecord[]
   /**
    * Every progressive login delay the service asked for, in order. Nothing
@@ -79,15 +75,11 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     SHUTDOWN_GRACE_MS: '2000',
     SETUP_SECRET,
     PUBLIC_ORIGIN: 'https://reader.test',
-    // Test requests arrive on a real loopback socket rather than through a
-    // proxy, so the forwarding header is only believed where a test sets it.
     TRUST_PROXY_HEADERS: 'true',
     ...(options.clientDir ? { CLIENT_DIR: options.clientDir } : {}),
     ...options.env,
   })
 
-  // Every boot — the first and each restart — is wired identically, so a
-  // restart really is the same service on the same volume.
   const boot = async () => {
     const logger = createLogger({
       level: config.logLevel,
@@ -107,8 +99,6 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       retrieval,
       sleep: async (milliseconds) => void sleeps.push(milliseconds),
       logger,
-      // Nudges are off by default so every retrieval happens at a wake the
-      // test drives; a test about the nudge itself turns them back on.
       scheduling: { nudges: false, ...options.scheduling },
       ...(options.retention ? { retention: options.retention } : {}),
     })
@@ -159,7 +149,6 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
   return harness
 }
 
-/** Any service a test forgot to stop, so one failure cannot hang the suite. */
 afterEach(async () => {
   const leftover = running.splice(0, running.length)
   await Promise.all(leftover.map((service) => service.stop()))

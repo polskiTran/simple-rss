@@ -2,7 +2,6 @@ import { loadConfig } from './config.js'
 import { createLogger } from './logger.js'
 import { startService, type RunningService } from './server.js'
 
-/** Container entrypoint: environment to configuration, platform signals to a graceful stop. */
 async function main(): Promise<void> {
   const config = loadConfig()
   const logger = createLogger({ level: config.logLevel })
@@ -22,7 +21,6 @@ async function main(): Promise<void> {
   })
 }
 
-/** A second signal means the operator is impatient: stop waiting for the drain. */
 function installSignalHandlers(service: RunningService): void {
   let stopping = false
 
@@ -47,8 +45,6 @@ function installSignalHandlers(service: RunningService): void {
 }
 
 main().catch((error: unknown) => {
-  // Configuration is read before a logger exists, so this is the one place
-  // that writes an unstructured line.
   console.error('simple-rss failed to start:', error)
   process.exitCode = 1
 })

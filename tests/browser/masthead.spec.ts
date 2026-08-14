@@ -10,14 +10,12 @@ async function claim(page: Page, installation: Installation): Promise<void> {
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
-/** A tile's sixteen backgrounds, as the browser is painting them right now. */
 async function inkLevels(page: Page, scope = '.masthead'): Promise<string[]> {
   return page.$$eval(`${scope} .wordmark-cell`, (cells) =>
     cells.map((cell) => getComputedStyle(cell).backgroundColor),
   )
 }
 
-/** Leaves the Digest request unanswered, so the reader stays on its wait. */
 async function hangTheDigest(page: Page): Promise<void> {
   await page.route('**/api/digest*', () => {})
 }
@@ -44,12 +42,9 @@ test.describe('the masthead mark', () => {
 
     await page.getByRole('link', { name: 'simple' }).hover()
 
-    // Mid-glint the matrix differs from rest. Sampled rather than asserted
-    // cell by cell — which cell is where at 120ms is the curve's business.
     await page.waitForTimeout(120)
     expect(await inkLevels(page)).not.toEqual(resting)
 
-    // Then it settles, with the pointer still on it: one pass, not a loop.
     await expect
       .poll(async () => inkLevels(page), { timeout: 2_000 })
       .toEqual(resting)
@@ -75,15 +70,12 @@ test.describe('the masthead mark', () => {
 
     const mastheadAtRest = await inkLevels(page)
     const frames = new Set<string>()
-    // A loop, not a single pass: over one 1200ms turn the waiting tile must
-    // keep changing rather than stop after the first pass.
     for (let sample = 0; sample < 8; sample++) {
       frames.add((await inkLevels(page, '.loading-note')).join())
       await page.waitForTimeout(150)
     }
 
     expect(frames.size).toBeGreaterThan(3)
-    // Meanwhile the mark in the masthead has not moved at all.
     expect(await inkLevels(page)).toEqual(mastheadAtRest)
   })
 
@@ -95,8 +87,6 @@ test.describe('the masthead mark', () => {
     await page.getByRole('link', { name: 'digest' }).click()
     await expect(page.getByText('loading the digest')).toBeVisible()
 
-    // The cells hold still — no reshuffling — but the tile as a whole keeps
-    // moving on opacity: a stopped loader lies.
     const cells = await inkLevels(page, '.loading-note')
     const opacities = new Set<string>()
     for (let sample = 0; sample < 6; sample++) {

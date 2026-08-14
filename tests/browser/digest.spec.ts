@@ -11,7 +11,6 @@ import {
 const LIGHT_PAPER = 'rgb(247, 247, 245)'
 const DARK_PAPER = 'rgb(18, 17, 15)'
 
-/** Claims the installation and subscribes to the fixture Feed, ending on Feeds. */
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
@@ -38,8 +37,6 @@ test.describe('the Digest presentation', () => {
     const heading = page.getByRole('heading', { name: 'today · 1 post' })
     await expect(heading).toBeVisible()
     await expect(heading).toHaveCSS('font-size', '12.5px')
-    // The count takes the quietest grey — a fact about what there is to read,
-    // never a badge.
     await expect(page.locator('.day-heading-count')).toHaveCSS('color', 'rgb(163, 162, 157)')
   })
 
@@ -48,7 +45,6 @@ test.describe('the Digest presentation', () => {
     await openDigest(page, installation)
 
     await expect(page.locator('body')).toHaveCSS('background-color', DARK_PAPER)
-    // Dark paper carries 4px more headroom on the desktop layout.
     await expect(page.locator('.paper')).toHaveCSS('padding-top', '36px')
     await expect(page.locator('.daily-band-field')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'today · 1 post' })).toBeVisible()
@@ -64,7 +60,6 @@ test.describe('the Digest presentation', () => {
     await expect(page.locator('body')).toHaveCSS('background-color', DARK_PAPER)
     await expect(page.locator('.paper')).toHaveCSS('padding-top', '36px')
 
-    // The choice belongs to this device, so a fresh load keeps it.
     await page.reload()
     await expect(page.locator('body')).toHaveCSS('background-color', DARK_PAPER)
 
@@ -77,9 +72,6 @@ test.describe('the Digest presentation', () => {
     await openDigest(page, installation)
     await expect(page.getByText('07:15')).toBeVisible()
 
-    // Day-boundary flips depend on the run date and are asserted under a fixed
-    // clock in `tests/server/settings.test.ts`. The wall time is deterministic:
-    // Midway holds UTC−11 all year, so 07:15 UTC must re-render as 20:15.
     await page.getByRole('link', { name: 'settings' }).click()
     await page.getByLabel('installation timezone').selectOption('Pacific/Midway')
     await page.getByRole('link', { name: 'digest' }).click()
@@ -100,14 +92,12 @@ test.describe('the Digest presentation', () => {
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'digest' }).click()
 
-    // One page, then a quiet word — never an auto-load on scroll.
     await expect(page.locator('.content-item')).toHaveCount(50)
     const older = page.getByRole('button', { name: 'older items' })
     await expect(older).toBeVisible()
 
     await older.click()
     await expect(page.locator('.content-item')).toHaveCount(55)
-    // Everything is loaded, so the list simply ends.
     await expect(older).toBeHidden()
   })
 
@@ -135,7 +125,6 @@ test.describe('the Digest inside the narrow paper', () => {
     const heading = page.getByRole('heading', { name: 'today · 1 post' })
     await expect(heading).toBeVisible()
     await expect(heading).toHaveCSS('font-size', '12px')
-    // 114px at every width: the field is clipped, never redrawn shorter.
     await expect(page.locator('.daily-band')).toHaveCSS('height', '114px')
     await expectNoHorizontalOverflow(page)
   })

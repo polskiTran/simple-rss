@@ -51,7 +51,6 @@ describe('the chronological Digest', () => {
 
   it('keeps stored timestamps UTC while grouping in the installation timezone', async () => {
     const service = await startTestService()
-    // 20:00 UTC on the 7th is already the morning of the 8th in Auckland.
     stubFeed(service, rss(item('one', 'Crossing midnight', '2026-08-07T20:00:00.000Z')))
     const user = await claimedDevice(service)
     service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
@@ -66,7 +65,6 @@ describe('the chronological Digest', () => {
       displayTime: '08:00',
     })
 
-    // The zone shapes only the grouping; what the volume holds stays UTC.
     const stored = service.database
       ?.prepare('select published_at as publishedAt, first_seen_at as firstSeenAt from feed_items')
       .get() as { publishedAt: string; firstSeenAt: string }
@@ -79,7 +77,6 @@ describe('the chronological Digest', () => {
     stubFeed(
       service,
       rss(
-        // More than a day past the manual clock's 2026-08-08T09:00Z.
         item('ahead', 'From a broken clock', '2026-08-19T09:00:00.000Z'),
         item('undated', 'An undated letter'),
         item('dated', 'First light', '2026-08-08T07:15:00.000Z'),
@@ -91,15 +88,12 @@ describe('the chronological Digest', () => {
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
-    // All three share today: the two fallbacks group by first-seen (09:00),
-    // sit above the 07:15 publication, and tie-break by newest item id.
     expect(digest.groups.map(({ label }) => label)).toEqual(['today'])
     expect(digest.groups[0]?.items.map((entry) => entry.title)).toEqual([
       'An undated letter',
       'From a broken clock',
       'First light',
     ])
-    // The implausible date is not erased — it just does not set the order.
     expect(digest.groups[0]?.items[1]?.publishedAt).toBe('2026-08-19T09:00:00.000Z')
   })
 

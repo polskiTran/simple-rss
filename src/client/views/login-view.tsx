@@ -8,8 +8,6 @@ export interface LoginViewProps {
   onSignedIn(status: AuthStatus): void
 }
 
-// One field: there is one User, nobody to name. No recovery link — recovery
-// is a shell command, not an email this installation could send.
 export function LoginView({ onSignedIn }: LoginViewProps) {
   const [password, setPassword] = useState('')
   const [notice, setNotice] = useState('')

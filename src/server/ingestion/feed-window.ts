@@ -26,8 +26,6 @@ export function persistFeedWindow(
   },
 ): boolean {
   const { feedId, parsed, resolvedUrl, validators, now } = options
-  // The publisher's host, not the XML's: many Feeds share one hosting domain,
-  // and it is the site the User means when they read the Feeds list.
   const domain = new URL(parsed.homePageUrl ?? resolvedUrl).hostname
   return db.transaction((tx) => {
     const subscribed = tx

@@ -26,7 +26,6 @@ const rss = (title: string, ...items: string[]) => `<?xml version="1.0"?>
 const stubFeed = (service: TestService, body: string, url: string = FEED_URL) =>
   service.upstream.stub(url, { headers: FEED_HEADERS, body })
 
-/** Subscribes the User to a Feed currently exposing the given document, first check landed. */
 async function subscribed(user: Device, service: TestService, xml: string, url: string = FEED_URL): Promise<void> {
   stubFeed(service, xml, url)
   const response = await user.post('/api/subscriptions', { url })
@@ -61,14 +60,10 @@ describe('searching retained reading metadata', () => {
       ),
     )
 
-    // A word from an item title.
     expect(await foundTitles(user, 'chronology')).toEqual(['Morning chronology'])
-    // A word only the normalized summary carries.
     expect(await foundTitles(user, 'estuary')).toEqual(['Evening walk'])
-    // A word from the Feed's own title matches everything it published.
     expect(await foundTitles(user, 'field notes')).toEqual(['Morning chronology', 'Evening walk'])
 
-    // The result identifies the item: title, Feed, date, and saved state.
     const [result] = (await search(user, 'chronology')).results
     expect(result).toEqual({
       feedItemId: 1,
@@ -95,22 +90,16 @@ describe('searching retained reading metadata', () => {
       ),
     )
 
-    // The last word matches as a prefix, so search-as-you-type converges.
     expect(await foundTitles(user, 'medi')).toEqual(['Résumé of the médiathèque visit'])
-    // Diacritics fold both ways.
     expect(await foundTitles(user, 'resume')).toEqual(['Résumé of the médiathèque visit'])
     expect(await foundTitles(user, 'résumé')).toEqual(['Résumé of the médiathèque visit'])
-    // Words must all match, not any: both items say "of"/"and"-adjacent words,
-    // only one says both "resume" and "visit".
     expect(await foundTitles(user, 'resume visit')).toEqual(['Résumé of the médiathèque visit'])
     expect(await foundTitles(user, 'resume espresso')).toEqual([])
 
-    // FTS5 syntax arrives as words, never as operators or errors.
     expect(await foundTitles(user, 'AND')).toEqual(['Coffee AND ordering'])
     expect(await foundTitles(user, 'coffee NOT ordering')).toEqual([])
     expect(await foundTitles(user, '"coffee')).toEqual(['Coffee AND ordering'])
     expect(await foundTitles(user, 'coffee*)^ ord')).toEqual(['Coffee AND ordering'])
-    // Nothing tokenizable is an empty answer, not a syntax error.
     expect(await foundTitles(user, '"*() -')).toEqual([])
   })
 
@@ -132,8 +121,6 @@ describe('searching retained reading metadata', () => {
     )
     expect(await foundTitles(user, 'draft')).toEqual(['Draft impressions'])
 
-    // The publisher retitles the entry, rewrites its summary, and renames the
-    // Feed itself; a manual refresh ingests all three corrections.
     stubFeed(
       service,
       rss('Estuary Notes', item('a', 'Settled impressions', { summary: 'Second thoughts' })),
@@ -144,7 +131,6 @@ describe('searching retained reading metadata', () => {
     expect(await foundTitles(user, 'settled')).toEqual(['Settled impressions'])
     expect(await foundTitles(user, 'second')).toEqual(['Settled impressions'])
     expect(await foundTitles(user, 'estuary')).toEqual(['Settled impressions'])
-    // The stale words are gone the moment the correction lands.
     expect(await foundTitles(user, 'draft')).toEqual([])
     expect(await foundTitles(user, 'first')).toEqual([])
     expect(await foundTitles(user, 'field')).toEqual([])
@@ -158,14 +144,11 @@ describe('searching retained reading metadata', () => {
 
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
 
-    // Before the sweep even runs, the unsaved item is already out of search —
-    // it left the Digest at unsubscribe, and search must agree.
     expect(await foundTitles(user, 'passing')).toEqual([])
     expect(await foundTitles(user, 'saved essay')).toEqual(['Saved essay'])
 
     await service.wakeScheduler()
 
-    // After cleanup the save is still found, still attributed.
     const [result] = (await search(user, 'saved essay')).results
     expect([result?.title, result?.feedTitle, result?.saved]).toEqual(['Saved essay', 'Field Notes', true])
     expect(await foundTitles(user, 'passing')).toEqual([])
@@ -183,7 +166,6 @@ describe('searching retained reading metadata', () => {
     expect((await user.signIn()).status).toBe(200)
     expect(await foundTitles(user, 'kept')).toEqual(['Kept'])
     expect(await foundTitles(user, 'dropped')).toEqual([])
-    // Gone from the index itself, not merely filtered out of the answer.
     const orphaned = service.database
       ?.prepare("SELECT count(*) AS rows FROM feed_item_search WHERE feed_item_search MATCH 'dropped'")
       .get() as { rows: number }
@@ -207,14 +189,12 @@ describe('searching retained reading metadata', () => {
     const before = await search(user, 'notes')
     expect(before.results).toHaveLength(2)
 
-    // The derived index is lost or corrupted; the canonical tables are not.
     service.database?.exec('DELETE FROM feed_item_search')
     expect(await search(user, 'notes')).toEqual({ results: [] })
 
     if (!service.database) throw new Error('the service has no open database')
     rebuildSearchIndex(service.database)
     expect(await search(user, 'notes')).toEqual(before)
-    // And the triggers keep maintaining the rebuilt index.
     stubFeed(service, rss('Field Notes', item('a', 'Morning chronology, revised', { summary: 'Tidal notes' })))
     service.clock.advance(60_000)
     expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
@@ -233,7 +213,6 @@ describe('searching retained reading metadata', () => {
 
     const { results } = await search(user, 'numbered')
     expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
-    // The bound keeps the newest matches, in Digest chronology.
     expect(results[0]?.title).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
     expect(results.at(-1)?.title).toBe('Numbered entry 5')
   })
@@ -244,7 +223,6 @@ describe('searching retained reading metadata', () => {
     const futureItem = item('z', 'Numbered entry future', { pubDate: '2999-01-01T00:00:00.000Z' })
     await subscribed(user, service, rss('Field Notes', futureItem))
 
-    // Two hours on, the Feed exposes a full page of plausibly dated items.
     service.clock.advance(2 * HOUR_MS)
     const many = Array.from({ length: SEARCH_RESULT_LIMIT + 5 }, (_, index) =>
       item(`n${index}`, `Numbered entry ${index}`, {
@@ -254,8 +232,6 @@ describe('searching retained reading metadata', () => {
     stubFeed(service, rss('Field Notes', futureItem, ...many))
     expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
 
-    // The year-2999 item orders by when it was first seen — the oldest match
-    // here — so it cannot hold a bound slot the newest matches deserve.
     const { results } = await search(user, 'numbered')
     expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
     expect(results.map((entry) => entry.title)).not.toContain('Numbered entry future')

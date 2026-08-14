@@ -1,6 +1,3 @@
-// Items order by publication time, falling back to first-seen. A date more than a day
-// ahead of now also falls back, so a publisher's broken clock cannot pin an item to the top.
-
 const FUTURE_TOLERANCE_MS = 24 * 60 * 60 * 1_000
 
 export function chronologyTime(publishedAt: string | null, firstSeenAt: string, now: Date): number {
@@ -10,10 +7,6 @@ export function chronologyTime(publishedAt: string | null, firstSeenAt: string, 
     : Date.parse(firstSeenAt)
 }
 
-/**
- * The newest publication instant chronology will believe, as ISO for SQL
- * queries that must apply the fallback rule before a LIMIT.
- */
 export function plausibleHorizon(now: Date): string {
   return new Date(now.getTime() + FUTURE_TOLERANCE_MS).toISOString()
 }
@@ -99,13 +92,12 @@ export function dayStartUtc(dayKey: string, timezone: string): Date {
   const guess = Date.parse(`${dayKey}T00:00:00.000Z`)
   let instant = guess
   for (let round = 0; round < 2; round += 1) {
-    instant = guess - zoneOffsetMs(instant, timezone)
+    instant = guess - millisecondsAheadOfUtc(instant, timezone)
   }
   return new Date(instant)
 }
 
-/** How far ahead of UTC the zone's wall clock reads at one instant. */
-function zoneOffsetMs(instant: number, timezone: string): number {
+function millisecondsAheadOfUtc(instant: number, timezone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
     hourCycle: 'h23',

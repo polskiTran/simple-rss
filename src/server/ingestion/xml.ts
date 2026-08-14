@@ -1,6 +1,3 @@
-// Guards shared by the two untrusted-XML entry points — Feed documents and
-// OPML uploads — so hardening one cannot drift from the other.
-
 const FORBIDDEN_DECLARATION = /<!\s*(?:DOCTYPE|ENTITY)\b/i
 
 /** DOCTYPE and ENTITY declarations can smuggle external entities in; refused before parsing. */

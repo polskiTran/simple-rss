@@ -75,7 +75,6 @@ export interface Config {
   readonly trustProxyHeaders: boolean
 }
 
-/** Fails at startup rather than at the first request that trips over a bad value. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = envSchema.safeParse(pickDefined(env))
   if (!parsed.success) {

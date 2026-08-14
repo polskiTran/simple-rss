@@ -33,11 +33,9 @@ export interface RetrievalProfile {
   readonly capacity: RetrievalCapacity
 }
 
-/** Safety policy lives here, not at callers: a caller may tighten a profile, never broaden it. */
 export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
   feed: {
     accept: ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml'],
-    // Full-text Feeds routinely run to several MiB.
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
     timeoutMs: 10_000,
     bodyTimeoutMs: 60_000,
@@ -70,10 +68,6 @@ export interface RetrievalLimits {
   readonly maxRedirects?: number
 }
 
-/**
- * The only request headers that reach a publisher; the User's Session cookie,
- * `Authorization`, the Setup Secret, and `Referer` never do.
- */
 const FORWARDABLE_HEADERS: Readonly<Record<string, true>> = {
   'accept-language': true,
   'if-modified-since': true,
@@ -155,13 +149,10 @@ export interface Retrieval {
 interface RetrievalOptions {
   readonly httpClient: HttpClient
   readonly logger: Logger
-  /** Internal test seam; production uses the system resolver. */
   readonly resolve?: ResolveAddresses
   /** The installation's canonical public origin. */
   readonly self: URL
-  /** Internal test seam; production uses `DEFAULT_CAPACITY`. */
   readonly capacity?: RetrievalCapacity
-  /** Internal test seam for exercising per-operation saturation. */
   readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
 }
 
@@ -206,7 +197,6 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
   }
 }
 
-/** Production factory: raw transport details stay inside the retrieval module. */
 export function createNetworkRetrieval(options: { readonly logger: Logger; readonly self: URL }): Retrieval {
   return createRetrieval({
     httpClient: createNetworkHttpClient(),
@@ -240,8 +230,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const bodyTimeoutMs = limits?.bodyTimeoutMs ?? profile.bodyTimeoutMs
   const headers = forwardableHeaders(request.headers, profile.accept)
 
-  // One controller: both deadlines, caller cancellation, and the byte ceiling
-  // all abort the same in-flight request.
   const controller = new AbortController()
   let abandoned: Abandonment | undefined
   const abort = (kind: Abandonment, message: string) => {
@@ -251,8 +239,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
   let timer = setTimeout(() => abort('timeout', `no answer within ${timeoutMs}ms`), timeoutMs)
 
-  // The body gets its own deadline: on one timer, a slow download reported
-  // itself as a host that never answered.
   const startBodyDeadline = (): void => {
     clearTimeout(timer)
     timer = setTimeout(() => abort('body_timeout', `body unfinished after ${bodyTimeoutMs}ms`), bodyTimeoutMs)
@@ -351,7 +337,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       continue
     }
 
-    // Shared log fields; the query string is deliberately omitted.
     const answered = { host: url.host, path: url.pathname, status: response.status, redirects }
 
     if (response.status === 304) {
@@ -422,7 +407,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
 interface BoundedBodyOptions {
   readonly maxBytes: number
-  /** Aborted by either deadline, the caller, or the byte ceiling. */
   readonly signal: AbortSignal
   readonly abandonedKind: () => Abandonment | undefined
   readonly abort: (error: RetrievalError) => void
@@ -445,8 +429,6 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
   let done = false
   let sink: ReadableStreamDefaultController<Uint8Array> | undefined
 
-  // Error the stream rather than close it: a closed stream would let a
-  // truncated body pass for a complete one.
   const stop = (error: RetrievalError | undefined): void => {
     if (done) return
     done = true
@@ -509,7 +491,6 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
   return stream
 }
 
-/** Turns a mid-stream failure back into a `RetrievalFailure` code. */
 async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
   if (!result.ok) return result
 
@@ -540,7 +521,6 @@ async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
   return { ...rest, bytes }
 }
 
-/** Only `FORWARDABLE_HEADERS` pass through; `Accept` and `User-Agent` are module-owned. */
 function forwardableHeaders(
   supplied: Readonly<Record<string, string>> | undefined,
   acceptedTypes: readonly string[],
@@ -570,12 +550,10 @@ function accepted(contentType: string, accept: readonly string[]): boolean {
   return accept.some((allowed) => allowed.trim().toLowerCase() === contentType)
 }
 
-/** Cancels an unread body so the socket does not linger. */
 async function discard(response: Response): Promise<void> {
   try {
     await response.body?.cancel()
   } catch {
-    // A body that already failed needs no further disposal.
   }
 }
 
@@ -592,10 +570,6 @@ function describe(error: unknown): string {
   return 'upstream request failed'
 }
 
-/**
- * Bounded in-flight work with a bounded queue: without the queue cap, a burst
- * of polls would pile up timers and memory for answers nobody waits for.
- */
 class ConcurrencyGate {
   readonly #limit: number
   readonly #queueLimit: number
@@ -632,7 +606,6 @@ class ConcurrencyGate {
     })
   }
 
-  /** Hands the slot to the next waiter rather than releasing and re-taking it. */
   leave(): void {
     const next = this.#waiting.shift()
     if (next) next(true)

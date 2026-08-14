@@ -119,7 +119,6 @@ describe('links', () => {
 })
 
 describe('images', () => {
-  /** A recognisable stand-in for the real signer, which the routes own. */
   const sign = (url: string) => `/api/reader/image?url=${encodeURIComponent(url)}&exp=99&sig=mac`
 
   it('rewrites approved images to the signed proxy path, resolving relative sources', () => {
@@ -237,7 +236,6 @@ describe('sanitization', () => {
   it('never passes raw HTML through as markup', () => {
     const markdown = articleMarkdown('<p>literal &lt;img src=x onerror=alert(1)&gt; tag</p>', BASE)
 
-    // The `<` is escaped, so no consumer can ever read the text as a tag.
     expect(markdown).toBe('literal \\<img src=x onerror=alert(1)> tag')
   })
 

@@ -7,7 +7,7 @@ export type BodyResult<T> = { readonly ok: true; readonly value: T } | { readonl
  * Validates a JSON body, answering `400` itself. Failure messages name fields
  * and constraints, never values — one route through here carries the password.
  */
-export async function readJsonBody<T>(c: Context, schema: z.ZodType<T>): Promise<BodyResult<T>> {
+export async function readJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<BodyResult<z.infer<S>>> {
   let raw: unknown
   try {
     raw = await c.req.json()

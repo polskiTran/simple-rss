@@ -14,10 +14,6 @@ import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
-/**
- * Membership is its own table, so a save survives ingestion's metadata
- * corrections, retention pruning, and unsubscribing.
- */
 export class LibraryService {
   readonly #db: BetterSQLite3Database
   readonly #clock: Clock
@@ -53,14 +49,12 @@ export class LibraryService {
     return { feedItemId, saved: false, savedAt: null }
   }
 
-  /** Same chronology and cursor as the Digest. */
   list(cursor?: ListCursor): Library {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
     const chronology = chronologySql(now)
 
-    // One row past the page says whether a next page exists at all.
     const fetched = this.#db
       .select({
         feedItemId: feedItems.id,
@@ -91,7 +85,6 @@ export class LibraryService {
         title: row.title ?? 'untitled',
         feedId: row.feedId,
         feedTitle: row.feedTitle,
-        // A save outlives its Subscription; the view says so.
         subscribed: row.subscribedFeedId !== null,
         link: row.link,
         publishedAt: row.publishedAt,

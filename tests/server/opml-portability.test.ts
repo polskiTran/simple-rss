@@ -34,7 +34,6 @@ describe('OPML import', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
-    // None of these hosts are stubbed: the report cannot depend on retrieval.
     const imported = await user.post('/api/subscriptions/import', {
       opml: opmlListing([RSS_URL, ATOM_URL, 'https://down.example/feed', 'not a url']),
     })
@@ -141,7 +140,6 @@ describe('OPML import', () => {
     await service.wakeScheduler()
     expect(service.database?.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
     expect(service.database?.prepare('SELECT count(*) AS count FROM feed_items').get()).toEqual({ count: 2 })
-    // The already-subscribed Feeds were never retrieved a second time.
     expect(service.upstream.requestsTo(RSS_URL)).toHaveLength(1)
     expect(service.upstream.requestsTo(ATOM_URL)).toHaveLength(1)
   })

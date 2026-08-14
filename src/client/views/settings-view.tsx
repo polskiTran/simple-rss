@@ -19,9 +19,6 @@ export interface SettingsViewProps {
   onAccessChanged(status: AuthStatus): void
 }
 
-// A two-column sheet, not the item shape, so preferences cannot be mistaken
-// for reading. The version shows because upgrades are deliberate here — the
-// User picks a version rather than following a moving tag.
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   const [version, setVersion] = useState<Version>({ kind: 'loading' })
   const [changing, setChanging] = useState(false)
@@ -41,7 +38,6 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
     try {
       await signOut()
     } finally {
-      // However the server answered, this device is finished with the session.
       onAccessChanged({ claimed: true, authenticated: false })
     }
   }
@@ -94,8 +90,6 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   )
 }
 
-// A select, not a free field: the only valid values are the zones this
-// runtime already knows.
 function TimezoneChoice() {
   const [state, setState] = useState<Timezone>({ kind: 'loading' })
   const [notice, setNotice] = useState('')
@@ -154,14 +148,11 @@ function TimezoneChoice() {
   )
 }
 
-// The stored zone may not be in this runtime's list; keep it selectable.
 function timezoneOptions(current: string): string[] {
   const known = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
   return known.includes(current) ? [...known] : [current, ...known]
 }
 
-// Same shape as the interval presets. `system` keeps following the device —
-// the resting state, not a third theme.
 function AppearanceChoice() {
   const [appearance, setAppearance] = useState<Appearance>(storedAppearance)
 
@@ -187,8 +178,6 @@ function AppearanceChoice() {
   )
 }
 
-// Changing the password signs every device out, including this one; the form
-// says so before submit, not after.
 function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): void }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')

@@ -8,7 +8,6 @@ import { USER_PASSWORD, SETUP_SECRET, startTestService, type TestService } from 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MINUTE_MS = 60 * 1000
 
-/** The session rows on the volume, for assertions HTTP cannot make. */
 function storedSessions(service: TestService): Array<{ token_hash: string }> {
   return service.database!.prepare('SELECT token_hash FROM sessions').all() as Array<{ token_hash: string }>
 }
@@ -28,10 +27,6 @@ async function errorCode(response: Response) {
   return apiErrorSchema.parse(await response.json()).error.code
 }
 
-/**
- * Guessing spread across enough addresses to reach the installation-wide
- * ceiling, while leaving each one below its own limit.
- */
 async function saturateTheCeiling(service: TestService): Promise<void> {
   for (let host = 1; host <= 5; host += 1) {
     const guesser = new Device(service, { address: `203.0.113.${host}` })
@@ -557,8 +552,6 @@ describe('resisting password guessing', () => {
   it('counts a forged forwarding header against the address that sent it', async () => {
     const service = await startTestService()
     await claimedDevice(service)
-    // A caller appending its own entry cannot spend someone else's budget:
-    // the proxy's entry is the rightmost one, and that is the one counted.
     const guesser = new Device(service, { address: '198.51.100.1, 203.0.113.7' })
     for (let attempt = 0; attempt < 5; attempt += 1) await guesser.signIn('a-wrong-password')
 

@@ -80,7 +80,6 @@ export async function validateDestination(
     return { ok: false, code: 'blocked_destination', reason: 'local network name' }
   }
 
-  // An address literal is its own answer; a resolver could only lie about it.
   const literal = classifyAddress(hostname)
   if (literal !== 'invalid') {
     return literal === 'public'

@@ -40,7 +40,6 @@ async function origin(handler: Handler): Promise<Origin> {
   }
 }
 
-/** The loopback origins tests talk to are exactly what the real guard refuses. */
 function clientReachingTheTestServer(): HttpClient {
   return createNetworkHttpClient({ isAllowedAddress: () => true })
 }
@@ -238,7 +237,6 @@ describe('createNetworkHttpClient', () => {
       request.on('close', () => closed?.())
       response.writeHead(200, { 'content-type': 'application/xml' })
       response.write('<rss>')
-      // Deliberately never finished, so only the caller can end this.
     })
 
     const controller = new AbortController()
@@ -264,7 +262,6 @@ describe('createNetworkHttpClient', () => {
       compressing.pipe(response)
       compressing.write('<rss>')
       compressing.flush()
-      // Never finished: cancelling must be what ends this, not the origin.
     })
 
     const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))

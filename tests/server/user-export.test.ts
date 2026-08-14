@@ -8,7 +8,6 @@ import { startTestService, type TestService } from '../support/service-harness.j
 const RSS_URL = 'https://journal.example/feed'
 const ATOM_URL = 'https://atom.example/feed.xml'
 
-/** A validator value that must never leave the installation in an export. */
 const RSS_ETAG = '"etag-value-that-stays-home"'
 
 const RSS = `<?xml version="1.0"?>
@@ -137,8 +136,6 @@ describe('the JSON export', () => {
     const text = await exported.text()
     const document = JSON.parse(text)
 
-    // The whole document is these keys and nothing else, so nothing sensitive
-    // can ride along unnoticed.
     expect(Object.keys(document).sort()).toEqual([
       'applicationVersion',
       'exportVersion',
@@ -159,8 +156,6 @@ describe('the JSON export', () => {
       'title',
     ])
 
-    // The verifier, the session hash, and the conditional-request validator
-    // all exist in the database this export was drawn from.
     const storedHash = service.database?.prepare('SELECT password_hash FROM user_auth').get() as {
       password_hash: string
     }
