@@ -43,10 +43,13 @@ async function readingSetup(
       item('evening', 'Evening notes', '2026-08-07T09:31:00.000Z'),
     ),
   })
-  service.upstream.stub(ARTICLE_URL, options.article ?? {
-    headers: { 'content-type': 'text/html; charset=utf-8' },
-    body: ARTICLE_HTML,
-  })
+  service.upstream.stub(
+    ARTICLE_URL,
+    options.article ?? {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: ARTICLE_HTML,
+    },
+  )
 
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)

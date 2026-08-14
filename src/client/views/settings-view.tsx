@@ -1,6 +1,12 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import type { AuthStatus, ServiceMeta } from '../../shared/api.js'
-import { changePassword, fetchInstallationPreferences, fetchServiceMeta, signOut, updateInstallationTimezone } from '../api.js'
+import {
+  changePassword,
+  fetchInstallationPreferences,
+  fetchServiceMeta,
+  signOut,
+  updateInstallationTimezone,
+} from '../api.js'
 import { APPEARANCE_OPTIONS, chooseAppearance, storedAppearance, type Appearance } from '../appearance.js'
 import { Field } from '../components/field.js'
 import { describeFailure, reasonToHold } from './failure.js'

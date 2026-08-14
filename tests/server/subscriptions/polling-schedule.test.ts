@@ -29,9 +29,7 @@ describe('polling schedule', () => {
   })
 
   it('spreads Feeds that share a preset instead of polling them in one burst', () => {
-    const offsets = new Set(
-      Array.from({ length: 10 }, (_, index) => pollingJitterMs(index + 1, 120)),
-    )
+    const offsets = new Set(Array.from({ length: 10 }, (_, index) => pollingJitterMs(index + 1, 120)))
     expect(offsets.size).toBeGreaterThan(5)
   })
 

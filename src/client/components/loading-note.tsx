@@ -8,7 +8,10 @@ export interface LoadingNoteProps {
 
 export function LoadingNote({ className, announce, children }: LoadingNoteProps) {
   return (
-    <p className={className === undefined ? 'loading-note' : `${className} loading-note`} {...(announce ? { role: 'status' } : {})}>
+    <p
+      className={className === undefined ? 'loading-note' : `${className} loading-note`}
+      {...(announce ? { role: 'status' } : {})}
+    >
       <MarkTile />
       {children}
     </p>

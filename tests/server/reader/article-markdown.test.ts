@@ -11,9 +11,7 @@ describe('article structure', () => {
       BASE,
     )
 
-    expect(markdown).toBe(
-      '## The shape of it\n\nThree years after *naming* the problem, the shape has **not moved**.',
-    )
+    expect(markdown).toBe('## The shape of it\n\nThree years after *naming* the problem, the shape has **not moved**.')
   })
 
   it('keeps nested and ordered lists', () => {
@@ -23,9 +21,7 @@ describe('article structure', () => {
       BASE,
     )
 
-    expect(markdown).toBe(
-      '- reduce capability\n  - of the model\n- separate the planner\n\n1. first\n2. second',
-    )
+    expect(markdown).toBe('- reduce capability\n  - of the model\n- separate the planner\n\n1. first\n2. second')
   })
 
   it('keeps block quotes, including quoted paragraphs', () => {
@@ -62,9 +58,7 @@ describe('article structure', () => {
       BASE,
     )
 
-    expect(markdown).toBe(
-      '| Name | Role |\n| --- | --- |\n| feed | polling |\n| reader | extraction |',
-    )
+    expect(markdown).toBe('| Name | Role |\n| --- | --- |\n| feed | polling |\n| reader | extraction |')
   })
 
   it('keeps supported math as TeX delimiters', () => {
@@ -228,7 +222,10 @@ describe('sanitization', () => {
   })
 
   it('escapes text lines that would begin a markdown block', () => {
-    const markdown = articleMarkdown('<p># not a heading<br>&gt; not a quote<br>- not a list<br>1. not ordered</p>', BASE)
+    const markdown = articleMarkdown(
+      '<p># not a heading<br>&gt; not a quote<br>- not a list<br>1. not ordered</p>',
+      BASE,
+    )
 
     expect(markdown).toBe('\\# not a heading\\\n\\> not a quote\\\n\\- not a list\\\n1\\. not ordered')
   })

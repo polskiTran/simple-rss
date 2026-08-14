@@ -63,10 +63,7 @@ function serialiseFields(fields: LogFields | undefined): LogFields {
 
   const out: LogFields = {}
   for (const [key, value] of Object.entries(fields)) {
-    out[key] =
-      value instanceof Error
-        ? { name: value.name, message: value.message, stack: value.stack ?? '' }
-        : value
+    out[key] = value instanceof Error ? { name: value.name, message: value.message, stack: value.stack ?? '' } : value
   }
   return out
 }

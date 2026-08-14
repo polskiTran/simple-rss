@@ -161,7 +161,6 @@ describe('retrieveBytes', () => {
     expect(upstream.requests).toHaveLength(1)
   })
 
-
   it('rejects non-finite stricter limits instead of disabling the profile', async () => {
     const { retrieval, upstream } = harness()
 
@@ -318,7 +317,10 @@ describe('redirects', () => {
     const { retrieval, upstream } = harness({
       addresses: { 'example.com': ['93.184.216.34'], 'cdn.example.net': ['93.184.216.35'] },
     })
-    upstream.stub('https://example.com/feed', { status: 301, headers: { location: 'https://cdn.example.net/feed.xml' } })
+    upstream.stub('https://example.com/feed', {
+      status: 301,
+      headers: { location: 'https://cdn.example.net/feed.xml' },
+    })
     upstream.stub('https://cdn.example.net/feed.xml', {
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
@@ -473,9 +475,7 @@ describe('giving up', () => {
       },
     })
     const caller = new AbortController()
-    const pending = retrieval.retrieveBytes(
-      feedRequest('https://example.com/feed.xml', { signal: caller.signal }),
-    )
+    const pending = retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { signal: caller.signal }))
     await resolving
     caller.abort()
 
@@ -701,9 +701,7 @@ describe('streaming', () => {
       body: chunkedBody([new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3])]),
     }))
 
-    const result = await retrieval.retrieve(
-      feedRequest('https://example.com/photo.jpg', { operation: 'image' }),
-    )
+    const result = await retrieval.retrieve(feedRequest('https://example.com/photo.jpg', { operation: 'image' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) return

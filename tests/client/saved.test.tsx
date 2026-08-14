@@ -111,9 +111,7 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(
-      await screen.findByText('the library is out of reach — check the connection, then try again'),
-    ).toBeDefined()
+    expect(await screen.findByText('the library is out of reach — check the connection, then try again')).toBeDefined()
 
     api.on('GET /api/library', { body: LIBRARY })
     await user.click(screen.getByRole('button', { name: 'try again' }))

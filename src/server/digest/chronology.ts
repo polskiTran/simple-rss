@@ -109,6 +109,8 @@ function millisecondsAheadOfUtc(instant: number, timezone: string): number {
     second: '2-digit',
   }).formatToParts(instant)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  const wall = Date.parse(`${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:${values.second}.000Z`)
+  const wall = Date.parse(
+    `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:${values.second}.000Z`,
+  )
   return wall - instant
 }

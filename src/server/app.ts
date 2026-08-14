@@ -71,9 +71,7 @@ export function createApp(deps: AppDependencies): Hono {
       : c.json<ReadinessBody>({ status: 'ready' })
   })
 
-  app.all('/health/*', (c) =>
-    c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404),
-  )
+  app.all('/health/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404))
 
   app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
   app.use(
@@ -126,9 +124,7 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.get('/api/meta', (c) => c.json<ServiceMeta>({ name: 'simple-rss', version: VERSION }))
 
-  app.all('/api/*', (c) =>
-    c.json({ error: { code: 'not_found', message: 'Unknown API route' } }, 404),
-  )
+  app.all('/api/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown API route' } }, 404))
 
   app.use('*', staticAssets({ root: deps.config.clientDir }))
 

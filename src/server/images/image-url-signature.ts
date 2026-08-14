@@ -25,8 +25,7 @@ export function createImageUrlSignature(options: {
   }
   const { key, clock } = options
 
-  const mac = (expiry: string, url: string): Buffer =>
-    createHmac('sha256', key).update(`${expiry}\n${url}`).digest()
+  const mac = (expiry: string, url: string): Buffer => createHmac('sha256', key).update(`${expiry}\n${url}`).digest()
 
   return {
     sign(url) {

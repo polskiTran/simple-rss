@@ -1,9 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import {
-  POLLING_INTERVAL_MINUTES,
-  type FeedDetail,
-  type PollingIntervalMinutes,
-} from '../../shared/api.js'
+import { POLLING_INTERVAL_MINUTES, type FeedDetail, type PollingIntervalMinutes } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { BackLink } from '../components/back-link.js'
@@ -70,8 +66,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     }
     try {
       setState({ kind: 'loaded', detail: await fetchFeedDetail(feedId) })
-    } catch {
-    }
+    } catch {}
   }
 
   async function changeInterval(pollingIntervalMinutes: PollingIntervalMinutes) {
@@ -111,9 +106,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
             kind: 'loaded',
             detail: {
               ...current.detail,
-              items: current.detail.items.map((item) =>
-                item.feedItemId === feedItemId ? { ...item, saved } : item,
-              ),
+              items: current.detail.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
             },
           }
         : current,
@@ -275,15 +268,7 @@ function Unsubscribe({
   )
 }
 
-function Grid({
-  grid,
-  title,
-  onShowDay,
-}: {
-  grid: CadenceGrid
-  title: string
-  onShowDay: (date: string) => void
-}) {
+function Grid({ grid, title, onShowDay }: { grid: CadenceGrid; title: string; onShowDay: (date: string) => void }) {
   return (
     <div className="cadence-figure">
       <div className="cadence-grid" role="group" aria-label={`26 weeks of publishing cadence for ${title}`}>
@@ -307,7 +292,11 @@ function Grid({
       <div className="cadence-months" aria-hidden="true">
         {grid.columns.map((column, index) =>
           column.monthLabel ? (
-            <span key={column.cells[0]?.date ?? index} className="cadence-month" style={{ '--column': index } as CSSProperties}>
+            <span
+              key={column.cells[0]?.date ?? index}
+              className="cadence-month"
+              style={{ '--column': index } as CSSProperties}
+            >
               {column.monthLabel}
             </span>
           ) : null,

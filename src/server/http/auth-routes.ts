@@ -130,8 +130,7 @@ function seedTimezone(settings: InstallationSettingsStore | undefined, timezone:
   if (!settings || !timezone) return
   try {
     settings.setTimezone(timezone, now)
-  } catch {
-  }
+  } catch {}
 }
 
 function status(c: Context, body: AuthStatus, code: 200 | 201 = 200) {

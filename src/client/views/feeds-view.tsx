@@ -59,8 +59,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     try {
       const { subscriptions } = await fetchSubscriptions()
       setState({ kind: 'loaded', subscriptions })
-    } catch {
-    }
+    } catch {}
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshList is recreated every render; depending on it would restart the 3s timer on every render.
@@ -138,8 +137,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     try {
       const { subscriptions } = await fetchSubscriptions()
       setState({ kind: 'loaded', subscriptions })
-    } catch {
-    }
+    } catch {}
   }
 
   return (
@@ -265,7 +263,8 @@ function SubscriptionList({
   if (state.kind === 'loading')
     return <LoadingNote className="empty-note subscription-list-state">loading feeds</LoadingNote>
   if (state.kind === 'unavailable') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
-  if (state.subscriptions.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
+  if (state.subscriptions.length === 0)
+    return <p className="empty-note subscription-list-state">no subscriptions yet</p>
 
   const shown = state.subscriptions.filter((subscription) => matches(subscription, query))
   if (shown.length === 0) return <p className="empty-note subscription-list-state">no feeds match</p>
@@ -303,9 +302,7 @@ function SubscriptionList({
 function matches(subscription: SubscriptionSummary, query: string): boolean {
   const line = query.trim().toLowerCase()
   if (!line || line.startsWith('http://') || line.startsWith('https://')) return true
-  return (
-    subscription.title.toLowerCase().includes(line) || subscription.domain.toLowerCase().includes(line)
-  )
+  return subscription.title.toLowerCase().includes(line) || subscription.domain.toLowerCase().includes(line)
 }
 
 function AvailabilityNote({

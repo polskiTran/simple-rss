@@ -204,9 +204,7 @@ export { expect } from '@playwright/test'
 // keeps the scrollbar's width out of the content, so `innerWidth` would hide
 // an overflow that wide.
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.body.clientWidth,
-  )
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.body.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 }
 

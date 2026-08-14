@@ -144,9 +144,10 @@ describe('validateDestination', () => {
       ok: false,
       code: 'blocked_destination',
     })
-    await expect(
-      validateDestination('https://READER.example.com:443/api/meta', policy),
-    ).resolves.toMatchObject({ ok: false, code: 'blocked_destination' })
+    await expect(validateDestination('https://READER.example.com:443/api/meta', policy)).resolves.toMatchObject({
+      ok: false,
+      code: 'blocked_destination',
+    })
   })
 
   it('refuses a trailing-dot spelling of the installation hostname', async () => {

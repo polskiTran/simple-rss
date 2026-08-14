@@ -114,17 +114,10 @@ describe('searching retained reading metadata', () => {
   it('follows metadata corrections: a retitled item and a renamed Feed', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
-    await subscribed(
-      user,
-      service,
-      rss('Field Notes', item('a', 'Draft impressions', { summary: 'First thoughts' })),
-    )
+    await subscribed(user, service, rss('Field Notes', item('a', 'Draft impressions', { summary: 'First thoughts' })))
     expect(await foundTitles(user, 'draft')).toEqual(['Draft impressions'])
 
-    stubFeed(
-      service,
-      rss('Estuary Notes', item('a', 'Settled impressions', { summary: 'Second thoughts' })),
-    )
+    stubFeed(service, rss('Estuary Notes', item('a', 'Settled impressions', { summary: 'Second thoughts' })))
     service.clock.advance(60_000)
     expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
 
@@ -178,11 +171,7 @@ describe('searching retained reading metadata', () => {
     await subscribed(
       user,
       service,
-      rss(
-        'Field Notes',
-        item('a', 'Morning chronology', { summary: 'Tidal notes' }),
-        item('b', 'Evening walk'),
-      ),
+      rss('Field Notes', item('a', 'Morning chronology', { summary: 'Tidal notes' }), item('b', 'Evening walk')),
     )
     expect((await user.put('/api/library/2')).status).toBe(200)
 

@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  digestSchema,
-  feedDetailSchema,
-  libraryMembershipSchema,
-  librarySchema,
-} from '../../src/shared/api.js'
+import { digestSchema, feedDetailSchema, libraryMembershipSchema, librarySchema } from '../../src/shared/api.js'
 import { claimedDevice, Device } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
 
@@ -140,9 +135,7 @@ describe('saving Feed Items to the Library', () => {
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(
-      digest.groups.flatMap((group) => group.items).map((entry) => [entry.title, entry.saved]),
-    ).toEqual([
+    expect(digest.groups.flatMap((group) => group.items).map((entry) => [entry.title, entry.saved])).toEqual([
       ['First light', true],
       ['Second thoughts', false],
     ])
@@ -168,9 +161,7 @@ describe('saving Feed Items to the Library', () => {
     expect((await user.post(`/api/feeds/1/refresh`)).status).toBe(200)
 
     const saved = await library(user)
-    expect(saved.items.map((entry) => [entry.feedItemId, entry.title])).toEqual([
-      [feedItemId, 'First light, revised'],
-    ])
+    expect(saved.items.map((entry) => [entry.feedItemId, entry.title])).toEqual([[feedItemId, 'First light, revised']])
     expect((await digestItem(user, 'First light, revised')).saved).toBe(true)
   })
 

@@ -6,7 +6,9 @@ export const IMAGE_REQUESTS_PER_WINDOW = 240
 
 const SWEEP_THRESHOLD = 256
 
-export type ImageRateVerdict = { readonly allowed: true } | { readonly allowed: false; readonly retryAfterSeconds: number }
+export type ImageRateVerdict =
+  | { readonly allowed: true }
+  | { readonly allowed: false; readonly retryAfterSeconds: number }
 
 export class ImageRateLimiter {
   readonly #clock: Clock

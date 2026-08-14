@@ -82,7 +82,9 @@ describe('opening one Feed', () => {
     expect(container.querySelectorAll('.cadence-cell[data-level="2"]')).toHaveLength(1)
     const months = [...container.querySelectorAll('.cadence-month')].map((label) => label.textContent)
     expect(months).toEqual(['february', 'april', 'june', 'august'])
-    expect(screen.getByText('3 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days')).toBeDefined()
+    expect(
+      screen.getByText('3 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days'),
+    ).toBeDefined()
 
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByText('today, 07:15')).toBeDefined()
@@ -251,7 +253,9 @@ describe('managing one Feed', () => {
     await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
 
     expect(
-      screen.getByText('this stops checking the feed and its items leave the digest — anything saved stays in your library'),
+      screen.getByText(
+        'this stops checking the feed and its items leave the digest — anything saved stays in your library',
+      ),
     ).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
 
@@ -262,9 +266,7 @@ describe('managing one Feed', () => {
   })
 
   it('unsubscribes on the confirming word and returns to the Feeds list', async () => {
-    const api = stubApi()
-      .on('GET /api/feeds/1', { body: DETAIL })
-      .on('DELETE /api/feeds/1', { status: 204 })
+    const api = stubApi().on('GET /api/feeds/1', { body: DETAIL }).on('DELETE /api/feeds/1', { status: 204 })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()

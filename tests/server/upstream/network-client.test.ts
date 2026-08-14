@@ -171,9 +171,9 @@ describe('createNetworkHttpClient', () => {
       response.end('encoded bytes')
     })
 
-    await expect(
-      clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`)),
-    ).rejects.toMatchObject({ code: 'unsupported_content_encoding' })
+    await expect(clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))).rejects.toMatchObject({
+      code: 'unsupported_content_encoding',
+    })
   })
 
   it('asks for encodings it can actually decode', async () => {
@@ -276,9 +276,7 @@ describe('createNetworkHttpClient', () => {
       response.end('<rss></rss>')
     })
 
-    await expect(createNetworkHttpClient()(new Request(`${running.url}/feed.xml`))).rejects.toThrow(
-      /refus|address/i,
-    )
+    await expect(createNetworkHttpClient()(new Request(`${running.url}/feed.xml`))).rejects.toThrow(/refus|address/i)
     expect(running.requests).toHaveLength(0)
   })
 })

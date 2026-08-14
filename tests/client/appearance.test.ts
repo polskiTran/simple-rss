@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  applyAppearance,
-  chooseAppearance,
-  storedAppearance,
-} from '../../src/client/appearance.js'
+import { applyAppearance, chooseAppearance, storedAppearance } from '../../src/client/appearance.js'
 
 afterEach(() => {
   localStorage.clear()

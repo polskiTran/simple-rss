@@ -14,7 +14,9 @@ async function renderAt(path: string) {
 
 function tabNames() {
   const sections = screen.getByRole('navigation', { name: 'Sections' })
-  return within(sections).getAllByRole('link').map((tab) => tab.textContent)
+  return within(sections)
+    .getAllByRole('link')
+    .map((tab) => tab.textContent)
 }
 
 function activeTab() {
@@ -81,8 +83,8 @@ describe('the application shell', () => {
   it('orders the hover glint along the tile’s anti-diagonal', async () => {
     const { container } = await renderAt('/digest')
 
-    const steps = [...container.querySelectorAll<HTMLElement>('.masthead .wordmark-cell')].map(
-      (cell) => cell.style.getPropertyValue('--glint-step'),
+    const steps = [...container.querySelectorAll<HTMLElement>('.masthead .wordmark-cell')].map((cell) =>
+      cell.style.getPropertyValue('--glint-step'),
     )
 
     expect(steps).toEqual(['0', '1', '2', '3', '1', '2', '3', '4', '2', '3', '4', '5', '3', '4', '5', '6'])

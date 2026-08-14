@@ -14,11 +14,7 @@ import {
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
-import {
-  FeedDocumentError,
-  parseFeedDocument,
-  type ParsedFeedDocument,
-} from '../ingestion/feed-document.js'
+import { FeedDocumentError, parseFeedDocument, type ParsedFeedDocument } from '../ingestion/feed-document.js'
 import { persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
@@ -347,10 +343,7 @@ export class SubscriptionService {
         .limit(1)
         .all()[0]
 
-      tx.update(feedUrlAliases)
-        .set({ feedId: existingFeedId })
-        .where(eq(feedUrlAliases.feedId, duplicate.feedId))
-        .run()
+      tx.update(feedUrlAliases).set({ feedId: existingFeedId }).where(eq(feedUrlAliases.feedId, duplicate.feedId)).run()
 
       if (hasItems) {
         tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
@@ -655,8 +648,7 @@ function wasNeverAsked(
   outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
 ): outcome is Extract<IngestFeedOutcome, { kind: 'retrieval-failed' }> {
   return (
-    outcome.kind === 'retrieval-failed' &&
-    (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
+    outcome.kind === 'retrieval-failed' && (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
   )
 }
 
@@ -722,10 +714,10 @@ function availabilityOf(record: SubscribedFeedRecord): FeedAvailability {
   }
 }
 
-function validatorsOf(retrieved: {
-  readonly etag: string | undefined
-  readonly lastModified: string | undefined
-}): { etag: string | null; lastModified: string | null } {
+function validatorsOf(retrieved: { readonly etag: string | undefined; readonly lastModified: string | undefined }): {
+  etag: string | null
+  lastModified: string | null
+} {
   return { etag: retrieved.etag ?? null, lastModified: retrieved.lastModified ?? null }
 }
 
@@ -752,4 +744,3 @@ function loggableUrl(value: string): string {
 function emptyCadence(): number[] {
   return Array.from({ length: 30 }, () => 0)
 }
-

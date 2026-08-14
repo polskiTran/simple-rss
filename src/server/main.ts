@@ -13,10 +13,7 @@ async function main(): Promise<void> {
   // Monitors without replacing Node's default handler: the process must still
   // exit non-zero rather than serve potentially corrupted state as healthy.
   process.on('uncaughtExceptionMonitor', (error, origin) => {
-    const event =
-      origin === 'unhandledRejection'
-        ? 'process.unhandled_rejection'
-        : 'process.uncaught_exception'
+    const event = origin === 'unhandledRejection' ? 'process.unhandled_rejection' : 'process.uncaught_exception'
     logger.error(event, { error })
   })
 }

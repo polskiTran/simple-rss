@@ -65,7 +65,8 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         if (active) {
           setArticleState({
             kind: 'failed',
-            waitSeconds: error instanceof ApiError && error.status === 429 ? (error.retryAfterSeconds ?? 30) : undefined,
+            waitSeconds:
+              error instanceof ApiError && error.status === 429 ? (error.retryAfterSeconds ?? 30) : undefined,
           })
         }
       })
@@ -119,7 +120,11 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </Suspense>
       ) : null}
       {articleState.kind === 'failed' ? (
-        <Fallback item={item} waitSeconds={articleState.waitSeconds} onRetry={() => setAttempt((current) => current + 1)} />
+        <Fallback
+          item={item}
+          waitSeconds={articleState.waitSeconds}
+          onRetry={() => setAttempt((current) => current + 1)}
+        />
       ) : null}
 
       {next ? (

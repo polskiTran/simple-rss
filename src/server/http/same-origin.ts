@@ -33,13 +33,8 @@ export function sameOrigin(options: SameOriginOptions): MiddlewareHandler {
  * browser reports `https:`; `X-Forwarded-Proto` bridges that, believed on the
  * same terms as the address header it travels with.
  */
-function expectedProtocol(
-  c: Parameters<MiddlewareHandler>[0],
-  options: SameOriginOptions,
-): string {
-  const forwarded = options.trustProxyHeaders
-    ? c.req.header('x-forwarded-proto')?.split(',')[0]?.trim()
-    : undefined
+function expectedProtocol(c: Parameters<MiddlewareHandler>[0], options: SameOriginOptions): string {
+  const forwarded = options.trustProxyHeaders ? c.req.header('x-forwarded-proto')?.split(',')[0]?.trim() : undefined
 
   return forwarded ? `${forwarded.toLowerCase()}:` : new URL(c.req.url).protocol
 }
