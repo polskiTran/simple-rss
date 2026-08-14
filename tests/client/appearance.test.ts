@@ -7,20 +7,20 @@ import {
 
 afterEach(() => {
   localStorage.clear()
-  delete document.documentElement.dataset['appearance']
+  delete document.documentElement.dataset.appearance
 })
 
 describe('per-device appearance', () => {
   it('rests on system: no stored choice, no pin on the document', () => {
     expect(storedAppearance()).toBe('system')
     applyAppearance(storedAppearance())
-    expect(document.documentElement.dataset['appearance']).toBeUndefined()
+    expect(document.documentElement.dataset.appearance).toBeUndefined()
   })
 
   it('pins a chosen scheme on the document and remembers it for this device', () => {
     chooseAppearance('dark')
 
-    expect(document.documentElement.dataset['appearance']).toBe('dark')
+    expect(document.documentElement.dataset.appearance).toBe('dark')
     expect(storedAppearance()).toBe('dark')
   })
 
@@ -28,7 +28,7 @@ describe('per-device appearance', () => {
     chooseAppearance('dark')
     chooseAppearance('system')
 
-    expect(document.documentElement.dataset['appearance']).toBeUndefined()
+    expect(document.documentElement.dataset.appearance).toBeUndefined()
     expect(localStorage.getItem('appearance')).toBeNull()
     expect(storedAppearance()).toBe('system')
   })

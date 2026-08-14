@@ -23,6 +23,7 @@ export function Field({ label, value, type = 'text', autoComplete, autoFocus, on
         type={type}
         value={value}
         autoComplete={autoComplete}
+        // biome-ignore lint/a11y/noAutofocus: only Setup and Login pass it, and each is a whole page whose single purpose is that one field.
         autoFocus={autoFocus}
         onChange={(event) => onChange(event.target.value)}
       />

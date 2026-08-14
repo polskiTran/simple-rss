@@ -19,6 +19,8 @@ pnpm only, Node ≥ 22.
 | `pnpm dev:server` / `pnpm dev:client` | Either half alone |
 | `pnpm build` | Build client then server (`build:client`, `build:server`) |
 | `pnpm start` | Run the built server from `dist/` |
+| `pnpm lint` | `biome check .` — formatting and the import boundaries (`biome.jsonc`) |
+| `pnpm format` | `biome format --write .` |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` / `pnpm test:watch` | Vitest (server tests) |
 | `pnpm test:browser` | Builds the client, runs Playwright in real Chromium |
@@ -28,7 +30,7 @@ pnpm only, Node ≥ 22.
 
 <important if="you are about to call any piece of work done">
 
-`pnpm typecheck && pnpm test` is the default loop. Add `pnpm test:browser` when client-visible behavior changes; `pnpm test:smoke` only when `Dockerfile` or container behavior changes.
+`pnpm lint && pnpm typecheck && pnpm test` is the default loop. Add `pnpm test:browser` when client-visible behavior changes; `pnpm test:smoke` only when `Dockerfile` or container behavior changes.
 </important>
 
 <important if="you are writing or modifying server tests">
@@ -43,7 +45,7 @@ ADRs in `docs/adr/` are binding: read the ones touching your area before designi
 
 <important if="you are making an outbound HTTP request — feed polling, Reader extraction, image proxy, or any new fetch">
 
-All outbound HTTP goes through the hardened `Retrieval` module in `src/server/upstream/` (ADR 0005). Callers state an operation; they never touch the raw adapter.
+All outbound HTTP goes through the hardened `Retrieval` module in `src/server/upstream/` (ADR 0005). Callers state an operation; they never touch the raw adapter. `pnpm lint` enforces this: raw `fetch` and `undici` are refused under `src/server/`.
 </important>
 
 <important if="you are naming things in code, tests, issues, or commit messages">

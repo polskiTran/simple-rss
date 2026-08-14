@@ -91,9 +91,9 @@ describe('the Feed Item image route', () => {
 
     const [request] = service.upstream.requestsTo(IMAGE_URL)
     if (!request) throw new Error('the image was never requested upstream')
-    expect(request.headers['cookie']).toBeUndefined()
-    expect(request.headers['authorization']).toBeUndefined()
-    expect(request.headers['accept']).toBe('image/jpeg, image/png, image/webp, image/gif, image/avif')
+    expect(request.headers.cookie).toBeUndefined()
+    expect(request.headers.authorization).toBeUndefined()
+    expect(request.headers.accept).toBe('image/jpeg, image/png, image/webp, image/gif, image/avif')
   })
 
   it('answers an uncached 404 for items without an image, unknown items, and bad identities', async () => {

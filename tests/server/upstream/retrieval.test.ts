@@ -742,7 +742,7 @@ describe('logging', () => {
 
     await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml?token=secret-value'))
 
-    const record = logs.find((entry) => entry['message'] === 'upstream.retrieval_failed')
+    const record = logs.find((entry) => entry.message === 'upstream.retrieval_failed')
     expect(record).toMatchObject({
       operation: 'feed',
       code: 'unsupported_content_type',
@@ -761,7 +761,7 @@ describe('logging', () => {
 
     await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
 
-    expect(logs.find((entry) => entry['message'] === 'upstream.retrieval_completed')).toMatchObject({
+    expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject({
       operation: 'feed',
       host: 'example.com',
       status: 200,

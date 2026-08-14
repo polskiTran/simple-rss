@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
+import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
 import { HomePageLink } from '../components/home-page-link.js'
@@ -63,6 +63,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshList is recreated every render; depending on it would restart the 3s timer on every render.
   useEffect(() => {
     if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
     if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
@@ -194,7 +195,7 @@ function feedUrlOf(query: string): string | undefined {
 async function watchFirstCheck(feedId: number): Promise<string> {
   for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
-    let detail
+    let detail: FeedDetail
     try {
       detail = await fetchFeedDetail(feedId)
     } catch (error) {
@@ -270,7 +271,7 @@ function SubscriptionList({
   if (shown.length === 0) return <p className="empty-note subscription-list-state">no feeds match</p>
 
   return (
-    <div className="content-list subscription-list" aria-label="Subscriptions">
+    <div className="content-list subscription-list" role="region" aria-label="Subscriptions">
       {shown.map((subscription) => (
         <article className="content-item feed-row" key={subscription.feedId}>
           <div className="feed-row-main">
@@ -349,6 +350,7 @@ function CadenceStrip({ counts, title }: { counts: readonly number[]; title: str
   return (
     <span className="cadence-strip" role="img" aria-label={`${total} items from ${title} in the last 30 days`}>
       {counts.map((count, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: counts is a fixed window of consecutive days — the cell's position is the day it stands for.
         <span className="cadence-day" data-level={cadenceLevel(count)} key={index} aria-hidden="true" />
       ))}
     </span>

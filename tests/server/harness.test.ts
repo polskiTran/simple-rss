@@ -48,9 +48,10 @@ describe('the test harness', () => {
 
   it('lets a fixture change between calls, the way a Feed does', async () => {
     let calls = 0
-    const upstream = new UpstreamFixtures().stubDynamic('https://example.com/feed.xml', () => ({
-      body: `<rss>${(calls += 1)}</rss>`,
-    }))
+    const upstream = new UpstreamFixtures().stubDynamic('https://example.com/feed.xml', () => {
+      calls += 1
+      return { body: `<rss>${calls}</rss>` }
+    })
     const service = await startTestService({ upstream })
 
     const first = await service.upstream.client(new Request('https://example.com/feed.xml'))
