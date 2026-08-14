@@ -56,7 +56,7 @@ The Railway template provisions:
 - Restart policy set to `Always`
 - 1 vCPU limit
 - 1 GB memory limit
-- One volume mounted at `/app/data`
+- One volume mounted at `/app/data`, with `RAILWAY_RUN_UID=0` so the container can write to it
 - Railway-managed HTTPS domain, with custom domains optional
 - Required setup and session secrets
 - Liveness and readiness health checks

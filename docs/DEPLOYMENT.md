@@ -96,8 +96,10 @@ docker run -d \
 
 The container runs as the unprivileged `node` user, writes structured JSON logs
 to stdout, and stops gracefully on `SIGTERM` (allow at least
-`SHUTDOWN_GRACE_MS` before force-killing). Backups are the CLI snapshot
-command below — never a raw copy of the live database file.
+`SHUTDOWN_GRACE_MS` before force-killing). A host that mounts a volume the
+`node` user cannot write to has to run the container as one that can — see
+[The volume](#the-volume). Backups are the CLI snapshot command below — never a
+raw copy of the live database file.
 
 ## Railway
 
@@ -121,6 +123,7 @@ Redis, no queue, no second service of any kind:
 | Health check | `/health/ready` |
 | `SETUP_SECRET` | `${{ secret(32) }}` — generated per deployment by the template, never a shared or hard-coded value |
 | `PUBLIC_ORIGIN` | `https://${{ RAILWAY_PUBLIC_DOMAIN }}` |
+| `RAILWAY_RUN_UID` | `0` — required by the volume, below |
 
 Railway bills actual usage, not the configured limits; this workload is
 expected to stay near the Hobby plan's minimum, and the 1 GB limit is
@@ -132,6 +135,63 @@ There is no `railway.json` in the repository on purpose: config-as-code
 applies to services Railway builds from a connected repo, while this template
 deploys the published image, so the settings above live in the template
 itself.
+
+### The volume
+
+Railway attaches no volume on its own, and volumes are not expressible in
+config-as-code either — the template provisions one, and a service built by
+hand has to be given one explicitly:
+
+```sh
+railway variable set RAILWAY_RUN_UID=0 --service <service> --skip-deploys
+railway volume add --mount-path /app/data
+```
+
+Without a volume the service still runs: `/app/data` resolves to the
+container's writable layer, so the database survives restarts and disappears
+with every deploy, taking the User's claim, Subscriptions, and reading history
+with it. The symptom is an upgraded installation asking to be claimed again.
+
+`RAILWAY_RUN_UID=0` is not optional. Railway mounts the volume owned by `root`
+and the mount replaces the image's `node`-owned `/app/data`, so the image's own
+`USER node` can no longer write there; the container must run as a uid that
+can. Without it the process starts and readiness stays closed on the write
+probe.
+
+Attaching the volume redeploys the service, and that deploy is the last one to
+discard the previous container's data — so take anything worth keeping off the
+service first.
+
+### Rescuing data from a service with no volume
+
+Everything durable is inside the container and there is no volume to download
+from, so the snapshot leaves over SSH. Take it with the CLI rather than copying
+the live database, and carry the hash across so a mangled transfer cannot pass
+for a backup:
+
+```sh
+railway ssh -- sh -c 'node dist/server/cli-main.js backup /tmp/snapshot.db && sha256sum /tmp/snapshot.db'
+railway ssh -- sh -c 'gzip -9 -c /tmp/snapshot.db | base64 -w0' 2>/dev/null \
+  | base64 -d | gunzip > snapshot.db
+sha256sum snapshot.db   # must equal what the container reported
+```
+
+Then attach the volume as above and restore onto it. `restore` refuses to run
+where a database already exists, and the deploy that mounted the empty volume
+created one, so remove it first — the running process holds its handle on the
+unlinked file until the redeploy, which is what makes it read the restored
+database:
+
+```sh
+railway volume files -v <volume> upload ./snapshot.db /backups/snapshot.db
+railway ssh -- sh -c 'rm -f /app/data/simple-rss.db /app/data/simple-rss.db-wal /app/data/simple-rss.db-shm'
+railway ssh -- node dist/server/cli-main.js restore /app/data/backups/snapshot.db
+railway redeploy -y
+```
+
+The restore reports what it recovered and rebuilds the search index; confirm
+`/health/ready` afterwards. Sessions come across, so signed-in devices stay
+signed in.
 
 ### First deployment and claim
 

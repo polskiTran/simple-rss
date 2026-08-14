@@ -46,7 +46,10 @@ ENV NODE_ENV=production \
     CLIENT_DIR=/app/dist/client \
     PORT=8080
 
-# The volume mounts here. Owned by `node` so the unprivileged user can write.
+# The volume mounts here. `node` owns it for hosts that mount nothing or mount
+# something it can already write; a platform volume mounts over this with its
+# own ownership, and such a host has to run the container as a uid that can
+# write to it — see docs/DEPLOYMENT.md.
 RUN mkdir -p /app/data && chown -R node:node /app
 
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
