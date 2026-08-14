@@ -186,7 +186,12 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
     try {
       // `localhost` and `127.0.0.1` are different origins to a browser even on
       // the same port, so this is genuinely somebody else's site.
-      await use({ url: `http://localhost:${port}`, serve: (html) => void (body = html) })
+      await use({
+        url: `http://localhost:${port}`,
+        serve: (html) => {
+          body = html
+        },
+      })
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }

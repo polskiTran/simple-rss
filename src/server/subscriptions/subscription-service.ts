@@ -26,7 +26,7 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { feedItems, feeds, feedUrlAliases, libraryItems, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalBytes, RetrievalFailure } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
+import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
 import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 
 export type CreateSubscriptionOutcome =
@@ -211,7 +211,7 @@ export class SubscriptionService {
   }
 
   importOpml(opml: string): ImportOpmlOutcome {
-    let outlines
+    let outlines: readonly OpmlFeedOutline[]
     try {
       outlines = parseOpml(opml)
     } catch (error) {
@@ -284,7 +284,7 @@ export class SubscriptionService {
       return { kind: 'not-modified' }
     }
 
-    let parsed
+    let parsed: ParsedFeedDocument
     try {
       parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
     } catch (error) {

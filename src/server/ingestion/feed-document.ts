@@ -252,7 +252,7 @@ function boundedPlainText(value: unknown, limit: number): string | null {
   // Stop nodes arrive raw. CDATA already wraps literal markup; outside it, XML entities
   // are still encoded — `&lt;p&gt;` is markup to interpret — so decode once before the HTML-to-text pass.
   const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(raw)
-  const source = cdata ? cdata[1]! : decodeXmlEntities(raw)
+  const source = cdata?.[1] ?? decodeXmlEntities(raw)
 
   const text = convert(source, {
     wordwrap: false,

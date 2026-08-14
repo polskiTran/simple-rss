@@ -48,7 +48,7 @@ describe('createLogger', () => {
     logger.error('startup.failed', { error: new Error('volume is full') })
 
     expect(written[0]?.error).toMatchObject({ message: 'volume is full', name: 'Error' })
-    expect(typeof (written[0]?.error as { stack: string }).stack).toBe('string')
+    expect(typeof (written[0]?.error as { stack?: string } | undefined)?.stack).toBe('string')
   })
 
   it('never lets a field overwrite level, message, or time', () => {

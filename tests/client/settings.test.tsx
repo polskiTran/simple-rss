@@ -7,7 +7,7 @@ import { stubApi } from './stub-api.js'
 afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
-  delete document.documentElement.dataset['appearance']
+  delete document.documentElement.dataset.appearance
 })
 
 function openSettings() {
@@ -87,7 +87,7 @@ describe('the Settings appearance', () => {
     await user.click(await screen.findByRole('button', { name: 'dark' }))
 
     expect(screen.getByRole('button', { name: 'dark' }).getAttribute('aria-pressed')).toBe('true')
-    expect(document.documentElement.dataset['appearance']).toBe('dark')
+    expect(document.documentElement.dataset.appearance).toBe('dark')
     expect(localStorage.getItem('appearance')).toBe('dark')
     expect(api.requests.filter(({ method }) => method !== 'GET')).toEqual([])
   })
@@ -100,7 +100,7 @@ describe('the Settings appearance', () => {
     await user.click(await screen.findByRole('button', { name: 'dark' }))
     await user.click(screen.getByRole('button', { name: 'system' }))
 
-    expect(document.documentElement.dataset['appearance']).toBeUndefined()
+    expect(document.documentElement.dataset.appearance).toBeUndefined()
     expect(localStorage.getItem('appearance')).toBeNull()
   })
 })

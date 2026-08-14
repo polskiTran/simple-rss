@@ -24,6 +24,6 @@ export function chooseAppearance(appearance: Appearance): void {
 
 export function applyAppearance(appearance: Appearance): void {
   const root = document.documentElement
-  if (appearance === 'system') delete root.dataset['appearance']
-  else root.dataset['appearance'] = appearance
+  if (appearance === 'system') delete root.dataset.appearance
+  else root.dataset.appearance = appearance
 }
