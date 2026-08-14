@@ -1,12 +1,13 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
-import { ApiError, fetchFeedDetail, fetchSubscriptions, importOpml, refreshFeed, subscribeToFeed } from '../api.js'
+import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
-import { AVAILABILITY_COPY, firstCheckFailure, noteDate, retryFailure, subscriptionFailure } from './feed-language.js'
+import { firstCheckFailure, retryFailure, subscriptionFailure, unavailableNote } from './feed-language.js'
+import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
 
 const FIRST_CHECK_ATTEMPTS = 8
 const FIRST_CHECK_INTERVAL_MS = 2_000
@@ -28,16 +29,17 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
   const [subscribing, setSubscribing] = useState(false)
-  const [importing, setImporting] = useState(false)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
   const [refreshRound, setRefreshRound] = useState(0)
 
+  // Not `useResource`: this list is also written by subscribing, so the first load merges
+  // into whatever landed while it was in flight rather than replacing it.
   useEffect(() => {
-    let active = true
-    void fetchSubscriptions()
+    const request = new AbortController()
+    void fetchSubscriptions(request.signal)
       .then(({ subscriptions }) => {
-        if (!active) return
+        if (request.signal.aborted) return
         setState((current) => {
           if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions }
           const merged = new Map(current.subscriptions.map((subscription) => [subscription.feedId, subscription]))
@@ -48,11 +50,11 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         })
       })
       .catch(() => {
-        if (active) setState((current) => (current.kind === 'loaded' ? current : { kind: 'unavailable' }))
+        if (!request.signal.aborted) {
+          setState((current) => (current.kind === 'loaded' ? current : { kind: 'unavailable' }))
+        }
       })
-    return () => {
-      active = false
-    }
+    return () => request.abort()
   }, [])
 
   async function refreshList(): Promise<void> {
@@ -101,24 +103,20 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }
 
-  async function importFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    // Cleared so choosing the same file again fires another change event.
-    event.target.value = ''
-    if (!file || importing) return
-
-    setImporting(true)
-    setNotice('')
-    setReport(undefined)
-    try {
-      const imported = await importOpml(await readFileText(file))
-      setReport(imported)
-      setRefreshRound(0)
-      await refreshList()
-    } catch (error) {
-      setNotice(importFailure(error))
-    } finally {
-      setImporting(false)
+  function imported(outcome: OpmlImportOutcome) {
+    switch (outcome.kind) {
+      case 'started':
+        setNotice('')
+        setReport(undefined)
+        return
+      case 'failed':
+        setNotice(outcome.notice)
+        return
+      case 'imported':
+        setReport(outcome.report)
+        setRefreshRound(0)
+        void refreshList()
+        return
     }
   }
 
@@ -155,21 +153,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
           onChange={(event) => setQuery(event.target.value)}
         />
       </form>
-      <div className="opml-controls">
-        <label className="opml-import">
-          <span>{importing ? 'importing…' : 'import OPML'}</span>
-          <input
-            className="opml-file-input"
-            type="file"
-            accept=".opml,.xml,text/x-opml,text/xml,application/xml"
-            disabled={importing}
-            onChange={importFile}
-          />
-        </label>
-        <a className="export-link" href="/api/subscriptions/export" download="subscriptions.opml">
-          export OPML
-        </a>
-      </div>
+      <OpmlControls onOutcome={imported} />
       <p className="notice feed-notice" aria-live="polite">
         {notice}
       </p>
@@ -216,37 +200,6 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-function readFileText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read'))
-    reader.readAsText(file)
-  })
-}
-
-function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
-  if (!report) return null
-  if (report.added === 0 && report.alreadySubscribed === 0 && report.unusable.length === 0) {
-    return <p className="notice import-report-summary">that OPML file lists no feeds</p>
-  }
-
-  return (
-    <div className="import-report" aria-live="polite">
-      <p className="notice import-report-summary">
-        {`imported — ${report.added} added, ${report.alreadySubscribed} already subscribed`}
-      </p>
-      {report.unusable.length > 0 ? (
-        <ul className="import-report-details">
-          {report.unusable.map((url) => (
-            <li key={url}>{url} — not a usable feed url</li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  )
-}
-
 function SubscriptionList({
   state,
   query,
@@ -288,7 +241,7 @@ function SubscriptionList({
           <div className="content-meta">
             <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
           </div>
-          <AvailabilityNote
+          <SubscriptionAvailability
             subscription={subscription}
             retrying={retryingFeedId === subscription.feedId}
             onRetry={onRetry}
@@ -305,7 +258,8 @@ function matches(subscription: SubscriptionSummary, query: string): boolean {
   return subscription.title.toLowerCase().includes(line) || subscription.domain.toLowerCase().includes(line)
 }
 
-function AvailabilityNote({
+/** A row in the list also says when a Feed has never been checked, and offers the retry. */
+function SubscriptionAvailability({
   subscription,
   retrying,
   onRetry,
@@ -320,16 +274,9 @@ function AvailabilityNote({
   }
   if (availability.state !== 'unavailable') return null
 
-  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'checking is not working'
-  const lastSuccess = availability.lastSuccessAt
-    ? `last reached ${noteDate(availability.lastSuccessAt)}`
-    : 'not reached since subscribing'
-
   return (
     <p className="availability-note">
-      <span>
-        {reason} — {lastSuccess}. its items stay in your digest.
-      </span>
+      <span>{unavailableNote(availability)}</span>
       <button
         className="text-button availability-retry"
         type="button"
@@ -352,16 +299,4 @@ function CadenceStrip({ counts, title }: { counts: readonly number[]; title: str
       ))}
     </span>
   )
-}
-
-const IMPORT_FAILURE_COPY: Readonly<Record<string, string>> = {
-  malformed_opml: 'that file is malformed XML',
-  unsupported_opml: 'that file is not an OPML subscription list',
-  too_many_feeds: 'that file lists more feeds than one import can process',
-  invalid_request: 'that file is too large to import',
-}
-
-function importFailure(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'the reader is unavailable'
-  return IMPORT_FAILURE_COPY[error.code] ?? 'that file could not be imported'
 }

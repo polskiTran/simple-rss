@@ -7,18 +7,13 @@ import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
 import { SaveToggle } from '../components/save-toggle.js'
+import { useResource } from '../use-resource.js'
 import { failureKind } from './failure.js'
 
 export interface DigestViewProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
-
-type DigestState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'loaded'; readonly digest: Digest }
-  | { readonly kind: 'unavailable' }
-  | { readonly kind: 'unreachable' }
 
 type SearchState =
   | { readonly kind: 'idle' }
@@ -43,25 +38,7 @@ function withOlderPage(digest: Digest, page: Digest): Digest {
 }
 
 export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
-  const [state, setState] = useState<DigestState>({ kind: 'loading' })
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(() => {
-    let active = true
-    setState({ kind: 'loading' })
-    setOlder('idle')
-    void fetchDigest()
-      .then((digest) => {
-        if (active) setState({ kind: 'loaded', digest })
-      })
-      .catch((error: unknown) => {
-        if (active) setState({ kind: failureKind(error) })
-      })
-    return () => {
-      active = false
-    }
-  }, [attempt])
-
+  const [state, { retry, set }] = useResource((signal) => fetchDigest(undefined, signal), [])
   const [older, setOlder] = useState<OlderState>('idle')
 
   const loadOlder = (cursor: string) => {
@@ -69,9 +46,7 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
     void fetchDigest(cursor)
       .then((page) => {
         setOlder('idle')
-        setState((current) =>
-          current.kind === 'loaded' ? { kind: 'loaded', digest: withOlderPage(current.digest, page) } : current,
-        )
+        set((digest) => withOlderPage(digest, page))
       })
       .catch(() => setOlder('failed'))
   }
@@ -80,45 +55,42 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' })
   const line = query.trim()
 
+  // The search waits for the typing to settle, which is why it stays its own effect.
   useEffect(() => {
     if (line === '') {
       setSearch({ kind: 'idle' })
       return
     }
-    let active = true
+    const request = new AbortController()
     setSearch({ kind: 'searching' })
     const settle = window.setTimeout(() => {
-      void fetchSearchResults(line)
+      void fetchSearchResults(line, request.signal)
         .then((found) => {
-          if (active) setSearch({ kind: 'found', results: found.results })
+          if (!request.signal.aborted) setSearch({ kind: 'found', results: found.results })
         })
         .catch((error: unknown) => {
-          if (active) setSearch({ kind: failureKind(error) })
+          if (!request.signal.aborted) setSearch({ kind: failureKind(error) })
         })
     }, SEARCH_SETTLE_MS)
     return () => {
-      active = false
+      request.abort()
       window.clearTimeout(settle)
     }
   }, [line])
 
-  const retry = () => setAttempt((current) => current + 1)
+  const tryAgain = () => {
+    setOlder('idle')
+    retry()
+  }
 
   const setSaved = (feedItemId: number, saved: boolean) => {
-    setState((current) =>
-      current.kind === 'loaded'
-        ? {
-            kind: 'loaded',
-            digest: {
-              ...current.digest,
-              groups: current.digest.groups.map((group) => ({
-                ...group,
-                items: group.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
-              })),
-            },
-          }
-        : current,
-    )
+    set((digest) => ({
+      ...digest,
+      groups: digest.groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
+      })),
+    }))
     setSearch((current) =>
       current.kind === 'found'
         ? {
@@ -143,18 +115,20 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
             : 'the digest is unavailable — try again in a moment'}
         </p>
         <p className="digest-retry">
-          <button className="text-button" type="button" onClick={retry}>
+          <button className="text-button" type="button" onClick={tryAgain}>
             try again
           </button>
         </p>
       </div>
     )
   }
-  if (state.digest.groups.length === 0) {
+
+  const digest = state.value
+  if (digest.groups.length === 0) {
     return <p className="view measure empty-note">nothing yet — subscribe to a Feed to start your digest</p>
   }
 
-  const { today } = state.digest
+  const { today } = digest
 
   return (
     <div className="view measure digest-view digest-view-today">
@@ -174,7 +148,7 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       {search.kind === 'idle' ? (
         <>
           <DailyBand date={today.date} volume={today.volume} />
-          {state.digest.groups.map((group) => (
+          {digest.groups.map((group) => (
             <section className="day-group" aria-labelledby={`day-${group.date}`} key={group.date}>
               <h2
                 className={group.label === 'today' ? 'day-heading' : 'day-heading day-heading-past'}
@@ -182,7 +156,7 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
               >
                 {group.label}
                 {group.label === 'today' ? (
-                  <span className="day-heading-count"> · {countLabel(state.digest.today.volume)}</span>
+                  <span className="day-heading-count"> · {countLabel(digest.today.volume)}</span>
                 ) : null}
               </h2>
               <div className="content-list">
@@ -206,7 +180,7 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
               </div>
             </section>
           ))}
-          <OlderItems nextCursor={state.digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
+          <OlderItems nextCursor={digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
         </>
       ) : (
         <SearchOutcome state={search} line={line} onOpenItem={onOpenItem} onOpenFeed={onOpenFeed} onSaved={setSaved} />
