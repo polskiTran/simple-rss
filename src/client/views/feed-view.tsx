@@ -1,4 +1,6 @@
 import { Button } from '@base-ui/react/button'
+import { Toggle } from '@base-ui/react/toggle'
+import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useState, type CSSProperties } from 'react'
 import {
   POLLING_INTERVAL_MINUTES,
@@ -180,20 +182,29 @@ function OpenFeed({
       <p className="cadence-stats">{grid.stats}</p>
       <UnavailableNote availability={detail.availability} />
       <div className="feed-controls">
-        <span className="interval-options" role="group" aria-label="checked every">
+        <ToggleGroup
+          className="interval-options"
+          aria-label="checked every"
+          value={[String(detail.schedule.pollingIntervalMinutes)]}
+          onValueChange={(chosen) => {
+            // Pressing the pressed word would empty the group; a Feed is always
+            // checked on one of the six, so that press stays where it is.
+            const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen[0])
+            if (minutes !== undefined) onChangeInterval(minutes)
+          }}
+        >
           <span className="interval-caption">checked every</span>
           {POLLING_INTERVAL_MINUTES.map((minutes) => (
-            <Button
+            <Toggle
               key={minutes}
               className="text-button interval-option"
-              aria-pressed={detail.schedule.pollingIntervalMinutes === minutes}
+              value={String(minutes)}
               aria-label={`check ${intervalPhrase(minutes)}`}
-              onClick={() => onChangeInterval(minutes)}
             >
               {INTERVAL_WORDS[minutes]}
-            </Button>
+            </Toggle>
           ))}
-        </span>
+        </ToggleGroup>
         <span className="feed-actions">
           <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>
             {refreshing ? 'refreshing…' : 'refresh now'}

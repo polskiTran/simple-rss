@@ -347,7 +347,7 @@
     cursor: pointer;
   }
 
-  .appearance-option[aria-pressed='true'] {
+  .appearance-option[data-pressed] {
     color: var(--color-ink-strong);
   }
 
@@ -586,7 +586,7 @@
     white-space: nowrap;
   }
 
-  .interval-option[aria-pressed='true'] {
+  .interval-option[data-pressed] {
     color: var(--color-ink-strong);
   }
 
@@ -782,7 +782,7 @@
     cursor: pointer;
   }
 
-  .save-toggle[aria-pressed='true'] {
+  .save-toggle[data-pressed] {
     color: var(--color-accent);
   }
 
@@ -1003,7 +1003,7 @@
       color: var(--color-ink-strong);
     }
 
-    .save-toggle:not([aria-pressed='true']):hover {
+    .save-toggle:not([data-pressed]):hover {
       color: var(--color-muted-foreground);
     }
 
