@@ -5,10 +5,10 @@ import type { RetrievalFailureCode } from '../../../src/server/upstream/retrieva
 
 function appAnswering(outcome: ReaderArticleOutcome) {
   return readerRoutes({
-    reader: () => ({
+    reader: {
       item: () => undefined,
       article: async () => outcome,
-    }),
+    },
   })
 }
 
@@ -39,9 +39,7 @@ describe('Reader failure answers', () => {
   })
 
   it('never caches the rate-limited answer and names the wait', async () => {
-    const response = await appAnswering({ kind: 'rate-limited', retryAfterSeconds: 17 }).request(
-      '/items/7/reader',
-    )
+    const response = await appAnswering({ kind: 'rate-limited', retryAfterSeconds: 17 }).request('/items/7/reader')
 
     expect(response.status).toBe(429)
     expect(response.headers.get('retry-after')).toBe('17')

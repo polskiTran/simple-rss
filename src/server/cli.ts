@@ -120,7 +120,10 @@ function restore(backupPath: string | undefined, context: CliContext): number {
   }
 
   try {
-    const report = restoreSnapshot(resolve(backupPath), context.config.databasePath, context.clock)
+    const report = restoreSnapshot(resolve(backupPath), context.config.databasePath, {
+      clock: context.clock,
+      rebuildIndex: rebuildSearchIndex,
+    })
     context.out(JSON.stringify(report))
     return 0
   } catch (error) {
@@ -133,11 +136,7 @@ function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function resetPassword(
-  db: SqliteDatabase,
-  argument: string | undefined,
-  context: CliContext,
-): Promise<number> {
+async function resetPassword(db: SqliteDatabase, argument: string | undefined, context: CliContext): Promise<number> {
   const password = argument ?? context.env?.[NEW_PASSWORD_VARIABLE]
 
   if (!password) {

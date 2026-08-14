@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "concurrently -n server,client -c blue,magenta \"pnpm dev:server\" \"pnpm dev:client\"",
-    "dev:server": "tsx watch src/server/main.ts",
+    "dev:server": "tsx watch --env-file-if-exists=.env src/server/main.ts",
     "dev:client": "vite",
     "build": "pnpm build:client && pnpm build:server",
     "build:client": "vite build",
@@ -19,6 +19,8 @@
     "test:watch": "vitest",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:browser": "pnpm build:client && playwright test",
+    "lint": "biome check --error-on-warnings .",
+    "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "cli": "tsx src/server/cli-main.ts"
   },
@@ -42,6 +44,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.8",
     "@fontsource/literata": "^5.1.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.0.9",

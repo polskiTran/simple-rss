@@ -366,11 +366,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     if (!accepted(contentType, profile.accept)) {
       await discard(response)
       controller.abort(new RetrievalError('unsupported_content_type', 'unusable content type'))
-      return fail(
-        'unsupported_content_type',
-        contentType ? `content type ${contentType}` : 'no content type',
-        answered,
-      )
+      return fail('unsupported_content_type', contentType ? `content type ${contentType}` : 'no content type', answered)
     }
 
     const declared = Number(response.headers.get('content-length'))
@@ -463,11 +459,7 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
         controller.enqueue(chunk.value)
       } catch (cause) {
         const abandoned = options.abandonedKind()
-        stop(
-          cause instanceof RetrievalError
-            ? cause
-            : new RetrievalError(abandoned ?? 'unavailable', describe(cause)),
-        )
+        stop(cause instanceof RetrievalError ? cause : new RetrievalError(abandoned ?? 'unavailable', describe(cause)))
       }
     },
     cancel(reason) {
@@ -553,8 +545,7 @@ function accepted(contentType: string, accept: readonly string[]): boolean {
 async function discard(response: Response): Promise<void> {
   try {
     await response.body?.cancel()
-  } catch {
-  }
+  } catch {}
 }
 
 function emptyStream(): ReadableStream<Uint8Array> {
@@ -620,10 +611,7 @@ interface ResolvedLimits {
   readonly maxRedirects: number
 }
 
-function stricterLimits(
-  profile: RetrievalProfile,
-  requested: RetrievalLimits | undefined,
-): ResolvedLimits | undefined {
+function stricterLimits(profile: RetrievalProfile, requested: RetrievalLimits | undefined): ResolvedLimits | undefined {
   const values = [requested?.maxBytes, requested?.timeoutMs, requested?.bodyTimeoutMs, requested?.maxRedirects]
   if (values.some((value) => value !== undefined && !Number.isFinite(value))) return undefined
 

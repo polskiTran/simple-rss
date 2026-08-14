@@ -33,11 +33,7 @@ export class SessionStore {
     const expiresAt = new Date(now.getTime() + ABSOLUTE_TIMEOUT_MS)
 
     return this.#db.transaction((tx) => {
-      const [current] = tx
-        .select({ passwordHash: userAuth.passwordHash })
-        .from(userAuth)
-        .limit(1)
-        .all()
+      const [current] = tx.select({ passwordHash: userAuth.passwordHash }).from(userAuth).limit(1).all()
 
       if (current?.passwordHash !== passwordHash) return undefined
 
@@ -73,11 +69,7 @@ export class SessionStore {
     }
 
     if (row.lastSeenAt <= isoAgo(now, TOUCH_INTERVAL_MS)) {
-      this.#db
-        .update(sessions)
-        .set({ lastSeenAt: now.toISOString() })
-        .where(eq(sessions.tokenHash, tokenHash))
-        .run()
+      this.#db.update(sessions).set({ lastSeenAt: now.toISOString() }).where(eq(sessions.tokenHash, tokenHash)).run()
     }
 
     return true
@@ -85,7 +77,10 @@ export class SessionStore {
 
   /** Ends one device's session. Unknown tokens are already revoked. */
   revoke(token: string): void {
-    this.#db.delete(sessions).where(eq(sessions.tokenHash, fingerprint(token))).run()
+    this.#db
+      .delete(sessions)
+      .where(eq(sessions.tokenHash, fingerprint(token)))
+      .run()
   }
 
   /** Removes sessions past either deadline. Returns how many were swept. */
@@ -95,7 +90,6 @@ export class SessionStore {
       .where(or(lte(sessions.expiresAt, now.toISOString()), lte(sessions.lastSeenAt, idleCutoff(now))))
       .run().changes
   }
-
 }
 
 function fingerprint(token: string): string {

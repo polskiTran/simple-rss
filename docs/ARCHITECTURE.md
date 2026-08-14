@@ -91,14 +91,14 @@ A future requirement for concurrent replicas, separate worker services, or high 
 - **Client:** React and Vite
 - **HTTP server:** Hono on Node
 - **Validation:** shared Zod schemas at API boundaries
-- **UI foundation:** Base UI primitives, Tailwind CSS, and application-owned design tokens/components
+- **UI foundation:** native HTML elements with manual ARIA, Tailwind CSS, and application-owned design tokens/components
 - **Database:** SQLite through `better-sqlite3` and Drizzle
 - **Search:** SQLite FTS5
 - **Reader extraction:** Defuddle on the server
 
 Next.js is intentionally absent. The private client does not need SSR, SEO, React Server Components, or framework-managed caching. Vite produces static assets that the same Hono process serves alongside `/api` routes.
 
-The interface uses no visually prescriptive component suite. Base UI supplies accessible interaction behavior while typography, spacing, color, density, and motion remain owned by Simple RSS.
+The interface uses no visually prescriptive component suite and no headless-component library. Every interactive control is a native element — `<button aria-pressed>` for toggles, `<a aria-current="page">` inside a labelled `<nav>` for the tab bar, `role="group"` around related choices — with accessible behavior hand-built rather than supplied. Typography, spacing, color, density, and motion are owned entirely by Simple RSS.
 
 ## Application boundaries
 
@@ -107,7 +107,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Client:** views, interactions, browser caching, and same-origin API calls
 - **HTTP:** routing, cookies, request validation, rate limiting, and response policy
 - **Authentication:** setup, credentials, sessions, and emergency reset
-- **Subscriptions:** Feed lifecycle and preferences
+- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` owns every Subscription write (create, OPML, unsubscribe, polling interval), `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailability` owns the three Feed Availability writes (`recordSuccess`, `recordFailure`, `recordDeferral`)
 - **Retrieval:** the one hardened boundary every outbound request passes through — destination and redirect validation, deadlines, decoded-size ceilings, and retrieval budgets
 - **Ingestion:** parsing, normalization, identity, and polling state
 - **Digest:** chronology and date grouping
@@ -118,7 +118,9 @@ The single package should still expose clear modules rather than mixing concerns
 - **Persistence:** connection usership, transactions, migrations, and backups
 - **Operations:** scheduler, health checks, logs, cleanup, and exports
 
-These are source-code boundaries, not separate packages or services.
+These are source-code boundaries, not separate packages or services — and the ones the folder tree can express are enforced rather than remembered. `biome.jsonc` refuses the imports a path can identify: nothing but `app.ts` reaching into `http/`, and no raw `fetch` or `undici` under `src/server/`. `tests/server/architecture.test.ts` walks the folder graph for what a path cannot see — import cycles, and `upstream/` depending on any other server folder. Root-level modules are not nodes in that graph, so the composition root can import freely in one direction and a shared interface belongs where it is consumed.
+
+`src/server/service.ts` is the composition root: it builds every domain service once, inside a single `try`/`catch`. A startup failure — the database won't open, or migrations fail — is recorded on `Readiness` rather than thrown, so the process stays up to report the reason on `/health/live` while `/health/ready` closes. On success the built instances are bundled into one `Services` value and handed to `createApp` (`src/server/app.ts`), which branches on that bundle exactly once, at construction: with services, every route module is wired with real instances; without them, all of `/api` answers 503 and no route has to ask again. A domain service is either fully constructed or the installation is not serving `/api`.
 
 ## Persistence model
 

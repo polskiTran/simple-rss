@@ -75,9 +75,7 @@ describe('LoginRateLimiter', () => {
     fail('203.0.113.7', PER_CLIENT_FAILURES)
     clock.advance(WINDOW_MS / 3)
 
-    expect(limiter.begin('203.0.113.7').retryAfterSeconds).toBe(
-      Math.ceil((WINDOW_MS * (2 / 3)) / 1000),
-    )
+    expect(limiter.begin('203.0.113.7').retryAfterSeconds).toBe(Math.ceil((WINDOW_MS * (2 / 3)) / 1000))
   })
 
   it('unblocks one failure at a time, so a blocked client cannot flood back', () => {

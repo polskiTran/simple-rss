@@ -1,6 +1,7 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import {
   POLLING_INTERVAL_MINUTES,
+  type FeedAvailability,
   type FeedDetail,
   type PollingIntervalMinutes,
 } from '../../shared/api.js'
@@ -12,13 +13,8 @@ import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
-import { AVAILABILITY_COPY, noteDate, retryFailure } from './feed-language.js'
-
-type DetailState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'loaded'; readonly detail: FeedDetail }
-  | { readonly kind: 'missing' }
-  | { readonly kind: 'unavailable' }
+import { useResource } from '../use-resource.js'
+import { retryFailure, unavailableNote } from './feed-language.js'
 
 export interface FeedViewProps {
   readonly feedId: number
@@ -31,28 +27,16 @@ export interface FeedViewProps {
 }
 
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
-  const [state, setState] = useState<DetailState>({ kind: 'loading' })
+  const [state, { set }] = useResource((signal) => fetchFeedDetail(feedId, signal), [feedId])
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [changingInterval, setChangingInterval] = useState(false)
   const [confirmingUnsubscribe, setConfirmingUnsubscribe] = useState(false)
   const [unsubscribing, setUnsubscribing] = useState(false)
 
-  useEffect(() => {
-    let active = true
-    setState({ kind: 'loading' })
-    void fetchFeedDetail(feedId)
-      .then((detail) => {
-        if (active) setState({ kind: 'loaded', detail })
-      })
-      .catch((error: unknown) => {
-        if (!active) return
-        setState(error instanceof ApiError && error.status === 404 ? { kind: 'missing' } : { kind: 'unavailable' })
-      })
-    return () => {
-      active = false
-    }
-  }, [feedId])
+  // A Feed the User is not subscribed to answers 404, which is a different note, not a failure.
+  const missing = state.kind === 'unavailable' && state.error instanceof ApiError && state.error.status === 404
+  const failed = state.kind === 'unavailable' || state.kind === 'unreachable'
 
   async function refresh() {
     if (refreshing) return
@@ -69,19 +53,19 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       setRefreshing(false)
     }
     try {
-      setState({ kind: 'loaded', detail: await fetchFeedDetail(feedId) })
-    } catch {
-    }
+      const detail = await fetchFeedDetail(feedId)
+      set(() => detail)
+    } catch {}
   }
 
   async function changeInterval(pollingIntervalMinutes: PollingIntervalMinutes) {
     if (changingInterval || state.kind !== 'loaded') return
-    if (state.detail.schedule.pollingIntervalMinutes === pollingIntervalMinutes) return
+    if (state.value.schedule.pollingIntervalMinutes === pollingIntervalMinutes) return
     setChangingInterval(true)
     setNotice('')
     try {
       const schedule = await updatePollingInterval(feedId, pollingIntervalMinutes)
-      setState({ kind: 'loaded', detail: { ...state.detail, schedule } })
+      set((detail) => ({ ...detail, schedule }))
       setNotice(`now checked ${intervalPhrase(pollingIntervalMinutes)}`)
     } catch {
       setNotice('the interval could not be changed')
@@ -105,19 +89,10 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   }
 
   function setSaved(feedItemId: number, saved: boolean) {
-    setState((current) =>
-      current.kind === 'loaded'
-        ? {
-            kind: 'loaded',
-            detail: {
-              ...current.detail,
-              items: current.detail.items.map((item) =>
-                item.feedItemId === feedItemId ? { ...item, saved } : item,
-              ),
-            },
-          }
-        : current,
-    )
+    set((detail) => ({
+      ...detail,
+      items: detail.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
+    }))
   }
 
   function showDay(date: string) {
@@ -136,11 +111,11 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         <BackLink className="feed-back" origin={origin} onBack={onBack} />
         {state.kind === 'loaded' ? (
           <>
-            <span className="feed-header-title">{state.detail.title}</span>
+            <span className="feed-header-title">{state.value.title}</span>
             <HomePageLink
               className="feed-header-domain"
-              domain={state.detail.domain}
-              homePageUrl={state.detail.homePageUrl}
+              domain={state.value.domain}
+              homePageUrl={state.value.homePageUrl}
             />
           </>
         ) : null}
@@ -148,13 +123,11 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       {state.kind === 'loading' ? (
         <LoadingNote className="empty-note feed-detail-state">loading the feed</LoadingNote>
       ) : null}
-      {state.kind === 'missing' ? (
-        <p className="empty-note feed-detail-state">that feed is not in your subscriptions</p>
-      ) : null}
-      {state.kind === 'unavailable' ? <p className="empty-note feed-detail-state">the feed is unavailable</p> : null}
+      {missing ? <p className="empty-note feed-detail-state">that feed is not in your subscriptions</p> : null}
+      {failed && !missing ? <p className="empty-note feed-detail-state">the feed is unavailable</p> : null}
       {state.kind === 'loaded' ? (
         <OpenFeed
-          detail={state.detail}
+          detail={state.value}
           notice={notice}
           refreshing={refreshing}
           onRefresh={refresh}
@@ -204,7 +177,7 @@ function OpenFeed({
     <>
       <Grid grid={grid} title={detail.title} onShowDay={onShowDay} />
       <p className="cadence-stats">{grid.stats}</p>
-      <AvailabilityNote detail={detail} />
+      <UnavailableNote availability={detail.availability} />
       <div className="feed-controls">
         <span className="interval-options" role="group" aria-label="checked every">
           <span className="interval-caption">checked every</span>
@@ -275,15 +248,7 @@ function Unsubscribe({
   )
 }
 
-function Grid({
-  grid,
-  title,
-  onShowDay,
-}: {
-  grid: CadenceGrid
-  title: string
-  onShowDay: (date: string) => void
-}) {
+function Grid({ grid, title, onShowDay }: { grid: CadenceGrid; title: string; onShowDay: (date: string) => void }) {
   return (
     <div className="cadence-figure">
       <div className="cadence-grid" role="group" aria-label={`26 weeks of publishing cadence for ${title}`}>
@@ -307,7 +272,11 @@ function Grid({
       <div className="cadence-months" aria-hidden="true">
         {grid.columns.map((column, index) =>
           column.monthLabel ? (
-            <span key={column.cells[0]?.date ?? index} className="cadence-month" style={{ '--column': index } as CSSProperties}>
+            <span
+              key={column.cells[0]?.date ?? index}
+              className="cadence-month"
+              style={{ '--column': index } as CSSProperties}
+            >
               {column.monthLabel}
             </span>
           ) : null,
@@ -317,20 +286,13 @@ function Grid({
   )
 }
 
-function AvailabilityNote({ detail }: { detail: FeedDetail }) {
-  const { availability } = detail
+/** An opened Feed says nothing while checking works, and nothing about a first check either. */
+function UnavailableNote({ availability }: { availability: FeedAvailability }) {
   if (availability.state !== 'unavailable') return null
-
-  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'checking is not working'
-  const lastSuccess = availability.lastSuccessAt
-    ? `last reached ${noteDate(availability.lastSuccessAt)}`
-    : 'not reached since subscribing'
 
   return (
     <p className="availability-note">
-      <span>
-        {reason} — {lastSuccess}. its items stay in your digest.
-      </span>
+      <span>{unavailableNote(availability)}</span>
     </p>
   )
 }

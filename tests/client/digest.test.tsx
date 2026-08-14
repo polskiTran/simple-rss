@@ -21,7 +21,11 @@ const item = (feedItemId: number, title: string, displayTime: string) => ({
 const DIGEST = {
   today: { date: '2026-08-08', volume: 2 },
   groups: [
-    { date: '2026-08-08', label: 'today', items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')] },
+    {
+      date: '2026-08-08',
+      label: 'today',
+      items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')],
+    },
     { date: '2026-08-07', label: 'yesterday', items: [item(1, 'Evening notes', '09:31')] },
     { date: '2026-06-03', label: 'june 3, 2026', items: [item(4, 'A June letter', '12:00')] },
   ],
@@ -93,7 +97,11 @@ describe('the chronological Digest', () => {
 
   it('says today · 1 post, in the singular, when one post is all there is', async () => {
     stubApi().on('GET /api/digest', {
-      body: { today: { date: '2026-08-08', volume: 1 }, groups: [{ ...DIGEST.groups[0], items: [item(3, 'First light', '07:15')] }], nextCursor: null },
+      body: {
+        today: { date: '2026-08-08', volume: 1 },
+        groups: [{ ...DIGEST.groups[0], items: [item(3, 'First light', '07:15')] }],
+        nextCursor: null,
+      },
     })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -103,7 +111,11 @@ describe('the chronological Digest', () => {
 
   it('counts nothing on a day when nothing has landed yet', async () => {
     stubApi().on('GET /api/digest', {
-      body: { today: { date: '2026-08-08', volume: 0 }, groups: [DIGEST.groups[1], DIGEST.groups[2]], nextCursor: null },
+      body: {
+        today: { date: '2026-08-08', volume: 0 },
+        groups: [DIGEST.groups[1], DIGEST.groups[2]],
+        nextCursor: null,
+      },
     })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -128,9 +140,7 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(
-      await screen.findByText('the digest is out of reach — check the connection, then try again'),
-    ).toBeDefined()
+    expect(await screen.findByText('the digest is out of reach — check the connection, then try again')).toBeDefined()
 
     api.on('GET /api/digest', { body: DIGEST })
     await user.click(screen.getByRole('button', { name: 'try again' }))
@@ -175,7 +185,9 @@ describe('searching from the Digest', () => {
     stubApi()
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=chronology', {
-        body: { results: [result(9, 'Morning chronology', 'today, 07:15'), result(8, 'Tide chronology', '3 june', true)] },
+        body: {
+          results: [result(9, 'Morning chronology', 'today, 07:15'), result(8, 'Tide chronology', '3 june', true)],
+        },
       })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -207,9 +219,7 @@ describe('searching from the Digest', () => {
     await user.type(await screen.findByRole('searchbox', { name: 'search your reading' }), 'driftwood')
 
     expect((await screen.findByRole('status')).textContent).toBe('searching…')
-    expect((await screen.findByText('nothing in your reading matches “driftwood”')).getAttribute('role')).toBe(
-      'status',
-    )
+    expect((await screen.findByText('nothing in your reading matches “driftwood”')).getAttribute('role')).toBe('status')
   })
 
   it('tells a silent network apart from a refusing server for a search too', async () => {

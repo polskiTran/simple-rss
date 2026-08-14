@@ -56,7 +56,8 @@ describe('extractArticle', () => {
   })
 
   it('reads the charset a page only declares in its meta tag', async () => {
-    const body = '<html><head><meta charset="windows-1252"></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
+    const body =
+      '<html><head><meta charset="windows-1252"></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
     const bytes = Uint8Array.from([...body].map((char) => char.charCodeAt(0)))
     const article = await extractArticle({ bytes, url: URL })
 

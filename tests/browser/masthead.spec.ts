@@ -11,9 +11,7 @@ async function claim(page: Page, installation: Installation): Promise<void> {
 }
 
 async function inkLevels(page: Page, scope = '.masthead'): Promise<string[]> {
-  return page.$$eval(`${scope} .wordmark-cell`, (cells) =>
-    cells.map((cell) => getComputedStyle(cell).backgroundColor),
-  )
+  return page.$$eval(`${scope} .wordmark-cell`, (cells) => cells.map((cell) => getComputedStyle(cell).backgroundColor))
 }
 
 async function hangTheDigest(page: Page): Promise<void> {
@@ -45,9 +43,7 @@ test.describe('the masthead mark', () => {
     await page.waitForTimeout(120)
     expect(await inkLevels(page)).not.toEqual(resting)
 
-    await expect
-      .poll(async () => inkLevels(page), { timeout: 2_000 })
-      .toEqual(resting)
+    await expect.poll(async () => inkLevels(page), { timeout: 2_000 }).toEqual(resting)
   })
 
   test('holds still for a User who asked for less motion', async ({ page, installation }) => {

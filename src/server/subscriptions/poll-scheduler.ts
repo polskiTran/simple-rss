@@ -22,7 +22,7 @@ export interface PollSchedulerLimits {
 }
 
 export interface PollSchedulerOptions extends PollSchedulerLimits {
-  readonly subscriptions: SubscriptionService
+  readonly subscriptions: Pick<SubscriptionService, 'dueFeedIds'>
   readonly refresh: FeedRefresh
   readonly retention: RetentionSweeper
   readonly logger: Logger
@@ -36,7 +36,7 @@ export interface PollSchedulerOptions extends PollSchedulerLimits {
  * timers, so restart catch-up is the ordinary path.
  */
 export class PollScheduler {
-  readonly #subscriptions: SubscriptionService
+  readonly #subscriptions: Pick<SubscriptionService, 'dueFeedIds'>
   readonly #refresh: FeedRefresh
   readonly #retention: RetentionSweeper
   readonly #logger: Logger

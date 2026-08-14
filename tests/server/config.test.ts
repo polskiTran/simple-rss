@@ -59,11 +59,9 @@ describe('loadConfig', () => {
 
     const moduleUrl = pathToFileURL(copiedConfig).href
     const script = `import { loadConfig } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(loadConfig({ PUBLIC_ORIGIN: 'https://reader.example.com' }).clientDir))`
-    const { stdout } = await run(
-      process.execPath,
-      ['--import', 'tsx', '--input-type=module', '--eval', script],
-      { cwd: checkout },
-    )
+    const { stdout } = await run(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
+      cwd: checkout,
+    })
 
     expect(JSON.parse(stdout)).toBe(join(checkout, 'dist', 'client'))
   })

@@ -1,44 +1,19 @@
-import { useEffect, useState } from 'react'
-import type { Library } from '../../shared/api.js'
+import { useState } from 'react'
 import { fetchLibrary } from '../api.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { failureKind } from './failure.js'
+import { useResource } from '../use-resource.js'
 
 export interface SavedViewProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
 
-type LibraryState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'loaded'; readonly library: Library }
-  | { readonly kind: 'unavailable' }
-  | { readonly kind: 'unreachable' }
-
 export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
-  const [state, setState] = useState<LibraryState>({ kind: 'loading' })
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(() => {
-    let active = true
-    setState({ kind: 'loading' })
-    setOlder('idle')
-    void fetchLibrary()
-      .then((library) => {
-        if (active) setState({ kind: 'loaded', library })
-      })
-      .catch((error: unknown) => {
-        if (active) setState({ kind: failureKind(error) })
-      })
-    return () => {
-      active = false
-    }
-  }, [attempt])
-
+  const [state, { retry, set }] = useResource((signal) => fetchLibrary(undefined, signal), [])
   const [older, setOlder] = useState<OlderState>('idle')
 
   const loadOlder = (cursor: string) => {
@@ -46,14 +21,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
     void fetchLibrary(cursor)
       .then((page) => {
         setOlder('idle')
-        setState((current) =>
-          current.kind === 'loaded'
-            ? {
-                kind: 'loaded',
-                library: { items: [...current.library.items, ...page.items], nextCursor: page.nextCursor },
-              }
-            : current,
-        )
+        set((library) => ({ items: [...library.items, ...page.items], nextCursor: page.nextCursor }))
       })
       .catch(() => setOlder('failed'))
   }
@@ -62,7 +30,10 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   const setSaved = (feedItemId: number, saved: boolean) =>
     setMembership((current) => new Map(current).set(feedItemId, saved))
 
-  const retry = () => setAttempt((current) => current + 1)
+  const tryAgain = () => {
+    setOlder('idle')
+    retry()
+  }
 
   if (state.kind === 'loading') {
     return <LoadingNote className="view measure empty-note">loading the library</LoadingNote>
@@ -76,14 +47,16 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
             : 'the library is unavailable — try again in a moment'}
         </p>
         <p className="digest-retry">
-          <button className="text-button" type="button" onClick={retry}>
+          <button className="text-button" type="button" onClick={tryAgain}>
             try again
           </button>
         </p>
       </div>
     )
   }
-  if (state.library.items.length === 0) {
+
+  const library = state.value
+  if (library.items.length === 0) {
     return (
       <p className="view measure empty-note">
         nothing saved yet — save an item from the digest or a feed to keep it here
@@ -94,7 +67,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   return (
     <div className="view measure">
       <div className="content-list">
-        {state.library.items.map((item) => (
+        {library.items.map((item) => (
           <article className="content-item" key={item.feedItemId}>
             <h2 className="content-item-title">
               <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
@@ -116,7 +89,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
           </article>
         ))}
       </div>
-      <OlderItems nextCursor={state.library.nextCursor} older={older} noun="saves" onLoadOlder={loadOlder} />
+      <OlderItems nextCursor={library.nextCursor} older={older} noun="saves" onLoadOlder={loadOlder} />
     </div>
   )
 }

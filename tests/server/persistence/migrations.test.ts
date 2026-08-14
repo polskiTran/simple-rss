@@ -57,9 +57,11 @@ describe('migrations', () => {
     const db = await openFreshDatabase()
     applyMigrations(db, new ManualClock('2026-08-08T09:00:00.000Z'))
 
-    const rows = db
-      .prepare('SELECT version, name, applied_at FROM schema_migrations ORDER BY version')
-      .all() as Array<{ version: number; name: string; applied_at: string }>
+    const rows = db.prepare('SELECT version, name, applied_at FROM schema_migrations ORDER BY version').all() as Array<{
+      version: number
+      name: string
+      applied_at: string
+    }>
 
     expect(rows).toHaveLength(migrations.length)
     for (const row of rows) {
@@ -78,9 +80,7 @@ describe('migrations', () => {
       ]),
     ).toThrow()
 
-    const table = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_done'")
-      .get()
+    const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_done'").get()
     expect(table).toBeUndefined()
     expect(appliedVersions(db)).toEqual([])
     db.close()

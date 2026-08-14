@@ -29,10 +29,7 @@ async function openDigest(page: Page, installation: Installation): Promise<void>
 test.describe('searching the reading history', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('finds items by summary words, opens one by keyboard, and returns cleanly', async ({
-    page,
-    installation,
-  }) => {
+  test('finds items by summary words, opens one by keyboard, and returns cleanly', async ({ page, installation }) => {
     await openDigest(page, installation)
 
     const field = page.getByRole('searchbox', { name: 'search your reading' })

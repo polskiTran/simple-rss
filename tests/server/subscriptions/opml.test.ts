@@ -1,12 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  MAX_OPML_FEEDS,
-  OpmlError,
-  parseOpml,
-  serializeOpml,
-} from '../../../src/server/subscriptions/opml.js'
+import { MAX_OPML_FEEDS, OpmlError, parseOpml, serializeOpml } from '../../../src/server/subscriptions/opml.js'
 
 const FIXTURES = join(import.meta.dirname, '../../fixtures/opml')
 

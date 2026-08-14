@@ -18,6 +18,7 @@ export function MarkTile() {
 
           return (
             <span
+              // biome-ignore lint/suspicious/noArrayIndexKey: TILE is a fixed decorative grid — the cell's position is its identity.
               key={`${y}-${x}`}
               className="wordmark-cell"
               data-level={level}

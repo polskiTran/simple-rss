@@ -119,8 +119,7 @@ async function waitFor(
   while (Date.now() < deadline) {
     try {
       if (accept(await container.fetch(path))) return
-    } catch {
-    }
+    } catch {}
     await new Promise((resolve) => setTimeout(resolve, 200))
   }
 

@@ -82,9 +82,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
 
   const dataDir = resolve(parsed.data.DATA_DIR)
-  const clientDir = parsed.data.CLIENT_DIR
-    ? resolve(parsed.data.CLIENT_DIR)
-    : defaultClientDir()
+  const clientDir = parsed.data.CLIENT_DIR ? resolve(parsed.data.CLIENT_DIR) : defaultClientDir()
 
   return {
     port: parsed.data.PORT,

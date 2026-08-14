@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: Typecheck and tests
+    name: Lint, typecheck and tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +17,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build

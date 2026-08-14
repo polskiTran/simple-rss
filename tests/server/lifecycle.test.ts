@@ -36,7 +36,9 @@ describe('service lifecycle', () => {
 
     const lifecycle = service.logs
       .map((record) => record.message)
-      .filter((message) => message === 'server.started' || message === 'server.stopping' || message === 'server.stopped')
+      .filter(
+        (message) => message === 'server.started' || message === 'server.stopping' || message === 'server.stopped',
+      )
     expect(lifecycle).toEqual(['server.started', 'server.stopping', 'server.stopped'])
   })
 
