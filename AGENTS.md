@@ -2,42 +2,66 @@
 
 An opinionated, opensource RSS reader: one pnpm package, one Docker image, one SQLite file. `README.md` has the philosophy; `docs/ARCHITECTURE.md` the accepted design.
 
-## Map
+## Project map
 
 - `src/server/` — the whole service: Hono API plus in-process scheduler, one folder per domain area (`subscriptions/`, `digest/`, `library/`, `reader/`, `images/`, `search/`, `retention/`, `auth/`, `persistence/`, `upstream/`).
 - `src/client/` — the React/Vite UI.
 - `src/shared/api.ts` — the Zod contract both sides import. Any API change starts here.
 - `tests/server/` (harness-driven), `tests/browser/` (Playwright), `tests/smoke/` (container), `tests/support/` (the harness itself).
 
-## Conventions
+pnpm only, Node ≥ 22.
 
-- **pnpm only**, Node ≥ 22. Scripts live in `package.json`.
-- **Vocabulary**: use `CONTEXT.md` terms verbatim in code, tests, issues, and commits — each entry lists the synonyms to avoid.
-- **ADRs are binding**: read the ones in `docs/adr/` touching your area before designing; if your work contradicts one, surface it rather than silently overriding. The one every feature hits: all outbound HTTP (feed polling, Reader extraction, image proxy) goes through the hardened `Retrieval` module in `src/server/upstream/` (ADR 0005) — callers state an operation, never touch the raw adapter.
-- **UI work**: `docs/DESIGN.md` is the design system — one repeated content shape, whitespace-only separation, accent reserved for saved state.
+<important if="you need to run commands to build, run, test, or typecheck">
 
-## Writing
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Server + client together |
+| `pnpm dev:server` / `pnpm dev:client` | Either half alone |
+| `pnpm build` | Build client then server (`build:client`, `build:server`) |
+| `pnpm start` | Run the built server from `dist/` |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm test` / `pnpm test:watch` | Vitest (server tests) |
+| `pnpm test:browser` | Builds the client, runs Playwright in real Chromium |
+| `pnpm test:smoke` | Container smoke tests (needs Docker) |
+| `pnpm cli` | The server CLI entrypoint |
+</important>
 
-The bar for comments, docstrings, and `docs/` prose:
+<important if="you are about to call any piece of work done">
 
-- **A comment earns its line by saying what the code cannot**: a constraint, a reason, a gotcha, the ADR behind a choice. One that restates its own code is a no-op; delete it.
-- **One or two lines.** If a comment needs a paragraph, the reasoning belongs in an ADR or `docs/`.
-- **Comments describe current behavior.** When behavior changes, update its comments in the same commit; if you cannot make a comment true, delete it.
+`pnpm typecheck && pnpm test` is the default loop. Add `pnpm test:browser` when client-visible behavior changes; `pnpm test:smoke` only when `Dockerfile` or container behavior changes.
+</important>
 
-## Verify
+<important if="you are writing or modifying server tests">
 
-- `pnpm typecheck && pnpm test` is the default loop before calling work done. Server tests run the real service against a temporary SQLite via `tests/support/service-harness.ts` — manual clock, upstream fixtures, injected `Retrieval`. Write new server tests through the harness rather than mocking internals.
-- `pnpm test:browser` when client-visible behavior changes (builds the client, runs real Chromium).
-- `pnpm test:smoke` only when `Dockerfile` or container behavior changes (needs Docker).
+Server tests run the real service against a temporary SQLite via `tests/support/service-harness.ts` — manual clock, upstream fixtures, injected `Retrieval`. Write new tests through the harness rather than mocking internals.
+</important>
 
-## Issue tracker
+<important if="you are designing a feature, changing behavior, or touching an area covered by an ADR">
 
-Issues live in GitHub Issues on `polskiTran/simple-rss`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+ADRs in `docs/adr/` are binding: read the ones touching your area before designing. If your work contradicts one, surface it rather than silently overriding.
+</important>
 
-## Triage labels
+<important if="you are making an outbound HTTP request — feed polling, Reader extraction, image proxy, or any new fetch">
 
-The five canonical triage roles, used verbatim as label strings. See `docs/agents/triage-labels.md`.
+All outbound HTTP goes through the hardened `Retrieval` module in `src/server/upstream/` (ADR 0005). Callers state an operation; they never touch the raw adapter.
+</important>
 
-## Domain docs
+<important if="you are naming things in code, tests, issues, or commit messages">
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CONTEXT.md` and `docs/adr/` are the single domain context; see `docs/agents/domain.md`.
+</important>
+
+<important if="you are building or restyling UI">
+
+`docs/DESIGN.md` is the design system — one repeated content shape, whitespace-only separation, accent reserved for saved state.
+</important>
+
+<important if="you are writing comments, docstrings, or docs/ prose">
+
+Comments describe current behavior. When behavior changes, update its comments in the same commit; if you cannot make a comment true, delete it.
+</important>
+
+<important if="you are filing, reading, labeling, or closing an issue">
+
+Issues live in GitHub Issues on `polskiTran/simple-rss`, via the `gh` CLI — see `docs/agents/issue-tracker.md`. The five canonical triage roles are used verbatim as label strings; see `docs/agents/triage-labels.md`.
+</important>
