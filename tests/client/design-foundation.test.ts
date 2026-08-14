@@ -176,6 +176,12 @@ describe('layout', () => {
     expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
   })
 
+  it('gives dark paper four more pixels above the masthead than light', () => {
+    expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
+    expect(darkBlocks()).toMatch(/\.paper\s*\{[^}]*padding:\s*36px 56px 0/)
+    expect(css).toMatch(/\[data-appearance='dark'\] \.paper\s*\{[^}]*padding:\s*36px 56px 0/)
+  })
+
   it('draws no cards or boxes in the interface — every rule here is an underline', () => {
     const drawn = css.replace(/--[a-z-]+:[^;]+;/g, '')
 

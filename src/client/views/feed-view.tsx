@@ -259,7 +259,9 @@ function Unsubscribe({
               <Button className="text-button" focusableWhenDisabled disabled={working} onClick={onUnsubscribe}>
                 {working ? 'unsubscribing…' : 'unsubscribe'}
               </Button>
-              <Dialog.Close className="text-button" disabled={working}>
+              {/* Composed onto Button: Dialog.Close takes native button props only,
+                  so the dismissing word borrows the focus its own press would cost it. */}
+              <Dialog.Close className="text-button" disabled={working} render={<Button focusableWhenDisabled />}>
                 keep subscribed
               </Dialog.Close>
             </p>
