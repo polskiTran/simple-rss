@@ -118,7 +118,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Persistence:** connection usership, transactions, migrations, and backups
 - **Operations:** scheduler, health checks, logs, cleanup, and exports
 
-These are source-code boundaries, not separate packages or services.
+These are source-code boundaries, not separate packages or services — and the ones the folder tree can express are enforced rather than remembered. `biome.jsonc` refuses the imports a path can identify: nothing but `app.ts` reaching into `http/`, and no raw `fetch` or `undici` under `src/server/`. `tests/server/architecture.test.ts` walks the folder graph for what a path cannot see — import cycles, and `upstream/` depending on any other server folder. Root-level modules are not nodes in that graph, so the composition root can import freely in one direction and a shared interface belongs where it is consumed.
 
 `src/server/service.ts` is the composition root: it builds every domain service once, inside a single `try`/`catch`. A startup failure — the database won't open, or migrations fail — is recorded on `Readiness` rather than thrown, so the process stays up to report the reason on `/health/live` while `/health/ready` closes. On success the built instances are bundled into one `Services` value and handed to `createApp` (`src/server/app.ts`), which branches on that bundle exactly once, at construction: with services, every route module is wired with real instances; without them, all of `/api` answers 503 and no route has to ask again. A domain service is either fully constructed or the installation is not serving `/api`.
 

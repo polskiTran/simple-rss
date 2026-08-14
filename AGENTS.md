@@ -48,6 +48,19 @@ ADRs in `docs/adr/` are binding: read the ones touching your area before designi
 All outbound HTTP goes through the hardened `Retrieval` module in `src/server/upstream/` (ADR 0005). Callers state an operation; they never touch the raw adapter. `pnpm lint` enforces this: raw `fetch` and `undici` are refused under `src/server/`.
 </important>
 
+<important if="you are adding an import under `src/server/`, or suppressing a lint rule">
+
+Three boundaries hold the server's folder graph. Each is owned by exactly one mechanism, so it fails where you can see it — none of them rely on review:
+
+- **Nothing under `src/server/` imports `src/server/http/`.** `http/` consumes the domain, never the reverse; `app.ts` is the one composition point and is exempt. Biome refuses the rest.
+- **Nothing under `src/server/` calls raw `fetch` or imports `undici`** — ADR 0005, above. Biome again.
+- **The folder graph stays acyclic, and `upstream/` imports no other server folder.** `tests/server/architecture.test.ts` walks it.
+
+Two things that test cannot see. Root-level modules (`app.ts`, `service.ts`, `clock.ts`, `logger.ts`) are not nodes in the graph, so a cycle through one of them passes — when two modules need a shared interface, declare it where it is *consumed* rather than where it is built. And the scan reads text, so a type-only back-edge fails the test: that is deliberate, since a cycle a person has to trace is a cycle whether or not it survives to runtime.
+
+Suppress a rule only with its reason attached. Every `biome-ignore` in the repo names why, and every rule turned off in `biome.jsonc` carries its reason on the line above it; a new `overrides` entry does the same. Note that an override *replaces* a rule rather than merging into it — restate what you still want.
+</important>
+
 <important if="you are naming things in code, tests, issues, or commit messages">
 
 Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CONTEXT.md` and `docs/adr/` are the single domain context; see `docs/agents/domain.md`.
