@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useEffect, useState, type FormEvent } from 'react'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
@@ -277,14 +278,14 @@ function SubscriptionAvailability({
   return (
     <p className="availability-note">
       <span>{unavailableNote(availability)}</span>
-      <button
+      <Button
         className="text-button availability-retry"
-        type="button"
+        focusableWhenDisabled
         disabled={retrying}
         onClick={() => onRetry(subscription.feedId)}
       >
         {retrying ? 'retrying…' : 'retry now'}
-      </button>
+      </Button>
     </p>
   )
 }

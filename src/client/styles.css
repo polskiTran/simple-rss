@@ -412,7 +412,11 @@
     cursor: pointer;
   }
 
-  .text-button:disabled {
+  /* A control that stays focusable while its request is in flight is refused
+     through `aria-disabled`, not the `disabled` attribute — so both spell the
+     same quiet word. */
+  .text-button:disabled,
+  .text-button[aria-disabled='true'] {
     color: var(--color-quiet);
     cursor: default;
   }
@@ -1003,7 +1007,7 @@
       color: var(--color-muted-foreground);
     }
 
-    .text-button:not(.interval-option):not(:disabled):hover,
+    .text-button:not(.interval-option):not(:disabled):not([aria-disabled='true']):hover,
     .export-link:hover,
     .opml-import:hover,
     .content-item-link:hover,

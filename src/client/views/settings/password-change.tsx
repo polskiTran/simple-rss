@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useState, type FormEvent } from 'react'
 import type { AuthStatus } from '../../../shared/api.js'
 import { changePassword } from '../../api.js'
@@ -57,9 +58,9 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
         onChange={setConfirmation}
       />
       <p className="gate-actions">
-        <button className="text-button" type="submit" disabled={saving}>
+        <Button className="text-button" type="submit" focusableWhenDisabled disabled={saving}>
           change password
-        </button>
+        </Button>
       </p>
       <p className="notice" role="status">
         {notice}

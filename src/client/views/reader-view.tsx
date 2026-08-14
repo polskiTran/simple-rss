@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { Suspense, lazy } from 'react'
 import type { ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
@@ -119,9 +120,9 @@ function Fallback({ item, waitSeconds, onRetry }: FallbackProps) {
             open original
           </a>
         ) : null}
-        <button className="text-button" type="button" onClick={onRetry}>
+        <Button className="text-button" onClick={onRetry}>
           retry parsing
-        </button>
+        </Button>
       </p>
       {waitSeconds !== undefined ? (
         <p className="empty-note">the last try was a moment ago — wait {waitSeconds}s, then retry</p>

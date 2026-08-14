@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useState } from 'react'
 import { fetchLibrary } from '../api.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
@@ -47,9 +48,9 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
             : 'the library is unavailable — try again in a moment'}
         </p>
         <p className="digest-retry">
-          <button className="text-button" type="button" onClick={tryAgain}>
+          <Button className="text-button" onClick={tryAgain}>
             try again
-          </button>
+          </Button>
         </p>
       </div>
     )
