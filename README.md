@@ -36,7 +36,7 @@ Simple RSS service
 
 Railway is the initially supported managed deployment. One always-running service hosts the client, API, scheduler, and Reader extraction; one persistent volume stores SQLite. The same image remains suitable for other Docker hosts.
 
-The stack is TypeScript, React, Vite, Hono, Tailwind CSS, Zod, Drizzle, `better-sqlite3`, SQLite FTS5, and Defuddle. The repository will remain one pnpm package until a real second deployable requires another boundary.
+The stack is TypeScript, React, Base UI, Vite, Hono, Tailwind CSS, Zod, Drizzle, `better-sqlite3`, SQLite FTS5, and Defuddle. The repository will remain one pnpm package until a real second deployable requires another boundary.
 
 See [the architecture document](docs/ARCHITECTURE.md) for the complete design.
 
@@ -61,3 +61,4 @@ pnpm test:smoke   # builds the image and exercises the container (needs Docker)
 - [ADR 0002: Container-first Railway deployment](docs/adr/0002-container-first-railway-deployment.md)
 - [ADR 0003: Application-owned authentication](docs/adr/0003-application-owned-single-user-authentication.md)
 - [ADR 0004: The API is closed by default](docs/adr/0004-api-closed-by-default.md)
+- [ADR 0008: Interactive behavior from Base UI](docs/adr/0008-interactive-behavior-from-base-ui.md)
