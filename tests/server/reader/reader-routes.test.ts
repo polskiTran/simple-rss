@@ -5,10 +5,10 @@ import type { RetrievalFailureCode } from '../../../src/server/upstream/retrieva
 
 function appAnswering(outcome: ReaderArticleOutcome) {
   return readerRoutes({
-    reader: () => ({
+    reader: {
       item: () => undefined,
       article: async () => outcome,
-    }),
+    },
   })
 }
 

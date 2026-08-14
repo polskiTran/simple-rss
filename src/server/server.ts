@@ -8,7 +8,8 @@ export interface StartOptions extends ServiceOptions {
   readonly port?: number
 }
 
-export interface RunningService extends Service {
+/** A listening service. `stop()` is the only way down: it drains before closing the database. */
+export interface RunningService extends Omit<Service, 'close'> {
   /** The port actually bound, which differs from the request when it was 0. */
   readonly port: number
   /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
@@ -44,7 +45,6 @@ export async function startService(options: StartOptions): Promise<RunningServic
     get scheduler() {
       return service.scheduler
     },
-    close: () => service.close(),
     port,
     url: `http://127.0.0.1:${port}`,
     stop() {
