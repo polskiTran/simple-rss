@@ -1,11 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-/**
- * Typed mirror of the tables the server queries; migrations remain the source of truth.
- * Drift is caught by the persistence tests, which build the database from migrations
- * and round-trip through these definitions.
- */
+/** Typed mirror of the tables the server queries; migrations remain the source of truth. */
 export const installationSettings = sqliteTable(
   'installation_settings',
   {

@@ -10,11 +10,6 @@ export interface RequireSessionOptions {
   readonly isPublic: (path: string) => boolean
 }
 
-/**
- * The whole access model: one guard in front of everything except the routes
- * that exist to get through it. An unclaimed installation therefore exposes
- * nothing but setup and health.
- */
 export function requireSession(options: RequireSessionOptions): MiddlewareHandler {
   return async (c, next) => {
     if (options.isPublic(c.req.path)) return next()

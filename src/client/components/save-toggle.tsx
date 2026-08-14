@@ -8,9 +8,6 @@ export interface SaveToggleProps {
   onSaved(saved: boolean): void
 }
 
-// A word, never an icon; `saved` takes the design's one reserved accent. The
-// word flips only once the server answers — Library membership is the
-// server's fact, not the button's.
 export function SaveToggle({ feedItemId, title, saved, onSaved }: SaveToggleProps) {
   const [pending, setPending] = useState(false)
 
@@ -21,7 +18,6 @@ export function SaveToggle({ feedItemId, title, saved, onSaved }: SaveToggleProp
       const membership = saved ? await unsaveFromLibrary(feedItemId) : await saveToLibrary(feedItemId)
       onSaved(membership.saved)
     } catch {
-      // On failure the word keeps the last server-confirmed state.
     } finally {
       setPending(false)
     }

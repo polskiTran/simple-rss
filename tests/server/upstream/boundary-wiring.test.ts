@@ -3,8 +3,6 @@ import { startTestService } from '../../support/service-harness.js'
 
 const FEED = 'https://feeds.example.com/atom.xml'
 
-// These assertions run through the real composition root and real config
-// parsing, so a Feed poller cannot quietly be wired to a bare client.
 describe('the service boundary', () => {
   it('retrieves through the installation-wide boundary', async () => {
     const service = await startTestService()

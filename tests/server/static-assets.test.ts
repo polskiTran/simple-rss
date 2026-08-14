@@ -71,8 +71,6 @@ describe('serving the built client', () => {
     const response = await service.fetch(path)
     const body = await response.text()
 
-    // Never the file itself: an escaping path is either a client route or,
-    // under /assets, a missing bundle file.
     expect(body).not.toContain('"name": "simple-rss"')
     expect(body).not.toContain('"version"')
   })

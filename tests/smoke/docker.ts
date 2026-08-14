@@ -12,7 +12,6 @@ export interface DockerResult {
   readonly code: number
 }
 
-/** Runs `docker` and returns its result, including a non-zero exit code. */
 export async function docker(args: string[]): Promise<DockerResult> {
   try {
     const { stdout, stderr } = await run('docker', args, { maxBuffer: 32 * 1024 * 1024 })
@@ -23,27 +22,21 @@ export async function docker(args: string[]): Promise<DockerResult> {
   }
 }
 
-// Builds for the host architecture, not `linux/amd64`: these tests certify
-// behaviour, which is architecture-neutral. The amd64 claim is asserted in CI
-// (`.github/workflows/ci.yml`), not locally.
 export async function buildImage(): Promise<void> {
   const result = await docker(['build', '-t', IMAGE, '.'])
   if (result.code !== 0) throw new Error(`docker build failed:\n${result.stderr}`)
 }
 
-/** A named volume standing in for the platform's persistent disk. */
 export function uniqueName(prefix: string): string {
   return `${prefix}-${randomBytes(4).toString('hex')}`
 }
 
 export interface Container {
   readonly name: string
-  /** Origin on the host, e.g. `http://127.0.0.1:49154`. */
   readonly url: string
   fetch(path: string, init?: RequestInit): Promise<Response>
   exec(args: string[]): Promise<DockerResult>
   logs(): Promise<string>
-  /** Sends SIGTERM and waits, returning how long the stop took and its code. */
   stop(timeoutSeconds?: number): Promise<{ durationMs: number; exitCode: number }>
   remove(): Promise<void>
 }
@@ -51,19 +44,10 @@ export interface Container {
 export interface StartOptions {
   readonly volume: string
   readonly env?: Record<string, string>
-  /** Container port to publish; matches PORT when that is overridden. */
   readonly port?: number
-  /**
-   * Whether to wait for readiness before returning. False for the cases that
-   * are *about* readiness staying closed, which would otherwise time out.
-   */
   readonly waitForReadiness?: boolean
 }
 
-/**
- * Starts the published image the way a platform would: an injected port, a
- * volume at `/app/data`, and nothing else.
- */
 export async function startContainer(options: StartOptions): Promise<Container> {
   const name = uniqueName('simple-rss-smoke')
   const port = options.port ?? 8080
@@ -116,12 +100,10 @@ export async function startContainer(options: StartOptions): Promise<Container> 
   return container
 }
 
-/** Waits until the process answers at all, whatever readiness says. */
 export async function waitForLiveness(container: Container, timeoutMs = 60_000): Promise<void> {
   await waitFor(container, timeoutMs, '/health/live', (response) => response.ok)
 }
 
-/** Polls readiness the way a platform health check does. */
 export async function waitForReady(container: Container, timeoutMs = 60_000): Promise<void> {
   await waitFor(container, timeoutMs, '/health/ready', (response) => response.ok)
 }
@@ -138,7 +120,6 @@ async function waitFor(
     try {
       if (accept(await container.fetch(path))) return
     } catch {
-      // Container is still binding its port.
     }
     await new Promise((resolve) => setTimeout(resolve, 200))
   }
@@ -146,7 +127,6 @@ async function waitFor(
   throw new Error(`container ${container.name} never answered ${path}:\n${await container.logs()}`)
 }
 
-/** Parses the container's structured stdout into records. */
 export function logRecords(logs: string): Array<Record<string, unknown>> {
   return logs
     .split('\n')

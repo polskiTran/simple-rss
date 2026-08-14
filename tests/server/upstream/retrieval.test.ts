@@ -48,7 +48,6 @@ function harness(options: HarnessOptions = {}): Harness {
 
 type RequestOverrides = Partial<Omit<RetrievalRequest, 'url' | 'limits'>> & RetrievalLimits
 
-/** A Feed-shaped retrieval, which every test varies rather than restates. */
 function feedRequest(url: string, overrides: RequestOverrides = {}): RetrievalRequest {
   const { maxBytes, timeoutMs, bodyTimeoutMs, maxRedirects, ...request } = overrides
   const limits: RetrievalLimits = {
@@ -517,8 +516,6 @@ describe('giving up', () => {
       body: pacedBody([new Uint8Array(8), new Uint8Array(8), new Uint8Array(8)], { gapMs: 25 }),
     }))
 
-    // Every chunk lands after the answer deadline: the Feed is slow to send,
-    // not silent.
     const result = await retrieval.retrieveBytes(
       feedRequest('https://example.com/feed.xml', { timeoutMs: 20, bodyTimeoutMs: 2_000 }),
     )
@@ -652,8 +649,6 @@ describe('capacity', () => {
     })
     const imageRequest = feedRequest('https://example.com/photo.jpg', { operation: 'image' })
 
-    // One image runs; the other two wait for the image budget, not for the
-    // boundary as a whole.
     const images = [retrieval.retrieveBytes(imageRequest), retrieval.retrieveBytes(imageRequest)]
     const queued = retrieval.retrieveBytes(imageRequest)
 
@@ -674,7 +669,6 @@ describe('capacity', () => {
       bodyTimeoutMs: 20,
     })
 
-    // Nobody reads or cancels it: the deadline is the only thing left to end it.
     expect(await retrieval.retrieve(imageRequest)).toMatchObject({ ok: true })
     await new Promise((resolve) => setTimeout(resolve, 60))
 

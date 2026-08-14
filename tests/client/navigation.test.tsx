@@ -89,7 +89,6 @@ const LIBRARY = {
       savedAt: '2026-08-08T09:05:00.000Z',
       displayDate: 'today, 07:15',
     },
-    // A save that outlived its Subscription: the Feed it names is gone.
     {
       feedItemId: 1,
       title: 'A June letter',
@@ -106,7 +105,6 @@ const LIBRARY = {
   nextCursor: null,
 }
 
-/** Every screen this suite walks between, answered by one stubbed server. */
 function reading(path: string): StubbedApi {
   const api = stubApi()
     .on('GET /api/digest', { body: DIGEST })
@@ -120,12 +118,10 @@ function reading(path: string): StubbedApi {
   return api
 }
 
-/** The way back, as the screen currently offers it. */
 function wayBack() {
   return screen.getByRole('link', { name: /^← / })
 }
 
-/** The section the tab bar says the User is in. */
 function activeTab() {
   return screen.getByRole('link', { current: 'page' }).textContent
 }
@@ -200,7 +196,6 @@ describe('a Feed Item’s attribution', () => {
     reading('/saved')
     render(<App />)
 
-    // There is no Feed left to open, so the name must not be a link.
     expect(await screen.findByText('The Slow Press · no longer subscribed')).toBeDefined()
     expect(screen.queryByRole('link', { name: /Slow Press/ })).toBeNull()
   })
@@ -283,8 +278,6 @@ describe('the way back out of an opened screen', () => {
     await user.click(await screen.findByRole('link', { name: 'First light' }))
     await openedArticle()
 
-    // Back out of the article returns to the Feed, which still knows it was
-    // reached from the Digest rather than the Feeds list.
     await user.click(wayBack())
     await openedFeed()
     expect(wayBack().textContent).toBe('← digest')
@@ -333,10 +326,6 @@ describe('the way back out of an opened screen', () => {
   })
 })
 
-/**
- * The Reader has no tab of its own, so it borrows the section it was opened
- * from. Exactly one tab stays current while it is open.
- */
 describe('the section an open article reads under', () => {
   it('is the library, for a save opened from it', async () => {
     reading('/saved')

@@ -11,13 +11,6 @@ export type Reply = { readonly status?: number; readonly body?: unknown; readonl
 
 export type Route = Reply | ((request: StubbedRequest) => Reply | Promise<Reply>)
 
-/**
- * The server, as the client sees it: a map from `METHOD /path` to a reply.
- *
- * The shell decides which screen to show from what `/api/auth/status` answers,
- * so a client test has to be able to state that answer precisely — and to
- * change it, the way signing in does.
- */
 export class StubbedApi {
   readonly #routes = new Map<string, Route>()
   readonly #requests: StubbedRequest[] = []
@@ -36,7 +29,6 @@ export class StubbedApi {
     return this
   }
 
-  /** Sets what the shell will be told on its next check. */
   authStatus(status: AuthStatus): this {
     return this.on('GET /api/auth/status', { body: status })
   }
@@ -49,7 +41,6 @@ export class StubbedApi {
     return this.#requests.filter((request) => `${request.method} ${request.path}` === route)
   }
 
-  /** Replaces `globalThis.fetch` for the duration of the test. */
   install(): void {
     vi.stubGlobal(
       'fetch',
@@ -71,7 +62,6 @@ export class StubbedApi {
   }
 }
 
-/** Installs a stub and returns it, for the common one-liner case. */
 export function stubApi(status?: AuthStatus): StubbedApi {
   const api = status ? new StubbedApi(status) : new StubbedApi()
   api.install()

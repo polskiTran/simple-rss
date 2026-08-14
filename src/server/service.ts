@@ -26,13 +26,9 @@ export interface ServiceOptions {
   readonly config: Config
   readonly logger?: Logger
   readonly clock?: Clock
-  /** Tests replace the deep retrieval module, never its raw network adapter. */
   readonly retrieval?: Retrieval
-  /** Overridden by tests so progressive login delays cost no wall-clock time. */
   readonly sleep?: Sleeper
-  /** Tests shrink the polling batch and concurrency; production uses defaults. */
   readonly scheduling?: PollSchedulerLimits
-  /** Tests shrink the retention sweep batch; production uses the default. */
   readonly retention?: RetentionLimits
 }
 
@@ -98,8 +94,6 @@ export function createService(options: ServiceOptions): Service {
 
     digest = new DigestService({ database, clock, settings })
     library = new LibraryService({ database, clock, settings })
-    // The signing key is minted per process: nothing at rest, and a restart
-    // only costs already-cached articles their images.
     imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
     images = new ImageService({ database, retrieval })
     reader = new ReaderService({
@@ -160,7 +154,6 @@ export function createService(options: ServiceOptions): Service {
       return scheduler
     },
     close() {
-      // The scheduler stops first, so no further wake lands on a closed handle.
       scheduler?.stop()
       scheduler = undefined
       database?.close()

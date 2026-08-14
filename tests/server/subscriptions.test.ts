@@ -38,9 +38,6 @@ describe('Subscriptions', () => {
 
     const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
-    // The response is the recorded decision before any retrieval: title and
-    // domain from the host, no home page yet, resolvedUrl unchanged,
-    // availability unchecked.
     expect(added.status).toBe(201)
     expect(await added.json()).toEqual({
       subscription: {
@@ -76,8 +73,6 @@ describe('Subscriptions', () => {
         {
           feedId: 1,
           title: 'Field Notes',
-          // The Feed answers on feeds.example but declares journal.example as
-          // its site, and the site is what the User is shown.
           domain: 'journal.example',
           homePageUrl: 'https://journal.example/',
           enteredUrl: ENTERED_URL,
@@ -111,8 +106,6 @@ describe('Subscriptions', () => {
               link: 'https://journal.example/first-light',
               publishedAt: '2026-08-08T07:15:00.000Z',
               displayTime: '07:15',
-              // The publisher's image URL stays server-side; the Digest
-              // only ever names the same-origin proxy route.
               imageUrl: '/api/items/1/image',
               summary: 'A clear morning.',
               firstSeenAt: '2026-08-08T09:00:00.000Z',
@@ -135,7 +128,6 @@ describe('Subscriptions', () => {
 
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
 
-    // No wakeScheduler here: the subscribe itself set the retrieval going.
     await vi.waitFor(async () => {
       const feeds = await (await user.get('/api/feeds')).json()
       expect(feeds.subscriptions[0]).toMatchObject({
@@ -158,8 +150,6 @@ describe('Subscriptions', () => {
 
     await service.wakeScheduler()
 
-    // Nothing to link and nothing to name the publisher by, so the host that
-    // answers stands in — which is the pre-home-page behaviour.
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0]).toMatchObject({
       title: 'Field Notes',
@@ -181,8 +171,6 @@ describe('Subscriptions', () => {
 
     await service.wakeScheduler()
 
-    // The declared site is the entered URL the redirect moved away from — still
-    // the Feed itself, so linking there would hand the User the XML.
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0]).toMatchObject({
       title: 'Field Notes',
@@ -215,8 +203,6 @@ describe('Subscriptions', () => {
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    // A different entered URL that redirects to the same Feed cannot be seen
-    // through at recording time; the retrieval is what reveals it.
     const alias = 'https://alias.example/feed'
     service.upstream.stub(alias, {
       status: 301,
@@ -228,8 +214,6 @@ describe('Subscriptions', () => {
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions).toHaveLength(1)
     expect(feeds.subscriptions[0]).toMatchObject({ title: 'Field Notes', availability: expect.objectContaining({ state: 'available' }) })
-    // The revealing URL now names the surviving Feed: subscribing it again is
-    // a duplicate at recording time, not another round of the merge.
     expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(409)
     expect(service.logs).toContainEqual(
       expect.objectContaining({ message: 'subscriptions.feeds_merged', feedId: 2, intoFeedId: 1 }),
@@ -258,7 +242,6 @@ describe('Subscriptions', () => {
       .find((item: { title: string }) => item.title === 'Kept essay')
     expect((await user.put(`/api/library/${kept.feedItemId}`)).status).toBe(200)
 
-    // The publisher moves: the second Feed now answers from the first's URL.
     service.upstream.stub(otherUrl, {
       status: 301,
       headers: { location: ENTERED_URL, 'content-type': 'text/plain' },
@@ -268,11 +251,8 @@ describe('Subscriptions', () => {
 
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions.map((subscription: { title: string }) => subscription.title)).toEqual(['Field Notes'])
-    // The save and its attribution survive the merge, dormant, for Retention.
     const library = await (await user.get('/api/library')).json()
     expect(library.items).toMatchObject([{ title: 'Kept essay', feedTitle: 'Elsewhere', subscribed: false }])
-    // The moved URL now names the surviving Feed: subscribing it again is a
-    // duplicate at recording time.
     expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(409)
   })
 
@@ -300,7 +280,6 @@ describe('Subscriptions', () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
 
-    // The host does not resolve — a typo'd URL imported from somewhere.
     expect((await user.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })).status).toBe(201)
 
     await service.wakeScheduler()
@@ -311,8 +290,6 @@ describe('Subscriptions', () => {
       category: 'unreachable',
     })
 
-    // Two more failed checks and the Subscription reads unavailable — still
-    // subscribed, still retried on its backoff, deletion the User's call.
     for (let failures = 2; failures <= 3; failures += 1) {
       service.clock.advance(24 * 60 * 60 * 1_000)
       await service.wakeScheduler()
@@ -343,8 +320,6 @@ describe('Subscriptions', () => {
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    // Nothing was ingested and nothing was blamed on the Feed; the attempt
-    // simply has not completed, so the Subscription is still due.
     expect(await (await user.get('/api/digest')).json()).toMatchObject({ today: { volume: 0 } })
     service.database?.exec('DROP TRIGGER reject_feed_item')
     service.clock.advance(60_000)
@@ -401,8 +376,6 @@ describe('Subscriptions', () => {
       'corrected link title',
       'fingerprint',
     ])
-    // A corrected summary must update the fingerprint-identified item in
-    // place, never mint a second Feed Item under a new identity.
     expect(digest.groups[0].items[2]).toMatchObject({ title: 'fingerprint', summary: 'corrected body' })
     const persisted = service.database
       ?.prepare('SELECT first_seen_at FROM feed_items ORDER BY id')
@@ -556,7 +529,6 @@ describe('Subscriptions', () => {
       publishedAt: '2026-08-08T06:00:00.000Z',
     })
 
-    // RSS 1.0 declares its site in the same place, and it reads the same way.
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0]).toMatchObject({ homePageUrl: 'https://rdf.example/journal' })
   })

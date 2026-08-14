@@ -3,10 +3,6 @@ import { sql, type SQL } from 'drizzle-orm'
 import { feedItems } from '../persistence/schema.js'
 import { plausibleHorizon } from './chronology.js'
 
-// Digest and Library pages resume by keyset cursor (the last item's chronology instant
-// and id, the two sort keys); an offset would drift as polling inserts at the top.
-// The client only echoes the cursor back; its contents are this module's business alone.
-
 export const LIST_PAGE_SIZE = 50
 
 export interface ListCursor {
@@ -40,7 +36,6 @@ export function decodeListCursor(value: string): ListCursor | undefined {
   return { chronology, feedItemId }
 }
 
-/** Null when the one-past-the-page fetch came back short and the list is over. */
 export function nextListCursor(
   fetchedCount: number,
   last: { readonly row: { readonly feedItemId: number }; readonly chronology: number } | undefined,

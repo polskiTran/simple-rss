@@ -155,9 +155,6 @@ describe('migrations', () => {
     const applied = applyMigrations(db)
 
     expect(applied).toEqual([8, 9])
-    // Nothing is invented at upgrade time; the validators go instead, so the
-    // next poll retrieves a document to read the home page from rather than
-    // being answered 304.
     expect(db.prepare('SELECT domain, home_page_url, etag, last_modified FROM feeds').get()).toEqual({
       domain: 'journal.example',
       home_page_url: null,

@@ -8,18 +8,12 @@ export interface Migration {
   readonly sql: string
 }
 
-/**
- * Literal SQL rather than generated diffs, so a reviewer reads exactly what runs
- * against a User's volume and the compiled server ships no loose `.sql` files.
- * Append-only: correct a released migration with a new one.
- */
+/** Append-only: correct a released migration with a new one. */
 export const migrations: readonly Migration[] = [
   {
     version: 1,
     name: 'installation-foundation',
     sql: `
-      -- The single row describing this installation. The CHECK keeps the
-      -- singleton honest instead of relying on every caller to remember.
       CREATE TABLE installation_settings (
         id         INTEGER PRIMARY KEY CHECK (id = 1),
         timezone   TEXT    NOT NULL,
@@ -27,8 +21,6 @@ export const migrations: readonly Migration[] = [
         updated_at TEXT    NOT NULL
       );
 
-      -- Readiness writes here to prove the mounted volume still accepts
-      -- writes. One row, rewritten in place, so it never grows.
       CREATE TABLE write_probe (
         id         INTEGER PRIMARY KEY CHECK (id = 1),
         checked_at TEXT    NOT NULL
@@ -39,13 +31,6 @@ export const migrations: readonly Migration[] = [
     version: 2,
     name: 'owner-authentication',
     sql: `
-      -- The User's single password verifier. One row, like the installation
-      -- it belongs to: its presence is what "claimed" means, so the CHECK is
-      -- what makes a second User unrepresentable rather than merely refused.
-      --
-      -- Released as written, so the name and the owner_ spelling stay: this
-      -- is the record of what already ran against existing volumes, back when
-      -- the glossary called this person the Owner. Migration 7 renames it.
       CREATE TABLE owner_auth (
         id            INTEGER PRIMARY KEY CHECK (id = 1),
         password_hash TEXT    NOT NULL,
@@ -53,13 +38,6 @@ export const migrations: readonly Migration[] = [
         updated_at    TEXT    NOT NULL
       );
 
-      -- One row per signed-in device. The token itself is never stored: the
-      -- primary key is its SHA-256, so a copy of the volume does not hand
-      -- anyone a working cookie.
-      --
-      -- Two deadlines, both absolute instants: last_seen_at moves forward as
-      -- the device is used and drives the idle timeout, while expires_at is
-      -- fixed at issue and cannot be extended by using the session.
       CREATE TABLE sessions (
         token_hash   TEXT PRIMARY KEY,
         created_at   TEXT NOT NULL,
@@ -67,7 +45,6 @@ export const migrations: readonly Migration[] = [
         expires_at   TEXT NOT NULL
       );
 
-      -- Pruning sweeps by deadline, so it must not scan every row.
       CREATE INDEX sessions_expires_at ON sessions (expires_at);
     `,
   },
@@ -75,9 +52,6 @@ export const migrations: readonly Migration[] = [
     version: 3,
     name: 'feeds-subscriptions-and-items',
     sql: `
-      -- A Feed is publisher-owned metadata and retrieval identity. The URL the
-      -- User entered and the last validated redirect target are deliberately
-      -- separate: provenance must survive an ordinary Feed migration.
       CREATE TABLE feeds (
         id           INTEGER PRIMARY KEY,
         entered_url  TEXT NOT NULL UNIQUE,
@@ -88,18 +62,12 @@ export const migrations: readonly Migration[] = [
         updated_at   TEXT NOT NULL
       );
 
-      -- Canonical request and resolved URLs share one uniqueness namespace.
-      -- This closes the gap two independent UNIQUE columns would leave when
-      -- one Feed's entered URL is another Feed's redirect target.
       CREATE TABLE feed_url_aliases (
         url     TEXT PRIMARY KEY,
         feed_id INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE
       );
       CREATE INDEX feed_url_aliases_feed_id ON feed_url_aliases (feed_id);
 
-      -- The User's choice to include a Feed. It is not folded into feeds:
-      -- future unsubscribe must be able to stop polling without erasing Feed
-      -- attribution held by a Library item.
       CREATE TABLE subscriptions (
         feed_id                  INTEGER PRIMARY KEY REFERENCES feeds(id) ON DELETE CASCADE,
         polling_interval_minutes INTEGER NOT NULL DEFAULT 120
@@ -127,8 +95,6 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX feed_items_last_observed
         ON feed_items (last_observed_at);
 
-      -- Library membership is separate and intentionally untouched by Feed
-      -- Item metadata upserts.
       CREATE TABLE library_items (
         feed_item_id INTEGER PRIMARY KEY REFERENCES feed_items(id) ON DELETE CASCADE,
         saved_at     TEXT NOT NULL
@@ -139,19 +105,13 @@ export const migrations: readonly Migration[] = [
     version: 4,
     name: 'polling-schedule',
     sql: `
-      -- Retrieval validators live with the Feed, whose publisher issued them.
-      -- They let the next poll ask "anything new?" instead of re-downloading.
       ALTER TABLE feeds ADD COLUMN etag TEXT;
       ALTER TABLE feeds ADD COLUMN last_modified TEXT;
 
-      -- The persisted due-time frontier. Backfilled from created_at so every
-      -- Subscription that predates this migration is immediately due and the
-      -- scheduler's first wake catches it up.
       ALTER TABLE subscriptions ADD COLUMN next_poll_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z';
       ALTER TABLE subscriptions ADD COLUMN last_polled_at TEXT;
       UPDATE subscriptions SET next_poll_at = created_at;
 
-      -- The scheduler queries this frontier once a minute; it must not scan.
       CREATE INDEX subscriptions_next_poll_at ON subscriptions (next_poll_at);
     `,
   },
@@ -159,20 +119,11 @@ export const migrations: readonly Migration[] = [
     version: 5,
     name: 'feed-availability',
     sql: `
-      -- Feed Availability state, kept with the Subscription it describes.
-      -- last_polled_at already records the most recent completed attempt;
-      -- these columns say how it went and how the run of failures stands.
-      --
-      -- Nothing is backfilled: pre-migration polls never recorded outcomes,
-      -- so last_success_at starts honest at NULL and fills in on the next
-      -- successful poll rather than claiming a success nobody observed.
       ALTER TABLE subscriptions ADD COLUMN last_success_at TEXT;
       ALTER TABLE subscriptions ADD COLUMN last_failure_at TEXT;
       ALTER TABLE subscriptions ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0
         CHECK (consecutive_failures >= 0);
 
-      -- The safe failure vocabulary, constrained here so no code path can
-      -- persist a raw error message where a category belongs.
       ALTER TABLE subscriptions ADD COLUMN last_failure_category TEXT
         CHECK (last_failure_category IN
           ('unreachable', 'timeout', 'too_large', 'unsupported_content', 'http_error', 'invalid_feed'));
@@ -182,11 +133,6 @@ export const migrations: readonly Migration[] = [
     version: 6,
     name: 'feed-item-search',
     sql: `
-      -- The search index over retained reading metadata: each retained Feed
-      -- Item's title, its normalized plain-text summary, and the title of the
-      -- Feed that published it. Article bodies are never stored, so they can
-      -- never be indexed. The table is derived state — rebuildable from the
-      -- canonical tables at any time and excluded from portable export.
       CREATE VIRTUAL TABLE feed_item_search USING fts5(
         item_title,
         summary,
@@ -194,19 +140,11 @@ export const migrations: readonly Migration[] = [
         tokenize = 'unicode61 remove_diacritics 2'
       );
 
-      -- Maintenance is triggers rather than application code, so every way a
-      -- Feed Item row changes — ingestion upserts, retention pruning,
-      -- unsubscribe cleanup, cascading Feed deletion, a future restore — keeps
-      -- the index current without each caller remembering to. A pruned item
-      -- leaves the index in the same transaction that removes its row, which
-      -- is what stops a derived index from outliving retention.
       CREATE TRIGGER feed_item_search_after_insert AFTER INSERT ON feed_items BEGIN
         INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
         VALUES (new.id, new.title, new.summary, (SELECT title FROM feeds WHERE id = new.feed_id));
       END;
 
-      -- Re-observation touches every item each poll; only a real metadata
-      -- correction is worth rewriting the indexed row for.
       CREATE TRIGGER feed_item_search_after_update AFTER UPDATE ON feed_items
       WHEN old.title IS NOT new.title OR old.summary IS NOT new.summary BEGIN
         DELETE FROM feed_item_search WHERE rowid = old.id;
@@ -218,14 +156,12 @@ export const migrations: readonly Migration[] = [
         DELETE FROM feed_item_search WHERE rowid = old.id;
       END;
 
-      -- A corrected Feed title reaches every indexed item it attributes.
       CREATE TRIGGER feed_item_search_after_feed_rename AFTER UPDATE OF title ON feeds
       WHEN old.title IS NOT new.title BEGIN
         UPDATE feed_item_search SET feed_title = new.title
         WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = new.id);
       END;
 
-      -- Items retained from before this migration are indexed once, here.
       INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
       SELECT feed_items.id, feed_items.title, feed_items.summary, feeds.title
       FROM feed_items JOIN feeds ON feeds.id = feed_items.feed_id;
@@ -235,15 +171,6 @@ export const migrations: readonly Migration[] = [
     version: 7,
     name: 'user-auth-rename',
     sql: `
-      -- The glossary renamed the Owner to the User, and storage follows so
-      -- that a reader of the schema meets one word for one concept. Nothing
-      -- about the singleton changes: same row, same verifier, same claim.
-      --
-      -- A plain RENAME is enough. Nothing references this table — no foreign
-      -- key, trigger, or view points at it — so there is no dependent SQL for
-      -- SQLite to rewrite, and the row survives untouched rather than being
-      -- copied through a rebuild that could drop the password verifier.
-      -- The CHECK is inline and unnamed, so it carries over as it is.
       ALTER TABLE owner_auth RENAME TO user_auth;
     `,
   },
@@ -251,9 +178,6 @@ export const migrations: readonly Migration[] = [
     version: 8,
     name: 'feed-home-page-url',
     sql: `
-      -- Nullable and left empty: the value comes from the Feed document, and
-      -- every subscribed Feed rewrites its own row on the next successful poll.
-      -- Backfilling from the Feed URL would only re-state what 'domain' holds.
       ALTER TABLE feeds ADD COLUMN home_page_url TEXT;
     `,
   },
@@ -261,11 +185,6 @@ export const migrations: readonly Migration[] = [
     version: 9,
     name: 'refetch-feeds-for-home-page',
     sql: `
-      -- Version 8 left home_page_url to the next successful poll, but a Feed
-      -- with stored validators answers 304 and no document is parsed, so the
-      -- column would stay empty until the publisher happened to post again.
-      --
-      -- Dropping the validators costs one unconditional fetch per Feed, once.
       UPDATE feeds SET etag = NULL, last_modified = NULL;
     `,
   },
@@ -290,7 +209,7 @@ export function appliedVersions(db: SqliteDatabase): number[] {
 
 /**
  * Each migration runs in its own transaction, so a failure leaves the database at the
- * last complete version. Runs before the server reports ready; a throw keeps readiness shut.
+ * last complete version.
  */
 export function applyMigrations(
   db: SqliteDatabase,

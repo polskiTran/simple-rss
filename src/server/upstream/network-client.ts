@@ -7,28 +7,19 @@ import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { isPublicAddress, unbracket } from './addresses.js'
 import { HttpClientError, type HttpClient } from './http-client.js'
 
-/** Encodings this client can decode, and therefore the only ones it asks for. */
 const ACCEPT_ENCODING = 'gzip, deflate, br'
 
 /** Statuses defined to carry no body; `Response` throws if given one. */
 const BODILESS_STATUSES = new Set([204, 205, 304])
 
 export interface NetworkHttpClientOptions {
-  /** Defaults to the real rule; tests relax it to reach a loopback origin. */
   readonly isAllowedAddress?: (address: string) => boolean
-  /** Internal test seam for deterministic socket DNS. */
   readonly lookup?: LookupFunction
 }
 
-/** Global per-protocol socket ceiling, idle keep-alive sockets included. */
 const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 8
 const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
-/**
- * Deliberately not `fetch`: addresses are checked inside the socket's own
- * lookup, redirects are never followed (the boundary above validates each
- * hop), and bodies are decoded here so callers count the bytes they hold.
- */
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
   const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
@@ -125,10 +116,6 @@ export function guardedLookup(
   }
 }
 
-/**
- * Node response to web `Response`, decoding the body and dropping the headers
- * that described its encoded form.
- */
 function toResponse(request: Request, response: IncomingMessage): Response {
   const status = response.statusCode ?? 0
   if (status < 200 || status > 599) {
@@ -166,13 +153,11 @@ function toResponse(request: Request, response: IncomingMessage): Response {
 
   const headers = new Headers()
   for (const [name, value] of Object.entries(response.headers)) {
-    // Set-Cookie is dropped: forwarding it would carry state between retrievals.
     if (value === undefined || name.toLowerCase() === 'set-cookie') continue
     for (const single of Array.isArray(value) ? value : [value]) {
       try {
         headers.append(name, single)
       } catch {
-        // A header a publisher malformed is dropped rather than fatal.
       }
     }
   }

@@ -1,4 +1,3 @@
-/** Paging is a deliberate action; nothing loads on scroll. */
 export type OlderState = 'idle' | 'loading' | 'failed'
 
 export function OlderItems({

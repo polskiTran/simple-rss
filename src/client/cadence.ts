@@ -1,10 +1,5 @@
 import { CADENCE_GRID_WEEKS, type CadenceObservation } from '../shared/api.js'
 
-/**
- * Cadence grid derivation: pure functions of the server's day-by-day
- * observations, so a fixed dataset always renders the same output.
- */
-
 export interface CadenceCell {
   readonly date: string
   readonly count: number
@@ -22,7 +17,6 @@ export interface CadenceGrid {
   readonly stats: string
 }
 
-// Counts bucket into four ink levels so the grid reads as rhythm, not a chart.
 export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count === 0) return 0
   if (count === 1) return 1
@@ -31,8 +25,6 @@ export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
-// Columns run oldest to newest; rows Monday to Sunday, the alignment the
-// server's Monday-opened window guarantees.
 export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   const columns: { cells: CadenceCell[]; monthLabel: string | undefined }[] = []
   for (let start = 0; start < days.length; start += 7) {
@@ -42,8 +34,6 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
     })
   }
 
-  // Label a column where a month first opens in it, but keep labels at least
-  // six columns apart.
   let lastLabelled: number | undefined
   for (const [index, column] of columns.entries()) {
     const month = monthOf(column.cells[0]?.date)
@@ -110,5 +100,4 @@ const MONTHS = [
   'december',
 ] as const
 
-/** Order matches the Monday-opened window. */
 const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const

@@ -28,10 +28,6 @@ export function articleMarkdown(html: string, baseUrl: string, options: ArticleM
   }
 }
 
-/**
- * Content vanishes with these elements. `img` and `picture` are absent — approved images
- * survive as signed proxy paths — while `source` stays dropped so only a `picture`'s fallback `img` speaks.
- */
 const DROPPED = new Set([
   'script',
   'style',
@@ -109,7 +105,6 @@ const HEADINGS: Readonly<Record<string, number>> = { h1: 1, h2: 2, h3: 3, h4: 4,
 
 function blocks(container: ParentNode, context: Rendering): string[] {
   const out: string[] = []
-  /** Consecutive phrasing nodes waiting to become one paragraph. */
   let run: Node[] = []
 
   const flush = (): void => {
@@ -169,7 +164,6 @@ function blocks(container: ParentNode, context: Rendering): string[] {
     } else if (tag === 'hr') {
       out.push('---')
     } else {
-      // Anything else (div, section, figure…) is only a container: its children speak.
       out.push(...blocks(element, context))
     }
   }
@@ -185,7 +179,6 @@ function paragraphOf(nodes: readonly Node[], context: Rendering): string | undef
   return kept.length > 0 ? kept.join('\\\n') : undefined
 }
 
-/** Trims lines and escapes anything that would otherwise begin a Markdown block. */
 function lines(text: string): string[] {
   return text
     .split('\n')
@@ -240,8 +233,6 @@ function inlineNode(node: Node, context: Rendering): string {
       return destination ? `[${inner.trim()}](${destination})` : inner
     }
     case 'img': {
-      // The publisher's URL never reaches the markdown: approved sources become
-      // signed same-origin paths, anything else disappears.
       const source = absoluteHttpUrl(element.getAttribute('src'), context)
       if (!source || !context.signImageUrl) return ''
       const alt = escapeText(element.getAttribute('alt') ?? '').trim()
@@ -256,13 +247,11 @@ function inlineNode(node: Node, context: Rendering): string {
   }
 }
 
-/** Absolute after resolution against the article, and plain http/https — nothing executable or inline. */
 function safeDestination(href: string | null, context: Rendering): string | undefined {
   const url = absoluteHttpUrl(href, context)
   return url === undefined ? undefined : escapeParentheses(url)
 }
 
-/** The address itself, before any Markdown-specific escaping. */
 function absoluteHttpUrl(href: string | null, context: Rendering): string | undefined {
   if (href === null) return undefined
   try {

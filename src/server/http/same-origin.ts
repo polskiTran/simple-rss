@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from 'hono'
 import { NO_STORE } from './responses.js'
 
-/** Methods that cannot change anything, so a foreign page reading them is moot. */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 export interface SameOriginOptions {
@@ -9,11 +8,7 @@ export interface SameOriginOptions {
   readonly trustProxyHeaders: boolean
 }
 
-/**
- * The second CSRF lock beside the `SameSite=Strict` cookie, covering what
- * cookie policy is weakest at: a same-site but different-origin page. A
- * missing `Origin` is refused — browsers always send it on these methods.
- */
+/** A missing `Origin` is refused — browsers always send it on these methods. */
 export function sameOrigin(options: SameOriginOptions): MiddlewareHandler {
   return async (c, next) => {
     if (SAFE_METHODS.has(c.req.method)) return next()

@@ -9,9 +9,6 @@ export interface FieldProps {
   onChange(value: string): void
 }
 
-// Underlined like the search field — the only rule `docs/DESIGN.md` allows.
-// The label is a real `<label>`, not placeholder text, so the field keeps its
-// name for screen readers and once filled in.
 export function Field({ label, value, type = 'text', autoComplete, autoFocus, onChange }: FieldProps) {
   const id = useId()
 

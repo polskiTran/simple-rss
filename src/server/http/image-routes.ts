@@ -34,8 +34,6 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
     )
   }
 
-  // On both routes the rate window is spent before any per-request work, so a
-  // flood costs the same whether or not its requests are well-formed.
   app.get('/items/:feedItemId/image', async (c) => {
     const images = deps.images()
     if (!images) return unavailable(c)
@@ -69,8 +67,6 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
 function answer(c: Context, outcome: ImageOutcome): Response {
   switch (outcome.kind) {
     case 'image':
-      // This response must never be re-interpreted, so `nosniff` is set here
-      // rather than relying on the installation-wide middleware.
       return c.body(outcome.body, 200, {
         'Content-Type': outcome.contentType,
         'Cache-Control': `private, max-age=${IMAGE_CACHE_SECONDS}`,
@@ -86,10 +82,6 @@ function answer(c: Context, outcome: ImageOutcome): Response {
   }
 }
 
-/**
- * A bad signature and a publisher outage look identical: the only consumer is
- * an `<img>` tag whose fallback is the same either way.
- */
 function imageUnavailable(c: Context): Response {
   return c.json({ error: { code: 'image_unavailable', message: 'No image is available' } }, 404, NO_STORE)
 }

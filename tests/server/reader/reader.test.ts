@@ -32,7 +32,6 @@ const ARTICLE_HTML = `<!doctype html>
     </body>
   </html>`
 
-/** An installation subscribed to the fixture Feed, with the article stubbed. */
 async function readingSetup(
   service: TestService,
   options: { article?: Parameters<TestService['upstream']['stub']>[1] } = {},
@@ -82,7 +81,6 @@ describe('the Reader item', () => {
     expect(reader.saved).toBe(false)
     expect(reader.nextInDigest).toMatchObject({ title: 'Evening notes', feedTitle: 'Field Notes' })
 
-    // Saving elsewhere is visible here: membership is never cached.
     await user.put(`/api/library/${feedItemId}`)
     const saved = readerItemSchema.parse(await (await user.get(`/api/items/${feedItemId}`)).json())
     expect(saved.saved).toBe(true)
@@ -193,8 +191,6 @@ describe('the Reader article', () => {
     expect(response.status).toBe(502)
     expect(response.headers.get('cache-control')).toBe('no-store')
 
-    // The failure changed nothing the User keeps: the item is still in the
-    // Digest with its summary, and it is still unsaved.
     const reader = readerItemSchema.parse(await (await user.get(`/api/items/${feedItemId}`)).json())
     expect(reader.summary).toBe('A clear morning over the valley.')
     expect(reader.saved).toBe(false)
@@ -223,12 +219,9 @@ describe('the Reader article', () => {
 
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
 
-    // The fallback offers `retry parsing`; the first deliberate retry really
-    // retrieves rather than being told to wait.
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
 
-    // Beyond that, retrying is refused with the wait, not another retrieval.
     const tooSoon = await user.get(`/api/items/${feedItemId}/reader`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
@@ -240,8 +233,6 @@ describe('the Reader article', () => {
     expect(retried.status).toBe(200)
     expect(readerArticleSchema.parse(await retried.json()).markdown).toContain('Field methods')
 
-    // Success ends the episode: the next failure starts fresh, with the
-    // automatic attempt and one honest retry again.
     healed = false
     const failed = await user.get(`/api/items/${feedItemId}/reader`)
     expect(failed.status).toBe(502)

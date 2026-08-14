@@ -10,8 +10,6 @@ function parseFixture(name: string) {
   return parseFeedDocument(new TextEncoder().encode(readFileSync(join(FIXTURES, name), 'utf-8')), RESOLVED_URL)
 }
 
-// RSS and Atom parity: both formats normalize to the same shape under the
-// same identity contract.
 describe('parseFeedDocument', () => {
   it('normalizes a representative RSS document', () => {
     const parsed = parseFixture('rss-representative.xml')
@@ -44,14 +42,12 @@ describe('parseFeedDocument', () => {
     const parsed = parseFixture('atom-representative.xml')
 
     expect(parsed.title).toBe('Atom Letters')
-    // The alternate link wins over the self link sitting beside it.
     expect(parsed.homePageUrl).toBe('https://atom.example/')
     expect(parsed.items).toEqual([
       {
         dedupeKey: 'guid:tag:atom.example,2026:one',
         identityKind: 'guid',
         title: 'One letter',
-        // Relative Atom links resolve against the resolved Feed URL.
         link: 'https://feeds.example/letters/one',
         publishedAt: '2026-08-08T07:15:00.000Z',
         imageUrl: 'https://images.example/one.jpg',
@@ -102,7 +98,6 @@ describe('parseFeedDocument', () => {
     (name) => {
       const parsed = parseFixture(name)
 
-      // No Feed title falls back to the resolved hostname in both formats.
       expect(parsed.title).toBe('feeds.example')
       expect(parsed.items).toHaveLength(1)
       expect(parsed.items[0]).toMatchObject({
@@ -135,8 +130,6 @@ describe('parseFeedDocument', () => {
     expect(parseFixture('rss-relative-home-page.xml').homePageUrl).toBe('https://feeds.example/about')
   })
 
-  // A Feed that moved keeps naming the URL it was pasted from, so the same page
-  // over http, or with a trailing slash, is still the Feed and still no site.
   it.each(['http://feeds.example/feed.xml', 'https://feeds.example/feed.xml/'])(
     'reads no home page from a Feed declaring %s, a redirect variant of its own URL',
     (declared) => {

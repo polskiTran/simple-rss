@@ -4,11 +4,9 @@ import { migrations } from '../../src/server/persistence/migrations.js'
 import { VERSION } from '../../src/shared/version.js'
 import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type Container } from './docker.js'
 
-/** The one-time secret this deployment is configured with. */
 const SETUP_SECRET = 'a-deployment-setup-secret'
 const USER_PASSWORD = 'a-calm-reading-password'
 
-/** Claims the installation over HTTP as a browser would; returns the session cookie. */
 async function claim(container: Container, password = USER_PASSWORD): Promise<string> {
   const response = await container.fetch('/api/auth/setup', {
     method: 'POST',
@@ -35,13 +33,9 @@ function sessionCookie(response: Response): string {
   return raw.split(';')[0]!
 }
 
-// The production image, run as a platform runs it: injected port, volume at
-// `/app/data`, stdout logs, SIGTERM. Under `pnpm test:smoke` — it builds an image.
-
 const started: Container[] = []
 const volumes: string[] = []
 
-/** Stops and deletes a container, taking it out of the cleanup list. */
 async function retire(container: Container): Promise<void> {
   await container.stop()
   await container.remove()
@@ -62,8 +56,6 @@ async function start(
 
   const container = await startContainer({
     volume,
-    // The platform template supplies these; every case not about setup-secret
-    // absence gets a deployment with a canonical public origin.
     env: { SETUP_SECRET, PUBLIC_ORIGIN: 'https://reader.test', ...options.env },
     ...(options.port ? { port: options.port } : {}),
     ...(options.waitForReadiness === undefined ? {} : { waitForReadiness: options.waitForReadiness }),
@@ -197,7 +189,6 @@ describe('the production image', () => {
 
     const { durationMs, exitCode } = await container.stop(30)
 
-    // 137 would mean the platform had to SIGKILL it after the timeout.
     expect(exitCode).toBe(0)
     expect(durationMs).toBeLessThan(15_000)
     expect(logRecords(await container.logs()).map((record) => record.message)).toContain('server.stopped')
@@ -279,16 +270,11 @@ describe('emergency password reset through the platform shell', () => {
 })
 
 describe('the release lifecycle', () => {
-  // The `docs/DEPLOYMENT.md` journey in one pass: claim, back up, replace the
-  // container on the retained volume, restore onto a fresh one. The upgrade
-  // runs the same image twice; migrations are covered by `replacing the container`.
   it('claims, persists state, backs up, upgrades, and restores the backup onto a fresh volume', async () => {
-    // A new User deploys the template and claims the installation.
     const first = await start()
     const cookie = await claim(first.container)
     await first.container.exec(['node', 'dist/server/cli-main.js', 'set-timezone', 'Europe/Berlin'])
 
-    // A deliberate backup before the upgrade.
     const backup = await first.container.exec([
       'node',
       'dist/server/cli-main.js',
@@ -297,16 +283,12 @@ describe('the release lifecycle', () => {
     ])
     expect(JSON.parse(backup.stdout)).toMatchObject({ backupCreated: true })
 
-    // The upgrade: a new container over the retained volume. Readiness gates
-    // traffic, the User's session and settings ride the volume.
     await retire(first.container)
     const upgraded = await start({ volume: first.volume })
     expect((await upgraded.container.fetch('/health/ready')).status).toBe(200)
     expect((await upgraded.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
     await retire(upgraded.container)
 
-    // The restore must land before any server initializes the directory — the
-    // CLI refuses one that already holds a database — so it runs one-off.
     const freshVolume = uniqueName('simple-rss-data')
     volumes.push(freshVolume)
     const restored = await docker([
@@ -327,8 +309,6 @@ describe('the release lifecycle', () => {
     expect(restored.code, restored.stderr).toBe(0)
     expect(JSON.parse(restored.stdout)).toMatchObject({ restored: true, claimed: true })
 
-    // The restored installation serves, keeps its settings, and lets the same
-    // password in — the verifier travelled inside the snapshot.
     const recovered = await start({ volume: freshVolume })
     expect((await recovered.container.fetch('/health/ready')).status).toBe(200)
     expect((await signIn(recovered.container, USER_PASSWORD)).status).toBe(200)

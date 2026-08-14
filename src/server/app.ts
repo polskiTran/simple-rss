@@ -48,7 +48,6 @@ export interface AppDependencies {
   readonly reader: () => ReaderService | undefined
   readonly search: () => SearchService | undefined
   readonly images: () => ImageService | undefined
-  /** Mints and checks the signed URLs Reader images travel behind. */
   readonly imageSignature: () => ImageUrlSignature | undefined
 }
 
@@ -63,7 +62,6 @@ export function createApp(deps: AppDependencies): Hono {
   app.use('*', securityHeaders())
   app.use('*', requestLogging(deps.logger))
 
-  // Health answers before the guards: a platform probe holds no session.
   app.get('/health/live', (c) => c.json<Liveness>({ status: 'live' }))
 
   app.get('/health/ready', (c) => {

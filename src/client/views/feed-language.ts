@@ -1,11 +1,6 @@
 import { MAX_FEED_SIZE_MIB, type FeedAvailabilityCategory } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
-/**
- * One copy table per failure vocabulary, so the list, the opened Feed, and
- * the subscribe notice cannot describe the same outcome two ways.
- */
-
 export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'the feed cannot be reached',
   timeout: 'the feed is taking too long to respond',
@@ -31,8 +26,6 @@ export function subscriptionFailure(error: unknown): string {
   return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
 }
 
-// Feed Availability categories mapped into the subscribe copy, so a failed
-// first check reads like any other subscribe failure.
 const FIRST_CHECK_FAILURE_CODE: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'feed_unreachable',
   timeout: 'feed_timeout',

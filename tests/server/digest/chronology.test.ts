@@ -35,27 +35,21 @@ describe('dateKey', () => {
     const instant = new Date('2026-08-07T20:00:00.000Z')
 
     expect(dateKey(instant, 'UTC')).toBe('2026-08-07')
-    // 20:00 UTC on the 7th is already the morning of the 8th in Auckland.
     expect(dateKey(instant, 'Pacific/Auckland')).toBe('2026-08-08')
-    // And still mid-afternoon of the 7th in New York.
     expect(dateKey(instant, 'America/New_York')).toBe('2026-08-07')
   })
 
   it('keeps the day stable across the spring-forward hour', () => {
-    // US DST begins 2026-03-08 at 02:00 local; the skipped hour must not
-    // displace either side of it into another calendar day.
     expect(dateKey(new Date('2026-03-08T06:59:00.000Z'), 'America/New_York')).toBe('2026-03-08')
     expect(dateKey(new Date('2026-03-08T07:00:00.000Z'), 'America/New_York')).toBe('2026-03-08')
   })
 
   it('keeps the day stable across the fall-back repeated hour', () => {
-    // US DST ends 2026-11-01; 01:30 local happens twice, on both offsets.
     expect(dateKey(new Date('2026-11-01T05:30:00.000Z'), 'America/New_York')).toBe('2026-11-01')
     expect(dateKey(new Date('2026-11-01T06:30:00.000Z'), 'America/New_York')).toBe('2026-11-01')
   })
 
   it('turns over at the timezone midnight on a DST transition day', () => {
-    // 23:59 EDT on October 31st against 00:00 EDT on November 1st.
     expect(dateKey(new Date('2026-11-01T03:59:00.000Z'), 'America/New_York')).toBe('2026-10-31')
     expect(dateKey(new Date('2026-11-01T04:00:00.000Z'), 'America/New_York')).toBe('2026-11-01')
   })

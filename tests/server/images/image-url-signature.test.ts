@@ -13,7 +13,6 @@ function signature(clock = new ManualClock()) {
   return createImageUrlSignature({ key: randomBytes(32), clock })
 }
 
-/** The query parameters of a signed path, for tests that tamper with them. */
 function queryOf(signedPath: string): URLSearchParams {
   return new URL(signedPath, 'https://reader.test').searchParams
 }

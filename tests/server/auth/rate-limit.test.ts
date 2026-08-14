@@ -7,8 +7,6 @@ import {
 } from '../../../src/server/auth/rate-limit.js'
 import { ManualClock } from '../../support/manual-clock.js'
 
-// The sliding-window arithmetic, cheaper to drive here than through HTTP.
-// `tests/server/authentication.test.ts` covers the same policy as the User meets it.
 describe('LoginRateLimiter', () => {
   let clock: ManualClock
   let limiter: LoginRateLimiter
@@ -88,7 +86,6 @@ describe('LoginRateLimiter', () => {
       clock.advance(MINUTE)
     }
 
-    // The oldest failure has just aged out, freeing exactly one slot.
     clock.advance(WINDOW_MS - PER_CLIENT_FAILURES * MINUTE + 1)
 
     allowed('203.0.113.7').recordFailure()
@@ -103,11 +100,6 @@ describe('LoginRateLimiter', () => {
     expect(allowed('203.0.113.7').successDelayMs).toBe(0)
   })
 
-  /**
-   * Reaches the global ceiling while keeping every individual client below its
-   * own limit — the shape of guessing spread across many addresses, which the
-   * per-client rule alone would not notice.
-   */
   function saturateAcrossClients(): void {
     let recorded = 0
     for (let host = 1; recorded < GLOBAL_FAILURES; host += 1) {
@@ -126,8 +118,6 @@ describe('LoginRateLimiter', () => {
   it('never blocks a client for attempts that were not its own', () => {
     saturateAcrossClients()
 
-    // A clean-history address is slowed but always let through — otherwise a
-    // few addresses could lock the User out of their own reader indefinitely.
     expect(limiter.begin('198.51.100.9').allowed).toBe(true)
   })
 

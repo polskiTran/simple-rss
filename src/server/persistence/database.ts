@@ -6,10 +6,6 @@ export type SqliteDatabase = Database.Database
 
 const BUSY_TIMEOUT_MS = 5_000
 
-/**
- * Configured the way `docs/ARCHITECTURE.md` requires: WAL, a busy timeout, foreign
- * keys. Missing parent directories are created because a freshly mounted volume is empty.
- */
 export function openDatabase(path: string): SqliteDatabase {
   mkdirSync(dirname(path), { recursive: true })
 

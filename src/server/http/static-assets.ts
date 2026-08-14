@@ -30,11 +30,7 @@ export interface StaticAssetsOptions {
   readonly root: string
 }
 
-/**
- * Serves the built client, falling back to `index.html` so client-side routes
- * survive a reload. `/api` and `/health` mount first, so a mistyped API path
- * can never return HTML.
- */
+/** Serves the built client, falling back to `index.html` so client-side routes survive a reload. */
 export function staticAssets(options: StaticAssetsOptions): MiddlewareHandler {
   const root = resolve(options.root)
   const indexPath = join(root, 'index.html')
@@ -47,8 +43,6 @@ export function staticAssets(options: StaticAssetsOptions): MiddlewareHandler {
       return send(requested, cacheControlFor(c.req.path))
     }
 
-    // A missing bundle file is a broken build, not a client route: falling
-    // back would answer a stale `<script src>` with HTML at 200.
     if (c.req.path.startsWith(IMMUTABLE_PREFIX)) return next()
 
     if (await isFile(indexPath)) {
@@ -59,10 +53,6 @@ export function staticAssets(options: StaticAssetsOptions): MiddlewareHandler {
   }
 }
 
-/**
- * Traversal is checked on the resolved path, so encoded and mixed forms
- * (`..%2f`, `/a/../../etc`) are all covered by the same test.
- */
 function resolveWithinRoot(root: string, urlPath: string): string | undefined {
   let decoded: string
   try {

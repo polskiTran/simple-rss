@@ -17,9 +17,7 @@ export interface DigestViewProps {
 type DigestState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly digest: Digest }
-  /** Server answered with a refusal or unparseable body. */
   | { readonly kind: 'unavailable' }
-  /** No response at all. */
   | { readonly kind: 'unreachable' }
 
 type SearchState =
@@ -31,8 +29,6 @@ type SearchState =
 
 const SEARCH_SETTLE_MS = 250
 
-// A page may begin in the day the previous one ended; that day's two halves
-// merge under the group already on screen.
 function withOlderPage(digest: Digest, page: Digest): Digest {
   const groups = [...digest.groups]
   const seam = groups.at(-1)
@@ -48,8 +44,6 @@ function withOlderPage(digest: Digest, page: Digest): Digest {
 
 export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   const [state, setState] = useState<DigestState>({ kind: 'loading' })
-  // Retrying re-runs the effect, so every attempt carries the same cleanup
-  // and none can answer after unmount.
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -92,8 +86,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       return
     }
     let active = true
-    // Set searching immediately: the settle delay batches keystrokes, and the
-    // state must not claim stale results meanwhile.
     setSearch({ kind: 'searching' })
     const settle = window.setTimeout(() => {
       void fetchSearchResults(line)
@@ -127,7 +119,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
           }
         : current,
     )
-    // The same item may be on screen as a search result; the two must agree.
     setSearch((current) =>
       current.kind === 'found'
         ? {
@@ -191,8 +182,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
               >
                 {group.label}
                 {group.label === 'today' ? (
-                  // The one count the design allows — never an unread count.
-                  // Whole-day volume, even when the page cuts today short.
                   <span className="day-heading-count"> · {countLabel(state.digest.today.volume)}</span>
                 ) : null}
               </h2>
@@ -237,8 +226,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   )
 }
 
-// Every state renders words — searching, unreachable, nothing matched — so
-// silence is never mistaken for an answer.
 function SearchOutcome({
   state,
   line,

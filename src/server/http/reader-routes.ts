@@ -97,7 +97,6 @@ const UNSUPPORTED: FailureAnswer = {
   message: 'The original page is not readable HTML',
 }
 
-/** One answer per retrieval failure category, mirroring the Feed routes. */
 const ARTICLE_ANSWERS: Readonly<Record<RetrievalFailureCode, FailureAnswer>> = {
   invalid_request: UNSAFE_LINK,
   invalid_url: UNSAFE_LINK,

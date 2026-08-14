@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { BAND_HEIGHT_PX } from '../../src/client/components/daily-band.js'
 
 // jsdom does not evaluate stylesheets, so these tests read styles.css directly
 // and hold its token values against the literals in `docs/DESIGN.md`.
@@ -11,7 +12,6 @@ beforeAll(async () => {
   css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
 })
 
-/** The stylesheet with everything inside `prefers-color-scheme: dark` removed. */
 function lightOnly(): string {
   return css.replace(/@media \(prefers-color-scheme: dark\)[^}]*\{[\s\S]*?\n\}/g, '')
 }
@@ -52,8 +52,6 @@ describe('the dark palette', () => {
 })
 
 describe('the surface', () => {
-  // DESIGN.md §2's #EDEDEA canvas is deliberately unbound (see the note there);
-  // this keeps the fill from being re-added in a harmless-looking one-liner.
   it('is one tone in both schemes, with no canvas behind the paper', () => {
     expect(css).not.toContain('--color-canvas')
     expect(css).not.toContain('#ededea')
@@ -90,8 +88,6 @@ describe('type', () => {
   })
 
   it('takes the tile’s tints from the cadence ramp and its peak from the wordmark ink', () => {
-    // A second grey set here would need its own dark binding and be the fifth
-    // ink level §6 rules out. `--rest` is the level hover and wait return to.
     expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*background:\s*var\(--rest\)/)
     expect(lightOnly()).toMatch(/\.wordmark-cell\s*\{[^}]*--rest: var\(--cadence-0\)/)
     for (const level of [1, 2, 3]) {
@@ -103,27 +99,19 @@ describe('type', () => {
   })
 
   it('glints the tile only for a pointer, and only where the mark is a link', () => {
-    // Match every pointer-gated block, not the first: the sheet select has its
-    // own, and the glint must sit inside a gate wherever it is written.
     const hover = (css.match(/@media \(hover: hover\) and \(pointer: fine\)\s*\{[\s\S]*?\n {2}\}/g) ?? []).join('\n')
 
-    // `a.wordmark`, not `.wordmark`: the tile on setup and login is not a link
-    // and stays still.
     expect(hover).toMatch(
       /a\.wordmark:hover \.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint 500ms cubic-bezier\(0\.23, 1, 0\.32, 1\) calc\(var\(--glint-step\) \* 60ms\)/,
     )
   })
 
   it('keeps the wait on the same glint, looping, and off the masthead mark', () => {
-    // `.loading-note .wordmark-cell`, never bare `.wordmark-cell`: the
-    // masthead mark must hold still while something is loading.
     expect(lightOnly()).toMatch(
       /\.loading-note \.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint-loop 1200ms linear infinite calc\(var\(--glint-step\) \* 60ms\)/,
     )
     expect(lightOnly()).not.toMatch(/\n {2}\.wordmark-cell\s*\{[^}]*animation:\s*wordmark-glint-loop/)
 
-    // The loop rests for the back two-thirds of each pass; without the hold it
-    // reads as flashing.
     const keyframes = /@keyframes wordmark-glint-loop\s*\{([\s\S]*?)\n {2}\}/.exec(css)?.[1] ?? ''
     expect(keyframes).toMatch(/0%,\s*30%,\s*100%\s*\{[^}]*background:\s*var\(--rest\)/)
     expect(keyframes).toMatch(/12%\s*\{[^}]*background:\s*var\(--glint\)/)
@@ -132,21 +120,15 @@ describe('type', () => {
   it('breathes the waiting tile rather than stopping it under reduced motion', () => {
     const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
 
-    // Exception to the no-glint rule: a stopped loader lies, so the cells hold
-    // still and the tile breathes on opacity alone.
     expect(reduced).toMatch(/\.loading-note \.wordmark-grid\s*\{[^}]*animation:\s*loading-mark-breathe/)
     expect(reduced).toMatch(/@keyframes loading-mark-breathe\s*\{[^}]*50%\s*\{[^}]*opacity:\s*0\.45/)
   })
 
   it('sends every cell to another level of the same ramp and back', () => {
-    // The glint may only use tones the ramp already owns; the keyframes leave
-    // both ends implicit so the resting tile is stated once.
     const destinations = [
       ['.wordmark-cell', 'var(--cadence-2)'],
       [".wordmark-cell[data-level='1']", 'var(--cadence-3)'],
       [".wordmark-cell[data-level='2']", 'var(--color-ink-strong)'],
-      // The two loud levels step down, so the matrix reshuffles rather than
-      // brightening.
       [".wordmark-cell[data-level='3']", 'var(--cadence-1)'],
       [".wordmark-cell[data-level='4']", 'var(--cadence-2)'],
     ] as const
@@ -181,8 +163,6 @@ describe('the narrow layout', () => {
     expect(narrow).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*19px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*gap:\s*18px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12px/)
-    // Below the breakpoint the content measure and the authentication forms
-    // both run the full width of the paper.
     expect(narrow).toMatch(/\.measure,\s*\n\s*\.gate\s*\{[^}]*max-width:\s*none/)
     expect(narrow).toMatch(/\.opml-controls\s*\{[^}]*gap:\s*18px/)
     expect(narrow).toMatch(/\.opml-controls\s*\{[^}]*font-size:\s*12px/)
@@ -192,21 +172,15 @@ describe('the narrow layout', () => {
 describe('layout', () => {
   it('holds the paper to the design width, with the measure released to it', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*max-width:\s*820px/)
-    // `docs/DESIGN.md` §4 drew a 620px measure; the departure — content runs
-    // the paper's width — is recorded in §4. Re-tightening it is a decision.
     expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
   })
 
   it('draws no cards or boxes in the interface — every rule here is an underline', () => {
-    // The article body is the exception: the Markdown renderer brings its own
-    // cards for code and tables. This stylesheet itself draws none.
     const drawn = css.replace(/--[a-z-]+:[^;]+;/g, '')
 
     expect(drawn).not.toMatch(/box-shadow|border-radius/)
 
-    // border-bottom is the one rule `docs/DESIGN.md` allows; a border on any
-    // other edge is a card sneaking in.
     const borders = drawn.match(/border[a-z-]*:\s*[^;]+/g) ?? []
     const boxes = borders.filter((rule) => rule !== 'border: 0' && !rule.startsWith('border-bottom:'))
 
@@ -221,22 +195,16 @@ describe('layout', () => {
     const suppressions = css.match(/outline:\s*none/g) ?? []
     const focusRules = css.match(/:focus-visible[^{]*\{[^}]*\}/g) ?? []
 
-    // Every `outline: none` must sit inside a `:focus-visible` block that
-    // draws a replacement.
     expect(focusRules).toHaveLength(4)
     expect(suppressions).toHaveLength(4)
     expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-ink\)/)
     expect(focusRules.join('\n')).toMatch(/text-decoration: underline/)
-    // A cadence cell cannot take an underline; its focus is an accent rule
-    // beneath the square.
     expect(focusRules.join('\n')).toMatch(/border-bottom: 2px solid var\(--color-accent\)/)
   })
 })
 
 describe('the Feeds tab', () => {
   it('lets the search treatment scroll with the page, on the documented rhythm', () => {
-    // `docs/DESIGN.md` §4 drew the field sticky; the departure is recorded
-    // there. No rule may pin itself — this holds the whole stylesheet.
     expect(css).not.toMatch(/position:\s*(sticky|fixed)/)
     expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*padding:\s*8px 0 32px/)
   })
@@ -257,7 +225,6 @@ describe('the Feeds tab', () => {
 
 describe('the Digest', () => {
   it('holds the day-group rhythm and heading scale to the layout table', () => {
-    // 44px above a date line, 24px below it — 32/20 at the narrow step.
     expect(lightOnly()).toMatch(/\.day-group \+ \.day-group\s*\{[^}]*margin-top:\s*44px/)
     expect(lightOnly()).toMatch(/\.day-heading\s*\{[^}]*margin:\s*0 0 24px/)
     expect(lightOnly()).toMatch(/\.day-heading\s*\{[^}]*font-size:\s*12\.5px/)
@@ -275,13 +242,13 @@ describe('the Digest', () => {
   })
 
   it('draws the band 114px tall, 34px under the header, the date line 40px below', () => {
-    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*height:\s*114px/)
+    expect(BAND_HEIGHT_PX).toBe(114)
+    expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*height:\s*var\(--daily-band-height\)/)
     expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*margin-bottom:\s*40px/)
     expect(lightOnly()).toMatch(/\.daily-band\s*\{[^}]*overflow:\s*hidden/)
     expect(lightOnly()).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*34px/)
 
     const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
-    // The band itself keeps its height; only the header gap steps down.
     expect(narrow).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*26px/)
     expect(narrow).not.toMatch(/\.daily-band\s*\{/)
   })
@@ -300,8 +267,6 @@ describe('the Digest', () => {
 
 describe('the Reader', () => {
   it('shares the one paper — no second, narrower card for the article', () => {
-    // `docs/DESIGN.md` §4 drew a 720px reader paper; the swap resized the
-    // masthead (§5 says it never moves). The departure is recorded in §4.
     expect(css).not.toContain('paper-reader')
   })
 
@@ -315,19 +280,14 @@ describe('the Reader', () => {
   })
 
   it('leaves the article’s blocks to the Markdown renderer', () => {
-    // The renderer styles its own blocks via scanned classes; a rule here
-    // would fight it.
     expect(css).toContain('@source "../../node_modules/streamdown/dist/*.js"')
     expect(lightOnly()).not.toMatch(/\.article-body (blockquote|table|th|td|hr|h[1-6]|pre|code|ul|ol)[\s,]*\{/)
   })
 
   it('binds the renderer’s tokens to this palette, in both schemes', () => {
-    // The renderer's classes ask for shadcn token names; unbound, an article
-    // renders in someone else's defaults or with no surface at all.
     for (const token of ['--color-background', '--color-foreground', '--color-border', '--color-primary']) {
       expect(lightOnly()).toContain(`${token}:`)
     }
-    // The two that are surfaces rather than inks, and so differ per scheme.
     for (const token of ['--color-muted', '--color-muted-foreground', '--color-sidebar']) {
       expect(lightOnly()).toContain(`${token}:`)
       expect(darkBlocks()).toContain(`${token}:`)
@@ -339,8 +299,6 @@ describe('the Reader', () => {
   })
 
   it('makes the renderer’s `dark:` classes follow the pinned appearance', () => {
-    // Shiki colours switch on `dark:`, which asks the device by default; a
-    // pinned light appearance would otherwise get dark code on light paper.
     const variant = /@custom-variant dark \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
 
     expect(variant).toContain('@media (prefers-color-scheme: dark)')
@@ -349,8 +307,6 @@ describe('the Reader', () => {
   })
 
   it('breaks a word no space will break rather than widening the measure', () => {
-    // An unbroken address or hash is the one thing that can push the reading
-    // column sideways on a phone.
     expect(lightOnly()).toMatch(/\.article-body\s*\{[^}]*overflow-wrap:\s*break-word/)
     expect(lightOnly()).toMatch(/\.reader-title\s*\{[^}]*overflow-wrap:\s*break-word/)
     expect(lightOnly()).toMatch(/\.reader-summary\s*\{[^}]*overflow-wrap:\s*break-word/)
@@ -376,7 +332,6 @@ describe('the Reader', () => {
 })
 
 describe('pinned appearance', () => {
-  /** The custom-property bindings inside a block of CSS, as `name: value`. */
   function bindings(block: string): string[] {
     return (block.match(/--[a-z0-9-]+:\s*[^;]+/g) ?? []).sort()
   }

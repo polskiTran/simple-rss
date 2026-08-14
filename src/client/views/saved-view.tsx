@@ -16,13 +16,9 @@ export interface SavedViewProps {
 type LibraryState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'loaded'; readonly library: Library }
-  /** Server answered with a refusal or unparseable body. */
   | { readonly kind: 'unavailable' }
-  /** No response at all. */
   | { readonly kind: 'unreachable' }
 
-// Unsaving flips the word in place; the row leaves only on the next visit,
-// so a misread tap can be undone where it happened.
 export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   const [state, setState] = useState<LibraryState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -62,8 +58,6 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
       .catch(() => setOlder('failed'))
   }
 
-  // Membership changes made on this screen, kept beside the fetched list so
-  // an unsaved row stays visible — and reversible — until the next visit.
   const [membership, setMembership] = useState<ReadonlyMap<number, boolean>>(new Map())
   const setSaved = (feedItemId: number, saved: boolean) =>
     setMembership((current) => new Map(current).set(feedItemId, saved))
@@ -106,8 +100,6 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
               <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
             </h2>
             <div className="content-meta">
-              {/* A save outlives its Subscription. Only a subscribed Feed opens —
-                  the server answers 404 for the rest — so that name stays text. */}
               {item.subscribed ? (
                 <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
               ) : (

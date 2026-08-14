@@ -1,13 +1,12 @@
 import { getConnInfo } from '@hono/node-server/conninfo'
 import type { Context } from 'hono'
 
-/** What rate limiting counts against when the caller cannot be identified. */
 const UNKNOWN = 'unknown'
 
 /**
  * Behind the platform proxy every socket shares one address, so the rightmost
  * `X-Forwarded-For` entry — the one the nearest proxy appended — wins;
- * anything further left is caller-supplied. Untrusted deployments ignore the header.
+ * anything further left is caller-supplied.
  */
 export function clientAddress(c: Context, trustProxyHeaders: boolean): string {
   if (trustProxyHeaders) {

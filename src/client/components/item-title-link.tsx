@@ -7,8 +7,6 @@ export interface ItemTitleLinkProps {
   onOpen(feedItemId: number): void
 }
 
-// A real link, so open-in-new-tab and copy-the-address keep working; every
-// list that shows a title uses this one shape.
 export function ItemTitleLink({ feedItemId, title, onOpen }: ItemTitleLinkProps) {
   return (
     <a

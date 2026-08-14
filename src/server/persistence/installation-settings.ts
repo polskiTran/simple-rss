@@ -3,7 +3,6 @@ import { eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from './database.js'
 import { installationSettings } from './schema.js'
 
-/** An installation belongs to one User. */
 const SINGLETON_ID = 1
 
 export interface InstallationSettings {
@@ -35,12 +34,11 @@ export class InstallationSettingsStore {
     return row
   }
 
-  /** An installation that never chose a zone reads as UTC — how its days were grouped all along. */
+  /** An installation that never chose a zone reads as UTC. */
   effectiveTimezone(): string {
     return this.read()?.timezone ?? 'UTC'
   }
 
-  /** `createdAt` is written once, so the installation's age survives later edits. */
   setTimezone(timezone: string, now: Date): void {
     assertResolvableTimezone(timezone)
     const at = now.toISOString()
@@ -56,7 +54,6 @@ export class InstallationSettingsStore {
   }
 }
 
-/** Typed so a route can refuse the zone as a bad request while other failures surface as what they are. */
 export class UnknownTimezoneError extends Error {
   constructor(timezone: string) {
     super(`Unknown installation timezone: ${timezone}`)
@@ -64,7 +61,6 @@ export class UnknownTimezoneError extends Error {
   }
 }
 
-/** An unresolvable zone would silently break every Digest grouping, so reject at entry, not at read time. */
 function assertResolvableTimezone(timezone: string): void {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone })

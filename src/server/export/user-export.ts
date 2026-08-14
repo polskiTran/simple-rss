@@ -6,11 +6,8 @@ import { appliedVersions } from '../persistence/migrations.js'
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-// The export format's own version, independent of the database schema; it
-// moves only when the format changes incompatibly.
 export const USER_EXPORT_VERSION = 1
 
-/** `dedupeKey` and `identityKind` let a future import re-identify the item instead of duplicating it. */
 export interface UserExportItem {
   readonly dedupeKey: string
   readonly identityKind: 'guid' | 'link' | 'content'
@@ -39,12 +36,6 @@ export interface UserExportFeed {
   readonly items: readonly UserExportItem[]
 }
 
-/**
- * The User's portable reading state. It deliberately never carries the password
- * verifier, session hashes, the Setup Secret, rate-limit state, validators, due
- * times, derived search rows, or migration records — the installation's
- * operational property, not the User's reading.
- */
 export interface UserExport {
   readonly format: typeof USER_EXPORT_FORMAT
   readonly exportVersion: typeof USER_EXPORT_VERSION
@@ -72,10 +63,6 @@ interface ItemRow extends Omit<UserExportItem, 'identityKind'> {
   identityKind: string
 }
 
-/**
- * One consistent snapshot, built in memory: Retention bounds the document to a
- * few megabytes at the ~100-Subscription target.
- */
 export function buildUserExport(options: {
   database: SqliteDatabase
   settings: InstallationSettingsStore

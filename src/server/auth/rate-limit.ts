@@ -6,15 +6,10 @@ export const WINDOW_MS = 15 * 60 * 1000
 /** Failed attempts one client address may make inside the window. */
 export const PER_CLIENT_FAILURES = 5
 
-// The per-client limit does nothing against guessing spread over many addresses.
-// This ceiling sits well above anything the User would produce by mistyping.
 export const GLOBAL_FAILURES = 20
 
-/** The first failure costs this long; each further one doubles it. */
 const BASE_DELAY_MS = 250
 
-// Long enough to make automated guessing pointless, short enough that a queue
-// of held requests cannot itself become the outage.
 const MAX_DELAY_MS = 2_000
 
 export interface AllowedAttempt {
@@ -45,12 +40,6 @@ interface AttemptRecord {
 
 type AttemptOutcome = 'failure' | 'success' | 'cancelled'
 
-/**
- * In-memory guessing resistance — one process by design, so no Redis. Pending checks
- * reserve a slot before the async verifier starts, so a burst cannot slip through on an
- * empty failure history. Only a client's own attempts can block it; the global ceiling
- * slows everyone but blocks nobody, so strangers cannot lock the User out.
- */
 export class LoginRateLimiter {
   readonly #attempts = new Map<string, AttemptRecord[]>()
   readonly #clock: Clock
@@ -60,10 +49,7 @@ export class LoginRateLimiter {
     this.#clock = clock
   }
 
-  /**
-   * Reserves one attempt before its secret is checked. A success pays for pressure
-   * already present; a failure also pays for the slot it just consumed.
-   */
+  /** Reserves one attempt before its secret is checked. */
   begin(client: string): AttemptVerdict {
     const now = this.#clock.now().getTime()
     const recent = this.#recent(client, now)
@@ -128,13 +114,11 @@ export class LoginRateLimiter {
     else this.#attempts.set(client, recent)
   }
 
-  /** What an attempt costs at the current client and installation pressure. */
   #cost(clientAttempts: number, now: number): number {
     const pressure = this.#allRecentCount(now) >= GLOBAL_FAILURES ? MAX_DELAY_MS : 0
     return Math.max(delayFor(clientAttempts), pressure)
   }
 
-  /** Attempts still inside the window for one client, oldest first. */
   #recent(client: string, now: number): AttemptRecord[] {
     const kept = (this.#attempts.get(client) ?? []).filter((attempt) => attempt.at > now - WINDOW_MS)
     if (kept.length === 0) this.#attempts.delete(client)
@@ -142,7 +126,6 @@ export class LoginRateLimiter {
     return kept
   }
 
-  /** Number of recent failed or pending attempts across every client. */
   #allRecentCount(now: number): number {
     let count = 0
     for (const client of this.#attempts.keys()) count += this.#recent(client, now).length
@@ -150,7 +133,6 @@ export class LoginRateLimiter {
   }
 }
 
-/** When a full client window next has a free slot. */
 function deadline(attempts: readonly AttemptRecord[], limit: number): number {
   if (attempts.length < limit) return 0
   const decisive = attempts[attempts.length - limit]

@@ -1,7 +1,5 @@
 import { expect, expectNoHorizontalOverflow, SETUP_SECRET, test, USER_PASSWORD } from './installation.js'
 
-// The timezone select is the one control sized by its content — every zone the
-// runtime knows. Only a real browser lays that out, hence the assertion here, not jsdom.
 test.describe('Settings at phone width', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
@@ -16,8 +14,6 @@ test.describe('Settings at phone width', () => {
     const select = page.getByLabel('installation timezone')
     await expect(select).toBeVisible()
 
-    // The select ends where the paper's content does, and nothing has forced
-    // the page wider than the phone: settings needs no panning.
     const edges = await page.evaluate(() => {
       const paper = document.querySelector('.paper') as HTMLElement
       const box = (document.querySelector('.sheet-select') as HTMLElement).getBoundingClientRect()

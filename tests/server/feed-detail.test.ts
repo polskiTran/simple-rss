@@ -45,7 +45,6 @@ describe('one opened Feed', () => {
       schedule: { pollingIntervalMinutes: 120 },
     })
 
-    // Newest first, each with its installation-timezone day and meta-row date.
     expect(detail.items.map(({ title, date, displayDate }) => [title, date, displayDate])).toEqual([
       ['First light', '2026-08-08', 'today, 07:15'],
       ['Evening notes', '2026-08-07', 'yesterday, 09:31'],
@@ -53,12 +52,10 @@ describe('one opened Feed', () => {
       ['A December letter', '2025-12-14', '14 december 2025'],
     ])
 
-    // The grid window: 26 Monday-opened week columns ending today.
     expect(detail.cadence).toHaveLength(181)
     expect(detail.cadence[0]).toEqual({ date: '2026-02-09', count: 0 })
     expect(detail.cadence.at(-1)).toEqual({ date: '2026-08-08', count: 1 })
     expect(detail.cadence.find(({ date }) => date === '2026-06-03')).toEqual({ date: '2026-06-03', count: 1 })
-    // Last December sits before the window, so it is retained but not drawn.
     expect(detail.cadence.every(({ count }) => count >= 0)).toBe(true)
     expect(detail.cadence.reduce((sum, { count }) => sum + count, 0)).toBe(3)
   })
@@ -83,7 +80,6 @@ describe('one opened Feed', () => {
     const service = await startTestService()
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
-      // 20:00 UTC on the 7th is already the morning of the 8th in Auckland.
       body: rss(item('one', 'Crossing midnight', '2026-08-07T20:00:00.000Z')),
     })
     const user = await claimedDevice(service)

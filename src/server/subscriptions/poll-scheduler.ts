@@ -9,20 +9,15 @@ export interface RetentionSweeper {
 
 export const WAKE_INTERVAL_MS = 60_000
 
-/** Batches poll oldest due time first. */
 const DEFAULT_BATCH_LIMIT = 25
 
 const DEFAULT_CONCURRENCY = 4
 
-// A poll that cannot record its outcome leaves its Feed due, so without a
-// ceiling a persistence fault would spin the drain loop.
 const MAX_BATCHES_PER_WAKE = 20
 
-/** Test seam: production always runs with the defaults above. */
 export interface PollSchedulerLimits {
   readonly batchLimit?: number
   readonly concurrency?: number
-  /** The test harness disables nudges so every retrieval happens at an explicitly driven wake. */
   readonly nudges?: boolean
 }
 
@@ -93,13 +88,11 @@ export class PollScheduler {
   }
 
   async #run(): Promise<void> {
-    // A nudge can land anywhere in a run — even mid-sweep — and must not be swallowed.
     do {
       await this.#drain()
     } while (this.#nudged)
   }
 
-  /** A full batch means more is waiting, so the wake continues instead of trickling one batch a minute. */
   async #drain(): Promise<void> {
     try {
       for (let batches = 0; batches < MAX_BATCHES_PER_WAKE; batches += 1) {
@@ -127,7 +120,6 @@ export class PollScheduler {
     }
   }
 
-  /** One Feed's poll failure never fails the batch. */
   async #poll(feedId: number): Promise<void> {
     try {
       const outcome = await this.#refresh.refresh(feedId)

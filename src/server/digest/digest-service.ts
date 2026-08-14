@@ -24,7 +24,6 @@ export class DigestService {
     const now = this.#clock.now()
     const chronology = chronologySql(now)
 
-    // One row past the page says whether a next page exists at all.
     const fetched = this.#db
       .select({
         feedItemId: feedItems.id,
@@ -76,7 +75,6 @@ export class DigestService {
     }
   }
 
-  /** Counted separately: the page may end mid-today, and the daily band speaks for the whole day. */
   #todayVolume(chronology: SQL, today: string, timezone: string): number {
     const start = dayStartUtc(today, timezone).toISOString()
     const end = dayStartUtc(dayAfter(today), timezone).toISOString()
@@ -161,7 +159,6 @@ function digestItemOf(row: DigestRow, instant: Date, timezone: string): DigestIt
     link: row.link,
     publishedAt: row.publishedAt,
     displayTime: timeLabel(instant, timezone),
-    // The publisher's URL stays server-side; the client only hears the same-origin proxy route.
     imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
     summary: row.summary,
     firstSeenAt: row.firstSeenAt,

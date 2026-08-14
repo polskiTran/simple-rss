@@ -3,7 +3,6 @@ import { and, eq, sql } from 'drizzle-orm'
 import type { SqliteDatabase } from '../persistence/database.js'
 import { userAuth, sessions } from '../persistence/schema.js'
 
-/** An installation has exactly one User. */
 const SINGLETON_ID = 1
 
 export interface UserAuthRecord {
@@ -13,7 +12,12 @@ export interface UserAuthRecord {
   readonly updatedAt: string
 }
 
-/** The row exists only after setup, so its existence answers whether the installation is claimed. */
+export type VerifierChangeOutcome =
+  /** `revoked` counts the sessions signed out, and is legitimately `0`. */
+  | { readonly kind: 'changed'; readonly revoked: number }
+  /** The current password no longer matches the stored verifier: nothing was written. */
+  | { readonly kind: 'stale-verifier' }
+
 export class UserAuthStore {
   readonly #db: BetterSQLite3Database
 
@@ -40,10 +44,6 @@ export class UserAuthStore {
     return this.read() !== undefined
   }
 
-  /**
-   * Two racing claims both finish hashing before either writes, so SQLite decides: the
-   * insert creates the singleton row or does nothing, and exactly one caller is told it won.
-   */
   claim(passwordHash: string, now: Date): boolean {
     const at = now.toISOString()
 
@@ -56,29 +56,23 @@ export class UserAuthStore {
     return result.changes === 1
   }
 
-  /**
-   * Replaces the verified current password and revokes every session in one transaction.
-   * A verifier rotated while Argon2 ran cannot be overwritten by the stale password.
-   */
-  changePassword(expectedHash: string, passwordHash: string, now: Date): number | undefined {
+  /** Replaces the verified current password and revokes every session in one transaction. */
+  changePassword(expectedHash: string, passwordHash: string, now: Date): VerifierChangeOutcome {
     const at = now.toISOString()
 
-    return this.#db.transaction((tx) => {
+    return this.#db.transaction((tx): VerifierChangeOutcome => {
       const changed = tx
         .update(userAuth)
         .set({ passwordHash, updatedAt: at })
         .where(and(eq(userAuth.id, SINGLETON_ID), eq(userAuth.passwordHash, expectedHash)))
         .run()
 
-      if (changed.changes !== 1) return undefined
-      return tx.delete(sessions).run().changes
+      if (changed.changes !== 1) return { kind: 'stale-verifier' }
+      return { kind: 'changed', revoked: tx.delete(sessions).run().changes }
     })
   }
 
-  /**
-   * Installs an emergency verifier and revokes every session atomically.
-   * Recovery may also claim an installation whose setup secret was lost.
-   */
+  /** Installs an emergency verifier and revokes every session atomically. */
   resetPassword(passwordHash: string, now: Date): number {
     const at = now.toISOString()
 

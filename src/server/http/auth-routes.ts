@@ -13,11 +13,7 @@ import { readJsonBody } from './json-body.js'
 import { invalidCredentials, NO_STORE, unavailable } from './responses.js'
 import { clearSessionCookie, readSessionCookie, writeSessionCookie } from './session-cookie.js'
 
-/**
- * Reachable without a Session because they are how a Session is obtained.
- * Exact paths, not a prefix: a new route under `/api/auth` stays guarded
- * until named here deliberately.
- */
+/** Reachable without a Session because they are how a Session is obtained. */
 export const PUBLIC_API_PATHS: ReadonlySet<string> = new Set([
   '/api/auth/status',
   '/api/auth/setup',
@@ -27,7 +23,6 @@ export const PUBLIC_API_PATHS: ReadonlySet<string> = new Set([
 export interface AuthRouteDependencies {
   /** Absent while the database could not be opened. */
   readonly authentication: () => Authentication | undefined
-  /** Where a successful claim seeds the detected installation timezone. */
   readonly settings: () => InstallationSettingsStore | undefined
   readonly clock: Clock
   readonly trustProxyHeaders: boolean
@@ -99,7 +94,6 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
     }
   })
 
-  // Signing out an already-signed-out device is a success, not a conflict.
   app.delete('/session', (c) => {
     deps.authentication()?.signOut(readSessionCookie(c))
     clearSessionCookie(c)
@@ -124,7 +118,6 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
       case 'rate-limited':
         return tooManyAttempts(c, outcome.retryAfterSeconds)
       case 'changed':
-        // Every Session was revoked, including this one, so the cookie goes too.
         clearSessionCookie(c)
         return status(c, { claimed: true, authenticated: false })
     }
@@ -133,16 +126,11 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   return app
 }
 
-/**
- * Best-effort: an unresolvable or absent zone leaves the installation on UTC
- * rather than failing the one claim this installation will ever accept.
- */
 function seedTimezone(settings: InstallationSettingsStore | undefined, timezone: string | undefined, now: Date) {
   if (!settings || !timezone) return
   try {
     settings.setTimezone(timezone, now)
   } catch {
-    // The claim stands; the User can still pick a timezone in Settings.
   }
 }
 

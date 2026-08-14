@@ -11,10 +11,6 @@ export interface DeviceOptions {
 /**
  * One browser talking to the installation: it keeps its own cookie jar and
  * sends the headers a browser sends.
- *
- * Tests are written as devices rather than raw requests because the behaviour
- * being asserted is about devices — a phone and a laptop signed in at once, one
- * of them signing out, a session that idled while its user was away.
  */
 export class Device {
   readonly #service: TestService
@@ -26,7 +22,6 @@ export class Device {
     this.#options = options
   }
 
-  /** The session token this device is holding, if any. */
   get sessionToken(): string | undefined {
     return this.#cookie
   }
@@ -92,7 +87,6 @@ export class Device {
     return response
   }
 
-  /** Keeps the jar in step with the server, including a deletion. */
   #absorb(response: Response): void {
     for (const raw of response.headers.getSetCookie()) {
       const [pair = '', ...attributes] = raw.split(';')

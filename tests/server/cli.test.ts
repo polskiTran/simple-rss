@@ -13,7 +13,6 @@ import { makeTempDataDir } from '../support/temp-dir.js'
 
 const ALL_VERSIONS = migrations.map((migration) => migration.version)
 
-/** Keeps the audit records the reset writes out of the test runner's output. */
 function discardingLogger(): Logger {
   return createLogger({ level: 'error', sink: () => {} })
 }
@@ -120,16 +119,11 @@ describe('runCli', () => {
   })
 })
 
-/**
- * Emergency recovery, which by design needs no email, no OAuth, no security
- * question, and no second User — only the mounted volume and a shell.
- */
 describe('runCli reset-password', () => {
   let context: CliContext
   let output: string[]
   let dataDir: string
 
-  /** Reads the volume the way the running service would, after the CLI exits. */
   function inspect<T>(read: (stores: { user: UserAuthStore; sessions: SessionStore }) => T): T {
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
     try {

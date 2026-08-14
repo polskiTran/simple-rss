@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 const BAYER_4 = [
   [0, 8, 2, 10],
   [12, 4, 14, 6],
@@ -5,13 +7,24 @@ const BAYER_4 = [
   [15, 7, 13, 5],
 ] as const
 
-// Drawn once at the paper's full 708px content width (the masthead's width);
-// the container clips it, so narrower viewports shorten the band without a
-// second element or height.
+export const BAND_WIDTH_PX = 708
+export const BAND_HEIGHT_PX = 114
+
+/** Centre-to-centre spacing of the dots. `.daily-band-field` sizes each dot from it. */
+const PITCH_PX = 5
+
 export function DailyBand({ date, volume }: { date: string; volume: number }) {
+  const geometry = {
+    '--daily-band-height': `${BAND_HEIGHT_PX}px`,
+    '--daily-band-pitch': `${PITCH_PX}px`,
+  } as CSSProperties
+
   return (
-    <div className="daily-band" aria-hidden="true">
-      <span className="daily-band-field" style={{ boxShadow: dailyShadows(date, volume, 708, 114) }} />
+    <div className="daily-band" aria-hidden="true" style={geometry}>
+      <span
+        className="daily-band-field"
+        style={{ boxShadow: dailyShadows(date, volume, BAND_WIDTH_PX, BAND_HEIGHT_PX) }}
+      />
     </div>
   )
 }
@@ -21,25 +34,17 @@ export function dailyShadows(date: string, volume: number, width: number, height
   const seed = hash(date)
   const ink = Math.min(1, Math.log2(Math.max(0, volume) + 1) / 5)
 
-  // Volume lowers the bar the noise must clear rather than brightening every
-  // cell, and never so far that the paper stops showing through.
   const bar = 0.74 - 0.3 * ink
 
   const shadows: string[] = []
 
-  for (let y = 0; y < height; y += 5) {
-    for (let x = 0; x < width; x += 5) {
-      const gridX = x / 5
-      const gridY = y / 5
-      // Two octaves: a long drift shapes the currents, a short grain frays
-      // them. The drift's wide horizontal wavelength makes the field flow
-      // along the band; both samplings skew off the row axis so the lattice
-      // never prints a stripe.
+  for (let y = 0; y < height; y += PITCH_PX) {
+    for (let x = 0; x < width; x += PITCH_PX) {
+      const gridX = x / PITCH_PX
+      const gridY = y / PITCH_PX
       const drift = valueNoise(seed, gridX / 17 + gridY * 0.045 + 0.37, gridY / 8.6 + gridX * 0.012 + 0.61)
       const grain = valueNoise(seed ^ 0x9e3779b9, gridX / 5.7 + 0.29, gridY / 3.2 + gridX * 0.02 + 0.83)
       const noise = drift * 0.68 + grain * 0.32
-      // The Bayer term straddles zero: it dithers the level boundaries
-      // without darkening the open paper.
       const dither = ((BAYER_4[gridY % 4]?.[gridX % 4] ?? 0) - 7.5) / 16
       const value = noise - bar + dither * 0.11
       const level = value <= 0 ? 0 : value < 0.09 ? 1 : value < 0.19 ? 2 : 3

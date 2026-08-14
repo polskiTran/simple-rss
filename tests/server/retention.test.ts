@@ -25,7 +25,6 @@ const rss = (...items: string[]) => `<?xml version="1.0"?>
 const stubFeed = (service: TestService, body: string, url: string = FEED_URL) =>
   service.upstream.stub(url, { headers: FEED_HEADERS, body })
 
-/** Subscribes the User to a Feed currently exposing the given document, first check landed. */
 async function subscribed(user: Device, service: TestService, xml: string, url: string = FEED_URL): Promise<void> {
   stubFeed(service, xml, url)
   const response = await user.post('/api/subscriptions', { url })
@@ -38,7 +37,6 @@ interface StoredItem {
   readonly lastObservedAt: string
 }
 
-/** Every retained Feed Item, straight from the volume, oldest row first. */
 function storedItems(service: TestService): StoredItem[] {
   return service.database
     ?.prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items ORDER BY id')
@@ -59,7 +57,6 @@ async function library(user: Device) {
   return librarySchema.parse(await (await user.get('/api/library')).json())
 }
 
-/** A Feed body the test holds open, to model a retrieval still in flight. */
 function heldBody(xml: string): { body: ReadableStream<Uint8Array>; release: () => void } {
   let release!: () => void
   const gate = new Promise<void>((resolve) => {
@@ -81,7 +78,6 @@ describe('history retention', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss(item('a', 'Kept'), item('b', 'Dropped')))
 
-    // The publisher's window rotates: one item stays exposed, one leaves.
     stubFeed(service, rss(item('a', 'Kept')))
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
@@ -98,17 +94,14 @@ describe('history retention', () => {
     await subscribed(user, service, rss(item('a', 'Kept'), item('b', 'Dropped')))
     stubFeed(service, rss(item('a', 'Kept')))
 
-    // One minute short of 90 days since "Dropped" left the window: retained.
     service.clock.advance(90 * DAY_MS - MINUTE_MS)
     await service.wakeScheduler()
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Kept', 'Dropped'])
 
-    // At exactly 90 days it becomes eligible and the next wake removes it.
     service.clock.advance(MINUTE_MS)
     await service.wakeScheduler()
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Kept'])
 
-    // Three months idled the session out; the User signs back in to look.
     expect((await user.signIn()).status).toBe(200)
     expect(await digestTitles(user)).toEqual(['Kept'])
   })
@@ -116,7 +109,6 @@ describe('history retention', () => {
   it('retains an item a slow Feed still exposes long after its publication date', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
-    // Published far more than 90 days ago, but the Feed still exposes it.
     await subscribed(user, service, rss(item('a', 'Yearly letter', '2026-01-05T08:00:00.000Z')))
 
     service.clock.advance(89 * DAY_MS)
@@ -136,13 +128,11 @@ describe('history retention', () => {
     const saved = await user.put('/api/library/1')
     expect(saved.status).toBe(200)
 
-    // The publisher empties the window and three months pass.
     stubFeed(service, rss())
     service.clock.advance(91 * DAY_MS)
     await service.wakeScheduler()
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Saved essay'])
 
-    // Unsubscribing does not touch the save either.
     expect((await user.signIn()).status).toBe(200)
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
     await service.wakeScheduler()
@@ -157,8 +147,6 @@ describe('history retention', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss(item('a', 'Quarterly letter')))
 
-    // Nothing woke for 91 days; the last observation is far past retention,
-    // but the Feed still exposes the item when this wake finally polls it.
     service.clock.advance(91 * DAY_MS)
     await service.wakeScheduler()
 
@@ -178,18 +166,15 @@ describe('history retention', () => {
 
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
 
-    // Gone from the Digest and the Subscription list at once, not at cleanup.
     expect(await digestTitles(user)).toEqual([])
     const list = subscriptionListSchema.parse(await (await user.get('/api/feeds')).json())
     expect(list.subscriptions).toEqual([])
     expect((await user.get('/api/feeds/1')).status).toBe(404)
 
-    // No wake ever polls it again.
     service.clock.advance(24 * HOUR_MS)
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(FEED_URL)).toHaveLength(1)
 
-    // Unsubscribing what is not subscribed finds nothing.
     expect((await user.delete('/api/feeds/1')).status).toBe(404)
     expect((await user.delete('/api/feeds/abc')).status).toBe(404)
   })
@@ -203,15 +188,12 @@ describe('history retention', () => {
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
     await service.wakeScheduler()
 
-    // The ordinary items are gone without waiting 90 days; the save and the
-    // Feed metadata behind its attribution stay.
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Saved essay'])
     expect(storedFeedTitles(service)).toEqual(['Field Notes'])
     expect((await library(user)).items.map((entry) => [entry.title, entry.feedTitle, entry.subscribed])).toEqual([
       ['Saved essay', 'Field Notes', false],
     ])
 
-    // Letting go of the last save lets cleanup retire the Feed itself.
     expect((await user.delete('/api/library/1')).status).toBe(200)
     await service.wakeScheduler()
     expect(storedItems(service)).toEqual([])
@@ -249,11 +231,9 @@ describe('history retention', () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, rss(item('a', 'First light')))
-    // The first check has landed and its refresh cooldown has passed.
     await service.wakeScheduler()
     service.clock.advance(60_000)
 
-    // A manual refresh is mid-retrieval when the User unsubscribes.
     const { body, release } = heldBody(rss(item('a', 'First light'), item('b', 'Late arrival')))
     service.upstream.stub(FEED_URL, { headers: FEED_HEADERS, body })
     const refreshing = user.post('/api/feeds/1/refresh')
@@ -262,7 +242,6 @@ describe('history retention', () => {
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
     release()
 
-    // The poll lands after the Subscription is gone: nothing is written.
     expect((await refreshing).status).toBe(404)
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['First light'])
 
@@ -281,9 +260,6 @@ describe('history retention', () => {
     await service.wakeScheduler()
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Saved essay'])
 
-    // The same URL subscribes again: the retained Feed identity is reused, the
-    // window is re-imported on the next check, and the old save is still the
-    // same saved item.
     const revived = await user.post('/api/subscriptions', { url: FEED_URL })
     expect(revived.status).toBe(201)
     const body = (await revived.json()) as { subscription: { feedId: number } }
@@ -296,7 +272,6 @@ describe('history retention', () => {
       [1, 'Saved essay'],
     ])
 
-    // And the revived Subscription polls like any other.
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(FEED_URL).length).toBeGreaterThanOrEqual(3)

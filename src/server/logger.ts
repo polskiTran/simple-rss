@@ -20,7 +20,6 @@ export interface Logger {
 export interface LoggerOptions {
   level: LogLevel
   now?: () => Date
-  /** Structured sink, used by tests to assert on records rather than text. */
   sink?: (record: LogRecord) => void
   /** Where JSON lines go when no `sink` is given. Defaults to stdout. */
   stream?: { write(chunk: string): unknown }

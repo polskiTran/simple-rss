@@ -4,8 +4,6 @@ import { dateKey, inDigestOrder, metaRowDate, plausibleHorizon } from '../digest
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 
-// A query drowning in matches wants another word, not a longer page; the bound
-// keeps the query cheap at the ~100-Subscription target.
 export const SEARCH_RESULT_LIMIT = 50
 
 interface MatchRow {
@@ -19,11 +17,6 @@ interface MatchRow {
   subscribedFeedId: number | null
 }
 
-/**
- * Answered from the `feed_item_search` FTS index the migration's triggers keep current.
- * Coverage is what the reader still shows; an unsubscribed Feed's unsaved items are
- * excluded immediately — a derived index must not resurrect what the User let go of.
- */
 export class SearchService {
   readonly #db: SqliteDatabase
   readonly #clock: Clock
@@ -43,9 +36,6 @@ export class SearchService {
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
-    // The FTS table decides what matches; the joins decide what may be shown. The LIMIT
-    // applies under the same chronology rule the rows are displayed in, so a
-    // future-dated item cannot hold a bound slot it will not rank at.
     const rows = this.#db
       .prepare(
         `SELECT
@@ -109,10 +99,6 @@ function matchExpressionOf(query: string): string | undefined {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }
 
-/**
- * Rebuilds the derived index from the canonical tables — the recovery the FTS design
- * promises. Run through the CLI; the triggers keep it current from then on.
- */
 export function rebuildSearchIndex(db: SqliteDatabase): number {
   return db.transaction(() => {
     db.exec('DELETE FROM feed_item_search')

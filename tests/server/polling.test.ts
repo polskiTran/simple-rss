@@ -30,7 +30,6 @@ function rss(title: string, items: readonly FeedItemFixture[]): string {
 
 const FEED_HEADERS = { 'content-type': 'application/rss+xml; charset=utf-8' }
 
-/** Subscribes the User to `url`, answering with the given document. */
 async function subscribed(
   user: Device,
   service: TestService,
@@ -52,7 +51,6 @@ interface StoredSchedule {
   readonly lastPolledAt: string | null
 }
 
-/** The persisted schedule, read the way the scheduler itself reads it. */
 function scheduleOf(service: TestService, feedId: number): StoredSchedule {
   const row = service.database
     ?.prepare(
@@ -66,7 +64,6 @@ function scheduleOf(service: TestService, feedId: number): StoredSchedule {
   return row as StoredSchedule
 }
 
-/** A Feed body the test holds open, to keep its retrieval slot occupied. */
 function heldBody(xml: string): { body: ReadableStream<Uint8Array>; release: () => void } {
   let release!: () => void
   const gate = new Promise<void>((resolve) => {
@@ -91,16 +88,13 @@ describe('background polling', () => {
       { guid: 'entry-1', title: 'First light', pubDate: 'Fri, 08 Aug 2026 07:15:00 GMT' },
     ]))
 
-    // The initial import counts as a poll: due one interval plus jitter later.
     const created = scheduleOf(service, 1)
     expect(created.pollingIntervalMinutes).toBe(120)
     expect(created.nextPollAt).toBe(nextPollTime(1, 120, new Date(START)))
 
-    // Before the due time nothing is polled.
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(url)).toHaveLength(1)
 
-    // The publisher corrects one title and adds an entry while nobody browses.
     service.upstream.stub(url, {
       headers: FEED_HEADERS,
       body: rss('Field Notes', [
@@ -112,7 +106,6 @@ describe('background polling', () => {
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(url)).toHaveLength(2)
 
-    // A different signed-in device sees the background work in its Digest.
     const phone = new Device(service)
     await phone.signIn()
     const digest = (await (await phone.get('/api/digest')).json()) as {
@@ -144,7 +137,6 @@ describe('background polling', () => {
     })
     const added = await user.post('/api/subscriptions', { url })
     expect(added.status).toBe(201)
-    // The first check retrieves in full and stores the validators.
     await service.wakeScheduler()
 
     service.clock.advance(3 * HOUR_MS)
@@ -156,18 +148,14 @@ describe('background polling', () => {
       'if-modified-since': 'Fri, 08 Aug 2026 07:00:00 GMT',
     })
 
-    // The stored Feed Items are exactly as the first retrieval left them.
     const items = service.database
       ?.prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items')
       .all()
     expect(items).toEqual([{ title: 'First light', lastObservedAt: START }])
 
-    // Scheduling still advanced, and logged the unchanged poll.
     expect(scheduleOf(service, 1).nextPollAt).toBe(nextPollTime(1, 120, service.clock.now()))
     expect(service.logs).toContainEqual(expect.objectContaining({ message: 'subscriptions.feed_unchanged', feedId: 1 }))
 
-    // The 304 rotated the ETag but stayed silent about Last-Modified; the next
-    // poll presents the newest validator of each.
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(url)[2]?.headers).toMatchObject({
@@ -182,8 +170,6 @@ describe('background polling', () => {
     const url = 'https://one.example/feed'
     await subscribed(user, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
 
-    // The next due time is anchored on the last completed poll — here the
-    // initial import — so the same change always lands on the same instant.
     const shortened = await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
     expect(shortened.status).toBe(200)
     expect(await shortened.json()).toEqual({
@@ -204,13 +190,11 @@ describe('background polling', () => {
     })
     expect(scheduleOf(service, 1).pollingIntervalMinutes).toBe(1440)
 
-    // Only the presets exist; there is no free-form schedule to mistype.
     expect((await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 45 })).status).toBe(400)
     expect((await user.put('/api/feeds/999/interval', { pollingIntervalMinutes: 30 })).status).toBe(404)
     const visitor = new Device(service)
     expect((await visitor.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })).status).toBe(401)
 
-    // The shortened interval is what the scheduler actually honours.
     await user.put('/api/feeds/1/interval', { pollingIntervalMinutes: 30 })
     service.clock.advance(35 * 60_000)
     await service.wakeScheduler()
@@ -238,7 +222,6 @@ describe('background polling', () => {
     const url = 'https://one.example/feed'
     await subscribed(user, service, url, rss('Field Notes', [{ guid: 'entry-1', title: 'First light' }]))
 
-    // The container is replaced and a whole day passes before it returns.
     service.clock.advance(26 * HOUR_MS)
     await service.restart()
 
@@ -261,8 +244,6 @@ describe('background polling', () => {
     await service.wakeScheduler()
 
     for (const url of urls) expect(service.upstream.requestsTo(url)).toHaveLength(2)
-    // The two most-overdue Feeds filled the first batch; the third followed
-    // in the same wake once that batch was done.
     const polled = service.upstream.requests.slice(-3).map((request) => request.url)
     expect([...polled.slice(0, 2)].sort()).toEqual([urls[0]!, urls[1]!].sort())
     expect(polled[2]).toBe(urls[2]!)
@@ -287,7 +268,6 @@ describe('background polling', () => {
     const wake = service.wakeScheduler()
 
     await vi.waitFor(() => expect(service.upstream.requests.length).toBe(creations + 4))
-    // Give an over-eager fifth retrieval every chance to appear before ruling it out.
     await new Promise((resolve) => setTimeout(resolve, 25))
     expect(service.upstream.requests.length).toBe(creations + 4)
 
@@ -309,8 +289,6 @@ describe('background polling', () => {
     const wake = service.wakeScheduler()
     await vi.waitFor(() => expect(service.upstream.requestsTo(url)).toHaveLength(2))
 
-    // The User presses refresh while the scheduled poll is still in flight:
-    // one retrieval serves both, and the schedule is simply the poll's.
     const refreshed = user.post('/api/feeds/1/refresh')
     await new Promise((resolve) => setTimeout(resolve, 25))
     expect(service.upstream.requestsTo(url)).toHaveLength(2)

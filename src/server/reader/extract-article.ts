@@ -3,7 +3,6 @@ import { parseHTML } from 'linkedom'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { articleMarkdown } from './article-markdown.js'
 
-// One steady number: the Reader header answers "roughly how long", not "exactly how fast are you".
 const WORDS_PER_MINUTE = 225
 
 export interface ExtractedArticle {
@@ -13,13 +12,10 @@ export interface ExtractedArticle {
 }
 
 export interface ExtractArticleInput {
-  /** Original page bytes, already bounded by the boundary. */
   readonly bytes: Uint8Array
-  /** Character set the transport declared, when it declared one. */
   readonly charset?: string | undefined
   /** The address the bytes actually came from, for resolving links. */
   readonly url: string
-  /** Rewrites an approved embedded image to its signed proxy path. */
   readonly signImageUrl?: SignImageUrl
 }
 
@@ -48,7 +44,6 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
       readingTimeMinutes: Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE)),
     }
   } catch {
-    // A document broken enough to crash extraction is simply not readable.
     return undefined
   }
 }
@@ -100,7 +95,6 @@ function metaCharset(bytes: Uint8Array): string | undefined {
   )
 }
 
-/** Tokens carrying at least one letter or digit. */
 function countWords(markdown: string): number {
   return markdown.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length
 }

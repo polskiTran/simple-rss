@@ -42,7 +42,6 @@ function rss(title: string): string {
 </channel></rss>`
 }
 
-/** Subscribes the User to `url` with a Feed that retrieves successfully, first check landed. */
 async function subscribed(user: Device, service: TestService, url: string): Promise<number> {
   service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
   const response = await user.post('/api/subscriptions', { url })
@@ -61,7 +60,6 @@ interface StoredAvailability {
   readonly lastFailureCategory: string | null
 }
 
-/** The persisted Feed Availability state, read as the service stores it. */
 function storedAvailability(service: TestService, feedId: number): StoredAvailability {
   if (!service.database) throw new Error('the service started without a database')
   return storedAvailabilityIn(service.database, feedId)
@@ -83,14 +81,12 @@ function storedAvailabilityIn(database: SqliteDatabase, feedId: number): StoredA
   return row as StoredAvailability
 }
 
-/** Moves the clock to this Subscription's persisted due time and wakes the scheduler. */
 async function pollWhenDue(service: TestService, feedId: number): Promise<void> {
   const due = Date.parse(storedAvailability(service, feedId).nextPollAt)
   service.clock.advance(Math.max(0, due - service.clock.now().getTime()))
   await service.wakeScheduler()
 }
 
-/** The Feed Availability the User's device sees for one Subscription. */
 async function availabilityOf(user: Device, feedId: number): Promise<FeedAvailability> {
   const response = await user.get('/api/feeds')
   expect(response.status).toBe(200)
@@ -111,13 +107,11 @@ describe('Feed Availability', () => {
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: 'gone' })
 
-    // Failure k schedules the next attempt min(interval · 2^(k-1), 24 h) out.
     for (const failures of [1, 2, 3, 4, 5, 6]) {
       await pollWhenDue(service, feedId)
       const stored = storedAvailability(service, feedId)
       expect(stored.consecutiveFailures).toBe(failures)
       expect(stored.nextPollAt).toBe(nextRetryTime(feedId, 120, failures, service.clock.now()))
-      // The cap holds absolutely: never more than a day, jitter included.
       expect(Date.parse(stored.nextPollAt) - service.clock.now().getTime()).toBeLessThanOrEqual(
         MAX_BACKOFF_MINUTES * 60_000,
       )
@@ -125,7 +119,6 @@ describe('Feed Availability', () => {
     expect(backoffMinutes(120, 5)).toBe(MAX_BACKOFF_MINUTES)
     expect(backoffMinutes(120, 6)).toBe(MAX_BACKOFF_MINUTES)
 
-    // Between due times the scheduler leaves the Feed alone.
     const attempts = service.upstream.requestsTo(url).length
     await service.wakeScheduler()
     expect(service.upstream.requestsTo(url)).toHaveLength(attempts)
@@ -139,7 +132,6 @@ describe('Feed Availability', () => {
 
     service.upstream.stub(url, { status: 503, headers: { 'content-type': 'text/plain' }, body: '' })
 
-    // Two failures stay calm: nothing is surfaced yet.
     await pollWhenDue(service, feedId)
     await pollWhenDue(service, feedId)
     expect(await availabilityOf(user, feedId)).toMatchObject({
@@ -147,7 +139,6 @@ describe('Feed Availability', () => {
       consecutiveFailures: 2,
     })
 
-    // The third failure is where Feed Availability begins.
     await pollWhenDue(service, feedId)
     expect(await availabilityOf(user, feedId)).toEqual({
       state: 'unavailable',
@@ -157,7 +148,6 @@ describe('Feed Availability', () => {
       category: 'http_error',
     })
 
-    // The Subscription is never removed and its retained Feed Items remain.
     const digest = (await (await user.get('/api/digest')).json()) as {
       groups: { items: { title: string }[] }[]
     }
@@ -186,7 +176,6 @@ describe('Feed Availability', () => {
       consecutiveFailures: 0,
       category: null,
     })
-    // The schedule returns to the ordinary Polling Interval.
     expect(storedAvailability(service, feedId).nextPollAt).toBe(
       nextPollTime(feedId, 120, service.clock.now()),
     )
@@ -229,13 +218,11 @@ describe('Feed Availability', () => {
     await pollWhenDue(service, feedId)
     await pollWhenDue(service, feedId)
 
-    // Right after the failed scheduled poll the manual retry is rate-limited.
     const tooSoon = await user.post(`/api/feeds/${feedId}/refresh`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
     expect((await availabilityOf(user, feedId)).state).toBe('unavailable')
 
-    // The publisher comes back; one manual retry restores availability at once.
     service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
     service.clock.advance(61_000)
     const retried = await user.post(`/api/feeds/${feedId}/refresh`)
@@ -346,7 +333,6 @@ describe('Feed Availability', () => {
 })
 
 describe('congestion at the retrieval boundary', () => {
-  /** Answers each retrieval with the next scripted result, in order. */
   function scriptedRetrieval(script: RetrievalBytesResult[]): Retrieval {
     return {
       retrieve: () => Promise.reject(new Error('these polls buffer, they never stream')),
@@ -392,11 +378,8 @@ describe('congestion at the retrieval boundary', () => {
 
     try {
       expect(service.create(url).kind).toBe('created')
-      // The first check is ordinary scheduler work now; it consumes the
-      // scripted success and leaves the Feed available.
       await service.ingest(1)
 
-      // A publisher error counts against the Feed…
       clock.advance(60_000)
       await service.ingest(1)
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
@@ -404,8 +387,6 @@ describe('congestion at the retrieval boundary', () => {
         lastFailureCategory: 'http_error',
       })
 
-      // …but the installation's own congestion does not: the failure run
-      // stands still and the attempt moves one ordinary interval on.
       clock.advance(60_000)
       await service.ingest(1)
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
@@ -415,7 +396,6 @@ describe('congestion at the retrieval boundary', () => {
         nextPollAt: nextPollTime(1, 120, clock.now()),
       })
 
-      // The Feed itself was never the problem, so the next answer clears it.
       clock.advance(60_000)
       await service.ingest(1)
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
@@ -434,8 +414,6 @@ describe('availability categories', () => {
       availabilityCategoryOf({ kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } })
 
     expect(failure('timeout')).toBe('timeout')
-    // Both ways of taking too long are one category to the User: the stored
-    // vocabulary says what they can act on, not which clock ran out.
     expect(failure('body_timeout')).toBe('timeout')
     expect(failure('too_large')).toBe('too_large')
     expect(failure('unsupported_content_type')).toBe('unsupported_content')

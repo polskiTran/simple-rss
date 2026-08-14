@@ -25,7 +25,6 @@ function discardingLogger(): Logger {
   return createLogger({ level: 'error', sink: () => {} })
 }
 
-/** A CLI invocation against a given data directory, the way an operator runs one. */
 function cliOn(dataDir: string): { context: CliContext; output: string[] } {
   const output: string[] = []
   const context: CliContext = {
@@ -83,7 +82,6 @@ describe('the backup command', () => {
     const snapshot = openDatabase(destination)
     expect(snapshot.prepare('SELECT title FROM feeds').all()).toEqual([{ title: 'Field Notes' }])
     snapshot.close()
-    // The live database was copied, not moved.
     expect(existsSync(context.config.databasePath)).toBe(true)
   })
 
@@ -212,8 +210,6 @@ describe('backup and restore, round-tripped through the running application', ()
     expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
     await service.stop()
 
-    // The derived search index is deliberately lost before the backup, so the
-    // restored installation's search can only work if restore rebuilt it.
     const live = openDatabase(databasePathOf(service))
     live.exec('DELETE FROM feed_item_search')
     live.close()
@@ -239,7 +235,6 @@ describe('backup and restore, round-tripped through the running application', ()
     const restored = await startTestService({ dataDir: freshDataDir })
     expect((await restored.fetch('/health/ready')).status).toBe(200)
 
-    // User access survives: the same password signs in on the restored copy.
     const device = new Device(restored)
     expect((await device.signIn(USER_PASSWORD)).status).toBe(200)
 
@@ -266,7 +261,6 @@ describe('backup and restore, round-tripped through the running application', ()
   it('migrates a backup taken before newer schema versions forward during restore', async () => {
     const dataDir = await makeTempDataDir()
     const { context: seed } = cliOn(dataDir)
-    // A backup from an older release: only the first schema versions exist.
     const older = openDatabase(seed.config.databasePath)
     applyMigrations(older, seed.clock, migrations.slice(0, 3))
     older.close()

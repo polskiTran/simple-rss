@@ -60,13 +60,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
       const { subscriptions } = await fetchSubscriptions()
       setState({ kind: 'loaded', subscriptions })
     } catch {
-      // The list already on screen is better than an unavailable note.
     }
   }
 
-  // While any Subscription waits for its first check, keep refreshing the
-  // list — bounded, so a Feed that stays unchecked ends with a quiet note
-  // rather than polling forever.
   useEffect(() => {
     if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
     if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
@@ -77,8 +73,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     return () => window.clearTimeout(timer)
   }, [state, refreshRound])
 
-  // One control searches and adds: typing narrows the list, an exact Feed URL
-  // subscribes on enter.
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const url = feedUrlOf(query)
@@ -128,8 +122,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }
 
-  // The manual retry behind an unavailable Feed's note; the list is refetched
-  // whatever the attempt finds.
   async function retry(feedId: number) {
     if (retryingFeedId !== undefined) return
     setRetryingFeedId(feedId)
@@ -146,7 +138,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
       const { subscriptions } = await fetchSubscriptions()
       setState({ kind: 'loaded', subscriptions })
     } catch {
-      // The retry outcome is already on screen; a failed refetch changes nothing.
     }
   }
 
@@ -200,9 +191,6 @@ function feedUrlOf(query: string): string | undefined {
   return /^https?:\/\/\S+$/i.test(line) ? line : undefined
 }
 
-// Watches a fresh Subscription's first check so a mistyped URL is caught
-// immediately (ADR 0007). The server never waits for this; after the watch
-// gives up, the list's availability note takes over.
 async function watchFirstCheck(feedId: number): Promise<string> {
   for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
@@ -210,8 +198,6 @@ async function watchFirstCheck(feedId: number): Promise<string> {
     try {
       detail = await fetchFeedDetail(feedId)
     } catch (error) {
-      // 404 here means the first retrieval revealed an already-subscribed
-      // Feed and this Subscription folded into it.
       if (error instanceof ApiError && error.status === 404) return 'already subscribed'
       continue
     }
@@ -240,8 +226,6 @@ function readFileText(file: File): Promise<string> {
   })
 }
 
-// The counts are all the server can tell — whether each Feed answers shows on
-// the list as its first check lands — so only unusable outlines get a line.
 function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
   if (!report) return null
   if (report.added === 0 && report.alreadySubscribed === 0 && report.unusable.length === 0) {
@@ -323,8 +307,6 @@ function matches(subscription: SubscriptionSummary, query: string): boolean {
   )
 }
 
-// Appears only once checking has failed three times in a row; states what is
-// known — never the raw error — and offers a retry, not removal.
 function AvailabilityNote({
   subscription,
   retrying,

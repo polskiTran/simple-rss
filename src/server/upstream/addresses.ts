@@ -145,7 +145,6 @@ function parseIpv6(address: string): Uint8Array | undefined {
 
   const leading = head === '' ? [] : head.split(':')
   const trailing = tail === undefined || tail === '' ? [] : tail.split(':')
-  // The `::` run is however many of the eight groups the two sides leave over.
   const gap = 8 - leading.length - trailing.length
   if (tail === undefined ? gap !== 0 : gap < 0) return undefined
 
@@ -170,10 +169,6 @@ function parseIpv6(address: string): Uint8Array | undefined {
   return bytes
 }
 
-/**
- * Rewrites a trailing dotted-quad (`::ffff:127.0.0.1`) as its two hex groups,
- * so the expansion above deals with one notation.
- */
 function withoutTrailingIpv4(address: string): string | undefined {
   if (!address.includes('.')) return address
 

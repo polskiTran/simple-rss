@@ -32,8 +32,6 @@ export function useAccess(): Gate {
 
   useEffect(recheck, [recheck])
 
-  // A session can end mid-use (idle timeout, password change elsewhere); the
-  // shell learns from the first refused request rather than by polling.
   useEffect(() => onSessionEnded(() => setAccess({ kind: 'locked' })), [])
 
   return { access, adopt: (status) => setAccess(accessFor(status)), recheck }

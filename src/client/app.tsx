@@ -20,11 +20,6 @@ import { SavedView } from './views/saved-view.js'
 import { SettingsView } from './views/settings-view.js'
 import { SetupView } from './views/setup-view.js'
 
-/**
- * Application shell. Nothing reflows, reorders, or hides between screens or
- * widths; only type scale and padding change. Tabs render only once access is
- * open — until then all four sections would refuse.
- */
 export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
@@ -42,7 +37,6 @@ export function App() {
 
 function viewFor(gate: Gate, navigation: Navigation) {
   switch (gate.access.kind) {
-    // Deliberately blank: a flash of the wrong screen is worse than a moment of nothing.
     case 'checking':
       return null
     case 'unavailable':
@@ -57,7 +51,6 @@ function viewFor(gate: Gate, navigation: Navigation) {
 }
 
 function signedInView(navigation: Navigation, gate: Gate) {
-  // The Reader overlays whichever section opened it, so check it before the tab switch.
   if (navigation.readerItemId !== undefined) {
     const feedItemId = navigation.readerItemId
     const origin = navigation.origin ?? DIGEST_ORIGIN
@@ -66,7 +59,6 @@ function signedInView(navigation: Navigation, gate: Gate) {
         feedItemId={feedItemId}
         origin={origin}
         onBack={navigation.returnTo}
-        // Reading on keeps the same origin, so the next article exits where this one would.
         onOpenItem={(next) => navigation.openReader(next, origin)}
         onOpenFeed={(feedId) => navigation.openFeed(feedId, readerOrigin(feedItemId, navigation.origin))}
       />
@@ -99,8 +91,6 @@ function signedInView(navigation: Navigation, gate: Gate) {
   }
 }
 
-// The shell knows the Feed's id, not its title; FeedView passes the title up
-// with each item so the Reader's back link can name the Feed.
 function OpenedFeed({ navigation, feedId }: { navigation: Navigation; feedId: number }) {
   return (
     <FeedView

@@ -1,7 +1,6 @@
 import type { ResolveAddresses } from '../../src/server/upstream/destination.js'
 import type { HttpClient } from '../../src/server/upstream/http-client.js'
 
-/** The public address every stubbed host answers with. */
 const STUBBED_HOST_ADDRESS = '93.184.216.34'
 
 export interface FixtureResponse {
@@ -100,7 +99,6 @@ export class UpstreamFixtures {
     }
   }
 
-  /** Waits, unless the caller gives up first — exactly as a slow host would. */
   async #hold(delayMs: number, signal: AbortSignal | null): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -132,7 +130,6 @@ export function chunkedBody(chunks: readonly Uint8Array[]): ReadableStream<Uint8
 }
 
 export interface PacedBodyOptions {
-  /** How long the publisher pauses between chunks. */
   readonly gapMs: number
   /** `false` models a publisher that sent part of the body, then went quiet without closing. */
   readonly ends?: boolean

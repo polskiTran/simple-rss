@@ -9,7 +9,6 @@ const FEED_URL = 'https://journal.example/feed'
 const IMAGE_URL = 'https://journal.example/hero.png'
 const ARTICLE_URL = 'https://journal.example/hero-story'
 
-/** Valid magic bytes followed by padding, so sniffing has something real. */
 function pngBytes(size = 64): Uint8Array {
   const bytes = new Uint8Array(size)
   bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
@@ -31,9 +30,7 @@ const item = (guid: string, title: string, imageUrl?: string) => `
 
 interface ImageSetup {
   readonly user: Device
-  /** The Feed Item whose enclosure is the stubbed hero image. */
   readonly withImage: number
-  /** A Feed Item that never carried an image. */
   readonly plain: number
 }
 
@@ -83,8 +80,6 @@ describe('the Feed Item image route', () => {
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(pngBytes())
 
-    // The proxy is what lets the image policy stay this narrow: same-origin
-    // proxied images need no publisher origins in the CSP.
     expect(response.headers.get('content-security-policy')).toContain("img-src 'self' data:")
   })
 
@@ -98,8 +93,6 @@ describe('the Feed Item image route', () => {
     if (!request) throw new Error('the image was never requested upstream')
     expect(request.headers['cookie']).toBeUndefined()
     expect(request.headers['authorization']).toBeUndefined()
-    // The Accept header is the image profile's, so the route can only ever
-    // travel through the boundary's image operation.
     expect(request.headers['accept']).toBe('image/jpeg, image/png, image/webp, image/gif, image/avif')
   })
 
@@ -141,7 +134,6 @@ const ARTICLE_HTML = `<!doctype html>
     </body>
   </html>`
 
-/** Reads the one signed image path out of an extracted article. */
 async function signedImagePath(user: Device, feedItemId: number): Promise<string> {
   const response = await user.get(`/api/items/${feedItemId}/reader`)
   expect(response.status).toBe(200)
@@ -215,13 +207,11 @@ describe('the signed Reader image route', () => {
     const { user, withImage } = await imageSetup(service)
     const path = await signedImagePath(user, withImage)
 
-    // The session survives the restart on the volume; the signing key does not.
     await service.restart()
     expect((await user.get(path)).status).toBe(404)
   })
 })
 
-/** A further device signing in to an installation someone already claimed. */
 async function signedInDevice(service: TestService, address: string): Promise<Device> {
   const device = new Device(service, { address })
   const response = await device.signIn()
@@ -263,8 +253,6 @@ describe('destination hardening', () => {
   })
 
   it('refuses an image whose host now resolves to a private address', async () => {
-    // The publisher's DNS changed after the Feed was ingested — the ordinary
-    // shape of a rebinding attempt — so the fetch-time answer is what counts.
     class MovedDns extends UpstreamFixtures {
       override get resolve(): ResolveAddresses {
         const base = super.resolve
@@ -391,8 +379,6 @@ describe('resource limits', () => {
     const { user, withImage } = await imageSetup(service)
 
     const response = await user.get(`/api/items/${withImage}/image`)
-    // The headers were honest when they left; the lie is only discovered
-    // mid-body, where the connection is torn down rather than completed.
     await expect(async () => {
       if ((await response.arrayBuffer()).byteLength > 5 * megabyte) throw new Error('served past the ceiling')
     }).rejects.toThrow()
@@ -415,8 +401,6 @@ describe('image rate limiting', () => {
     expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
     expect(refused.headers.get('cache-control')).toBe('no-store')
 
-    // The window is per client address, so the User's other device is not
-    // slowed by the greedy one.
     const other = await signedInDevice(service, '203.0.113.8')
     expect((await other.get('/api/items/999/image')).status).toBe(404)
   })

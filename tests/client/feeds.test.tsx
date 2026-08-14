@@ -32,7 +32,6 @@ const FEED = {
   availability: AVAILABLE,
 }
 
-/** What the subscribe answer looks like before any retrieval: host-named, unchecked. */
 const UNCHECKED_FEED = {
   ...FEED,
   title: 'journal.example',
@@ -52,7 +51,6 @@ const UNAVAILABLE_FEED = {
   },
 }
 
-/** The opened-Feed answer the subscribe watch polls for the first check. */
 function feedDetail(availability: object, itemCount: number) {
   return {
     feedId: FEED.feedId,
@@ -89,7 +87,6 @@ describe('Feeds', () => {
     })
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
     api.on('POST /api/subscriptions', () => {
-      // The first retrieval is still out; the watch waits on this reply.
       api.on('GET /api/feeds/1', () => firstCheck)
       api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
       return { status: 201, body: { subscription: UNCHECKED_FEED } }
@@ -101,12 +98,10 @@ describe('Feeds', () => {
     await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
-    // The recorded decision is on screen at once, named after its host…
     expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
     expect(screen.getByText('subscribed — checking the feed…')).toBeDefined()
     expect(screen.getByText('waiting for first check')).toBeDefined()
 
-    // …and the watch reports the first check inline, with the list corrected.
     releaseDetail?.({ body: feedDetail(AVAILABLE, 1) })
     expect(await screen.findByText('subscribed — 1 item in the digest')).toBeDefined()
     expect(await screen.findByText('Field Notes')).toBeDefined()
@@ -152,8 +147,6 @@ describe('Feeds', () => {
   it('reads a Subscription that merged away during its first check as already subscribed', async () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     api.on('POST /api/subscriptions', () => {
-      // The first retrieval revealed an already-subscribed Feed; the new
-      // Subscription quietly folded into it, so its detail is gone.
       api.on('GET /api/feeds/2', { status: 404, body: { error: { code: 'not_found', message: 'Not found' } } })
       return { status: 201, body: { subscription: { ...UNCHECKED_FEED, feedId: 2, enteredUrl: 'https://alias.example/feed' } } }
     })
@@ -271,14 +264,12 @@ describe('Feed Availability', () => {
     expect(screen.getByText(/last reached/i)).toBeDefined()
     expect(screen.getByText(/items stay in your digest/i)).toBeDefined()
     expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
-    // The Subscription itself is presented as usual, not as a problem row.
     expect(screen.getByText('Field Notes')).toBeDefined()
   })
 
   it('retries by hand and shows the restored Subscription at once', async () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
     api.on('POST /api/feeds/1/refresh', () => {
-      // The successful retry is what makes the next list read available again.
       api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
       return { body: { observedItems: 2 } }
     })
@@ -308,7 +299,6 @@ describe('Feed Availability', () => {
     await user.click(await screen.findByRole('button', { name: /retry now/i }))
 
     expect(await screen.findByText('checked a moment ago — wait a little before retrying')).toBeDefined()
-    // The note stays, because nothing about the Feed changed.
     expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
   })
 })
@@ -331,7 +321,6 @@ describe('OPML portability', () => {
     expect(await screen.findByText('imported — 2 added, 1 already subscribed')).toBeDefined()
     expect(screen.getByText(/not a url — not a usable feed url/i)).toBeDefined()
     expect(api.requestsTo('POST /api/subscriptions/import')).toMatchObject([{ body: { opml: OPML } }])
-    // The list is refetched, so the recorded Subscriptions appear.
     expect(await screen.findByText('Field Notes')).toBeDefined()
   })
 
@@ -359,8 +348,6 @@ describe('OPML portability', () => {
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('textbox', { name: /search or add feeds/i }))
-    // The search/add control submits itself, so the next stops are the import
-    // input and the export link.
     await user.tab()
     expect(document.activeElement).toBe(screen.getByLabelText(/import opml/i))
     await user.tab()

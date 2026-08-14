@@ -38,19 +38,15 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     const { container } = render(<App />)
 
-    // Today's heading carries the one number the design allows: how much
-    // there is to read today. Past days carry none.
     expect(await screen.findByRole('heading', { name: 'today · 2 posts' })).toBeDefined()
     const yesterday = screen.getByRole('heading', { name: 'yesterday' })
     expect(yesterday.className).toContain('day-heading-past')
     expect(yesterday.textContent).toBe('yesterday')
     expect(screen.getByRole('heading', { name: 'june 3, 2026' }).className).toContain('day-heading-past')
 
-    // The band is one element whose long shadow list is the field itself.
     const field = container.querySelector<HTMLElement>('.daily-band-field')
     expect(field?.style.boxShadow).toContain('var(--band-')
 
-    // Meta is source · time · save — and nothing resembling inbox state.
     const save = screen.getByRole('button', { name: 'save First light' })
     expect(save.textContent).toBe('save')
     expect(save.getAttribute('aria-pressed')).toBe('false')
@@ -91,7 +87,6 @@ describe('the chronological Digest', () => {
     const toggle = await screen.findByRole('button', { name: 'save First light' })
     await user.click(toggle)
 
-    // The word reports only what the server has confirmed.
     await waitFor(() => expect(toggle.textContent).toBe('save'))
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
@@ -113,7 +108,6 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    // No items landed today, so no today group and no count anywhere.
     expect(await screen.findByRole('heading', { name: 'yesterday' })).toBeDefined()
     expect(screen.queryByText(/\d+ posts?/)).toBeNull()
   })
@@ -138,7 +132,6 @@ describe('the chronological Digest', () => {
       await screen.findByText('the digest is out of reach — check the connection, then try again'),
     ).toBeDefined()
 
-    // The connection comes back; trying again is enough.
     api.on('GET /api/digest', { body: DIGEST })
     await user.click(screen.getByRole('button', { name: 'try again' }))
 
@@ -196,10 +189,8 @@ describe('searching from the Digest', () => {
     expect(results.textContent).toContain('Field Notes')
     expect(results.textContent).toContain('today, 07:15')
     expect(screen.getByRole('button', { name: 'save Tide chronology' }).textContent).toBe('saved')
-    // The Digest itself is not rendered while results are shown.
     expect(screen.queryByRole('heading', { name: 'today · 2 posts' })).toBeNull()
 
-    // Clearing the line brings the Digest straight back, no refetch needed.
     await user.clear(field)
     expect(await screen.findByRole('heading', { name: 'today · 2 posts' })).toBeDefined()
     expect(screen.queryByRole('region', { name: 'search results' })).toBeNull()
@@ -215,7 +206,6 @@ describe('searching from the Digest', () => {
 
     await user.type(await screen.findByRole('searchbox', { name: 'search your reading' }), 'driftwood')
 
-    // The pending state is announced while the answer is out.
     expect((await screen.findByRole('status')).textContent).toBe('searching…')
     expect((await screen.findByText('nothing in your reading matches “driftwood”')).getAttribute('role')).toBe(
       'status',
@@ -259,7 +249,6 @@ describe('searching from the Digest', () => {
     await user.click(toggle)
     await waitFor(() => expect(toggle.textContent).toBe('saved'))
 
-    // Back in the Digest, the same item already says so.
     await user.clear(field)
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'save First light' }).getAttribute('aria-pressed')).toBe('true'),

@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import {
-  POLLING_INTERVAL_PRESETS,
+  POLLING_INTERVAL_MINUTES,
   type FeedDetail,
   type PollingIntervalMinutes,
 } from '../../shared/api.js'
@@ -54,8 +54,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     }
   }, [feedId])
 
-  // Doubles as the retry when the Feed is unavailable; the detail is
-  // refetched whatever the attempt finds.
   async function refresh() {
     if (refreshing) return
     setRefreshing(true)
@@ -73,7 +71,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     try {
       setState({ kind: 'loaded', detail: await fetchFeedDetail(feedId) })
     } catch {
-      // The refresh outcome is already on screen; a failed refetch changes nothing.
     }
   }
 
@@ -93,8 +90,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     }
   }
 
-  // Success leaves for the Feeds list: this screen describes a Subscription
-  // that no longer exists.
   async function unsubscribe() {
     if (unsubscribing) return
     setUnsubscribing(true)
@@ -213,7 +208,7 @@ function OpenFeed({
       <div className="feed-controls">
         <span className="interval-options" role="group" aria-label="checked every">
           <span className="interval-caption">checked every</span>
-          {POLLING_INTERVAL_PRESETS.map((minutes) => (
+          {POLLING_INTERVAL_MINUTES.map((minutes) => (
             <button
               key={minutes}
               type="button"
@@ -252,8 +247,6 @@ function OpenFeed({
   )
 }
 
-// Unfolds under the controls that opened it — quiet words rather than a
-// warning dialog, with the consequence sentence as the confirmation step.
 function Unsubscribe({
   working,
   onConfirm,
@@ -264,8 +257,6 @@ function Unsubscribe({
   onUnsubscribe: () => void
 }) {
   return (
-    // The grid row opens from nothing on mount, so the content below arrives
-    // rather than teleports.
     <div className="unsubscribe-reveal">
       <div className="unsubscribe-controls" id="unsubscribe-confirmation">
         <p className="unsubscribe-consequences">
@@ -326,8 +317,6 @@ function Grid({
   )
 }
 
-// Same sentence as the list's note. No retry button: this screen's refresh
-// control just below is the retry.
 function AvailabilityNote({ detail }: { detail: FeedDetail }) {
   const { availability } = detail
   if (availability.state !== 'unavailable') return null
@@ -359,8 +348,6 @@ function Items({
     return <p className="empty-note feed-items-state">nothing retained from this feed yet</p>
   }
 
-  // The first Feed Item of each day anchors that day, so a selected grid cell
-  // has somewhere to move focus. No source labels: everything here is this Feed.
   const anchored = new Set<string>()
   return (
     <div className="content-list feed-items">

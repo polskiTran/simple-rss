@@ -16,7 +16,6 @@ const item = (guid: string, title: string, pubDate: string) => `
 const rss = (...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>Field Notes</title>${items.join('')}</channel></rss>`
 
-/** Feed Items published one minute apart, so their chronology is exact. */
 const minuteItems = (count: number) =>
   Array.from({ length: count }, (_, index) =>
     item(`note-${index}`, `note-${index}`, `2026-08-08T00:${String(index).padStart(2, '0')}:00.000Z`),
@@ -33,7 +32,6 @@ describe('the Library in pages', () => {
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    // Save every item, discovered through the paged Digest itself.
     const firstPage = digestSchema.parse(await (await user.get('/api/digest')).json())
     const restPage = digestSchema.parse(
       await (await user.get(`/api/digest?cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`)).json(),
