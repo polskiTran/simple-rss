@@ -1,3 +1,4 @@
+import { Toggle } from '@base-ui/react/toggle'
 import { useState } from 'react'
 import { saveToLibrary, unsaveFromLibrary } from '../api.js'
 
@@ -24,14 +25,8 @@ export function SaveToggle({ feedItemId, title, saved, onSaved }: SaveToggleProp
   }
 
   return (
-    <button
-      className="save-toggle"
-      type="button"
-      aria-pressed={saved}
-      aria-label={`save ${title}`}
-      onClick={() => void toggle()}
-    >
+    <Toggle className="save-toggle" pressed={saved} aria-label={`save ${title}`} onPressedChange={() => void toggle()}>
       {saved ? 'saved' : 'save'}
-    </button>
+    </Toggle>
   )
 }

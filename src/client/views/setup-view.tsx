@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useState, type FormEvent } from 'react'
 import type { AuthStatus } from '../../shared/api.js'
 import { ApiError, claimInstallation } from '../api.js'
@@ -67,9 +68,9 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
         onChange={setConfirmation}
       />
       <p className="gate-actions">
-        <button className="text-button" type="submit" disabled={claiming}>
+        <Button className="text-button" type="submit" focusableWhenDisabled disabled={claiming}>
           claim
-        </button>
+        </Button>
       </p>
       <p className="notice" role="status">
         {notice}

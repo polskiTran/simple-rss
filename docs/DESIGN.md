@@ -1,5 +1,9 @@
 # simple — design system
 
+Interactive behavior — focus, keyboard, trapping, dismissal — comes from Base UI
+(`docs/adr/0008-interactive-behavior-from-base-ui.md`). This document describes
+appearance and motion, not interaction.
+
 ## 1. Principles
 
 1. **One shape, repeated.** A content item is a 21px line with a 12.5px grey line under it. Posts, feeds, saved items are all that shape. Filters differ; the object does not.
@@ -14,7 +18,6 @@
 
 | Role | Value |
 | --- | --- |
-| ~~App background (canvas around cards)~~ | ~~`#EDEDEA`~~ — dropped, see below |
 | Paper | `#F7F7F5` |
 | Ink — titles, active tab | `#12110F` |
 | Ink — body prose | `#26251F` |
@@ -23,15 +26,12 @@
 | Grey — muted prose / pull quote | `#6B6A66` |
 | Accent (saved, cursor) | `#2438D8` |
 | Hairline (search underline) | `rgba(18,17,15,.15)` |
+| Dim (overlay backdrop) | `rgba(18,17,15,.28)` |
 
-**Implementation note — one surface, not two.** The `#EDEDEA` app background
-is not drawn. Every reference render in `docs/references/` is exported at the
-paper's edge — §4's 820 × 760 "card" is the artboard, not an object meant to
-float — so against a real viewport the canvas appeared only as two vertical
-bands beside the column: a box by another name, which §1 forbids. The paper is
-the whole field, edge to edge, in both schemes. Restoring the canvas means
-deciding what it is *around* (margin, radius, or shadow, all ruled out by §1),
-so it is a design change, not a stylesheet fix.
+**Departure — one surface, not two.** No canvas is drawn behind the paper; the
+paper is the whole field, edge to edge, in both schemes — a second tone shows
+against a real viewport only as two vertical bands beside the column, a box by
+another name, which §1 forbids.
 
 ### Dark (dark paper)
 
@@ -43,6 +43,7 @@ so it is a design change, not a stylesheet fix.
 | Grey — metadata | `#8C8B86` |
 | Grey — quietest | `#6B6A66` |
 | Accent (saved) | `#E3B341` |
+| Dim (overlay backdrop) | `rgba(0,0,0,.52)` |
 
 **Selection.** Selected text is the text cursor's range, so it shares the
 caret's accent rather than the platform's blue: the accent at `.12` over light
@@ -70,25 +71,38 @@ Literata only. Weights 200 / 300 (default) / 500. Italic used for the wordmark, 
 
 ## 4. Layout
 
-| | Desktop | 390px |
-| --- | --- | --- |
-| Card | 820 × 760 | 390 × 760 |
-| Padding | `32px 56px 0` (dark: `36px 56px 0`) | `28px 24px 0` |
-| Content measure | `max-width:620px` | full width |
-| Gap between items | 28px | 26px |
-| Gap between day groups | 44px above the date, 24px below | 32 / 20 |
-| Header → content | 48px (feeds), 34px (band), 40px (feed header) | 32 / 26 |
+The paper is 820px wide with 56px of side padding; the stylesheet carries the
+rest of the rhythm. What follows is where the built layout departs from the
+drawn one.
 
-**Departure — the measure.** The table's 620px content measure is not bound: rendered, a column narrower than the masthead left every screen ragged against its own header on the right edge. Content — lists, the reader, the daily band — runs the paper's own content width (820 − 2×56 = 708px on desktop), so it aligns with the header at both edges. The `.gate` forms keep their own 310px; a password is not prose.
+Dark paper takes 36px above the masthead where light takes 32px, at the desktop
+width only. The four pixels are an optical correction and not a value that
+escaped normalising: the masthead closes on a dark edge more tightly than on a
+pale one.
 
-**Reader** was drawn as the one screen that breaks the card — its own 720px paper, `padding:32px 84px 64px`, the 552px measure — but the departure is recorded here: rendered, swapping papers resized the masthead between screens, and §5 holds that the tabs never move or change. The Reader sits on the same 820px paper and the same measure as every other screen, keeping only its own inner rhythm — title scale, the 40px header gap, no fixed height. Metadata sits *under* the title, not above. It ends in "next in the digest" — never a dead stop.
+**Departure — the measure.** Content — lists, the Reader, the daily band — is not
+held to a measure narrower than the masthead, but runs the paper's own content
+width (820 − 2×56 = 708px on desktop), because a narrower column leaves every
+screen ragged against its own header on the right edge. The `.gate` forms keep
+their own 310px; a password is not prose.
 
-**Search** was drawn sticky (`position:sticky;top:0`) on a paper background; the departure is recorded here: the field scrolls with the page like everything else — nothing floats over the paper — and the occluding background goes with it. `padding:8px 0 32px`, the measure of its screen (see the measure departure above), underline `1px solid rgba(18,17,15,.15)`, and a 1px × 14px accent caret.
+**Departure — the Reader's paper.** The Reader sits on the same paper and the
+same measure as every other screen rather than the narrower one it was drawn on,
+because swapping papers resized the masthead between screens and §5 holds that
+the tabs never move. It keeps only its own inner rhythm — title scale, the 40px
+header gap, no fixed height. Metadata sits *under* the title, not above. It ends
+in "next in the digest" — never a dead stop.
+
+**Departure — the search field.** The field scrolls with the page rather than
+sticking to the top, so nothing but an overlay is ever drawn over the paper and
+the occluding background a sticky field needs goes with it. `padding:8px 0 32px`,
+the measure of its screen (see the measure departure above), underline
+`1px solid rgba(18,17,15,.15)`, and a 1px × 14px accent caret.
 
 ## 5. Components
 
 ### Wordmark
-A 4×4 tile of 3px squares, `gap:2px`, then `simple` in italic at 10px gap. Accepted render: `docs/references/brand.png`.
+A 4×4 tile of 3px squares, `gap:2px`, then `simple` in italic at 10px gap.
 
 The tile is drawn in the cadence ramp's five ink levels — `.06 / .20 / .38 / .60 / peak ink` — not in a second set of greys, so the mark is the cadence figure at mark size and §6's four-levels rule holds. Levels by row, `0`–`4` as the cadence grid numbers them:
 
@@ -133,8 +147,8 @@ Four ink levels — never more:
 ### Cadence grid (feed opened)
 26 weeks as columns: 7 rows of 11px squares, `gap:3px` both axes, columns run left (oldest) to right (newest). A column is a day you can jump to. Month labels below at 11.5px, then a one-line stat: `167 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 9 days`.
 
-**Implementation notes.** Values the reference renders imply but the tables
-above do not state, fixed here so the stylesheet has a source:
+**Implementation notes.** Values the sections above do not state, fixed here so
+the stylesheet has a source:
 
 - At the narrow breakpoint the grid keeps all 26 × 7 cells — nothing hides —
   and the cell steps down one size: 9px squares, `gap:2px`, so the columns fit
@@ -145,28 +159,28 @@ above do not state, fixed here so the stylesheet has a source:
   use. The stat line's "posts" is likewise this design's display copy; the
   domain vocabulary keeps saying Feed Item.
 - The opened Feed's header line (the way back, name in ink, domain) sits at 14px
-  (13px narrow) with 40px to the content below, per §4's feed-header row.
+  (13px narrow) with 40px to the content below.
   The way back is named after the screen it returns to: `← feeds` from the
   list, `← digest` from an item's source, `← article` from the Reader. The
   Reader's topline carries the same link in the same style. A screen opened by
   address falls back to the section it lives under.
-  Retained items begin 44px below the stat block — the §4 day-group rhythm.
+  Retained items begin below the stat block on the same gap that opens a day
+  group.
 - Month labels are announced where a column opens a month, but never within
-  six columns of the previous label; that spacing is what produces the
-  reference's `february · april · june · august`.
+  six columns of the previous label; that spacing is what produces
+  `february · april · june · august`.
 
 ### Daily band (digest)
-A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. Originally 64px tall on the 620px measure; with the measure released to the paper (§4 departure) it is drawn at the full 708px content width and deepened by ten rows to 114px — 23 rows of dots on the 5px pitch. The height holds at every width: the container clips the field, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
+A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. It runs the full 708px content width (§4's measure departure) and is 114px tall — 23 rows of dots on the pitch. The height holds at every width: the container clips the field, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
 
 Generation: value noise → ordered (Bayer) dither → four ink levels. Seeded by the date, so no two mornings repeat. Light levels `.07 / .16 / .30`; dark levels `.07 / .17 / .32 / .56`. It is decoration with a source — the day's own volume — not ornament.
 
-**Implementation notes.** What the accepted render fixes but the recipe above
-does not state:
+**Implementation notes.** What the recipe above does not state:
 
 - The day's volume sets *coverage*, not brightness. It lowers the bar the
   noise must clear to ink a cell, and the bar never drops so far that the
-  paper stops showing through: the reference is currents of ink in open
-  paper, and adding volume to every cell instead fills the band into a slab.
+  paper stops showing through: the band is currents of ink in open
+  paper, and adding volume to every cell instead fills it into a slab.
 - The noise is two octaves — a long drift whose horizontal wavelength is far
   longer than its vertical one, which is what makes the field flow along the
   band, and a short grain that frays the currents' edges. Both are sampled
@@ -177,10 +191,9 @@ In the reader it thins to a four-row strip above the article.
 
 ### Reader body
 
-**Implementation notes.** Two values the accepted reader reference
-(`docs/references/reader.png`, issue #14) fixes against the prose above:
+**Implementation notes.** Two values fixed against the prose above:
 
-- The reference opens straight from the metadata line into the first
+- The article opens straight from the metadata line into the first
   paragraph, so the daily band's four-row reader strip is deferred until a
   design pass actually draws it above an article.
 - **The article's blocks are the Markdown renderer's, not this document's.**
@@ -206,14 +219,27 @@ In the reader it thins to a four-row strip above the article.
   numbered one keeps its number clear of the formula instead of hanging it at
   an edge the formula has already passed.
 
+### Overlay
+
+The same `var(--color-paper)` drawn again, with no border, no radius and no
+shadow: the dimmed backdrop is the whole of its edge, so separation-by-whitespace
+becomes separation-by-dim rather than an exception to it. One component at every
+width — anchored to the bottom edge below 640px rather than swapped for a drawer,
+because two interaction models for one question is where one design becomes two.
+
+In at 150ms, out at 120ms, opacity only, both zero under
+`prefers-reduced-motion`. An overlay is the one exception to the entrance-only
+rule below; no other dismissal acquires an exit. *When* an overlay is permitted
+is ADR 0008's rule, not this document's.
+
 ### Motion
 
 The word the User presses answers instantly — the flip is the feedback: word
-hovers, the active tab, the save word, and every dismissal never ease. The
-mark is the exception, and the only one: it is not a word and has no flip to
-give, so it answers in the vocabulary it is drawn in (see the glint below).
-Otherwise motion belongs to arrivals. What a press summons, and what the
-machine answers on its own clock, enters on a breath — opacity or height,
+hovers, the active tab, the save word, and every dismissal but an overlay's
+never ease. The mark is the exception, and the only one: it is not a word and
+has no flip to give, so it answers in the vocabulary it is drawn in (see the
+glint below). Otherwise motion belongs to arrivals. What a press summons, and
+what the machine answers on its own clock, enters on a breath — opacity,
 ease-out, never a show:
 
 - A summoned view — a tab's screen, an opened Feed, the Reader — fades in
@@ -222,9 +248,8 @@ ease-out, never a show:
   Entrance-only; nothing the User does ever waits on an exit.
 - An article arriving from extraction (or its fallback) fades in over
   200ms, opacity only. The paper and the prose hold still.
-- The unsubscribe confirmation unfolds its height over the same 200ms, so
-  the items below it arrive rather than teleport. Dismissing it is the
-  User's act and stays instant.
+- An overlay fades in over 150ms and out over 120ms, opacity only — the one
+  motion in the system that runs on an exit (see Overlay above).
 - A selected cadence day scrolls its items into view smoothly, so the jump
   reads as travel down the same list.
 - **The mark's glint.** Hovered, the mark's sixteen cells step to another
@@ -241,8 +266,8 @@ ease-out, never a show:
   masthead mark stays out of it — two marks moving at once is the product
   fidgeting.
 
-Under `prefers-reduced-motion` the unfold and the scroll go instant and the
-fades remain — gentler, not zero. The glint on hover does not run at all; a
+Under `prefers-reduced-motion` the overlay's fades and the scroll go instant and
+the view fades remain — gentler, not zero. The glint on hover does not run at all; a
 flicker has no gentler version. The wait is the one thing that cannot stop,
 since "is anything still happening" is the only question it exists to answer,
 so its cells hold still and the tile breathes on opacity instead.

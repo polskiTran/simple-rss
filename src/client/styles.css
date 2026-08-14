@@ -51,6 +51,7 @@
 
 :root {
   --color-selection: rgb(36 56 216 / 0.12);
+  --color-dim: rgb(18 17 15 / 0.28);
   --band-0: rgb(18 17 15 / 0.07);
   --band-1: rgb(18 17 15 / 0.16);
   --band-2: rgb(18 17 15 / 0.3);
@@ -75,6 +76,7 @@
     --color-sidebar: rgb(240 238 233 / 0.04);
     --color-hairline: rgb(240 238 233 / 0.15);
     --color-selection: rgb(227 179 65 / 0.2);
+    --color-dim: rgb(0 0 0 / 0.52);
     --band-0: rgb(240 238 233 / 0.07);
     --band-1: rgb(240 238 233 / 0.17);
     --band-2: rgb(240 238 233 / 0.32);
@@ -99,6 +101,7 @@
   --color-sidebar: rgb(240 238 233 / 0.04);
   --color-hairline: rgb(240 238 233 / 0.15);
   --color-selection: rgb(227 179 65 / 0.2);
+  --color-dim: rgb(0 0 0 / 0.52);
   --band-0: rgb(240 238 233 / 0.07);
   --band-1: rgb(240 238 233 / 0.17);
   --band-2: rgb(240 238 233 / 0.32);
@@ -347,7 +350,7 @@
     cursor: pointer;
   }
 
-  .appearance-option[aria-pressed='true'] {
+  .appearance-option[data-pressed] {
     color: var(--color-ink-strong);
   }
 
@@ -412,7 +415,11 @@
     cursor: pointer;
   }
 
-  .text-button:disabled {
+  /* A control that stays focusable while its request is in flight is refused
+     through `aria-disabled`, not the `disabled` attribute — so both spell the
+     same quiet word. */
+  .text-button:disabled,
+  .text-button[aria-disabled='true'] {
     color: var(--color-quiet);
     cursor: default;
   }
@@ -582,7 +589,7 @@
     white-space: nowrap;
   }
 
-  .interval-option[aria-pressed='true'] {
+  .interval-option[data-pressed] {
     color: var(--color-ink-strong);
   }
 
@@ -598,42 +605,75 @@
     margin-top: 44px;
   }
 
-  .unsubscribe-reveal {
-    display: grid;
-    grid-template-rows: 1fr;
-    margin-top: 14px;
-    transition:
-      grid-template-rows 200ms ease-out,
-      opacity 200ms ease-out;
+  /* An overlay is the one place in this interface where motion runs on exit —
+     150ms in, 120ms out, opacity only, both zero under reduced motion. Every
+     other dismissal is instant (docs/DESIGN.md §5), so an exit transition
+     copied out of this block belongs nowhere else.
+
+     The paper is drawn again with no border, no radius and no shadow: the
+     dimmed backdrop is the whole of its edge, which is separation by dim
+     rather than an exception to separation by whitespace. */
+  .overlay-backdrop,
+  .overlay-viewport {
+    position: fixed;
+    inset: 0;
   }
 
-  @starting-style {
-    .unsubscribe-reveal {
-      grid-template-rows: 0fr;
-      opacity: 0;
-    }
+  .overlay-backdrop {
+    background: var(--color-dim);
   }
 
-  .unsubscribe-controls {
-    min-height: 0;
-    overflow: hidden;
+  .overlay-viewport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .overlay-popup {
+    width: 100%;
+    max-width: 390px;
+    background: var(--color-paper);
+    padding: 28px 24px;
+  }
+
+  .overlay-backdrop,
+  .overlay-popup {
+    transition: opacity 150ms ease-out;
+  }
+
+  .overlay-backdrop[data-ending-style],
+  .overlay-popup[data-ending-style] {
+    transition-duration: 120ms;
+  }
+
+  .overlay-backdrop[data-starting-style],
+  .overlay-backdrop[data-ending-style],
+  .overlay-popup[data-starting-style],
+  .overlay-popup[data-ending-style] {
+    opacity: 0;
+  }
+
+  .overlay-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.4;
+    color: var(--color-ink-strong);
+  }
+
+  .overlay-description {
+    margin: 8px 0 0;
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
   }
 
-  .unsubscribe-controls .text-button {
-    font-size: 12.5px;
-  }
-
-  .unsubscribe-consequences {
-    margin: 0;
-  }
-
   .unsubscribe-choice {
     display: flex;
     gap: 24px;
-    margin: 6px 0 0;
+    margin: 20px 0 0;
   }
 
   .opml-controls {
@@ -778,7 +818,7 @@
     cursor: pointer;
   }
 
-  .save-toggle[aria-pressed='true'] {
+  .save-toggle[data-pressed] {
     color: var(--color-accent);
   }
 
@@ -999,11 +1039,11 @@
       color: var(--color-ink-strong);
     }
 
-    .save-toggle:not([aria-pressed='true']):hover {
+    .save-toggle:not([data-pressed]):hover {
       color: var(--color-muted-foreground);
     }
 
-    .text-button:not(.interval-option):not(:disabled):hover,
+    .text-button:not(.interval-option):not(:disabled):not([aria-disabled='true']):hover,
     .export-link:hover,
     .opml-import:hover,
     .content-item-link:hover,
@@ -1160,6 +1200,18 @@
     flex-wrap: wrap;
   }
 
+  /* One overlay at every width — the same component, met at the thumb rather
+     than in the middle of the screen. */
+  .overlay-viewport {
+    align-items: end;
+    padding: 0;
+  }
+
+  .overlay-popup {
+    max-width: none;
+    padding: 24px 24px 32px;
+  }
+
   .feed-items,
   .feed-items-state {
     margin-top: 32px;
@@ -1180,8 +1232,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .unsubscribe-reveal {
-    transition-property: opacity;
+  /* Both ways, not just the entrance: the exit rule below carries an attribute
+     selector, so it has to be named again to be overridden. */
+  .overlay-backdrop,
+  .overlay-popup,
+  .overlay-backdrop[data-ending-style],
+  .overlay-popup[data-ending-style] {
+    transition-duration: 0s;
   }
 
   .wordmark-cell {

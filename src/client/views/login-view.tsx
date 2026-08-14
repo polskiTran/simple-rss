@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useState, type FormEvent } from 'react'
 import type { AuthStatus } from '../../shared/api.js'
 import { signIn } from '../api.js'
@@ -40,9 +41,9 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
         onChange={setPassword}
       />
       <p className="gate-actions">
-        <button className="text-button" type="submit" disabled={signingIn}>
+        <Button className="text-button" type="submit" focusableWhenDisabled disabled={signingIn}>
           sign in
-        </button>
+        </Button>
       </p>
       <p className="notice" role="status">
         {notice}

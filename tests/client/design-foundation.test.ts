@@ -33,6 +33,7 @@ describe('the light palette', () => {
     ['grey — quietest', '--color-quiet', '#a3a29d'],
     ['grey — muted prose', '--color-muted-foreground', '#6b6a66'],
     ['accent', '--color-accent', '#2438d8'],
+    ['dim — the overlay backdrop', '--color-dim', 'rgb(18 17 15 / 0.28)'],
   ])('binds %s through %s to %s', (_role, property, value) => {
     expect(lightOnly()).toContain(`${property}: ${value}`)
   })
@@ -46,6 +47,7 @@ describe('the dark palette', () => {
     ['grey — metadata', '--color-meta', '#8c8b86'],
     ['grey — quietest', '--color-quiet', '#6b6a66'],
     ['accent', '--color-accent', '#e3b341'],
+    ['dim — the overlay backdrop', '--color-dim', 'rgb(0 0 0 / 0.52)'],
   ])('binds %s through %s to %s', (_role, property, value) => {
     expect(darkBlocks()).toContain(`${property}: ${value}`)
   })
@@ -156,10 +158,9 @@ describe('type', () => {
 })
 
 describe('the narrow layout', () => {
-  it('steps type and padding down at the single breakpoint', () => {
+  it('steps type down and releases the measure at the single breakpoint', () => {
     const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
 
-    expect(narrow).toMatch(/\.paper\s*\{[^}]*padding:\s*28px 24px 0/)
     expect(narrow).toMatch(/\.wordmark-name\s*\{[^}]*font-size:\s*19px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*gap:\s*18px/)
     expect(narrow).toMatch(/\.tab-bar\s*\{[^}]*font-size:\s*12px/)
@@ -173,7 +174,12 @@ describe('layout', () => {
   it('holds the paper to the design width, with the measure released to it', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*max-width:\s*820px/)
     expect(lightOnly()).toMatch(/\.measure\s*\{[^}]*max-width:\s*none/)
+  })
+
+  it('gives dark paper four more pixels above the masthead than light', () => {
     expect(lightOnly()).toMatch(/\.paper\s*\{[^}]*padding:\s*32px 56px 0/)
+    expect(darkBlocks()).toMatch(/\.paper\s*\{[^}]*padding:\s*36px 56px 0/)
+    expect(css).toMatch(/\[data-appearance='dark'\] \.paper\s*\{[^}]*padding:\s*36px 56px 0/)
   })
 
   it('draws no cards or boxes in the interface — every rule here is an underline', () => {
@@ -205,7 +211,12 @@ describe('layout', () => {
 
 describe('the Feeds tab', () => {
   it('lets the search treatment scroll with the page, on the documented rhythm', () => {
-    expect(css).not.toMatch(/position:\s*(sticky|fixed)/)
+    // Nothing sticks to the viewport. `position: fixed` is not collateral here:
+    // the overlay is the one thing drawn over the paper (DESIGN.md §5), and it
+    // is the backdrop and the viewport, nothing else.
+    expect(css).not.toMatch(/position:\s*sticky/)
+    expect(css.match(/position:\s*fixed/g) ?? []).toHaveLength(1)
+    expect(css).toMatch(/\.overlay-backdrop,\n\s*\.overlay-viewport\s*\{[^}]*position:\s*fixed/)
     expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*padding:\s*8px 0 32px/)
   })
 
@@ -224,16 +235,12 @@ describe('the Feeds tab', () => {
 })
 
 describe('the Digest', () => {
-  it('holds the day-group rhythm and heading scale to the layout table', () => {
-    expect(lightOnly()).toMatch(/\.day-group \+ \.day-group\s*\{[^}]*margin-top:\s*44px/)
-    expect(lightOnly()).toMatch(/\.day-heading\s*\{[^}]*margin:\s*0 0 24px/)
+  it('holds the day heading to the §3 type table, italic and quiet when past', () => {
     expect(lightOnly()).toMatch(/\.day-heading\s*\{[^}]*font-size:\s*12\.5px/)
     expect(lightOnly()).toMatch(/\.day-heading-past\s*\{[^}]*font-style:\s*italic/)
     expect(lightOnly()).toMatch(/\.day-heading-past\s*\{[^}]*color:\s*var\(--color-quiet\)/)
 
     const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
-    expect(narrow).toMatch(/\.day-group \+ \.day-group\s*\{[^}]*margin-top:\s*32px/)
-    expect(narrow).toMatch(/\.day-heading\s*\{[^}]*margin-bottom:\s*20px/)
     expect(narrow).toMatch(/\.day-heading\s*\{[^}]*font-size:\s*12px/)
   })
 
@@ -249,7 +256,6 @@ describe('the Digest', () => {
     expect(lightOnly()).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*34px/)
 
     const narrow = /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
-    expect(narrow).toMatch(/\.digest-view-today\s*\{[^}]*padding-top:\s*26px/)
     expect(narrow).not.toMatch(/\.daily-band\s*\{/)
   })
 
