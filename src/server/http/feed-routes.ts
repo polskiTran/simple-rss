@@ -20,13 +20,13 @@ import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscrip
 import { readIdParam } from './id-param.js'
 import { readJsonBody } from './json-body.js'
 import { readListCursor } from './list-cursor.js'
-import { NO_STORE, notFound, retryAfter, unavailable } from './responses.js'
+import { NO_STORE, notFound, retryAfter } from './responses.js'
 import { answer, FEED_ANSWERS } from './retrieval-answers.js'
 
 export interface FeedRouteDependencies {
-  readonly subscriptions: () => SubscriptionService | undefined
-  readonly refresh: () => FeedRefresh | undefined
-  readonly digest: () => DigestService | undefined
+  readonly subscriptions: SubscriptionService
+  readonly refresh: FeedRefresh
+  readonly digest: DigestService
   /** Asks the scheduler to look at the due frontier now rather than next wake. */
   readonly nudgeScheduler: () => void
 }
@@ -35,13 +35,10 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   const app = new Hono()
 
   app.post('/subscriptions', async (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
-
     const body = await readJsonBody(c, createSubscriptionRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = service.create(body.value.url)
+    const outcome = deps.subscriptions.create(body.value.url)
     if (outcome.kind === 'created') {
       deps.nudgeScheduler()
       return c.json<CreateSubscriptionResponse>({ subscription: outcome.subscription }, 201, NO_STORE)
@@ -50,13 +47,10 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   })
 
   app.post('/subscriptions/import', async (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
-
     const body = await readJsonBody(c, importOpmlRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = service.importOpml(body.value.opml)
+    const outcome = deps.subscriptions.importOpml(body.value.opml)
     if (outcome.kind === 'invalid-opml') return opmlFailure(c, outcome.code)
     if (outcome.added > 0) deps.nudgeScheduler()
     return c.json<OpmlImportReport>(
@@ -66,41 +60,30 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     )
   })
 
-  app.get('/subscriptions/export', (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
-
-    return c.body(service.exportOpml(), 200, {
+  app.get('/subscriptions/export', (c) =>
+    c.body(deps.subscriptions.exportOpml(), 200, {
       ...NO_STORE,
       'Content-Type': 'text/x-opml; charset=utf-8',
       'Content-Disposition': 'attachment; filename="subscriptions.opml"',
-    })
-  })
+    }),
+  )
 
-  app.get('/feeds', (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
-    return c.json<SubscriptionList>({ subscriptions: [...service.list()] }, 200, NO_STORE)
-  })
+  app.get('/feeds', (c) => c.json<SubscriptionList>({ subscriptions: [...deps.subscriptions.list()] }, 200, NO_STORE))
 
   app.get('/feeds/:feedId', (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
     const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
     if (!feedId.ok) return feedId.response
 
-    const detail = service.detail(feedId.value)
+    const detail = deps.subscriptions.detail(feedId.value)
     if (!detail) return notFound(c)
     return c.json<FeedDetail>(detail, 200, NO_STORE)
   })
 
   app.post('/feeds/:feedId/refresh', async (c) => {
-    const refresh = deps.refresh()
-    if (!refresh) return unavailable(c)
     const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
     if (!feedId.ok) return feedId.response
 
-    const outcome = await refresh.refresh(feedId.value)
+    const outcome = await deps.refresh.refresh(feedId.value)
     if (outcome.kind === 'updated') {
       return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems }, 200, NO_STORE)
     }
@@ -111,37 +94,30 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   })
 
   app.delete('/feeds/:feedId', (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
     const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
     if (!feedId.ok) return feedId.response
 
-    const outcome = service.unsubscribe(feedId.value)
+    const outcome = deps.subscriptions.unsubscribe(feedId.value)
     if (outcome.kind === 'missing') return notFound(c)
     return c.body(null, 204, NO_STORE)
   })
 
   app.put('/feeds/:feedId/interval', async (c) => {
-    const service = deps.subscriptions()
-    if (!service) return unavailable(c)
     const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
     if (!feedId.ok) return feedId.response
 
     const body = await readJsonBody(c, updatePollingIntervalRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = service.setPollingInterval(feedId.value, body.value.pollingIntervalMinutes)
+    const outcome = deps.subscriptions.setPollingInterval(feedId.value, body.value.pollingIntervalMinutes)
     if (outcome.kind === 'missing') return notFound(c)
     return c.json<PollingSchedule>(outcome.schedule, 200, NO_STORE)
   })
 
   app.get('/digest', (c) => {
-    const digest = deps.digest()
-    if (!digest) return unavailable(c)
-
     const cursor = readListCursor(c)
     if (!cursor.ok) return cursor.response
-    return c.json<Digest>(digest.read(cursor.cursor), 200, NO_STORE)
+    return c.json<Digest>(deps.digest.read(cursor.cursor), 200, NO_STORE)
   })
 
   return app

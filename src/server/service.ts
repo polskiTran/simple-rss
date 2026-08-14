@@ -1,13 +1,13 @@
 import { randomBytes } from 'node:crypto'
 import type { Hono } from 'hono'
-import { createApp } from './app.js'
-import { createAuthentication, type Authentication } from './auth/authentication.js'
+import { createApp, type Services } from './app.js'
+import { createAuthentication } from './auth/authentication.js'
 import type { Sleeper } from './auth/sleeper.js'
 import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
 import { DigestService } from './digest/digest-service.js'
 import { ImageService } from './images/image-service.js'
-import { createImageUrlSignature, type ImageUrlSignature } from './images/image-url-signature.js'
+import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
@@ -65,38 +65,28 @@ export function createService(options: ServiceOptions): Service {
     })
   const readiness = new Readiness()
 
-  let database: SqliteDatabase | undefined
-  let settings: InstallationSettingsStore | undefined
-  let authentication: Authentication | undefined
-  let subscriptions: SubscriptionService | undefined
-  let refresh: FeedRefresh | undefined
-  let digest: DigestService | undefined
-  let library: LibraryService | undefined
-  let reader: ReaderService | undefined
-  let search: SearchService | undefined
-  let images: ImageService | undefined
-  let imageSignature: ImageUrlSignature | undefined
   let scheduler: PollScheduler | undefined
+  let services: Services | undefined
 
   try {
-    database = openDatabase(config.databasePath)
+    const database = openDatabase(config.databasePath)
     const applied = applyMigrations(database, clock)
-    settings = new InstallationSettingsStore(database)
-    authentication = createAuthentication({
+    const settings = new InstallationSettingsStore(database)
+    const authentication = createAuthentication({
       database,
       clock,
       logger,
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    subscriptions = new SubscriptionService({ database, retrieval, clock, settings, logger })
-    refresh = new FeedRefresh({ clock, subscriptions })
+    const subscriptions = new SubscriptionService({ database, retrieval, clock, settings, logger })
+    const refresh = new FeedRefresh({ clock, subscriptions })
 
-    digest = new DigestService({ database, clock, settings })
-    library = new LibraryService({ database, clock, settings })
-    imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
-    images = new ImageService({ database, retrieval })
-    reader = new ReaderService({
+    const digest = new DigestService({ database, clock, settings })
+    const library = new LibraryService({ database, clock, settings })
+    const imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
+    const images = new ImageService({ database, retrieval })
+    const reader = new ReaderService({
       database,
       clock,
       settings,
@@ -104,9 +94,27 @@ export function createService(options: ServiceOptions): Service {
       digest,
       signImageUrl: imageSignature.sign,
     })
-    search = new SearchService({ database, clock, settings })
+    const search = new SearchService({ database, clock, settings })
     const retention = new RetentionService({ database, clock, logger, ...options.retention })
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
+
+    services = {
+      database,
+      authentication,
+      settings,
+      subscriptions,
+      refresh,
+      digest,
+      library,
+      reader,
+      search,
+      images,
+      imageSignature,
+      // Reads the binding rather than capturing the scheduler, so a nudge after
+      // close() is the no-op it has always been.
+      nudgeScheduler: () => scheduler?.nudge(),
+    }
+
     scheduler.start()
     readiness.markReady()
     logger.info('startup.migrations_applied', {
@@ -118,24 +126,7 @@ export function createService(options: ServiceOptions): Service {
     logger.error('startup.migrations_failed', { databasePath: config.databasePath, error })
   }
 
-  const app = createApp({
-    config,
-    clock,
-    logger,
-    readiness,
-    database: () => database,
-    authentication: () => authentication,
-    settings: () => settings,
-    subscriptions: () => subscriptions,
-    refresh: () => refresh,
-    digest: () => digest,
-    nudgeScheduler: () => scheduler?.nudge(),
-    library: () => library,
-    reader: () => reader,
-    search: () => search,
-    images: () => images,
-    imageSignature: () => imageSignature,
-  })
+  const app = createApp({ config, clock, logger, readiness, services })
 
   return {
     app,
@@ -145,10 +136,10 @@ export function createService(options: ServiceOptions): Service {
     readiness,
     retrieval,
     get database() {
-      return database
+      return services?.database
     },
     get settings() {
-      return settings
+      return services?.settings
     },
     get scheduler() {
       return scheduler
@@ -156,18 +147,8 @@ export function createService(options: ServiceOptions): Service {
     close() {
       scheduler?.stop()
       scheduler = undefined
-      database?.close()
-      database = undefined
-      settings = undefined
-      authentication = undefined
-      subscriptions = undefined
-      refresh = undefined
-      digest = undefined
-      library = undefined
-      reader = undefined
-      search = undefined
-      images = undefined
-      imageSignature = undefined
+      services?.database.close()
+      services = undefined
     },
   }
 }

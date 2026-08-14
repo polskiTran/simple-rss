@@ -7,12 +7,11 @@ import {
 } from '../../shared/api.js'
 import type { ReaderService } from '../reader/reader-service.js'
 import { readIdParam } from './id-param.js'
-import { NO_STORE, notFound, retryAfter, unavailable } from './responses.js'
+import { NO_STORE, notFound, retryAfter } from './responses.js'
 import { answer, ARTICLE_ANSWERS } from './retrieval-answers.js'
 
 export interface ReaderRouteDependencies {
-  /** Absent only while startup could not open the database. */
-  readonly reader: () => Pick<ReaderService, 'item' | 'article'> | undefined
+  readonly reader: Pick<ReaderService, 'item' | 'article'>
 }
 
 /**
@@ -24,23 +23,19 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
   const app = new Hono()
 
   app.get('/items/:feedItemId', (c) => {
-    const reader = deps.reader()
-    if (!reader) return unavailable(c)
     const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
     if (!feedItemId.ok) return feedItemId.response
 
-    const item = reader.item(feedItemId.value)
+    const item = deps.reader.item(feedItemId.value)
     if (!item) return notFound(c)
     return c.json<ReaderItem>(item, 200, NO_STORE)
   })
 
   app.get('/items/:feedItemId/reader', async (c) => {
-    const reader = deps.reader()
-    if (!reader) return unavailable(c)
     const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
     if (!feedItemId.ok) return feedItemId.response
 
-    const outcome = await reader.article(feedItemId.value)
+    const outcome = await deps.reader.article(feedItemId.value)
     switch (outcome.kind) {
       case 'extracted':
         return c.json<ReaderArticle>(outcome.article, 200, {

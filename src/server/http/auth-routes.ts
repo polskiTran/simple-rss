@@ -10,7 +10,7 @@ import type { Clock } from '../clock.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { clientAddress } from './client-address.js'
 import { readJsonBody } from './json-body.js'
-import { invalidCredentials, NO_STORE, retryAfter, unavailable } from './responses.js'
+import { invalidCredentials, NO_STORE, retryAfter } from './responses.js'
 import { clearSessionCookie, readSessionCookie, writeSessionCookie } from './session-cookie.js'
 
 /** Reachable without a Session because they are how a Session is obtained. */
@@ -21,9 +21,8 @@ export const PUBLIC_API_PATHS: ReadonlySet<string> = new Set([
 ])
 
 export interface AuthRouteDependencies {
-  /** Absent while the database could not be opened. */
-  readonly authentication: () => Authentication | undefined
-  readonly settings: () => InstallationSettingsStore | undefined
+  readonly authentication: Authentication
+  readonly settings: InstallationSettingsStore
   readonly clock: Clock
   readonly trustProxyHeaders: boolean
 }
@@ -32,28 +31,20 @@ export interface AuthRouteDependencies {
 export function authRoutes(deps: AuthRouteDependencies): Hono {
   const app = new Hono()
 
-  app.get('/status', (c) => {
-    const authentication = deps.authentication()
-    if (!authentication) return unavailable(c)
-
-    return status(c, authentication.status(readSessionCookie(c)))
-  })
+  app.get('/status', (c) => status(c, deps.authentication.status(readSessionCookie(c))))
 
   app.post('/setup', async (c) => {
-    const authentication = deps.authentication()
-    if (!authentication) return unavailable(c)
-
     const body = await readJsonBody(c, claimRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = await authentication.claim({
+    const outcome = await deps.authentication.claim({
       ...body.value,
       client: clientAddress(c, deps.trustProxyHeaders),
     })
 
     switch (outcome.kind) {
       case 'claimed':
-        seedTimezone(deps.settings(), body.value.timezone, deps.clock.now())
+        seedTimezone(deps.settings, body.value.timezone, deps.clock.now())
         writeSessionCookie(c, outcome.session, deps.clock.now())
         return status(c, { claimed: true, authenticated: true }, 201)
       case 'already-claimed':
@@ -72,13 +63,10 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   })
 
   app.post('/session', async (c) => {
-    const authentication = deps.authentication()
-    if (!authentication) return unavailable(c)
-
     const body = await readJsonBody(c, signInRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = await authentication.signIn({
+    const outcome = await deps.authentication.signIn({
       password: body.value.password,
       client: clientAddress(c, deps.trustProxyHeaders),
     })
@@ -95,19 +83,16 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   })
 
   app.delete('/session', (c) => {
-    deps.authentication()?.signOut(readSessionCookie(c))
+    deps.authentication.signOut(readSessionCookie(c))
     clearSessionCookie(c)
     return c.body(null, 204, NO_STORE)
   })
 
   app.post('/password', async (c) => {
-    const authentication = deps.authentication()
-    if (!authentication) return unavailable(c)
-
     const body = await readJsonBody(c, passwordChangeRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = await authentication.changePassword({
+    const outcome = await deps.authentication.changePassword({
       ...body.value,
       client: clientAddress(c, deps.trustProxyHeaders),
     })
@@ -126,8 +111,8 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   return app
 }
 
-function seedTimezone(settings: InstallationSettingsStore | undefined, timezone: string | undefined, now: Date) {
-  if (!settings || !timezone) return
+function seedTimezone(settings: InstallationSettingsStore, timezone: string | undefined, now: Date) {
+  if (!timezone) return
   try {
     settings.setTimezone(timezone, now)
   } catch {}

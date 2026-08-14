@@ -44,6 +44,23 @@ describe('health endpoints', () => {
     await chmod(unwritable, 0o700)
   })
 
+  // An installation without services registers no /api routes at all, so one
+  // refusal stands in for every one of them.
+  it('refuses the whole API when startup could not migrate the database', async () => {
+    const parent = await makeTempDataDir()
+    const unwritable = join(parent, 'readonly')
+    await mkdir(unwritable)
+    await chmod(unwritable, 0o500)
+
+    const service = await startTestService({ dataDir: join(unwritable, 'data') })
+
+    const response = await service.fetch('/api/feeds')
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: { code: 'unavailable', message: 'Service is not ready' } })
+    await chmod(unwritable, 0o700)
+  })
+
   it('logs a failed startup with the reason instead of exiting silently', async () => {
     const parent = await makeTempDataDir()
     const unwritable = join(parent, 'readonly')
