@@ -125,7 +125,12 @@ const ascii = (head: Uint8Array, at: number, expected: string): boolean =>
 const IMAGE_SIGNATURES: Readonly<Record<string, (head: Uint8Array) => boolean>> = {
   'image/jpeg': (head) => head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff,
   'image/png': (head) =>
-    head[0] === 0x89 && ascii(head, 1, 'PNG') && head[4] === 0x0d && head[5] === 0x0a && head[6] === 0x1a && head[7] === 0x0a,
+    head[0] === 0x89 &&
+    ascii(head, 1, 'PNG') &&
+    head[4] === 0x0d &&
+    head[5] === 0x0a &&
+    head[6] === 0x1a &&
+    head[7] === 0x0a,
   'image/gif': (head) => ascii(head, 0, 'GIF87a') || ascii(head, 0, 'GIF89a'),
   'image/webp': (head) => ascii(head, 0, 'RIFF') && ascii(head, 8, 'WEBP'),
   'image/avif': (head) => ascii(head, 4, 'ftyp') && (ascii(head, 8, 'avif') || ascii(head, 8, 'avis')),

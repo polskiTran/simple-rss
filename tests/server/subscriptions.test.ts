@@ -213,7 +213,10 @@ describe('Subscriptions', () => {
 
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions).toHaveLength(1)
-    expect(feeds.subscriptions[0]).toMatchObject({ title: 'Field Notes', availability: expect.objectContaining({ state: 'available' }) })
+    expect(feeds.subscriptions[0]).toMatchObject({
+      title: 'Field Notes',
+      availability: expect.objectContaining({ state: 'available' }),
+    })
     expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(409)
     expect(service.logs).toContainEqual(
       expect.objectContaining({ message: 'subscriptions.feeds_merged', feedId: 2, intoFeedId: 1 }),
@@ -377,9 +380,9 @@ describe('Subscriptions', () => {
       'fingerprint',
     ])
     expect(digest.groups[0].items[2]).toMatchObject({ title: 'fingerprint', summary: 'corrected body' })
-    const persisted = service.database
-      ?.prepare('SELECT first_seen_at FROM feed_items ORDER BY id')
-      .all() as Array<{ first_seen_at: string }>
+    const persisted = service.database?.prepare('SELECT first_seen_at FROM feed_items ORDER BY id').all() as Array<{
+      first_seen_at: string
+    }>
     expect(persisted.map((item) => item.first_seen_at)).toEqual([
       '2026-08-08T09:00:00.000Z',
       '2026-08-08T09:00:00.000Z',
@@ -489,9 +492,7 @@ describe('Subscriptions', () => {
 
     const digest = await (await user.get('/api/digest')).json()
     expect(
-      digest.groups[0].items
-        .map((item: { feedTitle: string; title: string }) => [item.feedTitle, item.title])
-        .sort(),
+      digest.groups[0].items.map((item: { feedTitle: string; title: string }) => [item.feedTitle, item.title]).sort(),
     ).toEqual([
       ['First Wire', 'Syndicated everywhere'],
       ['Second Wire', 'Syndicated everywhere'],

@@ -186,7 +186,12 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
     try {
       // `localhost` and `127.0.0.1` are different origins to a browser even on
       // the same port, so this is genuinely somebody else's site.
-      await use({ url: `http://localhost:${port}`, serve: (html) => void (body = html) })
+      await use({
+        url: `http://localhost:${port}`,
+        serve: (html) => {
+          body = html
+        },
+      })
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
@@ -199,9 +204,7 @@ export { expect } from '@playwright/test'
 // keeps the scrollbar's width out of the content, so `innerWidth` would hide
 // an overflow that wide.
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.body.clientWidth,
-  )
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.body.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 }
 

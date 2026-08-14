@@ -104,8 +104,7 @@ export const articleCode: CodeHighlighterPlugin = {
         // `--shiki-dark`, the shape the renderer's `dark:` classes read.
         callback(highlighter.codeToTokens(code, { lang: grammar, themes: { light: THEMES[0], dark: THEMES[1] } }))
       })
-      .catch(() => {
-      })
+      .catch(() => {})
     return null
   },
 }

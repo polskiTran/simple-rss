@@ -26,10 +26,7 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
 test.describe('the Library', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('saves from the Digest, keeps it across contexts and a reload, and unsaves', async ({
-    page,
-    installation,
-  }) => {
+  test('saves from the Digest, keeps it across contexts and a reload, and unsaves', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
 
@@ -62,10 +59,7 @@ test.describe('the Library', () => {
     await expect(page.getByText(/nothing saved yet/)).toBeVisible()
   })
 
-  test('save is keyboard-operable and repeated saves stay one membership', async ({
-    page,
-    installation,
-  }) => {
+  test('save is keyboard-operable and repeated saves stay one membership', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
 
@@ -90,10 +84,7 @@ test.describe('the Library', () => {
     await expect(page.getByRole('heading', { name: 'First light' })).toHaveCount(1)
   })
 
-  test('opens the Feed a save names, until the save outlives its Subscription', async ({
-    page,
-    installation,
-  }) => {
+  test('opens the Feed a save names, until the save outlives its Subscription', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('button', { name: 'save First light' }).click()
@@ -116,10 +107,7 @@ test.describe('the Library', () => {
 test.describe('the Library inside the narrow paper', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
-  test('keeps the shared shape and spacing without horizontal overflow', async ({
-    page,
-    installation,
-  }) => {
+  test('keeps the shared shape and spacing without horizontal overflow', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('button', { name: 'save First light' }).click()

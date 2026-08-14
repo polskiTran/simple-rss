@@ -11,15 +11,15 @@ import {
   nextPollTime,
   nextRetryTime,
 } from '../../src/server/subscriptions/polling-schedule.js'
+// Aliased: the class writes the state, while the same-named shared type imported
+// above is what a read of it looks like, which the HTTP tests below assert on.
 import {
-  SubscriptionService,
+  FeedAvailability as FeedAvailabilityWrites,
   availabilityCategoryOf,
-} from '../../src/server/subscriptions/subscription-service.js'
-import type {
-  Retrieval,
-  RetrievalBytesResult,
-  RetrievalFailureCode,
-} from '../../src/server/upstream/retrieval.js'
+} from '../../src/server/subscriptions/feed-availability.js'
+import { FeedPoll } from '../../src/server/subscriptions/feed-poll.js'
+import { SubscriptionService } from '../../src/server/subscriptions/subscription-service.js'
+import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../src/server/upstream/retrieval.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
@@ -176,9 +176,7 @@ describe('Feed Availability', () => {
       consecutiveFailures: 0,
       category: null,
     })
-    expect(storedAvailability(service, feedId).nextPollAt).toBe(
-      nextPollTime(feedId, 120, service.clock.now()),
-    )
+    expect(storedAvailability(service, feedId).nextPollAt).toBe(nextPollTime(feedId, 120, service.clock.now()))
     expect(storedAvailability(service, feedId).lastFailureAt).toBeNull()
   })
 
@@ -363,7 +361,14 @@ describe('congestion at the retrieval boundary', () => {
     const database = openDatabase(join(await makeTempDataDir(), 'availability.db'))
     applyMigrations(database, clock)
     const url = 'https://one.example/feed'
-    const service = new SubscriptionService({
+    const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
+    const subscriptions = new SubscriptionService({
+      database,
+      clock,
+      settings: new InstallationSettingsStore(database),
+      logger,
+    })
+    const poll = new FeedPoll({
       database,
       retrieval: scriptedRetrieval([
         feedBytes(url),
@@ -372,23 +377,24 @@ describe('congestion at the retrieval boundary', () => {
         feedBytes(url),
       ]),
       clock,
-      settings: new InstallationSettingsStore(database),
-      logger: createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} }),
+      logger,
+      subscriptions,
+      availability: new FeedAvailabilityWrites({ database, clock, logger }),
     })
 
     try {
-      expect(service.create(url).kind).toBe('created')
-      await service.ingest(1)
+      expect(subscriptions.create(url).kind).toBe('created')
+      await poll.ingest(1)
 
       clock.advance(60_000)
-      await service.ingest(1)
+      await poll.ingest(1)
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
         consecutiveFailures: 1,
         lastFailureCategory: 'http_error',
       })
 
       clock.advance(60_000)
-      await service.ingest(1)
+      await poll.ingest(1)
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
         consecutiveFailures: 1,
         lastFailureCategory: 'http_error',
@@ -397,7 +403,7 @@ describe('congestion at the retrieval boundary', () => {
       })
 
       clock.advance(60_000)
-      await service.ingest(1)
+      await poll.ingest(1)
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
         consecutiveFailures: 0,
         lastFailureCategory: null,

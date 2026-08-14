@@ -41,9 +41,7 @@ describe('the cadence grid', () => {
 
 describe('the one-line statistics', () => {
   it('derives the post count, busiest weekday, and longest quiet stretch from the observations', () => {
-    const { stats } = cadenceGrid(
-      cadenceWindow({ '2026-06-03': 2, '2026-08-06': 1, '2026-08-07': 1, '2026-08-08': 1 }),
-    )
+    const { stats } = cadenceGrid(cadenceWindow({ '2026-06-03': 2, '2026-08-06': 1, '2026-08-07': 1, '2026-08-08': 1 }))
 
     expect(stats).toBe('5 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days')
   })

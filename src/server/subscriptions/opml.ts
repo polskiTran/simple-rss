@@ -50,13 +50,13 @@ export function parseOpml(text: string): readonly OpmlFeedOutline[] {
     throw new OpmlError('malformed_opml', 'OPML XML could not be parsed')
   }
 
-  const opml = asRecord(asRecord(document)['opml'])
+  const opml = asRecord(asRecord(document).opml)
   if (Object.keys(opml).length === 0) {
     throw new OpmlError('unsupported_opml', 'The document is not an OPML subscription list')
   }
 
   const feeds = new Map<string, OpmlFeedOutline>()
-  collectFeeds(asRecord(opml['body'])['outline'], feeds)
+  collectFeeds(asRecord(opml.body).outline, feeds)
   return [...feeds.values()]
 }
 
@@ -97,7 +97,7 @@ function collectFeeds(outline: unknown, feeds: Map<string, OpmlFeedOutline>): vo
       const title = attributeIgnoringCase(record, 'title') ?? attributeIgnoringCase(record, 'text')
       feeds.set(url, { url, title: title ? title.slice(0, MAX_TITLE_LENGTH) : null })
     }
-    collectFeeds(record['outline'], feeds)
+    collectFeeds(record.outline, feeds)
   }
 }
 

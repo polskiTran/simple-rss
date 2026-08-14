@@ -46,8 +46,6 @@ describe('the service boundary', () => {
   })
 
   it('refuses to start with a public origin that is not a URL', async () => {
-    await expect(startTestService({ env: { PUBLIC_ORIGIN: 'reader.example.com' } })).rejects.toThrow(
-      /PUBLIC_ORIGIN/,
-    )
+    await expect(startTestService({ env: { PUBLIC_ORIGIN: 'reader.example.com' } })).rejects.toThrow(/PUBLIC_ORIGIN/)
   })
 })

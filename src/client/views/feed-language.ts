@@ -1,4 +1,4 @@
-import { MAX_FEED_SIZE_MIB, type FeedAvailabilityCategory } from '../../shared/api.js'
+import { MAX_FEED_SIZE_MIB, type FeedAvailability, type FeedAvailabilityCategory } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
 export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
@@ -46,6 +46,16 @@ export function retryFailure(error: unknown): string {
 
   const reason = SUBSCRIPTION_FAILURE_COPY[error.code]
   return reason ? `still unavailable — ${reason}` : 'still unavailable — the feed could not be retrieved'
+}
+
+/** The one sentence an unavailable Feed gets, said the same in the list and on the Feed itself. */
+export function unavailableNote(availability: FeedAvailability): string {
+  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'checking is not working'
+  const lastSuccess = availability.lastSuccessAt
+    ? `last reached ${noteDate(availability.lastSuccessAt)}`
+    : 'not reached since subscribing'
+
+  return `${reason} — ${lastSuccess}. its items stay in your digest.`
 }
 
 export function noteDate(iso: string): string {

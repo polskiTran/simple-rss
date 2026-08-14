@@ -1,0 +1,139 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": ["**", "!tests/fixtures/", "!**/*.svg"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "trailingCommas": "all",
+      "arrowParentheses": "always",
+      "bracketSpacing": true
+    }
+  },
+  // styles.css is hand-organised into the sections docs/DESIGN.md names, and
+  // tests/client/design-foundation.test.ts reads it as text — reformatting it
+  // would churn both for nothing. Linting still applies.
+  "css": {
+    "parser": { "tailwindDirectives": true },
+    "formatter": { "enabled": false }
+  },
+  // Import order here groups type imports before value imports rather than sorting;
+  // that grouping is deliberate, so nothing rewrites it.
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      // Every control here is a native element plus manual ARIA (docs/ARCHITECTURE.md);
+      // swapping in <search>/<fieldset> would change the boxes styles.css targets.
+      "a11y": {
+        "useSemanticElements": "off"
+      },
+      // An extra dependency is never a bug — it is a deliberate re-run trigger,
+      // which is exactly what the views' `attempt` retry counter is.
+      "correctness": {
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": { "reportUnnecessaryDependencies": false }
+        }
+      },
+      "style": {
+        "noNonNullAssertion": "error",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "undici": "Outbound HTTP goes through the Retrieval module in src/server/upstream/ (ADR 0005)."
+            }
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    // http/ is a consumer of the domain, never a dependency of it — app.ts is the one
+    // composition point. An override replaces the rule rather than merging into it, so
+    // the repo-wide undici ban above is restated here.
+    {
+      "includes": ["src/server/**", "!src/server/http/**", "!src/server/app.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "undici": "Outbound HTTP goes through the Retrieval module in src/server/upstream/ (ADR 0005)."
+                },
+                "patterns": [
+                  {
+                    "group": ["**/http/*", "**/http/**"],
+                    "message": "src/server/http/ is a consumer of the domain, never a dependency of it. Only app.ts composes it."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    // ADR 0005: the only outbound HTTP under src/server/ is upstream/'s node:http adapter.
+    // Scoped to the server so the browser's own fetch in src/client/api.ts needs no exemption.
+    {
+      "includes": ["src/server/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "fetch": "All outbound HTTP goes through the Retrieval module in src/server/upstream/ (ADR 0005)."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    // src/ holds no non-null assertions and should not gain any. A test asserting
+    // on a value it just produced is a different situation, and reads better for it.
+    {
+      "includes": ["tests/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    // Playwright reads a fixture's parameter list to discover its dependencies,
+    // so a fixture with none is spelled `async ({}, use)`.
+    {
+      "includes": ["tests/browser/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noEmptyPattern": "off"
+          }
+        }
+      }
+    }
+  ]
+}

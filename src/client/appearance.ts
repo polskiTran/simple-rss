@@ -18,12 +18,11 @@ export function chooseAppearance(appearance: Appearance): void {
   try {
     if (appearance === 'system') localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, appearance)
-  } catch {
-  }
+  } catch {}
 }
 
 export function applyAppearance(appearance: Appearance): void {
   const root = document.documentElement
-  if (appearance === 'system') delete root.dataset['appearance']
-  else root.dataset['appearance'] = appearance
+  if (appearance === 'system') delete root.dataset.appearance
+  else root.dataset.appearance = appearance
 }

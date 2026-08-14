@@ -131,7 +131,13 @@ describe('Feeds', () => {
       api.on('GET /api/feeds/1', {
         body: feedDetail({ ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' }, 0),
       })
-      api.on('GET /api/feeds', { body: { subscriptions: [{ ...UNCHECKED_FEED, availability: { ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' } }] } })
+      api.on('GET /api/feeds', {
+        body: {
+          subscriptions: [
+            { ...UNCHECKED_FEED, availability: { ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' } },
+          ],
+        },
+      })
       return { status: 201, body: { subscription: UNCHECKED_FEED } }
     })
     window.history.replaceState(null, '', '/feeds')
@@ -148,7 +154,10 @@ describe('Feeds', () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     api.on('POST /api/subscriptions', () => {
       api.on('GET /api/feeds/2', { status: 404, body: { error: { code: 'not_found', message: 'Not found' } } })
-      return { status: 201, body: { subscription: { ...UNCHECKED_FEED, feedId: 2, enteredUrl: 'https://alias.example/feed' } } }
+      return {
+        status: 201,
+        body: { subscription: { ...UNCHECKED_FEED, feedId: 2, enteredUrl: 'https://alias.example/feed' } },
+      }
     })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
@@ -373,7 +382,6 @@ describe('daily Digest band', () => {
   })
 })
 describe('Digest', () => {
-
   it('renders chronological date groups with the Feed, time, and save affordance', async () => {
     stubApi().on('GET /api/digest', {
       body: {

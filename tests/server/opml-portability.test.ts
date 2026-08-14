@@ -120,9 +120,9 @@ describe('OPML import', () => {
 
     expect((await user.post('/api/subscriptions/import', { opml: opmlListing([ATOM_URL]) })).status).toBe(200)
 
-    expect(
-      service.database?.prepare('SELECT polling_interval_minutes FROM subscriptions').all(),
-    ).toEqual([{ polling_interval_minutes: 120 }])
+    expect(service.database?.prepare('SELECT polling_interval_minutes FROM subscriptions').all()).toEqual([
+      { polling_interval_minutes: 120 },
+    ])
   })
 
   it('keeps a repeated import from duplicating Subscriptions or Feed Items', async () => {

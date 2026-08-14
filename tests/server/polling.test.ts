@@ -84,9 +84,12 @@ describe('background polling', () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
-    await subscribed(user, service, url, rss('Field Notes', [
-      { guid: 'entry-1', title: 'First light', pubDate: 'Fri, 08 Aug 2026 07:15:00 GMT' },
-    ]))
+    await subscribed(
+      user,
+      service,
+      url,
+      rss('Field Notes', [{ guid: 'entry-1', title: 'First light', pubDate: 'Fri, 08 Aug 2026 07:15:00 GMT' }]),
+    )
 
     const created = scheduleOf(service, 1)
     expect(created.pollingIntervalMinutes).toBe(120)
@@ -148,9 +151,7 @@ describe('background polling', () => {
       'if-modified-since': 'Fri, 08 Aug 2026 07:00:00 GMT',
     })
 
-    const items = service.database
-      ?.prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items')
-      .all()
+    const items = service.database?.prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items').all()
     expect(items).toEqual([{ title: 'First light', lastObservedAt: START }])
 
     expect(scheduleOf(service, 1).nextPollAt).toBe(nextPollTime(1, 120, service.clock.now()))

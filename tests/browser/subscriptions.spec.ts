@@ -23,9 +23,9 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
 async function expectFeedAndDigest(page: Page, installation: Installation): Promise<void> {
   await subscribe(page, installation)
   await expect(page.getByText('publisher.example')).toBeVisible()
-  const visibleCadenceDays = await page.locator('.cadence-day').evaluateAll(
-    (days) => days.filter((day) => getComputedStyle(day).display !== 'none').length,
-  )
+  const visibleCadenceDays = await page
+    .locator('.cadence-day')
+    .evaluateAll((days) => days.filter((day) => getComputedStyle(day).display !== 'none').length)
   expect(visibleCadenceDays).toBe((page.viewportSize()?.width ?? 0) <= 640 ? 14 : 30)
 
   await page.getByRole('link', { name: 'digest' }).click()

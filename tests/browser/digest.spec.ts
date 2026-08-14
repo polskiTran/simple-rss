@@ -106,9 +106,7 @@ test.describe('the Digest presentation', () => {
 
     await page.context().setOffline(true)
     await page.getByRole('link', { name: 'digest' }).click()
-    await expect(
-      page.getByText('the digest is out of reach — check the connection, then try again'),
-    ).toBeVisible()
+    await expect(page.getByText('the digest is out of reach — check the connection, then try again')).toBeVisible()
 
     await page.context().setOffline(false)
     await page.getByRole('button', { name: 'try again' }).click()

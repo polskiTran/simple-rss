@@ -12,8 +12,8 @@ import type { Logger } from './logger.js'
 import { assertWritable, type SqliteDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderService } from './reader/reader-service.js'
-import type { SearchService } from './search/search-service.js'
 import type { Readiness } from './readiness.js'
+import type { SearchService } from './search/search-service.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
 import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
@@ -25,36 +25,47 @@ import { readerRoutes } from './http/reader-routes.js'
 import { searchRoutes } from './http/search-routes.js'
 import { settingsRoutes } from './http/settings-routes.js'
 import { requireSession } from './http/require-session.js'
+import { unavailable } from './http/responses.js'
 import { sameOrigin } from './http/same-origin.js'
 import { securityHeaders } from './http/security-headers.js'
 import { staticAssets } from './http/static-assets.js'
+
+/**
+ * Everything a serving installation has. Declared here, where it is consumed,
+ * so the composition root depends on this contract rather than the reverse.
+ * The bundle is built whole or not at all, so no route downstream has to ask
+ * whether one piece of it arrived.
+ */
+export interface Services {
+  readonly database: SqliteDatabase
+  readonly authentication: Authentication
+  readonly settings: InstallationSettingsStore
+  readonly subscriptions: SubscriptionService
+  readonly refresh: FeedRefresh
+  readonly digest: DigestService
+  readonly library: LibraryService
+  readonly reader: ReaderService
+  readonly search: SearchService
+  readonly images: ImageService
+  readonly imageSignature: ImageUrlSignature
+  /** Asks the scheduler for an immediate look at the due frontier. */
+  nudgeScheduler(): void
+}
 
 export interface AppDependencies {
   readonly config: Config
   readonly clock: Clock
   readonly logger: Logger
   readonly readiness: Readiness
-  /** Absent while the database could not be opened; readiness reports that rather than crash-looping. */
-  readonly database: () => SqliteDatabase | undefined
-  /** Absent for the same reason the database is. */
-  readonly authentication: () => Authentication | undefined
-  readonly settings: () => InstallationSettingsStore | undefined
-  readonly subscriptions: () => SubscriptionService | undefined
-  readonly refresh: () => FeedRefresh | undefined
-  readonly digest: () => DigestService | undefined
-  /** Asks the scheduler for an immediate look at the due frontier. */
-  readonly nudgeScheduler: () => void
-  readonly library: () => LibraryService | undefined
-  readonly reader: () => ReaderService | undefined
-  readonly search: () => SearchService | undefined
-  readonly images: () => ImageService | undefined
-  readonly imageSignature: () => ImageUrlSignature | undefined
+  /** Absent while startup could not open the database; readiness reports that rather than crash-looping. */
+  readonly services: Services | undefined
 }
 
 /**
  * The whole HTTP surface. Route order is the contract: `/health` and `/api`
  * match before the client fallback so they can never return HTML, and the
- * `/api` guards register before any route they protect.
+ * `/api` guards register before any route they protect. Whether the
+ * installation has services is decided once, here, rather than per request.
  */
 export function createApp(deps: AppDependencies): Hono {
   const app = new Hono()
@@ -71,64 +82,65 @@ export function createApp(deps: AppDependencies): Hono {
       : c.json<ReadinessBody>({ status: 'ready' })
   })
 
-  app.all('/health/*', (c) =>
-    c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404),
-  )
+  app.all('/health/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404))
 
-  app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
-  app.use(
-    '/api/*',
-    requireSession({
-      authentication: deps.authentication,
-      isPublic: (path) => PUBLIC_API_PATHS.has(path),
-    }),
-  )
+  const services = deps.services
+  if (services) {
+    app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
+    app.use(
+      '/api/*',
+      requireSession({
+        authentication: services.authentication,
+        isPublic: (path) => PUBLIC_API_PATHS.has(path),
+      }),
+    )
 
-  app.route(
-    '/api/auth',
-    authRoutes({
-      authentication: deps.authentication,
-      settings: deps.settings,
-      clock: deps.clock,
-      trustProxyHeaders: deps.config.trustProxyHeaders,
-    }),
-  )
+    app.route(
+      '/api/auth',
+      authRoutes({
+        authentication: services.authentication,
+        settings: services.settings,
+        clock: deps.clock,
+        trustProxyHeaders: deps.config.trustProxyHeaders,
+      }),
+    )
 
-  app.route('/api', settingsRoutes({ settings: deps.settings, clock: deps.clock }))
+    app.route('/api', settingsRoutes({ settings: services.settings, clock: deps.clock }))
 
-  app.route('/api', exportRoutes({ database: deps.database, settings: deps.settings, clock: deps.clock }))
+    app.route('/api', exportRoutes({ database: services.database, settings: services.settings, clock: deps.clock }))
 
-  app.route(
-    '/api',
-    feedRoutes({
-      subscriptions: deps.subscriptions,
-      refresh: deps.refresh,
-      digest: deps.digest,
-      nudgeScheduler: deps.nudgeScheduler,
-    }),
-  )
+    app.route(
+      '/api',
+      feedRoutes({
+        subscriptions: services.subscriptions,
+        refresh: services.refresh,
+        digest: services.digest,
+        nudgeScheduler: services.nudgeScheduler,
+      }),
+    )
 
-  app.route('/api', libraryRoutes({ library: deps.library }))
+    app.route('/api', libraryRoutes({ library: services.library }))
 
-  app.route('/api', readerRoutes({ reader: deps.reader }))
+    app.route('/api', readerRoutes({ reader: services.reader }))
 
-  app.route('/api', searchRoutes({ search: deps.search }))
+    app.route('/api', searchRoutes({ search: services.search }))
 
-  app.route(
-    '/api',
-    imageRoutes({
-      images: deps.images,
-      signature: deps.imageSignature,
-      clock: deps.clock,
-      trustProxyHeaders: deps.config.trustProxyHeaders,
-    }),
-  )
+    app.route(
+      '/api',
+      imageRoutes({
+        images: services.images,
+        signature: services.imageSignature,
+        clock: deps.clock,
+        trustProxyHeaders: deps.config.trustProxyHeaders,
+      }),
+    )
 
-  app.get('/api/meta', (c) => c.json<ServiceMeta>({ name: 'simple-rss', version: VERSION }))
+    app.get('/api/meta', (c) => c.json<ServiceMeta>({ name: 'simple-rss', version: VERSION }))
 
-  app.all('/api/*', (c) =>
-    c.json({ error: { code: 'not_found', message: 'Unknown API route' } }, 404),
-  )
+    app.all('/api/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown API route' } }, 404))
+  } else {
+    app.all('/api/*', unavailable)
+  }
 
   app.use('*', staticAssets({ root: deps.config.clientDir }))
 
@@ -152,17 +164,17 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   if (state.kind === 'starting') return 'starting'
   if (state.kind === 'failed') return state.reason
 
-  const db = deps.database()
-  if (!db) return 'database is not open'
+  const database = deps.services?.database
+  if (!database) return 'database is not open'
 
   try {
-    assertWritable(db, deps.clock.now())
+    assertWritable(database, deps.clock.now())
   } catch (error) {
     deps.logger.error('readiness.write_probe_failed', { error })
     return 'database is not writable'
   }
 
-  const authentication = deps.authentication()
+  const authentication = deps.services?.authentication
   if (!authentication) return 'authentication is not available'
 
   return authentication.setupBlocker()

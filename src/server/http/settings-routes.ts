@@ -3,11 +3,10 @@ import { updateTimezoneRequestSchema, type InstallationPreferences } from '../..
 import type { Clock } from '../clock.js'
 import { UnknownTimezoneError, type InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { readJsonBody } from './json-body.js'
-import { NO_STORE, unavailable } from './responses.js'
+import { NO_STORE } from './responses.js'
 
 export interface SettingsRouteDependencies {
-  /** Absent while the database could not be opened. */
-  readonly settings: () => InstallationSettingsStore | undefined
+  readonly settings: InstallationSettingsStore
   readonly clock: Clock
 }
 
@@ -15,22 +14,16 @@ export interface SettingsRouteDependencies {
 export function settingsRoutes(deps: SettingsRouteDependencies): Hono {
   const app = new Hono()
 
-  app.get('/settings', (c) => {
-    const settings = deps.settings()
-    if (!settings) return unavailable(c)
-
-    return c.json<InstallationPreferences>({ timezone: settings.effectiveTimezone() }, 200, NO_STORE)
-  })
+  app.get('/settings', (c) =>
+    c.json<InstallationPreferences>({ timezone: deps.settings.effectiveTimezone() }, 200, NO_STORE),
+  )
 
   app.put('/settings/timezone', async (c) => {
-    const settings = deps.settings()
-    if (!settings) return unavailable(c)
-
     const body = await readJsonBody(c, updateTimezoneRequestSchema)
     if (!body.ok) return body.response
 
     try {
-      settings.setTimezone(body.value.timezone, deps.clock.now())
+      deps.settings.setTimezone(body.value.timezone, deps.clock.now())
     } catch (error) {
       if (!(error instanceof UnknownTimezoneError)) throw error
       return c.json(

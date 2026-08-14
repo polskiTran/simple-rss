@@ -124,8 +124,7 @@ function isBlockedName(hostname: string): boolean {
 /** Scheme is deliberately ignored: the public proxy may answer HTTPS outside and HTTP inside. */
 function isSelf(url: URL, self: URL): boolean {
   return (
-    normaliseHostname(url.hostname) === normaliseHostname(self.hostname) &&
-    effectivePort(url) === effectivePort(self)
+    normaliseHostname(url.hostname) === normaliseHostname(self.hostname) && effectivePort(url) === effectivePort(self)
   )
 }
 

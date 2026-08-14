@@ -27,9 +27,7 @@ describe('state on the durable volume', () => {
 
     await service.restart()
 
-    const applied = service.logs
-      .slice(beforeRestart)
-      .find((record) => record.message === 'startup.migrations_applied')
+    const applied = service.logs.slice(beforeRestart).find((record) => record.message === 'startup.migrations_applied')
     expect(applied?.applied).toEqual([])
   })
 

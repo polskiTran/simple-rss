@@ -18,7 +18,6 @@ async function signIn(page: Page, installation: Installation, password = USER_PA
   await page.getByRole('button', { name: 'sign in' }).click()
 }
 
-
 test.describe('claiming an installation in a browser', () => {
   test('takes the setup secret and lands the User in the reader', async ({ page, installation }) => {
     await page.goto(installation.url)
@@ -71,7 +70,6 @@ test.describe('the session cookie', () => {
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 })
-
 
 test.describe('signing back in', () => {
   test('refuses a wrong password with one generic line', async ({ browser, page, installation }) => {

@@ -2,10 +2,7 @@ import { and, eq, isNull, lte } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
-  FEED_UNAVAILABLE_AFTER_FAILURES,
   pollingIntervalMinutesSchema,
-  type FeedAvailability,
-  type FeedAvailabilityCategory,
   type FeedDetail,
   type FeedItemRow,
   type PollingIntervalMinutes,
@@ -14,20 +11,15 @@ import {
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
-import {
-  FeedDocumentError,
-  parseFeedDocument,
-  type ParsedFeedDocument,
-} from '../ingestion/feed-document.js'
-import { persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, feedUrlAliases, libraryItems, subscriptions } from '../persistence/schema.js'
-import type { Retrieval, RetrievalBytes, RetrievalFailure } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode } from './opml.js'
-import { nextPollTime, nextRetryTime } from './polling-schedule.js'
+import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
+import { loggableUrl } from './loggable-url.js'
+import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
+import { nextPollTime } from './polling-schedule.js'
 
 export type CreateSubscriptionOutcome =
   | { readonly kind: 'created'; readonly subscription: SubscriptionSummary }
@@ -42,15 +34,6 @@ export type ImportOpmlOutcome =
       readonly alreadySubscribed: number
       readonly unusable: readonly string[]
     }
-
-export type IngestFeedOutcome =
-  | { readonly kind: 'updated'; readonly observedItems: number }
-  | { readonly kind: 'not-modified' }
-  | { readonly kind: 'missing' }
-  /** The retrieval revealed this Feed to be another subscribed Feed (ADR 0007). */
-  | { readonly kind: 'merged'; readonly intoFeedId: number }
-  | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
-  | { readonly kind: 'invalid-feed'; readonly code: FeedDocumentError['code'] }
 
 export type SetPollingIntervalOutcome =
   | { readonly kind: 'updated'; readonly schedule: PollingSchedule }
@@ -67,19 +50,7 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
-interface SubscribedFeedRecord extends FeedRecord {
-  readonly lastPolledAt: string | null
-  readonly lastSuccessAt: string | null
-  readonly consecutiveFailures: number
-  readonly lastFailureCategory: FeedAvailabilityCategory | null
-}
-
-interface PollableFeed extends FeedRecord {
-  readonly etag: string | null
-  readonly lastModified: string | null
-  readonly pollingIntervalMinutes: number
-  readonly consecutiveFailures: number
-}
+interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {}
 
 const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
@@ -98,22 +69,20 @@ const SUBSCRIBED_FEED_COLUMNS = {
   lastFailureCategory: subscriptions.lastFailureCategory,
 }
 
+/** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
 export class SubscriptionService {
   readonly #db: BetterSQLite3Database
-  readonly #retrieval: Retrieval
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
   readonly #logger: Logger
 
   constructor(options: {
     database: SqliteDatabase
-    retrieval: Retrieval
     clock: Clock
     settings: InstallationSettingsStore
     logger: Logger
   }) {
     this.#db = drizzle(options.database)
-    this.#retrieval = options.retrieval
     this.#clock = options.clock
     this.#settings = options.settings
     this.#logger = options.logger.child({ component: 'subscriptions' })
@@ -211,7 +180,7 @@ export class SubscriptionService {
   }
 
   importOpml(opml: string): ImportOpmlOutcome {
-    let outlines
+    let outlines: readonly OpmlFeedOutline[]
     try {
       outlines = parseOpml(opml)
     } catch (error) {
@@ -242,96 +211,12 @@ export class SubscriptionService {
     return serializeOpml(this.#subscribedFeeds(), this.#clock.now())
   }
 
-  async ingest(feedId: number): Promise<IngestFeedOutcome> {
-    const feed = this.#pollableFeed(feedId)
-    if (!feed) return { kind: 'missing' }
-
-    const outcome = await this.#poll(feed)
-    if (outcome.kind === 'missing' || outcome.kind === 'merged') return outcome
-    if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.#recordSuccess(feed)
-    else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
-    else this.#recordFailure(feed, availabilityCategoryOf(outcome))
-    return outcome
-  }
-
-  async #poll(feed: PollableFeed): Promise<IngestFeedOutcome> {
-    const headers: Record<string, string> = {}
-    if (feed.etag) headers['if-none-match'] = feed.etag
-    if (feed.lastModified) headers['if-modified-since'] = feed.lastModified
-
-    const retrieved = await this.#retrieval.retrieveBytes({
-      url: feed.resolvedUrl,
-      operation: 'feed',
-      headers,
-    })
-    if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
-
-    if (retrieved.notModified) {
-      // A 304 may still rotate the validators; keeping the newest ones keeps
-      // later requests conditional. No Feed Item row is touched.
-      this.#db
-        .update(feeds)
-        .set({
-          etag: retrieved.etag ?? feed.etag,
-          lastModified: retrieved.lastModified ?? feed.lastModified,
-        })
-        .where(eq(feeds.id, feed.feedId))
-        .run()
-      this.#logger.info('subscriptions.feed_unchanged', {
-        feedId: feed.feedId,
-        resolvedUrl: loggableUrl(feed.resolvedUrl),
-      })
-      return { kind: 'not-modified' }
-    }
-
-    let parsed
-    try {
-      parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
-    } catch (error) {
-      if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
-      throw error
-    }
-
-    // Two entered URLs can hide one Feed; the retrieval is what reveals it.
-    // The later Subscription folds into the existing Feed (ADR 0007).
-    const existingFeedId = this.#aliasOwner(retrieved.url)
-    if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
-      return this.#mergeInto(feed, existingFeedId, parsed, retrieved)
-    }
-
-    const persisted = persistFeedWindow(this.#db, {
-      feedId: feed.feedId,
-      parsed,
-      resolvedUrl: retrieved.url,
-      validators: validatorsOf(retrieved),
-      now: this.#clock.now().toISOString(),
-    })
-    if (!persisted) return { kind: 'missing' }
-    const observedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
-    this.#logger.info('subscriptions.feed_window_ingested', {
-      feedId: feed.feedId,
-      enteredUrl: loggableUrl(feed.enteredUrl),
-      resolvedUrl: loggableUrl(retrieved.url),
-      observedItems,
-    })
-    return { kind: 'updated', observedItems }
-  }
-
-  #aliasOwner(url: string): number | undefined {
-    return this.#db
-      .select({ feedId: feedUrlAliases.feedId })
-      .from(feedUrlAliases)
-      .where(eq(feedUrlAliases.url, url))
-      .limit(1)
-      .all()[0]?.feedId
-  }
-
-  #mergeInto(
-    duplicate: PollableFeed,
-    existingFeedId: number,
-    parsed: ParsedFeedDocument,
-    retrieved: RetrievalBytes,
-  ): IngestFeedOutcome {
+  /**
+   * Folds a duplicate Subscription into the Feed its retrieval revealed (ADR 0007).
+   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor:
+   * the poll discovers the duplicate, but the Subscription writes belong here.
+   */
+  mergeInto(duplicate: PolledFeed, existingFeedId: number): void {
     const now = this.#clock.now().toISOString()
     this.#db.transaction((tx) => {
       const existingSubscribed = tx
@@ -347,10 +232,7 @@ export class SubscriptionService {
         .limit(1)
         .all()[0]
 
-      tx.update(feedUrlAliases)
-        .set({ feedId: existingFeedId })
-        .where(eq(feedUrlAliases.feedId, duplicate.feedId))
-        .run()
+      tx.update(feedUrlAliases).set({ feedId: existingFeedId }).where(eq(feedUrlAliases.feedId, duplicate.feedId)).run()
 
       if (hasItems) {
         tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
@@ -365,20 +247,7 @@ export class SubscriptionService {
       }
     })
 
-    const existing = this.#pollableFeed(existingFeedId)
-    if (existing) {
-      persistFeedWindow(this.#db, {
-        feedId: existingFeedId,
-        parsed,
-        resolvedUrl: retrieved.url,
-        validators: validatorsOf(retrieved),
-        now,
-      })
-      this.#recordSuccess(existing)
-    }
-
     this.#logger.info('subscriptions.feeds_merged', { feedId: duplicate.feedId, intoFeedId: existingFeedId })
-    return { kind: 'merged', intoFeedId: existingFeedId }
   }
 
   /**
@@ -431,89 +300,6 @@ export class SubscriptionService {
       .limit(limit)
       .all()
       .map((row) => row.feedId)
-  }
-
-  #recordSuccess(feed: PollableFeed): void {
-    const now = this.#clock.now()
-    this.#db
-      .update(subscriptions)
-      .set({
-        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
-        lastPolledAt: now.toISOString(),
-        lastSuccessAt: now.toISOString(),
-        lastFailureAt: null,
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-      })
-      .where(eq(subscriptions.feedId, feed.feedId))
-      .run()
-  }
-
-  /**
-   * A failure only lengthens the wait; the User can retry by hand. The Subscription
-   * survives — a failing Feed stays subscribed and its Feed Items stay in the Digest.
-   */
-  #recordFailure(feed: PollableFeed, category: FeedAvailabilityCategory): void {
-    const now = this.#clock.now()
-    const consecutiveFailures = feed.consecutiveFailures + 1
-    const nextPollAt = nextRetryTime(feed.feedId, feed.pollingIntervalMinutes, consecutiveFailures, now)
-    this.#db
-      .update(subscriptions)
-      .set({
-        nextPollAt,
-        lastPolledAt: now.toISOString(),
-        lastFailureAt: now.toISOString(),
-        consecutiveFailures,
-        lastFailureCategory: category,
-      })
-      .where(eq(subscriptions.feedId, feed.feedId))
-      .run()
-
-    this.#logger.warn('subscriptions.feed_poll_failed', {
-      feedId: feed.feedId,
-      resolvedUrl: loggableUrl(feed.resolvedUrl),
-      category,
-      consecutiveFailures,
-      nextPollAt,
-    })
-  }
-
-  /**
-   * The publisher was never asked (boundary saturated, or the caller gave up), so
-   * Feed Availability is left untouched and the attempt moves one Polling Interval on.
-   */
-  #recordDeferral(feed: PollableFeed, code: RetrievalFailure['code']): void {
-    const now = this.#clock.now()
-    this.#db
-      .update(subscriptions)
-      .set({
-        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
-        lastPolledAt: now.toISOString(),
-      })
-      .where(eq(subscriptions.feedId, feed.feedId))
-      .run()
-
-    this.#logger.info('subscriptions.feed_poll_deferred', {
-      feedId: feed.feedId,
-      resolvedUrl: loggableUrl(feed.resolvedUrl),
-      code,
-    })
-  }
-
-  #pollableFeed(feedId: number): PollableFeed | undefined {
-    return this.#db
-      .select({
-        ...FEED_RECORD_COLUMNS,
-        etag: feeds.etag,
-        lastModified: feeds.lastModified,
-        pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
-        consecutiveFailures: subscriptions.consecutiveFailures,
-      })
-      .from(feeds)
-      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .where(eq(feeds.id, feedId))
-      .limit(1)
-      .all()[0]
   }
 
   list(): readonly SubscriptionSummary[] {
@@ -651,39 +437,6 @@ export class SubscriptionService {
   }
 }
 
-function wasNeverAsked(
-  outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
-): outcome is Extract<IngestFeedOutcome, { kind: 'retrieval-failed' }> {
-  return (
-    outcome.kind === 'retrieval-failed' &&
-    (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
-  )
-}
-
-/**
- * Everything the network refused to answer collapses into `unreachable`; the
- * finer distinctions are transport detail the User cannot act on.
- */
-export function availabilityCategoryOf(
-  outcome: Extract<IngestFeedOutcome, { kind: 'retrieval-failed' } | { kind: 'invalid-feed' }>,
-): FeedAvailabilityCategory {
-  if (outcome.kind === 'invalid-feed') return 'invalid_feed'
-  switch (outcome.failure.code) {
-    case 'timeout':
-    case 'body_timeout':
-      return 'timeout'
-    case 'too_large':
-      return 'too_large'
-    case 'unsupported_content_type':
-    case 'unsupported_content_encoding':
-      return 'unsupported_content'
-    case 'http_error':
-      return 'http_error'
-    default:
-      return 'unreachable'
-  }
-}
-
 /** Shared by first subscription and revival: due immediately — the first retrieval is scheduler work (ADR 0007). */
 function newSubscription(feedId: number, now: string) {
   return {
@@ -707,28 +460,6 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
   }
 }
 
-function availabilityOf(record: SubscribedFeedRecord): FeedAvailability {
-  return {
-    state:
-      record.consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES
-        ? 'unavailable'
-        : record.lastSuccessAt === null
-          ? 'unchecked'
-          : 'available',
-    lastCheckedAt: record.lastPolledAt,
-    lastSuccessAt: record.lastSuccessAt,
-    consecutiveFailures: record.consecutiveFailures,
-    category: record.lastFailureCategory,
-  }
-}
-
-function validatorsOf(retrieved: {
-  readonly etag: string | undefined
-  readonly lastModified: string | undefined
-}): { etag: string | null; lastModified: string | null } {
-  return { etag: retrieved.etag ?? null, lastModified: retrieved.lastModified ?? null }
-}
-
 function canonicalFeedUrl(value: string): string | undefined {
   try {
     const url = new URL(value)
@@ -740,16 +471,6 @@ function canonicalFeedUrl(value: string): string | undefined {
   }
 }
 
-function loggableUrl(value: string): string {
-  try {
-    const url = new URL(value)
-    return `${url.origin}${url.pathname}`
-  } catch {
-    return ''
-  }
-}
-
 function emptyCadence(): number[] {
   return Array.from({ length: 30 }, () => 0)
 }
-

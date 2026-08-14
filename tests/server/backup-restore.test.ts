@@ -8,7 +8,7 @@ import { openDatabase } from '../../src/server/persistence/database.js'
 import { applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { ManualClock } from '../support/manual-clock.js'
-import { startTestService, databasePathOf, USER_PASSWORD, type TestService } from '../support/service-harness.js'
+import { startTestService, databasePathOf, USER_PASSWORD } from '../support/service-harness.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
 const RSS_URL = 'https://journal.example/feed'

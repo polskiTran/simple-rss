@@ -27,10 +27,7 @@ async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
 test.describe('Reader View', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('opens from the Digest, reads clean structured content, and returns', async ({
-    page,
-    installation,
-  }) => {
+  test('opens from the Digest, reads clean structured content, and returns', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
 
@@ -93,10 +90,7 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('heading', { name: /today · 1 post/ })).toBeVisible()
   })
 
-  test('brings its Markdown renderer down with the first article, not with the app', async ({
-    page,
-    installation,
-  }) => {
+  test('brings its Markdown renderer down with the first article, not with the app', async ({ page, installation }) => {
     const renderer: string[] = []
     page.on('request', (request) => {
       if (/article-renderer|article-markdown/.test(request.url())) renderer.push(request.url())
@@ -126,10 +120,7 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
   })
 
-  test('falls back to the summary with a rate-limited retry when parsing fails', async ({
-    page,
-    installation,
-  }) => {
+  test('falls back to the summary with a rate-limited retry when parsing fails', async ({ page, installation }) => {
     await subscribe(page, installation, installation.brokenArticleFeedUrl)
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'Slow water' }).click()
@@ -152,10 +143,7 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('button', { name: 'save Slow water' })).toHaveText('save')
   })
 
-  test('never dead-ends: next in the digest walks to the following item', async ({
-    page,
-    installation,
-  }) => {
+  test('never dead-ends: next in the digest walks to the following item', async ({ page, installation }) => {
     await subscribe(page, installation)
     await subscribeTo(page, installation.brokenArticleFeedUrl)
     await page.getByRole('link', { name: 'digest' }).click()
@@ -169,10 +157,7 @@ test.describe('Reader View', () => {
     await expect(page.getByText('next in the digest')).toHaveCount(0)
   })
 
-  test('walks Digest, Feed and Reader by attribution, and back the same way', async ({
-    page,
-    installation,
-  }) => {
+  test('walks Digest, Feed and Reader by attribution, and back the same way', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'digest' }).click()
 

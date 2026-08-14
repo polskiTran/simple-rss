@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { digestSchema, librarySchema, subscriptionListSchema } from '../../src/shared/api.js'
-import { claimedDevice, Device } from '../support/device.js'
+import { claimedDevice, type Device } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
 
 const START = '2026-08-08T09:00:00.000Z'
@@ -268,9 +268,7 @@ describe('history retention', () => {
     await service.wakeScheduler()
 
     expect((await digestTitles(user)).sort()).toEqual(['Passing note', 'Saved essay'])
-    expect((await library(user)).items.map((entry) => [entry.feedItemId, entry.title])).toEqual([
-      [1, 'Saved essay'],
-    ])
+    expect((await library(user)).items.map((entry) => [entry.feedItemId, entry.title])).toEqual([[1, 'Saved essay']])
 
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()

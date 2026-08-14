@@ -58,13 +58,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
         autoFocus
         onChange={setSetupSecret}
       />
-      <Field
-        label="password"
-        type="password"
-        value={password}
-        autoComplete="new-password"
-        onChange={setPassword}
-      />
+      <Field label="password" type="password" value={password} autoComplete="new-password" onChange={setPassword} />
       <Field
         label="confirm password"
         type="password"
