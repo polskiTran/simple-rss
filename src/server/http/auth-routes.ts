@@ -10,7 +10,7 @@ import type { Clock } from '../clock.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { clientAddress } from './client-address.js'
 import { readJsonBody } from './json-body.js'
-import { invalidCredentials, NO_STORE, unavailable } from './responses.js'
+import { invalidCredentials, NO_STORE, retryAfter, unavailable } from './responses.js'
 import { clearSessionCookie, readSessionCookie, writeSessionCookie } from './session-cookie.js'
 
 /** Reachable without a Session because they are how a Session is obtained. */
@@ -138,8 +138,9 @@ function status(c: Context, body: AuthStatus, code: 200 | 201 = 200) {
 }
 
 function tooManyAttempts(c: Context, retryAfterSeconds: number) {
-  return c.json({ error: { code: 'too_many_attempts', message: 'Too many attempts' } }, 429, {
-    ...NO_STORE,
-    'Retry-After': String(retryAfterSeconds),
-  })
+  return c.json(
+    { error: { code: 'too_many_attempts', message: 'Too many attempts' } },
+    429,
+    retryAfter(retryAfterSeconds),
+  )
 }

@@ -1,15 +1,12 @@
 import type { Context } from 'hono'
 import type { z } from 'zod'
-
-export type BodyResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly response: Response }
+import type { Validated } from './responses.js'
 
 /**
  * Validates a JSON body, answering `400` itself. Failure messages name fields
  * and constraints, never values — one route through here carries the password.
  */
-export async function readJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<BodyResult<z.infer<S>>> {
+export async function readJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<Validated<z.infer<S>>> {
   let raw: unknown
   try {
     raw = await c.req.json()

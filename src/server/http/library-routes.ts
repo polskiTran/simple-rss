@@ -1,8 +1,9 @@
-import { Hono, type Context } from 'hono'
+import { Hono } from 'hono'
 import { feedItemIdParameterSchema, type Library, type LibraryMembership } from '../../shared/api.js'
 import type { LibraryService } from '../library/library-service.js'
+import { readIdParam } from './id-param.js'
 import { readListCursor } from './list-cursor.js'
-import { NO_STORE, unavailable } from './responses.js'
+import { NO_STORE, notFound, unavailable } from './responses.js'
 
 export interface LibraryRouteDependencies {
   /** Absent only while startup could not open the database. */
@@ -25,10 +26,10 @@ export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   app.put('/library/:feedItemId', (c) => {
     const library = deps.library()
     if (!library) return unavailable(c)
-    const feedItemId = feedItemIdParameterSchema.safeParse(c.req.param('feedItemId'))
-    if (!feedItemId.success) return notFound(c)
+    const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
+    if (!feedItemId.ok) return feedItemId.response
 
-    const membership = library.save(feedItemId.data)
+    const membership = library.save(feedItemId.value)
     if (!membership) return notFound(c)
     return c.json<LibraryMembership>(membership, 200, NO_STORE)
   })
@@ -36,15 +37,11 @@ export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   app.delete('/library/:feedItemId', (c) => {
     const library = deps.library()
     if (!library) return unavailable(c)
-    const feedItemId = feedItemIdParameterSchema.safeParse(c.req.param('feedItemId'))
-    if (!feedItemId.success) return notFound(c)
+    const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
+    if (!feedItemId.ok) return feedItemId.response
 
-    return c.json<LibraryMembership>(library.unsave(feedItemId.data), 200, NO_STORE)
+    return c.json<LibraryMembership>(library.unsave(feedItemId.value), 200, NO_STORE)
   })
 
   return app
-}
-
-function notFound(c: Context) {
-  return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404, NO_STORE)
 }
