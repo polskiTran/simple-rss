@@ -1,5 +1,5 @@
 import type { Clock } from '../clock.js'
-import type { IngestFeedOutcome, SubscriptionService } from './subscription-service.js'
+import type { FeedPoll, IngestFeedOutcome } from './feed-poll.js'
 
 const REFRESH_COOLDOWN_MS = 60_000
 
@@ -10,13 +10,13 @@ export type RefreshFeedOutcome =
 /** Coalesces concurrent refreshes and bounds deliberate repeat retrievals per Feed. */
 export class FeedRefresh {
   readonly #clock: Clock
-  readonly #subscriptions: SubscriptionService
+  readonly #poll: Pick<FeedPoll, 'ingest'>
   readonly #inFlight = new Map<number, Promise<IngestFeedOutcome>>()
   readonly #lastStartedAt = new Map<number, number>()
 
-  constructor(options: { readonly clock: Clock; readonly subscriptions: SubscriptionService }) {
+  constructor(options: { readonly clock: Clock; readonly poll: Pick<FeedPoll, 'ingest'> }) {
     this.#clock = options.clock
-    this.#subscriptions = options.subscriptions
+    this.#poll = options.poll
   }
 
   refresh(feedId: number): Promise<RefreshFeedOutcome> {
@@ -39,7 +39,7 @@ export class FeedRefresh {
     }
 
     this.#lastStartedAt.set(feedId, now)
-    const refresh = this.#subscriptions
+    const refresh = this.#poll
       .ingest(feedId)
       .then((outcome) => {
         if (outcome.kind === 'missing') this.#lastStartedAt.delete(feedId)
