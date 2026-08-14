@@ -1,3 +1,7 @@
+import { Button } from '@base-ui/react/button'
+import { Dialog } from '@base-ui/react/dialog'
+import { Toggle } from '@base-ui/react/toggle'
+import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useState, type CSSProperties } from 'react'
 import {
   POLLING_INTERVAL_MINUTES,
@@ -179,39 +183,42 @@ function OpenFeed({
       <p className="cadence-stats">{grid.stats}</p>
       <UnavailableNote availability={detail.availability} />
       <div className="feed-controls">
-        <span className="interval-options" role="group" aria-label="checked every">
+        <ToggleGroup
+          className="interval-options"
+          aria-label="checked every"
+          value={[String(detail.schedule.pollingIntervalMinutes)]}
+          onValueChange={(chosen) => {
+            // Pressing the pressed word would empty the group; a Feed is always
+            // checked on one of the six, so that press stays where it is.
+            const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen[0])
+            if (minutes !== undefined) onChangeInterval(minutes)
+          }}
+        >
           <span className="interval-caption">checked every</span>
           {POLLING_INTERVAL_MINUTES.map((minutes) => (
-            <button
+            <Toggle
               key={minutes}
-              type="button"
               className="text-button interval-option"
-              aria-pressed={detail.schedule.pollingIntervalMinutes === minutes}
+              value={String(minutes)}
               aria-label={`check ${intervalPhrase(minutes)}`}
-              onClick={() => onChangeInterval(minutes)}
             >
               {INTERVAL_WORDS[minutes]}
-            </button>
+            </Toggle>
           ))}
-        </span>
+        </ToggleGroup>
         <span className="feed-actions">
-          <button className="text-button feed-refresh" type="button" disabled={refreshing} onClick={onRefresh}>
+          <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>
             {refreshing ? 'refreshing…' : 'refresh now'}
-          </button>
-          <button
-            className="text-button unsubscribe-open"
-            type="button"
-            aria-expanded={confirmingUnsubscribe}
-            aria-controls="unsubscribe-confirmation"
-            onClick={() => onConfirmUnsubscribe(!confirmingUnsubscribe)}
-          >
-            unsubscribe…
-          </button>
+          </Button>
+          <Unsubscribe
+            feedTitle={detail.title}
+            confirming={confirmingUnsubscribe}
+            working={unsubscribing}
+            onConfirm={onConfirmUnsubscribe}
+            onUnsubscribe={onUnsubscribe}
+          />
         </span>
       </div>
-      {confirmingUnsubscribe ? (
-        <Unsubscribe working={unsubscribing} onConfirm={onConfirmUnsubscribe} onUnsubscribe={onUnsubscribe} />
-      ) : null}
       <p className="notice feed-notice" aria-live="polite">
         {notice}
       </p>
@@ -220,31 +227,48 @@ function OpenFeed({
   )
 }
 
+/**
+ * Unsubscribing is a decision to settle before anything else, so it is asked in
+ * an overlay: focus trapped, escape and the dimmed backdrop both meaning keep.
+ */
 function Unsubscribe({
+  feedTitle,
+  confirming,
   working,
   onConfirm,
   onUnsubscribe,
 }: {
+  feedTitle: string
+  confirming: boolean
   working: boolean
   onConfirm: (confirming: boolean) => void
   onUnsubscribe: () => void
 }) {
   return (
-    <div className="unsubscribe-reveal">
-      <div className="unsubscribe-controls" id="unsubscribe-confirmation">
-        <p className="unsubscribe-consequences">
-          this stops checking the feed and its items leave the digest — anything saved stays in your library
-        </p>
-        <p className="unsubscribe-choice">
-          <button className="text-button" type="button" disabled={working} onClick={onUnsubscribe}>
-            {working ? 'unsubscribing…' : 'unsubscribe'}
-          </button>
-          <button className="text-button" type="button" disabled={working} onClick={() => onConfirm(false)}>
-            keep subscribed
-          </button>
-        </p>
-      </div>
-    </div>
+    <Dialog.Root open={confirming} onOpenChange={onConfirm}>
+      <Dialog.Trigger className="text-button unsubscribe-open">unsubscribe…</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="overlay-backdrop" />
+        <Dialog.Viewport className="overlay-viewport">
+          <Dialog.Popup className="overlay-popup">
+            <Dialog.Title className="overlay-title">unsubscribe from {feedTitle}</Dialog.Title>
+            <Dialog.Description className="overlay-description">
+              this stops checking the feed and its items leave the digest — anything saved stays in your library
+            </Dialog.Description>
+            <p className="unsubscribe-choice">
+              <Button className="text-button" focusableWhenDisabled disabled={working} onClick={onUnsubscribe}>
+                {working ? 'unsubscribing…' : 'unsubscribe'}
+              </Button>
+              {/* Composed onto Button: Dialog.Close takes native button props only,
+                  so the dismissing word borrows the focus its own press would cost it. */}
+              <Dialog.Close className="text-button" disabled={working} render={<Button focusableWhenDisabled />}>
+                keep subscribed
+              </Dialog.Close>
+            </p>
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
 

@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useState } from 'react'
 import type { AuthStatus } from '../../shared/api.js'
 import { signOut } from '../api.js'
@@ -54,16 +55,16 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
 
         <dt className="sheet-label">password</dt>
         <dd className="sheet-value">
-          <button className="text-button" type="button" onClick={() => setChanging(!changing)}>
+          <Button className="text-button" onClick={() => setChanging(!changing)}>
             {changing ? 'cancel' : 'change'}
-          </button>
+          </Button>
         </dd>
 
         <dt className="sheet-label">session</dt>
         <dd className="sheet-value">
-          <button className="text-button" type="button" onClick={leave}>
+          <Button className="text-button" onClick={leave}>
             sign out
-          </button>
+          </Button>
         </dd>
       </dl>
 

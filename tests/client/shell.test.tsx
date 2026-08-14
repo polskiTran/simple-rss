@@ -69,7 +69,7 @@ describe('the application shell', () => {
     expect(activeTab()).toBe('saved')
   })
 
-  it('draws the mark as the 4x4 cadence tile of docs/references/brand.png', async () => {
+  it('draws the mark as the 4x4 cadence tile of DESIGN.md §5', async () => {
     const { container } = await renderAt('/digest')
 
     const levels = [...container.querySelectorAll('.masthead .wordmark-cell')].map((cell) =>

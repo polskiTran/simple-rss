@@ -1,3 +1,5 @@
+import { Button } from '@base-ui/react/button'
+
 export type OlderState = 'idle' | 'loading' | 'failed'
 
 export function OlderItems({
@@ -16,14 +18,14 @@ export function OlderItems({
   return (
     <p className="older-items">
       {older === 'failed' ? <span role="status">older {noun} are out of reach — </span> : null}
-      <button
+      <Button
         className="text-button"
-        type="button"
+        focusableWhenDisabled
         disabled={older === 'loading'}
         onClick={() => onLoadOlder(nextCursor)}
       >
         {older === 'loading' ? `loading older ${noun}…` : older === 'failed' ? 'try again' : `older ${noun}`}
-      </button>
+      </Button>
     </p>
   )
 }

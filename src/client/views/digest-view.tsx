@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useEffect, useState } from 'react'
 import { MAX_SEARCH_QUERY_LENGTH, type Digest, type SearchResult } from '../../shared/api.js'
 import { fetchDigest, fetchSearchResults } from '../api.js'
@@ -115,9 +116,9 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
             : 'the digest is unavailable — try again in a moment'}
         </p>
         <p className="digest-retry">
-          <button className="text-button" type="button" onClick={tryAgain}>
+          <Button className="text-button" onClick={tryAgain}>
             try again
-          </button>
+          </Button>
         </p>
       </div>
     )
