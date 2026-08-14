@@ -1,4 +1,5 @@
 import { Button } from '@base-ui/react/button'
+import { Dialog } from '@base-ui/react/dialog'
 import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useState, type CSSProperties } from 'react'
@@ -209,19 +210,15 @@ function OpenFeed({
           <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>
             {refreshing ? 'refreshing…' : 'refresh now'}
           </Button>
-          <Button
-            className="text-button unsubscribe-open"
-            aria-expanded={confirmingUnsubscribe}
-            aria-controls="unsubscribe-confirmation"
-            onClick={() => onConfirmUnsubscribe(!confirmingUnsubscribe)}
-          >
-            unsubscribe…
-          </Button>
+          <Unsubscribe
+            feedTitle={detail.title}
+            confirming={confirmingUnsubscribe}
+            working={unsubscribing}
+            onConfirm={onConfirmUnsubscribe}
+            onUnsubscribe={onUnsubscribe}
+          />
         </span>
       </div>
-      {confirmingUnsubscribe ? (
-        <Unsubscribe working={unsubscribing} onConfirm={onConfirmUnsubscribe} onUnsubscribe={onUnsubscribe} />
-      ) : null}
       <p className="notice feed-notice" aria-live="polite">
         {notice}
       </p>
@@ -230,31 +227,46 @@ function OpenFeed({
   )
 }
 
+/**
+ * Unsubscribing is a decision to settle before anything else, so it is asked in
+ * an overlay: focus trapped, escape and the dimmed backdrop both meaning keep.
+ */
 function Unsubscribe({
+  feedTitle,
+  confirming,
   working,
   onConfirm,
   onUnsubscribe,
 }: {
+  feedTitle: string
+  confirming: boolean
   working: boolean
   onConfirm: (confirming: boolean) => void
   onUnsubscribe: () => void
 }) {
   return (
-    <div className="unsubscribe-reveal">
-      <div className="unsubscribe-controls" id="unsubscribe-confirmation">
-        <p className="unsubscribe-consequences">
-          this stops checking the feed and its items leave the digest — anything saved stays in your library
-        </p>
-        <p className="unsubscribe-choice">
-          <Button className="text-button" focusableWhenDisabled disabled={working} onClick={onUnsubscribe}>
-            {working ? 'unsubscribing…' : 'unsubscribe'}
-          </Button>
-          <Button className="text-button" focusableWhenDisabled disabled={working} onClick={() => onConfirm(false)}>
-            keep subscribed
-          </Button>
-        </p>
-      </div>
-    </div>
+    <Dialog.Root open={confirming} onOpenChange={onConfirm}>
+      <Dialog.Trigger className="text-button unsubscribe-open">unsubscribe…</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="overlay-backdrop" />
+        <Dialog.Viewport className="overlay-viewport">
+          <Dialog.Popup className="overlay-popup">
+            <Dialog.Title className="overlay-title">unsubscribe from {feedTitle}</Dialog.Title>
+            <Dialog.Description className="overlay-description">
+              this stops checking the feed and its items leave the digest — anything saved stays in your library
+            </Dialog.Description>
+            <p className="unsubscribe-choice">
+              <Button className="text-button" focusableWhenDisabled disabled={working} onClick={onUnsubscribe}>
+                {working ? 'unsubscribing…' : 'unsubscribe'}
+              </Button>
+              <Dialog.Close className="text-button" disabled={working}>
+                keep subscribed
+              </Dialog.Close>
+            </p>
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
 
