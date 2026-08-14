@@ -1,7 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Clock } from '../clock.js'
-import { rebuildSearchIndex } from '../search/search-service.js'
 import { assertWritable, openDatabase, type SqliteDatabase } from './database.js'
 import { applyMigrations } from './migrations.js'
 
@@ -57,8 +56,17 @@ export interface RestoreReport {
 /**
  * All verification — integrity, migrations, the search rebuild, a real write — happens
  * on a staging copy renamed into place only after everything passed.
+ *
+ * The rebuild arrives as a dependency: it must run on the staging copy, before the
+ * rename, but the derived index belongs to `search/` and persistence does not depend on it.
  */
-export function restoreSnapshot(backupPath: string, databasePath: string, clock: Clock): RestoreReport {
+export function restoreSnapshot(
+  backupPath: string,
+  databasePath: string,
+  options: { clock: Clock; rebuildIndex: (db: SqliteDatabase) => number },
+): RestoreReport {
+  const { clock, rebuildIndex } = options
+
   if (!existsSync(backupPath)) {
     throw new Error(`there is no backup at ${backupPath}`)
   }
@@ -87,7 +95,7 @@ export function restoreSnapshot(backupPath: string, databasePath: string, clock:
         throw new Error('the snapshot failed its integrity check')
       }
       const migrationsApplied = applyMigrations(db, clock)
-      const indexedItems = rebuildSearchIndex(db)
+      const indexedItems = rebuildIndex(db)
       assertWritable(db, clock.now())
 
       report = {

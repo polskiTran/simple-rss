@@ -120,7 +120,10 @@ function restore(backupPath: string | undefined, context: CliContext): number {
   }
 
   try {
-    const report = restoreSnapshot(resolve(backupPath), context.config.databasePath, context.clock)
+    const report = restoreSnapshot(resolve(backupPath), context.config.databasePath, {
+      clock: context.clock,
+      rebuildIndex: rebuildSearchIndex,
+    })
     context.out(JSON.stringify(report))
     return 0
   } catch (error) {
