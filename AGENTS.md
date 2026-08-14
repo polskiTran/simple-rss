@@ -19,10 +19,10 @@ pnpm only, Node ≥ 22.
 | `pnpm dev:server` / `pnpm dev:client` | Either half alone |
 | `pnpm build` | Build client then server (`build:client`, `build:server`) |
 | `pnpm start` | Run the built server from `dist/` |
-| `pnpm lint` | `biome check .` — formatting and the import boundaries (`biome.jsonc`) |
+| `pnpm lint` | `biome check --error-on-warnings .` — formatting and the import boundaries (`biome.jsonc`); a warning fails it |
 | `pnpm format` | `biome format --write .` |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` / `pnpm test:watch` | Vitest (server tests) |
+| `pnpm typecheck` | `tsc -p tsconfig.json --noEmit` |
+| `pnpm test` / `pnpm test:watch` | Vitest — both projects: `tests/server/` in node, `tests/client/` in jsdom |
 | `pnpm test:browser` | Builds the client, runs Playwright in real Chromium |
 | `pnpm test:smoke` | Container smoke tests (needs Docker) |
 | `pnpm cli` | The server CLI entrypoint |
