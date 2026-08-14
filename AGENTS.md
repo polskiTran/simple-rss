@@ -4,7 +4,7 @@ An opinionated, opensource RSS reader: one pnpm package, one Docker image, one S
 
 ## Project map
 
-- `src/server/` — the whole service: Hono API plus in-process scheduler, one folder per domain area (`subscriptions/`, `digest/`, `library/`, `reader/`, `images/`, `search/`, `retention/`, `auth/`, `persistence/`, `upstream/`).
+- `src/server/` — the whole service: Hono API plus in-process scheduler, one folder per domain area (`auth/`, `digest/`, `export/`, `http/`, `images/`, `ingestion/`, `library/`, `persistence/`, `reader/`, `retention/`, `search/`, `subscriptions/`, `upstream/`).
 - `src/client/` — the React/Vite UI.
 - `src/shared/api.ts` — the Zod contract both sides import. Any API change starts here.
 - `tests/server/` (harness-driven), `tests/browser/` (Playwright), `tests/smoke/` (container), `tests/support/` (the harness itself).
