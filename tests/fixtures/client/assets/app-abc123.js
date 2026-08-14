@@ -1,1 +1,1 @@
-export const marker = "built client"
+export const marker = 'built client'

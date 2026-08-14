@@ -157,8 +157,7 @@ function toResponse(request: Request, response: IncomingMessage): Response {
     for (const single of Array.isArray(value) ? value : [value]) {
       try {
         headers.append(name, single)
-      } catch {
-      }
+      } catch {}
     }
   }
   if (encodings.length > 0) {
@@ -174,9 +173,7 @@ function toResponse(request: Request, response: IncomingMessage): Response {
 function contentEncodings(value: string | string[] | undefined): readonly string[] {
   const raw = Array.isArray(value) ? value.join(',') : value
   if (raw === undefined || raw.trim() === '') return []
-  const encodings = raw
-    .split(',')
-    .map((entry: string) => entry.trim().toLowerCase())
+  const encodings = raw.split(',').map((entry: string) => entry.trim().toLowerCase())
 
   if (encodings.some((encoding) => encoding === '') || (encodings.includes('identity') && encodings.length > 1)) {
     throw new HttpClientError('unsupported_content_encoding', 'malformed content encoding')

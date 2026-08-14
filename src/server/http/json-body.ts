@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
 import type { z } from 'zod'
 
-export type BodyResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly response: Response }
+export type BodyResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly response: Response }
 
 /**
  * Validates a JSON body, answering `400` itself. Failure messages name fields

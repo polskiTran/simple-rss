@@ -6,9 +6,7 @@ const FIRST_SEEN = '2026-08-08T06:00:00.000Z'
 
 describe('chronologyTime', () => {
   it('orders by a valid publication time', () => {
-    expect(chronologyTime('2026-08-01T12:00:00.000Z', FIRST_SEEN, NOW)).toBe(
-      Date.parse('2026-08-01T12:00:00.000Z'),
-    )
+    expect(chronologyTime('2026-08-01T12:00:00.000Z', FIRST_SEEN, NOW)).toBe(Date.parse('2026-08-01T12:00:00.000Z'))
   })
 
   it('falls back to first-seen when the publication time is missing', () => {

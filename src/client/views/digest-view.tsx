@@ -206,21 +206,10 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
               </div>
             </section>
           ))}
-          <OlderItems
-            nextCursor={state.digest.nextCursor}
-            older={older}
-            noun="items"
-            onLoadOlder={loadOlder}
-          />
+          <OlderItems nextCursor={state.digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
         </>
       ) : (
-        <SearchOutcome
-          state={search}
-          line={line}
-          onOpenItem={onOpenItem}
-          onOpenFeed={onOpenFeed}
-          onSaved={setSaved}
-        />
+        <SearchOutcome state={search} line={line} onOpenItem={onOpenItem} onOpenFeed={onOpenFeed} onSaved={setSaved} />
       )}
     </div>
   )

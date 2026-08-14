@@ -268,9 +268,7 @@ describe('history retention', () => {
     await service.wakeScheduler()
 
     expect((await digestTitles(user)).sort()).toEqual(['Passing note', 'Saved essay'])
-    expect((await library(user)).items.map((entry) => [entry.feedItemId, entry.title])).toEqual([
-      [1, 'Saved essay'],
-    ])
+    expect((await library(user)).items.map((entry) => [entry.feedItemId, entry.title])).toEqual([[1, 'Saved essay']])
 
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()

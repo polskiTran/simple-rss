@@ -272,10 +272,6 @@ function opmlFailure(c: Context, code: OpmlFailureCode) {
     case 'unsupported_opml':
       return c.json({ error: { code, message: 'The file is not an OPML subscription list' } }, 422, NO_STORE)
     case 'too_many_feeds':
-      return c.json(
-        { error: { code, message: `One import processes at most ${MAX_OPML_FEEDS} Feeds` } },
-        413,
-        NO_STORE,
-      )
+      return c.json({ error: { code, message: `One import processes at most ${MAX_OPML_FEEDS} Feeds` } }, 413, NO_STORE)
   }
 }

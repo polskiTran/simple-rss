@@ -151,9 +151,7 @@ describe('article images', () => {
   })
 
   it('renders no image from anywhere but the signed proxy route', () => {
-    const body = bodyOf(
-      '![leak](https://tracker.example/pixel.png) then ![wrong route](/api/items/1/image)',
-    )
+    const body = bodyOf('![leak](https://tracker.example/pixel.png) then ![wrong route](/api/items/1/image)')
 
     expect(body.querySelector('img')).toBeNull()
     expect(body.textContent).toContain('leak')

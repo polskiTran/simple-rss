@@ -1,9 +1,5 @@
 import { Hono, type Context } from 'hono'
-import {
-  feedItemIdParameterSchema,
-  type Library,
-  type LibraryMembership,
-} from '../../shared/api.js'
+import { feedItemIdParameterSchema, type Library, type LibraryMembership } from '../../shared/api.js'
 import type { LibraryService } from '../library/library-service.js'
 import { readListCursor } from './list-cursor.js'
 import { NO_STORE, unavailable } from './responses.js'

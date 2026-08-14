@@ -8,7 +8,13 @@ import { articleCode } from './article-code.js'
 
 export function ArticleMarkdown({ markdown }: { readonly markdown: string }) {
   return (
-    <Streamdown className="article-body" mode="static" plugins={PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={COMPONENTS}>
+    <Streamdown
+      className="article-body"
+      mode="static"
+      plugins={PLUGINS}
+      rehypePlugins={REHYPE_PLUGINS}
+      components={COMPONENTS}
+    >
       {markdown}
     </Streamdown>
   )
@@ -59,7 +65,14 @@ function ArticleImage({ src, alt = '' }: ComponentProps<'img'>) {
   if (failed) return <span className="article-image-fallback">{alt || 'image unavailable'}</span>
 
   return (
-    <img className="article-image" src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    <img
+      className="article-image"
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
   )
 }
 

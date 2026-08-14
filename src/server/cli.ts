@@ -133,11 +133,7 @@ function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function resetPassword(
-  db: SqliteDatabase,
-  argument: string | undefined,
-  context: CliContext,
-): Promise<number> {
+async function resetPassword(db: SqliteDatabase, argument: string | undefined, context: CliContext): Promise<number> {
   const password = argument ?? context.env?.[NEW_PASSWORD_VARIABLE]
 
   if (!password) {

@@ -11,15 +11,8 @@ import {
   nextPollTime,
   nextRetryTime,
 } from '../../src/server/subscriptions/polling-schedule.js'
-import {
-  SubscriptionService,
-  availabilityCategoryOf,
-} from '../../src/server/subscriptions/subscription-service.js'
-import type {
-  Retrieval,
-  RetrievalBytesResult,
-  RetrievalFailureCode,
-} from '../../src/server/upstream/retrieval.js'
+import { SubscriptionService, availabilityCategoryOf } from '../../src/server/subscriptions/subscription-service.js'
+import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../src/server/upstream/retrieval.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
@@ -176,9 +169,7 @@ describe('Feed Availability', () => {
       consecutiveFailures: 0,
       category: null,
     })
-    expect(storedAvailability(service, feedId).nextPollAt).toBe(
-      nextPollTime(feedId, 120, service.clock.now()),
-    )
+    expect(storedAvailability(service, feedId).nextPollAt).toBe(nextPollTime(feedId, 120, service.clock.now()))
     expect(storedAvailability(service, feedId).lastFailureAt).toBeNull()
   })
 

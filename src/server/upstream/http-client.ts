@@ -5,10 +5,7 @@
  */
 export type HttpClient = (request: Request) => Promise<Response>
 
-export type HttpClientFailureCode =
-  | 'blocked_destination'
-  | 'unresolvable_host'
-  | 'unsupported_content_encoding'
+export type HttpClientFailureCode = 'blocked_destination' | 'unresolvable_host' | 'unsupported_content_encoding'
 
 export class HttpClientError extends Error {
   readonly code: HttpClientFailureCode

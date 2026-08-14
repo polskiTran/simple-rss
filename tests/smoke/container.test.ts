@@ -44,12 +44,7 @@ async function retire(container: Container): Promise<void> {
 }
 
 async function start(
-  options: {
-    volume?: string
-    env?: Record<string, string>
-    port?: number
-    waitForReadiness?: boolean
-  } = {},
+  options: { volume?: string; env?: Record<string, string>; port?: number; waitForReadiness?: boolean } = {},
 ) {
   const volume = options.volume ?? uniqueName('simple-rss-data')
   if (!options.volume) volumes.push(volume)
@@ -247,12 +242,7 @@ describe('emergency password reset through the platform shell', () => {
     const { container } = await start()
     const cookie = await claim(container)
 
-    const reset = await container.exec([
-      'node',
-      'dist/server/cli-main.js',
-      'reset-password',
-      'the-recovered-password',
-    ])
+    const reset = await container.exec(['node', 'dist/server/cli-main.js', 'reset-password', 'the-recovered-password'])
 
     expect(JSON.parse(reset.stdout)).toEqual({ passwordReset: true, sessionsRevoked: 1 })
     expect((await container.fetch('/api/meta', { headers: { cookie } })).status).toBe(401)

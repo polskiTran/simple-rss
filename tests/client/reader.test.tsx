@@ -31,9 +31,7 @@ const ARTICLE = {
 }
 
 function reading(): StubbedApi {
-  const api = stubApi()
-    .on('GET /api/items/3', { body: ITEM })
-    .on('GET /api/items/3/reader', { body: ARTICLE })
+  const api = stubApi().on('GET /api/items/3', { body: ITEM }).on('GET /api/items/3/reader', { body: ARTICLE })
   window.history.replaceState(null, '', '/reader/3')
   return api
 }
@@ -72,8 +70,9 @@ describe('Reader View', () => {
   })
 
   it('saves and unsaves from the Reader through the Library contract', async () => {
-    const api = reading()
-      .on('PUT /api/library/3', { body: { feedItemId: 3, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } })
+    const api = reading().on('PUT /api/library/3', {
+      body: { feedItemId: 3, saved: true, savedAt: '2026-08-08T09:05:00.000Z' },
+    })
     render(<App />)
     const user = userEvent.setup()
 

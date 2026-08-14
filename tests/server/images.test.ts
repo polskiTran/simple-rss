@@ -256,8 +256,7 @@ describe('destination hardening', () => {
     class MovedDns extends UpstreamFixtures {
       override get resolve(): ResolveAddresses {
         const base = super.resolve
-        return async (hostname, signal) =>
-          hostname === 'moved.example' ? ['10.0.0.9'] : base(hostname, signal)
+        return async (hostname, signal) => (hostname === 'moved.example' ? ['10.0.0.9'] : base(hostname, signal))
       }
     }
 
@@ -309,7 +308,13 @@ describe('format validation', () => {
   it('accepts each allowed format when the bytes agree', async () => {
     const formats: [string, Uint8Array][] = [
       ['image/jpeg', bytesOf([0xff, 0xd8, 0xff, 0xe0], 24)],
-      ['image/gif', bytesOf([...'GIF89a'].map((c) => c.charCodeAt(0)), 24)],
+      [
+        'image/gif',
+        bytesOf(
+          [...'GIF89a'].map((c) => c.charCodeAt(0)),
+          24,
+        ),
+      ],
       ['image/webp', webpBytes()],
       ['image/avif', avifBytes()],
     ]
@@ -333,14 +338,23 @@ function bytesOf(head: number[], size: number): Uint8Array {
 
 function webpBytes(): Uint8Array {
   const bytes = new Uint8Array(24)
-  bytes.set([...'RIFF'].map((c) => c.charCodeAt(0)), 0)
-  bytes.set([...'WEBP'].map((c) => c.charCodeAt(0)), 8)
+  bytes.set(
+    [...'RIFF'].map((c) => c.charCodeAt(0)),
+    0,
+  )
+  bytes.set(
+    [...'WEBP'].map((c) => c.charCodeAt(0)),
+    8,
+  )
   return bytes
 }
 
 function avifBytes(): Uint8Array {
   const bytes = new Uint8Array(24)
-  bytes.set([...'ftypavif'].map((c) => c.charCodeAt(0)), 4)
+  bytes.set(
+    [...'ftypavif'].map((c) => c.charCodeAt(0)),
+    4,
+  )
   return bytes
 }
 

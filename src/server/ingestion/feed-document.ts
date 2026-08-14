@@ -153,7 +153,10 @@ function pageKey(value: string): string {
 function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: boolean): NormalizedFeedItem {
   const title = boundedPlainText(recordField(record, ['title', 'atom:title']), MAX_TITLE_LENGTH)
   const summary = boundedPlainText(
-    recordField(record, atom ? ['summary', 'content', 'atom:summary', 'atom:content'] : ['description', 'content:encoded']),
+    recordField(
+      record,
+      atom ? ['summary', 'content', 'atom:summary', 'atom:content'] : ['description', 'content:encoded'],
+    ),
     MAX_SUMMARY_LENGTH,
   )
   const link = normalizeHttpUrl(atom ? atomLink(record, 'alternate') : recordField(record, ['link']), baseUrl)
@@ -189,18 +192,21 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
 
 function imageOf(record: Record<string, unknown>, atom: boolean): unknown {
   const media = recordField(record, ['media:content', 'media:thumbnail'])
-  const mediaUrl = attributeOf(arrayOf(media).find((candidate) => {
-    const entry = asRecord(candidate)
-    const medium = plainValue(entry['@_medium'])
-    const type = plainValue(entry['@_type'])
-    return medium === 'image' || type?.startsWith('image/') || (!medium && !type)
-  }), 'url')
+  const mediaUrl = attributeOf(
+    arrayOf(media).find((candidate) => {
+      const entry = asRecord(candidate)
+      const medium = plainValue(entry['@_medium'])
+      const type = plainValue(entry['@_type'])
+      return medium === 'image' || type?.startsWith('image/') || (!medium && !type)
+    }),
+    'url',
+  )
   if (mediaUrl) return mediaUrl
 
   const enclosure = atom ? atomLinkElement(record, 'enclosure') : recordField(record, ['enclosure'])
   const enclosureRecord = asRecord(enclosure)
   const enclosureType = plainValue(enclosureRecord['@_type'])
-  return enclosureType?.startsWith('image/') ? enclosureRecord['@_url'] ?? enclosureRecord['@_href'] : undefined
+  return enclosureType?.startsWith('image/') ? (enclosureRecord['@_url'] ?? enclosureRecord['@_href']) : undefined
 }
 
 function atomLink(record: Record<string, unknown>, relationship: string): unknown {
@@ -212,9 +218,7 @@ function atomLinkElement(record: Record<string, unknown>, relationship: string):
   const links = arrayOf(recordField(record, ['link', 'atom:link']))
   return (
     links.find((candidate) => plainValue(asRecord(candidate)['@_rel']) === relationship) ??
-    (relationship === 'alternate'
-      ? links.find((candidate) => !plainValue(asRecord(candidate)['@_rel']))
-      : undefined)
+    (relationship === 'alternate' ? links.find((candidate) => !plainValue(asRecord(candidate)['@_rel'])) : undefined)
   )
 }
 

@@ -26,23 +26,19 @@ describe('fatal process errors', () => {
       })\n`,
     )
 
-    const child = spawn(
-      process.execPath,
-      ['--import', 'tsx', '--import', trigger, 'src/server/main.ts'],
-      {
-        cwd: process.cwd(),
-        env: {
-          ...process.env,
-          CLIENT_DIR: 'tests/fixtures/client',
-          DATA_DIR: join(root, 'data'),
-          FATAL_KIND: kind,
-          PORT: String(await freePort()),
-          SETUP_SECRET: 'a-long-enough-setup-secret-for-process-tests',
-          PUBLIC_ORIGIN: 'https://reader.test',
-        },
-        stdio: 'pipe',
+    const child = spawn(process.execPath, ['--import', 'tsx', '--import', trigger, 'src/server/main.ts'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        CLIENT_DIR: 'tests/fixtures/client',
+        DATA_DIR: join(root, 'data'),
+        FATAL_KIND: kind,
+        PORT: String(await freePort()),
+        SETUP_SECRET: 'a-long-enough-setup-secret-for-process-tests',
+        PUBLIC_ORIGIN: 'https://reader.test',
       },
-    )
+      stdio: 'pipe',
+    })
 
     let stdout = ''
     child.stdout.on('data', (chunk: Buffer) => {
@@ -102,8 +98,7 @@ function waitForLog(child: ChildProcessWithoutNullStreams, predicate: () => bool
 function waitForExit(
   child: ChildProcessWithoutNullStreams,
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
-  const { promise, resolve, reject } =
-    Promise.withResolvers<{ code: number | null; signal: NodeJS.Signals | null }>()
+  const { promise, resolve, reject } = Promise.withResolvers<{ code: number | null; signal: NodeJS.Signals | null }>()
   const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
     clearTimeout(timeout)
     resolve({ code, signal })

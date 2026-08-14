@@ -457,9 +457,7 @@ describe('resisting password guessing', () => {
     await claimedDevice(service)
     const guesser = new Device(service, { address: '203.0.113.7' })
 
-    const responses = await Promise.all(
-      Array.from({ length: 6 }, () => guesser.signIn('a-wrong-password')),
-    )
+    const responses = await Promise.all(Array.from({ length: 6 }, () => guesser.signIn('a-wrong-password')))
 
     expect(responses.map((response) => response.status).sort()).toEqual([401, 401, 401, 401, 401, 429])
   })

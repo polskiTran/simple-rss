@@ -27,10 +27,7 @@ export function nextRetryTime(
   from: Date,
 ): string {
   const waitMinutes = backoffMinutes(intervalMinutes, consecutiveFailures)
-  const waitMs = Math.min(
-    waitMinutes * 60_000 + pollingJitterMs(feedId, waitMinutes),
-    MAX_BACKOFF_MINUTES * 60_000,
-  )
+  const waitMs = Math.min(waitMinutes * 60_000 + pollingJitterMs(feedId, waitMinutes), MAX_BACKOFF_MINUTES * 60_000)
   return new Date(from.getTime() + waitMs).toISOString()
 }
 
