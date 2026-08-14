@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
-import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
+import { Suspense, lazy } from 'react'
+import type { ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackLink } from '../components/back-link.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
@@ -7,24 +7,13 @@ import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
-import { failureKind } from './failure.js'
+import { useResource } from '../use-resource.js'
 
 const ArticleMarkdown = lazy(async () => ({
   default: (await import('../components/article-markdown.js')).ArticleMarkdown,
 }))
 
 const parsingNote = <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
-
-type ItemState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'loaded'; readonly item: ReaderItem }
-  | { readonly kind: 'unavailable' }
-  | { readonly kind: 'unreachable' }
-
-type ArticleState =
-  | { readonly kind: 'extracting' }
-  | { readonly kind: 'ready'; readonly article: ReaderArticle }
-  | { readonly kind: 'failed'; readonly waitSeconds: number | undefined }
 
 export interface ReaderViewProps {
   readonly feedItemId: number
@@ -35,45 +24,11 @@ export interface ReaderViewProps {
 }
 
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
-  const [itemState, setItemState] = useState<ItemState>({ kind: 'loading' })
-  const [articleState, setArticleState] = useState<ArticleState>({ kind: 'extracting' })
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(() => {
-    let active = true
-    setItemState({ kind: 'loading' })
-    void fetchReaderItem(feedItemId)
-      .then((item) => {
-        if (active) setItemState({ kind: 'loaded', item })
-      })
-      .catch((error: unknown) => {
-        if (active) setItemState({ kind: failureKind(error) })
-      })
-    return () => {
-      active = false
-    }
-  }, [feedItemId])
-
-  useEffect(() => {
-    let active = true
-    setArticleState({ kind: 'extracting' })
-    void fetchReaderArticle(feedItemId)
-      .then((article) => {
-        if (active) setArticleState({ kind: 'ready', article })
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          setArticleState({
-            kind: 'failed',
-            waitSeconds:
-              error instanceof ApiError && error.status === 429 ? (error.retryAfterSeconds ?? 30) : undefined,
-          })
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, [feedItemId, attempt])
+  const [itemState, { set: setItem }] = useResource((signal) => fetchReaderItem(feedItemId, signal), [feedItemId])
+  const [articleState, { retry: retryParsing }] = useResource(
+    (signal) => fetchReaderArticle(feedItemId, signal),
+    [feedItemId],
+  )
 
   if (itemState.kind === 'loading') {
     return <LoadingNote className="view measure empty-note">opening the article</LoadingNote>
@@ -88,9 +43,9 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
     )
   }
 
-  const { item } = itemState
+  const item = itemState.value
   const next = item.nextInDigest
-  const setSaved = (saved: boolean) => setItemState({ kind: 'loaded', item: { ...item, saved } })
+  const setSaved = (saved: boolean) => setItem((current) => ({ ...current, saved }))
 
   return (
     <article className="view measure reader-view">
@@ -104,7 +59,7 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         <p className="content-meta reader-meta">
           <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
           <span>{item.displayDate}</span>
-          {articleState.kind === 'ready' ? <span>{articleState.article.readingTimeMinutes} min</span> : null}
+          {articleState.kind === 'loaded' ? <span>{articleState.value.readingTimeMinutes} min</span> : null}
           {item.link ? (
             <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
               open original
@@ -113,18 +68,14 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </p>
       </header>
 
-      {articleState.kind === 'extracting' ? parsingNote : null}
-      {articleState.kind === 'ready' ? (
+      {articleState.kind === 'loading' ? parsingNote : null}
+      {articleState.kind === 'loaded' ? (
         <Suspense fallback={parsingNote}>
-          <ArticleMarkdown markdown={articleState.article.markdown} />
+          <ArticleMarkdown markdown={articleState.value.markdown} />
         </Suspense>
       ) : null}
-      {articleState.kind === 'failed' ? (
-        <Fallback
-          item={item}
-          waitSeconds={articleState.waitSeconds}
-          onRetry={() => setAttempt((current) => current + 1)}
-        />
+      {articleState.kind === 'unavailable' || articleState.kind === 'unreachable' ? (
+        <Fallback item={item} waitSeconds={waitSecondsOf(articleState.error)} onRetry={retryParsing} />
       ) : null}
 
       {next ? (
@@ -141,6 +92,11 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
       ) : null}
     </article>
   )
+}
+
+/** Extraction refuses a second attempt too soon; the wait it names is the User's cue. */
+function waitSecondsOf(error: unknown): number | undefined {
+  return error instanceof ApiError && error.status === 429 ? (error.retryAfterSeconds ?? 30) : undefined
 }
 
 interface FallbackProps {

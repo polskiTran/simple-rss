@@ -65,11 +65,13 @@ const UNAUTHENTICATED = 'unauthenticated'
 const REQUEST_TIMEOUT_MS = 30_000
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  // Every request carries the deadline; a caller's own signal only adds to it.
+  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   const response = await fetch(path, {
     ...init,
     headers: { accept: 'application/json', ...init.headers },
     credentials: 'same-origin',
-    signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: init.signal ? AbortSignal.any([init.signal, deadline]) : deadline,
   })
 
   if (response.ok) return response
@@ -79,6 +81,11 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   if (code === UNAUTHENTICATED && path !== STATUS_PATH) sessionEnded?.()
 
   throw new ApiError(response.status, code, retryAfterOf(response))
+}
+
+/** A read a view can abandon: `useResource` hands its signal down, so leaving cancels the request. */
+function read(path: string, signal: AbortSignal | undefined): Promise<Response> {
+  return request(path, signal ? { signal } : {})
 }
 
 function post(path: string, body: unknown): Promise<Response> {
@@ -136,13 +143,13 @@ export async function refreshFeed(feedId: number): Promise<RefreshFeedResponse> 
   return refreshFeedResponseSchema.parse(await response.json())
 }
 
-export async function fetchSubscriptions(): Promise<SubscriptionList> {
-  const response = await request('/api/feeds')
+export async function fetchSubscriptions(signal?: AbortSignal): Promise<SubscriptionList> {
+  const response = await read('/api/feeds', signal)
   return subscriptionListSchema.parse(await response.json())
 }
 
-export async function fetchFeedDetail(feedId: number): Promise<FeedDetail> {
-  const response = await request(`/api/feeds/${feedId}`)
+export async function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<FeedDetail> {
+  const response = await read(`/api/feeds/${feedId}`, signal)
   return feedDetailSchema.parse(await response.json())
 }
 
@@ -163,19 +170,19 @@ export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }
 
-export async function fetchDigest(cursor?: string): Promise<Digest> {
-  const response = await request(cursor ? `/api/digest?cursor=${encodeURIComponent(cursor)}` : '/api/digest')
+export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promise<Digest> {
+  const response = await read(cursor ? `/api/digest?cursor=${encodeURIComponent(cursor)}` : '/api/digest', signal)
   return digestSchema.parse(await response.json())
 }
 
 /** Searches retained reading metadata only; results newest first. */
-export async function fetchSearchResults(query: string): Promise<SearchResults> {
-  const response = await request(`/api/search?q=${encodeURIComponent(query)}`)
+export async function fetchSearchResults(query: string, signal?: AbortSignal): Promise<SearchResults> {
+  const response = await read(`/api/search?q=${encodeURIComponent(query)}`, signal)
   return searchResultsSchema.parse(await response.json())
 }
 
-export async function fetchLibrary(cursor?: string): Promise<Library> {
-  const response = await request(cursor ? `/api/library?cursor=${encodeURIComponent(cursor)}` : '/api/library')
+export async function fetchLibrary(cursor?: string, signal?: AbortSignal): Promise<Library> {
+  const response = await read(cursor ? `/api/library?cursor=${encodeURIComponent(cursor)}` : '/api/library', signal)
   return librarySchema.parse(await response.json())
 }
 
@@ -189,18 +196,18 @@ export async function unsaveFromLibrary(feedItemId: number): Promise<LibraryMemb
   return libraryMembershipSchema.parse(await response.json())
 }
 
-export async function fetchReaderItem(feedItemId: number): Promise<ReaderItem> {
-  const response = await request(`/api/items/${feedItemId}`)
+export async function fetchReaderItem(feedItemId: number, signal?: AbortSignal): Promise<ReaderItem> {
+  const response = await read(`/api/items/${feedItemId}`, signal)
   return readerItemSchema.parse(await response.json())
 }
 
-export async function fetchReaderArticle(feedItemId: number): Promise<ReaderArticle> {
-  const response = await request(`/api/items/${feedItemId}/reader`)
+export async function fetchReaderArticle(feedItemId: number, signal?: AbortSignal): Promise<ReaderArticle> {
+  const response = await read(`/api/items/${feedItemId}/reader`, signal)
   return readerArticleSchema.parse(await response.json())
 }
 
-export async function fetchInstallationPreferences(): Promise<InstallationPreferences> {
-  const response = await request('/api/settings')
+export async function fetchInstallationPreferences(signal?: AbortSignal): Promise<InstallationPreferences> {
+  const response = await read('/api/settings', signal)
   return installationPreferencesSchema.parse(await response.json())
 }
 
@@ -213,8 +220,8 @@ export async function updateInstallationTimezone(timezone: string): Promise<Inst
   return installationPreferencesSchema.parse(await response.json())
 }
 
-export async function fetchServiceMeta(): Promise<ServiceMeta> {
-  const response = await request('/api/meta')
+export async function fetchServiceMeta(signal?: AbortSignal): Promise<ServiceMeta> {
+  const response = await read('/api/meta', signal)
   return serviceMetaSchema.parse(await response.json())
 }
 
