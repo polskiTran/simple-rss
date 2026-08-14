@@ -5,7 +5,7 @@ import type { ImageOutcome, ImageService } from '../images/image-service.js'
 import { ImageRateLimiter } from '../images/image-rate-limit.js'
 import type { ImageUrlSignature } from '../images/image-url-signature.js'
 import { clientAddress } from './client-address.js'
-import { NO_STORE, unavailable } from './responses.js'
+import { NO_STORE, retryAfter, unavailable } from './responses.js'
 
 export interface ImageRouteDependencies {
   /** Absent only while startup could not open the database. */
@@ -30,7 +30,7 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
     return c.json(
       { error: { code: 'image_rate_limited', message: 'Too many image requests; wait before retrying' } },
       429,
-      { ...NO_STORE, 'Retry-After': String(verdict.retryAfterSeconds) },
+      retryAfter(verdict.retryAfterSeconds),
     )
   }
 
