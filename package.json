@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:browser": "pnpm build:client && playwright test",
-    "lint": "biome check .",
+    "lint": "biome check --error-on-warnings .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "cli": "tsx src/server/cli-main.ts"
