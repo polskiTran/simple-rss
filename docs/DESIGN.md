@@ -75,6 +75,11 @@ The paper is 820px wide with 56px of side padding; the stylesheet carries the
 rest of the rhythm. What follows is where the built layout departs from the
 drawn one.
 
+Dark paper takes 36px above the masthead where light takes 32px, at the desktop
+width only. The four pixels are an optical correction and not a value that
+escaped normalising: the masthead closes on a dark edge more tightly than on a
+pale one.
+
 **Departure — the measure.** Content — lists, the Reader, the daily band — is not
 held to a measure narrower than the masthead, but runs the paper's own content
 width (820 − 2×56 = 708px on desktop), because a narrower column leaves every
