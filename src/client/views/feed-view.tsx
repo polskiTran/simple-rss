@@ -1,3 +1,4 @@
+import { Button } from '@base-ui/react/button'
 import { useState, type CSSProperties } from 'react'
 import {
   POLLING_INTERVAL_MINUTES,
@@ -182,31 +183,29 @@ function OpenFeed({
         <span className="interval-options" role="group" aria-label="checked every">
           <span className="interval-caption">checked every</span>
           {POLLING_INTERVAL_MINUTES.map((minutes) => (
-            <button
+            <Button
               key={minutes}
-              type="button"
               className="text-button interval-option"
               aria-pressed={detail.schedule.pollingIntervalMinutes === minutes}
               aria-label={`check ${intervalPhrase(minutes)}`}
               onClick={() => onChangeInterval(minutes)}
             >
               {INTERVAL_WORDS[minutes]}
-            </button>
+            </Button>
           ))}
         </span>
         <span className="feed-actions">
-          <button className="text-button feed-refresh" type="button" disabled={refreshing} onClick={onRefresh}>
+          <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>
             {refreshing ? 'refreshing…' : 'refresh now'}
-          </button>
-          <button
+          </Button>
+          <Button
             className="text-button unsubscribe-open"
-            type="button"
             aria-expanded={confirmingUnsubscribe}
             aria-controls="unsubscribe-confirmation"
             onClick={() => onConfirmUnsubscribe(!confirmingUnsubscribe)}
           >
             unsubscribe…
-          </button>
+          </Button>
         </span>
       </div>
       {confirmingUnsubscribe ? (
@@ -236,12 +235,12 @@ function Unsubscribe({
           this stops checking the feed and its items leave the digest — anything saved stays in your library
         </p>
         <p className="unsubscribe-choice">
-          <button className="text-button" type="button" disabled={working} onClick={onUnsubscribe}>
+          <Button className="text-button" focusableWhenDisabled disabled={working} onClick={onUnsubscribe}>
             {working ? 'unsubscribing…' : 'unsubscribe'}
-          </button>
-          <button className="text-button" type="button" disabled={working} onClick={() => onConfirm(false)}>
+          </Button>
+          <Button className="text-button" focusableWhenDisabled disabled={working} onClick={() => onConfirm(false)}>
             keep subscribed
-          </button>
+          </Button>
         </p>
       </div>
     </div>
