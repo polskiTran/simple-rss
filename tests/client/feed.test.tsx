@@ -252,11 +252,7 @@ describe('managing one Feed', () => {
 
     await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
 
-    expect(
-      screen.getByText(
-        'this stops checking the feed and its items leave the digest — anything saved stays in your library',
-      ),
-    ).toBeDefined()
+    expect(screen.getByText('Removes the feed and its items except saved items.')).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
 
     await user.click(screen.getByRole('button', { name: 'cancel' }))
