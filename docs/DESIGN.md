@@ -9,7 +9,7 @@ appearance and motion, not interaction.
 1. **One shape, repeated.** A content item is a 21px line with a 12.5px grey line under it. Posts, feeds, saved items are all that shape. Filters differ; the object does not.
 2. **Settings is not that shape.** It drops to a 13/14px two-column sheet so preferences can never be mistaken for reading.
 3. **No dividers, no cards, no boxes.** Separation is whitespace only. The one rule in the system is the search field's underline.
-4. **Colour is reserved.** Accent appears on saved state, the text cursor, and links inside an article — the third added when the reading surface took the Markdown renderer's standards (§5, Reader body). Nowhere else.
+4. **Colour is reserved.** Accent appears on saved state, the text cursor, and links inside an article. Danger accent on destructive action.
 5. **Cadence is the unfair advantage.** Publishing rhythm — the thing only an RSS reader knows — is drawn as dot matrices at four ink levels. No charts, no curves, no colour.
 
 ## 2. Colour
@@ -25,6 +25,7 @@ appearance and motion, not interaction.
 | Grey — quietest (save affordance, counts, month labels) | `#A3A29D` |
 | Grey — muted prose / pull quote | `#6B6A66` |
 | Accent (saved, cursor) | `#2438D8` |
+| Danger (destructive action) | `#B02B27` |
 | Hairline (search underline) | `rgba(18,17,15,.15)` |
 | Dim (overlay backdrop) | `rgba(18,17,15,.28)` |
 
@@ -43,6 +44,7 @@ another name, which §1 forbids.
 | Grey — metadata | `#8C8B86` |
 | Grey — quietest | `#6B6A66` |
 | Accent (saved) | `#E3B341` |
+| Danger (destructive action) | `#B02B27` |
 | Dim (overlay backdrop) | `rgba(0,0,0,.52)` |
 
 **Selection.** Selected text is the text cursor's range, so it shares the
@@ -276,7 +278,9 @@ so its cells hold still and the tile breathes on opacity instead.
 
 - Never more than four ink levels in a matrix.
 - Never a border where whitespace will do.
-- Never a second typeface, never a second accent.
+- Never a second typeface.
+- Never all caps mono font.
+- No hairline design.
 - Numbers appear only where they answer "is there something to read": post counts, quiet stretches. No engagement stats, no read time in lists (only in the reader header).
 
 ## 7. Breakpoints

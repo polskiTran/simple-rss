@@ -35,6 +35,7 @@
   --color-meta: #8c8b86;
   --color-quiet: #a3a29d;
   --color-accent: #2438d8;
+  --color-danger: #b02b27;
   --color-hairline: rgb(18 17 15 / 0.15);
 
   /* The renderer's tokens, under the names its classes ask for (shadcn's).
@@ -71,6 +72,7 @@
     --color-meta: #8c8b86;
     --color-quiet: #6b6a66;
     --color-accent: #e3b341;
+    --color-danger: #f47c6b;
     --color-muted: rgb(240 238 233 / 0.08);
     --color-muted-foreground: #8c8b86;
     --color-sidebar: rgb(240 238 233 / 0.04);
@@ -96,6 +98,7 @@
   --color-meta: #8c8b86;
   --color-quiet: #6b6a66;
   --color-accent: #e3b341;
+  --color-danger: #f47c6b;
   --color-muted: rgb(240 238 233 / 0.08);
   --color-muted-foreground: #8c8b86;
   --color-sidebar: rgb(240 238 233 / 0.04);
@@ -674,6 +677,10 @@
     display: flex;
     gap: 24px;
     margin: 20px 0 0;
+  }
+
+  .unsubscribe-confirm {
+    color: var(--color-danger);
   }
 
   .opml-controls {
