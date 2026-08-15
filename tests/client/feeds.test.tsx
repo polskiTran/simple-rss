@@ -55,6 +55,8 @@ function feedDetail(availability: object, itemCount: number) {
   return {
     feedId: FEED.feedId,
     title: FEED.title,
+    reportedTitle: FEED.title,
+    customTitle: null,
     domain: FEED.domain,
     homePageUrl: FEED.homePageUrl,
     enteredUrl: FEED.enteredUrl,

@@ -90,6 +90,30 @@ test.describe('desktop Feed and Digest rendering', () => {
     await expectOpenFeed(page)
   })
 
+  test('sets a custom title in the edit overlay, and clearing it restores the reported title', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    await page.getByRole('button', { name: 'edit' }).click()
+
+    const title = page.getByRole('textbox', { name: 'title' })
+    await expect(title).toHaveAttribute('placeholder', 'Field Notes')
+    await title.fill('Tech tabloid')
+    await page.getByRole('button', { name: 'save', exact: true }).click()
+
+    await expect(page.locator('.feed-header-title')).toHaveText('Tech tabloid')
+    await page.getByRole('link', { name: '← feeds' }).click()
+    await page.getByRole('link', { name: 'Tech tabloid' }).click()
+
+    await page.getByRole('button', { name: 'edit' }).click()
+    await expect(title).toHaveValue('Tech tabloid')
+    await title.fill('')
+    await page.getByRole('button', { name: 'save', exact: true }).click()
+    await expect(page.locator('.feed-header-title')).toHaveText('Field Notes')
+  })
+
   test('colours the confirming word of the unsubscribe overlay, and only it', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'Field Notes' }).click()

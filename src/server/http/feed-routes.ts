@@ -3,10 +3,12 @@ import {
   createSubscriptionRequestSchema,
   feedIdParameterSchema,
   importOpmlRequestSchema,
+  updateFeedDetailsRequestSchema,
   updatePollingIntervalRequestSchema,
   type CreateSubscriptionResponse,
   type Digest,
   type FeedDetail,
+  type FeedDetailsUpdate,
   type OpmlImportReport,
   type PollingSchedule,
   type RefreshFeedResponse,
@@ -100,6 +102,18 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const outcome = deps.subscriptions.unsubscribe(feedId.value)
     if (outcome.kind === 'missing') return notFound(c)
     return c.body(null, 204, NO_STORE)
+  })
+
+  app.put('/feeds/:feedId/details', async (c) => {
+    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    if (!feedId.ok) return feedId.response
+
+    const body = await readJsonBody(c, updateFeedDetailsRequestSchema)
+    if (!body.ok) return body.response
+
+    const outcome = deps.subscriptions.setFeedDetails(feedId.value, body.value.customTitle)
+    if (outcome.kind === 'missing') return notFound(c)
+    return c.json<FeedDetailsUpdate>(outcome.details, 200, NO_STORE)
   })
 
   app.put('/feeds/:feedId/interval', async (c) => {
