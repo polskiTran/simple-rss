@@ -318,8 +318,8 @@ describe('the way back out of an opened screen', () => {
     await user.click(await screen.findByRole('link', { name: 'Field Notes' }))
     await openedFeed()
 
-    await user.click(screen.getByRole('button', { name: 'unsubscribe…' }))
     await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
+    await user.click(screen.getByRole('button', { name: 'confirm' }))
 
     expect(await screen.findByRole('textbox', { name: /search or add feeds/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')

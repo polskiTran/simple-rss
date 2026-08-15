@@ -8,6 +8,9 @@ import {
   type Installation,
 } from './installation.js'
 
+const DANGER_RED = 'rgb(176, 43, 39)'
+const INK = 'rgb(18, 17, 15)'
+
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
@@ -85,6 +88,15 @@ test.describe('desktop Feed and Digest rendering', () => {
   test('opens one Feed into its cadence grid and manages it there', async ({ page, installation }) => {
     await subscribe(page, installation)
     await expectOpenFeed(page)
+  })
+
+  test('colours the confirming word of the unsubscribe overlay, and only it', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    await page.getByRole('button', { name: 'unsubscribe' }).click()
+
+    await expect(page.getByRole('button', { name: 'confirm' })).toHaveCSS('color', DANGER_RED)
+    await expect(page.getByRole('button', { name: 'cancel' })).toHaveCSS('color', INK)
   })
 })
 

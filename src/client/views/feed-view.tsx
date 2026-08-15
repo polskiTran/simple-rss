@@ -227,10 +227,7 @@ function OpenFeed({
   )
 }
 
-/**
- * Unsubscribing is a decision to settle before anything else, so it is asked in
- * an overlay: focus trapped, escape and the dimmed backdrop both meaning keep.
- */
+/* Unsubscribing confirmation dialog */
 function Unsubscribe({
   feedTitle,
   confirming,
@@ -246,23 +243,28 @@ function Unsubscribe({
 }) {
   return (
     <Dialog.Root open={confirming} onOpenChange={onConfirm}>
-      <Dialog.Trigger className="text-button unsubscribe-open">unsubscribe…</Dialog.Trigger>
+      <Dialog.Trigger className="text-button unsubscribe-open">unsubscribe</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="overlay-backdrop" />
         <Dialog.Viewport className="overlay-viewport">
           <Dialog.Popup className="overlay-popup">
             <Dialog.Title className="overlay-title">unsubscribe from {feedTitle}</Dialog.Title>
             <Dialog.Description className="overlay-description">
-              this stops checking the feed and its items leave the digest — anything saved stays in your library
+                Removes the feed and its items except saved items.
             </Dialog.Description>
             <p className="unsubscribe-choice">
-              <Button className="text-button" focusableWhenDisabled disabled={working} onClick={onUnsubscribe}>
-                {working ? 'unsubscribing…' : 'unsubscribe'}
+              <Button
+                className="text-button unsubscribe-confirm"
+                focusableWhenDisabled
+                disabled={working}
+                onClick={onUnsubscribe}
+              >
+                {working ? 'unsubscribing…' : 'confirm'}
               </Button>
               {/* Composed onto Button: Dialog.Close takes native button props only,
                   so the dismissing word borrows the focus its own press would cost it. */}
               <Dialog.Close className="text-button" disabled={working} render={<Button focusableWhenDisabled />}>
-                keep subscribed
+                cancel
               </Dialog.Close>
             </p>
           </Dialog.Popup>

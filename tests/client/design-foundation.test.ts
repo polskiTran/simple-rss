@@ -33,6 +33,7 @@ describe('the light palette', () => {
     ['grey — quietest', '--color-quiet', '#a3a29d'],
     ['grey — muted prose', '--color-muted-foreground', '#6b6a66'],
     ['accent', '--color-accent', '#2438d8'],
+    ['danger — the confirming word of a destructive overlay', '--color-danger', '#b02b27'],
     ['dim — the overlay backdrop', '--color-dim', 'rgb(18 17 15 / 0.28)'],
   ])('binds %s through %s to %s', (_role, property, value) => {
     expect(lightOnly()).toContain(`${property}: ${value}`)
@@ -47,9 +48,18 @@ describe('the dark palette', () => {
     ['grey — metadata', '--color-meta', '#8c8b86'],
     ['grey — quietest', '--color-quiet', '#6b6a66'],
     ['accent', '--color-accent', '#e3b341'],
+    ['danger — the confirming word of a destructive overlay', '--color-danger', '#f47c6b'],
     ['dim — the overlay backdrop', '--color-dim', 'rgb(0 0 0 / 0.52)'],
   ])('binds %s through %s to %s', (_role, property, value) => {
     expect(darkBlocks()).toContain(`${property}: ${value}`)
+  })
+})
+
+describe('the danger colour', () => {
+  it('is spent on the confirming word of the unsubscribe overlay and nowhere else', () => {
+    expect(css.match(/var\(--color-danger\)/g) ?? []).toHaveLength(1)
+    expect(css).toMatch(/\.unsubscribe-confirm\s*\{[^}]*color:\s*var\(--color-danger\)/)
+    expect(css).not.toMatch(/\.unsubscribe-confirm\s*\{[^}]*background/)
   })
 })
 

@@ -250,7 +250,7 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
 
     expect(
       screen.getByText(
@@ -259,9 +259,9 @@ describe('managing one Feed', () => {
     ).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: 'keep subscribed' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
 
-    expect(screen.getByRole('button', { name: 'unsubscribe…' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'unsubscribe' })).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
   })
 
@@ -271,8 +271,8 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
-    await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
+    await user.click(screen.getByRole('button', { name: 'confirm' }))
 
     expect(await screen.findByRole('textbox', { name: /search or add feeds/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
@@ -290,12 +290,12 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe…' }))
-    await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
+    await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
+    await user.click(screen.getByRole('button', { name: 'confirm' }))
 
     expect(await screen.findByText('the feed could not be unsubscribed')).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
-    expect(screen.getByRole('button', { name: 'unsubscribe…' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'unsubscribe' })).toBeDefined()
   })
 })
 

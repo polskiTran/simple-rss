@@ -94,8 +94,8 @@ test.describe('the Library', () => {
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
     await expect(page.getByRole('link', { name: '← saved' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'unsubscribe…' }).click()
-    await page.getByRole('button', { name: 'unsubscribe', exact: true }).click()
+    await page.getByRole('button', { name: 'unsubscribe' }).click()
+    await page.getByRole('button', { name: 'confirm' }).click()
     await expect(page.getByRole('textbox', { name: 'search or add feeds' })).toBeVisible()
 
     await page.getByRole('link', { name: 'saved' }).click()
