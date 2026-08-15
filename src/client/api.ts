@@ -4,6 +4,7 @@ import {
   createSubscriptionResponseSchema,
   digestSchema,
   feedDetailSchema,
+  feedDetailsUpdateSchema,
   installationPreferencesSchema,
   libraryMembershipSchema,
   librarySchema,
@@ -19,6 +20,7 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type FeedDetail,
+  type FeedDetailsUpdate,
   type InstallationPreferences,
   type Library,
   type LibraryMembership,
@@ -151,6 +153,16 @@ export async function fetchSubscriptions(signal?: AbortSignal): Promise<Subscrip
 export async function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<FeedDetail> {
   const response = await read(`/api/feeds/${feedId}`, signal)
   return feedDetailSchema.parse(await response.json())
+}
+
+/** Sets or clears the Custom Title; null means the reported title stands. */
+export async function updateFeedDetails(feedId: number, customTitle: string | null): Promise<FeedDetailsUpdate> {
+  const response = await request(`/api/feeds/${feedId}/details`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ customTitle }),
+  })
+  return feedDetailsUpdateSchema.parse(await response.json())
 }
 
 export async function updatePollingInterval(

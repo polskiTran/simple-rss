@@ -69,6 +69,8 @@ export const subscriptions = sqliteTable(
     feedId: integer('feed_id')
       .primaryKey()
       .references(() => feeds.id, { onDelete: 'cascade' }),
+    /** The Custom Title; null means the Feed's reported title stands. */
+    customTitle: text('custom_title'),
     pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
     /** The persisted due-time frontier the scheduler wakes to query. */
     nextPollAt: text('next_poll_at').notNull(),

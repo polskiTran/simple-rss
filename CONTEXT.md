@@ -24,6 +24,14 @@ _Avoid_: Channel, source
 The User's decision to include a Feed in their Digest, together with preferences specific to that Feed.
 _Avoid_: Feed list, followed feed
 
+**Custom Title**:
+The User's Subscription-held name for a Feed. While set, it is the Feed's name everywhere the Feed is named, including OPML export and search; clearing it returns the Feed's reported title. OPML Import never creates one.
+_Avoid_: Nickname, rename, alias
+
+**Custom Description**:
+The User's Subscription-held description for a Feed, shown in place of the Feed Description while set; clearing it returns the Feed Description.
+_Avoid_: Note, annotation
+
 **OPML Import**:
 Recording the Subscriptions listed in an OPML file without contacting any Feed; whether each Feed answers is Feed Availability's story.
 _Avoid_: Feed migration, bulk subscribe
@@ -43,6 +51,10 @@ _Avoid_: Post, article
 **Feed Home Page**:
 The site a Feed declares as its own, read from the Feed document and absent when the Feed names only its own URL. It supplies the host shown beside a Feed and the link behind it, so the Feeds list names the publisher rather than whichever host serves the XML.
 _Avoid_: Site URL, website, channel link
+
+**Feed Description**:
+The description a Feed reports about itself in the Feed document, refreshed on each successful retrieval like the Feed's reported title.
+_Avoid_: Subtitle, blurb, about text
 
 **Feed Window**:
 The set of Feed Items exposed by a Feed during its latest successful retrieval.

@@ -673,10 +673,27 @@
     color: var(--color-quiet);
   }
 
-  .unsubscribe-choice {
+  .overlay-choice {
     display: flex;
     gap: 24px;
     margin: 20px 0 0;
+  }
+
+  .edit-details-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin: 20px 0 0;
+  }
+
+  /* Inside the form the column gap already separates it. */
+  .edit-details-form .overlay-choice {
+    margin: 0;
+  }
+
+  .field-input::placeholder {
+    color: var(--color-meta);
+    opacity: 1;
   }
 
   .unsubscribe-confirm {

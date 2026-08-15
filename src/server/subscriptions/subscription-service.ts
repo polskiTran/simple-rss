@@ -1,9 +1,10 @@
-import { and, eq, isNull, lte } from 'drizzle-orm'
+import { and, eq, isNull, lte, sql } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   pollingIntervalMinutesSchema,
   type FeedDetail,
+  type FeedDetailsUpdate,
   type FeedItemRow,
   type PollingIntervalMinutes,
   type PollingSchedule,
@@ -41,6 +42,10 @@ export type SetPollingIntervalOutcome =
 
 export type UnsubscribeOutcome = { readonly kind: 'unsubscribed' } | { readonly kind: 'missing' }
 
+export type SetFeedDetailsOutcome =
+  | { readonly kind: 'updated'; readonly details: FeedDetailsUpdate }
+  | { readonly kind: 'missing' }
+
 interface FeedRecord {
   readonly feedId: number
   readonly title: string
@@ -63,6 +68,8 @@ const FEED_RECORD_COLUMNS = {
 
 const SUBSCRIBED_FEED_COLUMNS = {
   ...FEED_RECORD_COLUMNS,
+  // Effective title: the Custom Title wins wherever a Subscription is named.
+  title: sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`,
   lastPolledAt: subscriptions.lastPolledAt,
   lastSuccessAt: subscriptions.lastSuccessAt,
   consecutiveFailures: subscriptions.consecutiveFailures,
@@ -279,6 +286,23 @@ export class SubscriptionService {
     return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
   }
 
+  /** Sets or clears the Custom Title; the Feed's reported title keeps being tracked underneath. */
+  setFeedDetails(feedId: number, customTitle: string | null): SetFeedDetailsOutcome {
+    const row = this.#db
+      .select({ reportedTitle: feeds.title })
+      .from(subscriptions)
+      .innerJoin(feeds, eq(feeds.id, subscriptions.feedId))
+      .where(eq(subscriptions.feedId, feedId))
+      .limit(1)
+      .all()[0]
+    if (!row) return { kind: 'missing' }
+
+    this.#db.update(subscriptions).set({ customTitle }).where(eq(subscriptions.feedId, feedId)).run()
+
+    this.#logger.info('subscriptions.feed_details_changed', { feedId, customTitle: customTitle !== null })
+    return { kind: 'updated', details: { title: customTitle ?? row.reportedTitle, customTitle } }
+  }
+
   /**
    * Deletes only the Subscription row — polling and Digest membership hinge on it.
    * Retained rows wait for the retention sweep, which keeps saves and their attribution.
@@ -312,6 +336,8 @@ export class SubscriptionService {
     const record = this.#db
       .select({
         ...SUBSCRIBED_FEED_COLUMNS,
+        reportedTitle: feeds.title,
+        customTitle: subscriptions.customTitle,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
         nextPollAt: subscriptions.nextPollAt,
       })
@@ -362,6 +388,8 @@ export class SubscriptionService {
     return {
       feedId: record.feedId,
       title: record.title,
+      reportedTitle: record.reportedTitle,
+      customTitle: record.customTitle,
       domain: record.domain,
       homePageUrl: record.homePageUrl,
       enteredUrl: record.enteredUrl,

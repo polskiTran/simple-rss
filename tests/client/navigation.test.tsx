@@ -34,6 +34,8 @@ const DIGEST = {
 const DETAIL = {
   feedId: 1,
   title: 'Field Notes',
+  reportedTitle: 'Field Notes',
+  customTitle: null,
   domain: 'journal.example',
   homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',

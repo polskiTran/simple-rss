@@ -188,6 +188,14 @@ export const migrations: readonly Migration[] = [
       UPDATE feeds SET etag = NULL, last_modified = NULL;
     `,
   },
+  {
+    version: 10,
+    name: 'subscription-custom-title',
+    sql: `
+      ALTER TABLE subscriptions ADD COLUMN custom_title TEXT
+        CHECK (custom_title IS NULL OR length(custom_title) BETWEEN 1 AND 512);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

@@ -7,11 +7,20 @@ import {
   POLLING_INTERVAL_MINUTES,
   type FeedAvailability,
   type FeedDetail,
+  type FeedDetailsUpdate,
   type PollingIntervalMinutes,
 } from '../../shared/api.js'
-import { ApiError, fetchFeedDetail, refreshFeed, unsubscribeFromFeed, updatePollingInterval } from '../api.js'
+import {
+  ApiError,
+  fetchFeedDetail,
+  refreshFeed,
+  unsubscribeFromFeed,
+  updateFeedDetails,
+  updatePollingInterval,
+} from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { BackLink } from '../components/back-link.js'
+import { Field } from '../components/field.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
@@ -139,6 +148,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
           onShowDay={showDay}
           onSaved={setSaved}
           onOpenItem={onOpenItem}
+          onDetailsSaved={(details) => set((detail) => ({ ...detail, ...details }))}
           confirmingUnsubscribe={confirmingUnsubscribe}
           unsubscribing={unsubscribing}
           onConfirmUnsubscribe={setConfirmingUnsubscribe}
@@ -158,6 +168,7 @@ function OpenFeed({
   onShowDay,
   onSaved,
   onOpenItem,
+  onDetailsSaved,
   confirmingUnsubscribe,
   unsubscribing,
   onConfirmUnsubscribe,
@@ -171,6 +182,7 @@ function OpenFeed({
   onShowDay: (date: string) => void
   onSaved: (feedItemId: number, saved: boolean) => void
   onOpenItem: (feedItemId: number, feedTitle: string) => void
+  onDetailsSaved: (details: FeedDetailsUpdate) => void
   confirmingUnsubscribe: boolean
   unsubscribing: boolean
   onConfirmUnsubscribe: (confirming: boolean) => void
@@ -207,6 +219,7 @@ function OpenFeed({
           ))}
         </ToggleGroup>
         <span className="feed-actions">
+          <EditFeedDetails detail={detail} onSaved={onDetailsSaved} />
           <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>
             {refreshing ? 'refreshing…' : 'refresh now'}
           </Button>
@@ -224,6 +237,75 @@ function OpenFeed({
       </p>
       <Items detail={detail} onSaved={onSaved} onOpenItem={onOpenItem} />
     </>
+  )
+}
+
+/* Custom Title dialog: the placeholder shows the reported title, and a blank field clears the override back to it. */
+function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: FeedDetailsUpdate) => void }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState('')
+
+  function openChanged(next: boolean) {
+    setOpen(next)
+    if (next) {
+      setDraft(detail.customTitle ?? '')
+      setNotice('')
+    }
+  }
+
+  async function save() {
+    if (saving) return
+    setSaving(true)
+    try {
+      const trimmed = draft.trim()
+      const details = await updateFeedDetails(detail.feedId, trimmed === '' ? null : trimmed)
+      onSaved(details)
+      setOpen(false)
+    } catch {
+      setNotice('the title could not be changed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={openChanged}>
+      <Dialog.Trigger className="text-button">edit</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="overlay-backdrop" />
+        <Dialog.Viewport className="overlay-viewport">
+          <Dialog.Popup className="overlay-popup">
+            <Dialog.Title className="overlay-title">edit {detail.title}</Dialog.Title>
+            <Dialog.Description className="overlay-description">
+              Your title names the feed everywhere; leaving it blank returns to the feed's own.
+            </Dialog.Description>
+            <form
+              className="edit-details-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void save()
+              }}
+            >
+              <Field label="title" value={draft} placeholder={detail.reportedTitle} onChange={setDraft} />
+              <p className="overlay-choice">
+                <Button className="text-button" type="submit" focusableWhenDisabled disabled={saving}>
+                  {saving ? 'saving…' : 'save'}
+                </Button>
+                {/* Composed onto Button exactly as the unsubscribe overlay's dismissing word is. */}
+                <Dialog.Close className="text-button" disabled={saving} render={<Button focusableWhenDisabled />}>
+                  cancel
+                </Dialog.Close>
+              </p>
+              <p className="notice" aria-live="polite">
+                {notice}
+              </p>
+            </form>
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
 
@@ -250,9 +332,9 @@ function Unsubscribe({
           <Dialog.Popup className="overlay-popup">
             <Dialog.Title className="overlay-title">unsubscribe from {feedTitle}</Dialog.Title>
             <Dialog.Description className="overlay-description">
-                Removes the feed and its items except saved items.
+              Removes the feed and its items except saved items.
             </Dialog.Description>
-            <p className="unsubscribe-choice">
+            <p className="overlay-choice">
               <Button
                 className="text-button unsubscribe-confirm"
                 focusableWhenDisabled
