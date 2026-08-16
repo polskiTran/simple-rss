@@ -7,7 +7,7 @@ export interface FieldProps {
   readonly autoComplete?: string
   readonly autoFocus?: boolean
   /** What stands when the value is left blank, e.g. a Feed's reported title. */
-  readonly placeholder?: string
+  readonly placeholder?: string | undefined
   onChange(value: string): void
 }
 

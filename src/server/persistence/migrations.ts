@@ -272,6 +272,14 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 13,
+    name: 'subscription-custom-description',
+    sql: `
+      ALTER TABLE subscriptions ADD COLUMN custom_description TEXT
+        CHECK (custom_description IS NULL OR length(custom_description) BETWEEN 1 AND 1024);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

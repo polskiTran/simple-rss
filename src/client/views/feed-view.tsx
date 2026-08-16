@@ -243,17 +243,19 @@ function OpenFeed({
   )
 }
 
-/* Custom Title dialog: the placeholder shows the reported title, and a blank field clears the override back to it. */
+/* Custom Title and Custom Description dialog: each placeholder shows the reported value, and a blank field clears that override back to it. */
 function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: FeedDetailsUpdate) => void }) {
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [titleDraft, setTitleDraft] = useState('')
+  const [descriptionDraft, setDescriptionDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
 
   function openChanged(next: boolean) {
     setOpen(next)
     if (next) {
-      setDraft(detail.customTitle ?? '')
+      setTitleDraft(detail.customTitle ?? '')
+      setDescriptionDraft(detail.customDescription ?? '')
       setNotice('')
     }
   }
@@ -262,12 +264,14 @@ function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (de
     if (saving) return
     setSaving(true)
     try {
-      const trimmed = draft.trim()
-      const details = await updateFeedDetails(detail.feedId, trimmed === '' ? null : trimmed)
+      const details = await updateFeedDetails(detail.feedId, {
+        customTitle: overrideOf(titleDraft),
+        customDescription: overrideOf(descriptionDraft),
+      })
       onSaved(details)
       setOpen(false)
     } catch {
-      setNotice('the title could not be changed')
+      setNotice('the details could not be changed')
     } finally {
       setSaving(false)
     }
@@ -282,7 +286,8 @@ function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (de
           <Dialog.Popup className="overlay-popup">
             <Dialog.Title className="overlay-title">edit {detail.title}</Dialog.Title>
             <Dialog.Description className="overlay-description">
-              Your title names the feed everywhere; leaving it blank returns to the feed's own.
+              Your title names the feed everywhere, your description shows on its page; a blank field returns to the
+              feed's own.
             </Dialog.Description>
             <form
               className="edit-details-form"
@@ -291,7 +296,13 @@ function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (de
                 void save()
               }}
             >
-              <Field label="title" value={draft} placeholder={detail.reportedTitle} onChange={setDraft} />
+              <Field label="title" value={titleDraft} placeholder={detail.reportedTitle} onChange={setTitleDraft} />
+              <Field
+                label="description"
+                value={descriptionDraft}
+                placeholder={detail.reportedDescription ?? undefined}
+                onChange={setDescriptionDraft}
+              />
               <p className="overlay-choice">
                 <Button className="text-button" type="submit" focusableWhenDisabled disabled={saving}>
                   {saving ? 'saving…' : 'save'}
@@ -454,6 +465,12 @@ function Items({
       })}
     </div>
   )
+}
+
+/** Blank input is not a value: it clears the override so the reported value stands. */
+function overrideOf(draft: string): string | null {
+  const trimmed = draft.trim()
+  return trimmed === '' ? null : trimmed
 }
 
 function dayAnchor(feedId: number, date: string): string {

@@ -9,6 +9,7 @@ import {
   type PollingIntervalMinutes,
   type PollingSchedule,
   type SubscriptionSummary,
+  type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
@@ -16,6 +17,7 @@ import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import {
+  effectiveFeedDescription,
   effectiveFeedTitle,
   feedItems,
   feeds,
@@ -78,6 +80,7 @@ const FEED_RECORD_COLUMNS = {
 const SUBSCRIBED_FEED_COLUMNS = {
   ...FEED_RECORD_COLUMNS,
   title: effectiveFeedTitle,
+  description: effectiveFeedDescription,
   lastPolledAt: subscriptions.lastPolledAt,
   lastSuccessAt: subscriptions.lastSuccessAt,
   consecutiveFailures: subscriptions.consecutiveFailures,
@@ -295,10 +298,10 @@ export class SubscriptionService {
     return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
   }
 
-  /** Sets or clears the Custom Title; the Feed's reported title keeps being tracked underneath. */
-  setFeedDetails(feedId: number, customTitle: string | null): SetFeedDetailsOutcome {
+  /** Replaces both overrides; the Feed's reported title and description keep being tracked underneath. */
+  setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): SetFeedDetailsOutcome {
     const row = this.#db
-      .select({ reportedTitle: feeds.title })
+      .select({ reportedTitle: feeds.title, reportedDescription: feeds.description })
       .from(subscriptions)
       .innerJoin(feeds, eq(feeds.id, subscriptions.feedId))
       .where(eq(subscriptions.feedId, feedId))
@@ -306,10 +309,23 @@ export class SubscriptionService {
       .all()[0]
     if (!row) return { kind: 'missing' }
 
-    this.#db.update(subscriptions).set({ customTitle }).where(eq(subscriptions.feedId, feedId)).run()
+    const { customTitle, customDescription } = overrides
+    this.#db.update(subscriptions).set({ customTitle, customDescription }).where(eq(subscriptions.feedId, feedId)).run()
 
-    this.#logger.info('subscriptions.feed_details_changed', { feedId, customTitle: customTitle !== null })
-    return { kind: 'updated', details: { title: customTitle ?? row.reportedTitle, customTitle } }
+    this.#logger.info('subscriptions.feed_details_changed', {
+      feedId,
+      customTitle: customTitle !== null,
+      customDescription: customDescription !== null,
+    })
+    return {
+      kind: 'updated',
+      details: {
+        title: customTitle ?? row.reportedTitle,
+        customTitle,
+        description: customDescription ?? row.reportedDescription,
+        customDescription,
+      },
+    }
   }
 
   /**
@@ -347,6 +363,8 @@ export class SubscriptionService {
         ...SUBSCRIBED_FEED_COLUMNS,
         reportedTitle: feeds.title,
         customTitle: subscriptions.customTitle,
+        reportedDescription: feeds.description,
+        customDescription: subscriptions.customDescription,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
         nextPollAt: subscriptions.nextPollAt,
       })
@@ -400,6 +418,8 @@ export class SubscriptionService {
       description: record.description,
       reportedTitle: record.reportedTitle,
       customTitle: record.customTitle,
+      reportedDescription: record.reportedDescription,
+      customDescription: record.customDescription,
       domain: record.domain,
       homePageUrl: record.homePageUrl,
       enteredUrl: record.enteredUrl,
