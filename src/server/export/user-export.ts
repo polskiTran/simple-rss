@@ -6,7 +6,7 @@ import { appliedVersions } from '../persistence/migrations.js'
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-export const USER_EXPORT_VERSION = 1
+export const USER_EXPORT_VERSION = 2
 
 export interface UserExportItem {
   readonly dedupeKey: string
@@ -25,12 +25,16 @@ export interface UserExportItem {
 export interface UserExportFeed {
   readonly enteredUrl: string
   readonly resolvedUrl: string
+  /** The reported title and Feed Description; the User's overrides live on `subscription`. */
   readonly title: string
+  readonly description: string | null
   readonly domain: string
   readonly homePageUrl: string | null
   readonly createdAt: string
   readonly subscription: {
     readonly pollingIntervalMinutes: number
+    readonly customTitle: string | null
+    readonly customDescription: string | null
     readonly createdAt: string
   } | null
   readonly items: readonly UserExportItem[]
@@ -52,10 +56,13 @@ interface FeedRow {
   enteredUrl: string
   resolvedUrl: string
   title: string
+  description: string | null
   domain: string
   homePageUrl: string | null
   createdAt: string
   pollingIntervalMinutes: number | null
+  customTitle: string | null
+  customDescription: string | null
   subscribedAt: string | null
 }
 
@@ -78,10 +85,13 @@ export function buildUserExport(options: {
            feeds.entered_url                      AS enteredUrl,
            feeds.resolved_url                     AS resolvedUrl,
            feeds.title                            AS title,
+           feeds.description                      AS description,
            feeds.domain                           AS domain,
            feeds.home_page_url                    AS homePageUrl,
            feeds.created_at                       AS createdAt,
            subscriptions.polling_interval_minutes AS pollingIntervalMinutes,
+           subscriptions.custom_title             AS customTitle,
+           subscriptions.custom_description       AS customDescription,
            subscriptions.created_at               AS subscribedAt
          FROM feeds
          LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id
@@ -112,13 +122,19 @@ export function buildUserExport(options: {
         enteredUrl: feed.enteredUrl,
         resolvedUrl: feed.resolvedUrl,
         title: feed.title,
+        description: feed.description,
         domain: feed.domain,
         homePageUrl: feed.homePageUrl,
         createdAt: feed.createdAt,
         subscription:
           feed.pollingIntervalMinutes === null || feed.subscribedAt === null
             ? null
-            : { pollingIntervalMinutes: feed.pollingIntervalMinutes, createdAt: feed.subscribedAt },
+            : {
+                pollingIntervalMinutes: feed.pollingIntervalMinutes,
+                customTitle: feed.customTitle,
+                customDescription: feed.customDescription,
+                createdAt: feed.subscribedAt,
+              },
         items: (itemsOfFeed.all(feed.id) as ItemRow[]).map(
           (item): UserExportItem => ({ ...item, identityKind: item.identityKind as UserExportItem['identityKind'] }),
         ),

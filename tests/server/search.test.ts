@@ -134,17 +134,21 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
 
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid', customDescription: null })).status,
+    ).toBe(200)
     expect(await foundTitles(user, 'tabloid')).toEqual(['Morning chronology'])
     expect(await foundTitles(user, 'field')).toEqual([])
     const [result] = (await search(user, 'tabloid')).results
     expect(result?.feedTitle).toBe('Tech Tabloid')
 
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Morning Journal' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Morning Journal', customDescription: null })).status,
+    ).toBe(200)
     expect(await foundTitles(user, 'journal')).toEqual(['Morning chronology'])
     expect(await foundTitles(user, 'tabloid')).toEqual([])
 
-    expect((await user.put('/api/feeds/1/details', { customTitle: null })).status).toBe(200)
+    expect((await user.put('/api/feeds/1/details', { customTitle: null, customDescription: null })).status).toBe(200)
     expect(await foundTitles(user, 'field')).toEqual(['Morning chronology'])
     expect(await foundTitles(user, 'tabloid')).toEqual([])
   })
@@ -153,7 +157,9 @@ describe('searching retained reading metadata', () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid', customDescription: null })).status,
+    ).toBe(200)
 
     stubFeed(service, rss('Estuary Notes', item('a', 'Morning chronology')))
     service.clock.advance(60_000)
@@ -162,7 +168,7 @@ describe('searching retained reading metadata', () => {
     expect(await foundTitles(user, 'tabloid')).toEqual(['Morning chronology'])
     expect(await foundTitles(user, 'estuary')).toEqual([])
 
-    expect((await user.put('/api/feeds/1/details', { customTitle: null })).status).toBe(200)
+    expect((await user.put('/api/feeds/1/details', { customTitle: null, customDescription: null })).status).toBe(200)
     expect(await foundTitles(user, 'estuary')).toEqual(['Morning chronology'])
     expect(await foundTitles(user, 'tabloid')).toEqual([])
   })
@@ -172,7 +178,9 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Saved essay')))
     expect((await user.put('/api/library/1')).status).toBe(200)
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid', customDescription: null })).status,
+    ).toBe(200)
 
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
 
@@ -184,7 +192,9 @@ describe('searching retained reading metadata', () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid', customDescription: null })).status,
+    ).toBe(200)
 
     service.database?.exec('DELETE FROM feed_item_search')
     if (!service.database) throw new Error('the service has no open database')

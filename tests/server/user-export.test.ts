@@ -101,8 +101,40 @@ describe('the JSON export', () => {
     ])
 
     const exportedAtom = document.feeds.find((feed: { title: string }) => feed.title === 'Atom Letters')
-    expect(exportedAtom.subscription).toEqual({ pollingIntervalMinutes: 120, createdAt: expect.any(String) })
+    expect(exportedAtom.subscription).toEqual({
+      pollingIntervalMinutes: 120,
+      customTitle: null,
+      customDescription: null,
+      createdAt: expect.any(String),
+    })
     expect(exportedAtom.items[0].savedAt).toBeNull()
+  })
+
+  it('carries the Feed Description and both overrides faithfully, under the bumped version', async () => {
+    const service = await startTestService()
+    service.upstream.stub(RSS_URL, {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: RSS.replace(
+        '<title>Field Notes</title>',
+        '<title>Field Notes</title><description>From the field</description>',
+      ),
+    })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+    await service.wakeScheduler()
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: 'read weekly' }))
+        .status,
+    ).toBe(200)
+
+    const document = await (await user.get('/api/export')).json()
+
+    expect(document.exportVersion).toBe(2)
+    expect(document.feeds[0]).toMatchObject({
+      title: 'Field Notes',
+      description: 'From the field',
+      subscription: { customTitle: 'Tech tabloid', customDescription: 'read weekly' },
+    })
   })
 
   it('keeps an unsubscribed Feed that Library saves still attribute', async () => {
@@ -147,6 +179,7 @@ describe('the JSON export', () => {
     ])
     expect(Object.keys(document.feeds[0]).sort()).toEqual([
       'createdAt',
+      'description',
       'domain',
       'enteredUrl',
       'homePageUrl',

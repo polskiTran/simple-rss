@@ -73,6 +73,8 @@ export const subscriptions = sqliteTable(
       .references(() => feeds.id, { onDelete: 'cascade' }),
     /** The Custom Title; null means the Feed's reported title stands. */
     customTitle: text('custom_title'),
+    /** The Custom Description; null means the Feed Description stands. */
+    customDescription: text('custom_description'),
     pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
     /** The persisted due-time frontier the scheduler wakes to query. */
     nextPollAt: text('next_poll_at').notNull(),
@@ -91,6 +93,11 @@ export const subscriptions = sqliteTable(
 
 /** Requires a `subscriptions` join; left-join where the query can name unsubscribed Feeds. */
 export const effectiveFeedTitle = sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`
+
+/** Same join rule; null when neither the User nor the Feed describes it. */
+export const effectiveFeedDescription = sql<
+  string | null
+>`coalesce(${subscriptions.customDescription}, ${feeds.description})`
 
 /** Normalized Feed Window entries, deduplicated only inside their Feed. */
 export const feedItems = sqliteTable(

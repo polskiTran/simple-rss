@@ -26,9 +26,14 @@ describe('Custom Title', () => {
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    const updated = await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid' })
+    const updated = await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })
     expect(updated.status).toBe(200)
-    expect(await updated.json()).toEqual({ title: 'Tech tabloid', customTitle: 'Tech tabloid' })
+    expect(await updated.json()).toEqual({
+      title: 'Tech tabloid',
+      customTitle: 'Tech tabloid',
+      description: null,
+      customDescription: null,
+    })
 
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0]).toMatchObject({ title: 'Tech tabloid' })
@@ -47,7 +52,9 @@ describe('Custom Title', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,
+    ).toBe(200)
 
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
@@ -59,9 +66,14 @@ describe('Custom Title', () => {
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0]).toMatchObject({ title: 'Tech tabloid' })
 
-    const cleared = await user.put('/api/feeds/1/details', { customTitle: null })
+    const cleared = await user.put('/api/feeds/1/details', { customTitle: null, customDescription: null })
     expect(cleared.status).toBe(200)
-    expect(await cleared.json()).toEqual({ title: 'Field Notes, renamed', customTitle: null })
+    expect(await cleared.json()).toEqual({
+      title: 'Field Notes, renamed',
+      customTitle: null,
+      description: null,
+      customDescription: null,
+    })
     const detail = await (await user.get('/api/feeds/1')).json()
     expect(detail).toMatchObject({
       title: 'Field Notes, renamed',
@@ -76,9 +88,14 @@ describe('Custom Title', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    const updated = await user.put('/api/feeds/1/details', { customTitle: 'My reading' })
+    const updated = await user.put('/api/feeds/1/details', { customTitle: 'My reading', customDescription: null })
     expect(updated.status).toBe(200)
-    expect(await updated.json()).toEqual({ title: 'My reading', customTitle: 'My reading' })
+    expect(await updated.json()).toEqual({
+      title: 'My reading',
+      customTitle: 'My reading',
+      description: null,
+      customDescription: null,
+    })
 
     await service.wakeScheduler()
     const detail = await (await user.get('/api/feeds/1')).json()
@@ -90,11 +107,15 @@ describe('Custom Title', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
-    expect((await user.put('/api/feeds/1/details', { customTitle: '' })).status).toBe(400)
-    expect((await user.put('/api/feeds/1/details', { customTitle: '   ' })).status).toBe(400)
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'a'.repeat(513) })).status).toBe(400)
+    expect((await user.put('/api/feeds/1/details', { customTitle: '', customDescription: null })).status).toBe(400)
+    expect((await user.put('/api/feeds/1/details', { customTitle: '   ', customDescription: null })).status).toBe(400)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'a'.repeat(513), customDescription: null })).status,
+    ).toBe(400)
     expect((await user.put('/api/feeds/1/details', {})).status).toBe(400)
-    expect((await user.put('/api/feeds/99/details', { customTitle: 'Anything' })).status).toBe(404)
+    expect((await user.put('/api/feeds/99/details', { customTitle: 'Anything', customDescription: null })).status).toBe(
+      404,
+    )
 
     const detail = await (await user.get('/api/feeds/1')).json()
     expect(detail).toMatchObject({ title: 'journal.example', customTitle: null })
@@ -108,7 +129,9 @@ describe('Custom Title across read surfaces', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,
+    ).toBe(200)
 
     const digest = await (await user.get('/api/digest')).json()
     const item = digest.groups[0].items[0]
@@ -140,7 +163,9 @@ describe('Custom Title across read surfaces', () => {
     expect((await user.post('/api/subscriptions', { url: 'https://zebra.example/feed' })).status).toBe(201)
     await service.wakeScheduler()
 
-    expect((await user.put('/api/feeds/2/details', { customTitle: 'Aardvark Signal' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/2/details', { customTitle: 'Aardvark Signal', customDescription: null })).status,
+    ).toBe(200)
 
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions.map((subscription: { title: string }) => subscription.title)).toEqual([
@@ -160,7 +185,9 @@ describe('Custom Title across read surfaces', () => {
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
     expect((await user.put('/api/library/1')).status).toBe(200)
-    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid' })).status).toBe(200)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,
+    ).toBe(200)
 
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
     const library = await (await user.get('/api/library')).json()

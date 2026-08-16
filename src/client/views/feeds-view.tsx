@@ -253,10 +253,15 @@ function SubscriptionList({
   )
 }
 
+/** Matches the effective title, the effective description, and the domain. */
 function matches(subscription: SubscriptionSummary, query: string): boolean {
   const line = query.trim().toLowerCase()
   if (!line || line.startsWith('http://') || line.startsWith('https://')) return true
-  return subscription.title.toLowerCase().includes(line) || subscription.domain.toLowerCase().includes(line)
+  return (
+    subscription.title.toLowerCase().includes(line) ||
+    subscription.domain.toLowerCase().includes(line) ||
+    (subscription.description?.toLowerCase().includes(line) ?? false)
+  )
 }
 
 /** A row in the list also says when a Feed has never been checked, and offers the retry. */

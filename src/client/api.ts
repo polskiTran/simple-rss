@@ -33,6 +33,7 @@ import {
   type SearchResults,
   type SubscriptionList,
   type ServiceMeta,
+  type UpdateFeedDetailsRequest,
 } from '../shared/api.js'
 
 export class ApiError extends Error {
@@ -155,12 +156,12 @@ export async function fetchFeedDetail(feedId: number, signal?: AbortSignal): Pro
   return feedDetailSchema.parse(await response.json())
 }
 
-/** Sets or clears the Custom Title; null means the reported title stands. */
-export async function updateFeedDetails(feedId: number, customTitle: string | null): Promise<FeedDetailsUpdate> {
+/** Replaces both overrides; a null field means the reported value stands. */
+export async function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {
   const response = await request(`/api/feeds/${feedId}/details`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ customTitle }),
+    body: JSON.stringify(details),
   })
   return feedDetailsUpdateSchema.parse(await response.json())
 }

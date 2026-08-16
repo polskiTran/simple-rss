@@ -111,7 +111,7 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, updateFeedDetailsRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = deps.subscriptions.setFeedDetails(feedId.value, body.value.customTitle)
+    const outcome = deps.subscriptions.setFeedDetails(feedId.value, body.value)
     if (outcome.kind === 'missing') return notFound(c)
     return c.json<FeedDetailsUpdate>(outcome.details, 200, NO_STORE)
   })
