@@ -129,6 +129,71 @@ describe('searching retained reading metadata', () => {
     expect(await foundTitles(user, 'field')).toEqual([])
   })
 
+  it('matches and attributes by the Custom Title while set, and by the reported title once cleared', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
+
+    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+    expect(await foundTitles(user, 'tabloid')).toEqual(['Morning chronology'])
+    expect(await foundTitles(user, 'field')).toEqual([])
+    const [result] = (await search(user, 'tabloid')).results
+    expect(result?.feedTitle).toBe('Tech Tabloid')
+
+    expect((await user.put('/api/feeds/1/details', { customTitle: 'Morning Journal' })).status).toBe(200)
+    expect(await foundTitles(user, 'journal')).toEqual(['Morning chronology'])
+    expect(await foundTitles(user, 'tabloid')).toEqual([])
+
+    expect((await user.put('/api/feeds/1/details', { customTitle: null })).status).toBe(200)
+    expect(await foundTitles(user, 'field')).toEqual(['Morning chronology'])
+    expect(await foundTitles(user, 'tabloid')).toEqual([])
+  })
+
+  it('leaves the index on the Custom Title through a publisher rename, catching up once cleared', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
+    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+
+    stubFeed(service, rss('Estuary Notes', item('a', 'Morning chronology')))
+    service.clock.advance(60_000)
+    expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
+
+    expect(await foundTitles(user, 'tabloid')).toEqual(['Morning chronology'])
+    expect(await foundTitles(user, 'estuary')).toEqual([])
+
+    expect((await user.put('/api/feeds/1/details', { customTitle: null })).status).toBe(200)
+    expect(await foundTitles(user, 'estuary')).toEqual(['Morning chronology'])
+    expect(await foundTitles(user, 'tabloid')).toEqual([])
+  })
+
+  it('unsubscribing takes the Custom Title with it: a retained Library item matches the reported title again', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Saved essay')))
+    expect((await user.put('/api/library/1')).status).toBe(200)
+    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+
+    expect((await user.delete('/api/feeds/1')).status).toBe(204)
+
+    expect(await foundTitles(user, 'field')).toEqual(['Saved essay'])
+    expect(await foundTitles(user, 'tabloid')).toEqual([])
+  })
+
+  it('rebuilds the index with the Custom Title, not the reported title', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
+    expect((await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid' })).status).toBe(200)
+
+    service.database?.exec('DELETE FROM feed_item_search')
+    if (!service.database) throw new Error('the service has no open database')
+    rebuildSearchIndex(service.database)
+
+    expect(await foundTitles(user, 'tabloid')).toEqual(['Morning chronology'])
+    expect(await foundTitles(user, 'field')).toEqual([])
+  })
+
   it('keeps finding a Library item whose Feed the User unsubscribed', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
