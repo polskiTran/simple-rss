@@ -36,6 +36,7 @@ export class SearchService {
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
+    // The coalesce restates `effectiveFeedTitle` (persistence/schema.ts) in raw SQL; keep them in step.
     const rows = this.#db
       .prepare(
         `SELECT
@@ -44,7 +45,7 @@ export class SearchService {
            feed_items.published_at  AS publishedAt,
            feed_items.first_seen_at AS firstSeenAt,
            feeds.id                 AS feedId,
-           feeds.title              AS feedTitle,
+           coalesce(subscriptions.custom_title, feeds.title) AS feedTitle,
            library_items.saved_at   AS savedAt,
            subscriptions.feed_id    AS subscribedFeedId
          FROM feed_item_search

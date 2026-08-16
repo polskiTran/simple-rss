@@ -1,4 +1,4 @@
-import { and, eq, isNull, lte, sql } from 'drizzle-orm'
+import { and, eq, isNull, lte } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
@@ -15,7 +15,14 @@ import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { feedItems, feeds, feedUrlAliases, libraryItems, subscriptions } from '../persistence/schema.js'
+import {
+  effectiveFeedTitle,
+  feedItems,
+  feeds,
+  feedUrlAliases,
+  libraryItems,
+  subscriptions,
+} from '../persistence/schema.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
@@ -70,8 +77,7 @@ const FEED_RECORD_COLUMNS = {
 
 const SUBSCRIBED_FEED_COLUMNS = {
   ...FEED_RECORD_COLUMNS,
-  // Effective title: the Custom Title wins wherever a Subscription is named.
-  title: sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`,
+  title: effectiveFeedTitle,
   lastPolledAt: subscriptions.lastPolledAt,
   lastSuccessAt: subscriptions.lastSuccessAt,
   consecutiveFailures: subscriptions.consecutiveFailures,
@@ -408,12 +414,13 @@ export class SubscriptionService {
     }
   }
 
+  /** Ordered by effective title — the order of the Feeds list and of OPML export alike. */
   #subscribedFeeds(): readonly SubscribedFeedRecord[] {
     return this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .orderBy(feeds.title)
+      .orderBy(effectiveFeedTitle)
       .all()
   }
 
