@@ -7,7 +7,7 @@ import type { DigestService } from '../digest/digest-service.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { feedItems, feeds, libraryItems } from '../persistence/schema.js'
+import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
 import { extractArticle } from './extract-article.js'
 
@@ -60,7 +60,7 @@ export class ReaderService {
         feedItemId: feedItems.id,
         title: feedItems.title,
         feedId: feeds.id,
-        feedTitle: feeds.title,
+        feedTitle: effectiveFeedTitle,
         link: feedItems.link,
         publishedAt: feedItems.publishedAt,
         summary: feedItems.summary,
@@ -69,6 +69,7 @@ export class ReaderService {
       })
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(eq(feedItems.id, feedItemId))
       .limit(1)

@@ -89,6 +89,9 @@ export const subscriptions = sqliteTable(
   (table) => [index('subscriptions_next_poll_at').on(table.nextPollAt)],
 )
 
+/** Requires a `subscriptions` join; left-join where the query can name unsubscribed Feeds. */
+export const effectiveFeedTitle = sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`
+
 /** Normalized Feed Window entries, deduplicated only inside their Feed. */
 export const feedItems = sqliteTable(
   'feed_items',
