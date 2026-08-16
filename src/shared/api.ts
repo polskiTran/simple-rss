@@ -153,6 +153,8 @@ export const feedSummarySchema = z.object({
   feedId: z.number().int().positive(),
   /** Effective: the Custom Title when set, else the reported title. */
   title: z.string(),
+  /** The Feed Description; null until a retrieval reports one. */
+  description: z.string().nullable(),
   /** Host of the home page when the Feed declares one, else host of the Feed URL. */
   domain: z.string(),
   /** The publisher's site, for linking the domain. Null until a retrieval finds one. */

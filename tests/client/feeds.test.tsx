@@ -24,6 +24,7 @@ const UNCHECKED = {
 const FEED = {
   feedId: 1,
   title: 'Field Notes',
+  description: null,
   domain: 'journal.example',
   homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
@@ -55,6 +56,7 @@ function feedDetail(availability: object, itemCount: number) {
   return {
     feedId: FEED.feedId,
     title: FEED.title,
+    description: null,
     reportedTitle: FEED.title,
     customTitle: null,
     domain: FEED.domain,

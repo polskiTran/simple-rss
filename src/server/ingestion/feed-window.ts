@@ -48,6 +48,7 @@ export function persistFeedWindow(
     tx.update(feeds)
       .set({
         title: parsed.title,
+        description: parsed.description,
         domain,
         homePageUrl: parsed.homePageUrl,
         resolvedUrl,

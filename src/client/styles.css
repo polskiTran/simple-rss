@@ -493,6 +493,19 @@
     color: var(--color-ink-strong);
   }
 
+  /* When a Feed Description follows, it takes over the header's 40px to the
+     content below; the header keeps only the 10px between the two lines. */
+  .feed-header:has(+ .feed-description) {
+    margin-bottom: 10px;
+  }
+
+  .feed-description {
+    margin: 0 0 40px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-meta);
+  }
+
   .cadence-figure {
     --cadence-cell: 11px;
     --cadence-gap: 3px;
@@ -1199,6 +1212,10 @@
 
   .feed-header {
     gap: 16px;
+    font-size: 13px;
+  }
+
+  .feed-description {
     font-size: 13px;
   }
 

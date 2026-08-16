@@ -39,6 +39,8 @@ export const feeds = sqliteTable('feeds', {
   enteredUrl: text('entered_url').notNull().unique(),
   resolvedUrl: text('resolved_url').notNull().unique(),
   title: text('title').notNull(),
+  /** The Feed Description; null when the document reports none. Refreshed with the title. */
+  description: text('description'),
   /** The host shown for the Feed: the home page's when it declares one, else the Feed URL's. */
   domain: text('domain').notNull(),
   /** Null until a retrieval finds a site link that is not the Feed URL itself. */
