@@ -62,13 +62,19 @@ export function parseOpml(text: string): readonly OpmlFeedOutline[] {
 
 /** Writes active Subscriptions as OPML 2.0, using the resolved URL — the endpoint that currently answers. */
 export function serializeOpml(
-  subscriptions: readonly { readonly title: string; readonly resolvedUrl: string }[],
+  subscriptions: readonly {
+    readonly title: string
+    readonly description: string | null
+    readonly resolvedUrl: string
+  }[],
   now: Date,
 ): string {
   const outlines = subscriptions.map(
     (subscription) =>
       `    <outline type="rss" text="${escapeAttribute(subscription.title)}" ` +
-      `title="${escapeAttribute(subscription.title)}" xmlUrl="${escapeAttribute(subscription.resolvedUrl)}"/>`,
+      `title="${escapeAttribute(subscription.title)}" ` +
+      (subscription.description === null ? '' : `description="${escapeAttribute(subscription.description)}" `) +
+      `xmlUrl="${escapeAttribute(subscription.resolvedUrl)}"/>`,
   )
 
   return [

@@ -49,6 +49,7 @@ export type SetFeedDetailsOutcome =
 interface FeedRecord {
   readonly feedId: number
   readonly title: string
+  readonly description: string | null
   readonly domain: string
   readonly homePageUrl: string | null
   readonly enteredUrl: string
@@ -60,6 +61,7 @@ interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {}
 const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
   title: feeds.title,
+  description: feeds.description,
   domain: feeds.domain,
   homePageUrl: feeds.homePageUrl,
   enteredUrl: feeds.enteredUrl,
@@ -133,6 +135,7 @@ export class SubscriptionService {
         return {
           feedId,
           title,
+          description: null,
           domain,
           homePageUrl: null,
           enteredUrl,
@@ -388,6 +391,7 @@ export class SubscriptionService {
     return {
       feedId: record.feedId,
       title: record.title,
+      description: record.description,
       reportedTitle: record.reportedTitle,
       customTitle: record.customTitle,
       domain: record.domain,
@@ -479,6 +483,7 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
   return {
     feedId: record.feedId,
     title: record.title,
+    description: record.description,
     domain: record.domain,
     homePageUrl: record.homePageUrl,
     enteredUrl: record.enteredUrl,

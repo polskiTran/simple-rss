@@ -154,7 +154,7 @@ describe('migrations', () => {
 
     const applied = applyMigrations(db)
 
-    expect(applied).toEqual([8, 9, 10])
+    expect(applied).toEqual([8, 9, 10, 11])
     expect(db.prepare('SELECT domain, home_page_url, etag, last_modified FROM feeds').get()).toEqual({
       domain: 'journal.example',
       home_page_url: null,

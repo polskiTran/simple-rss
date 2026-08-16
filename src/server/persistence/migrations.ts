@@ -196,6 +196,18 @@ export const migrations: readonly Migration[] = [
         CHECK (custom_title IS NULL OR length(custom_title) BETWEEN 1 AND 512);
     `,
   },
+  {
+    version: 11,
+    name: 'feed-description',
+    sql: `
+      ALTER TABLE feeds ADD COLUMN description TEXT
+        CHECK (description IS NULL OR length(description) BETWEEN 1 AND 1024);
+
+      -- Dropping the validators makes the next poll unconditional, so existing
+      -- Feeds report their description without waiting for the document to change.
+      UPDATE feeds SET etag = NULL, last_modified = NULL;
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

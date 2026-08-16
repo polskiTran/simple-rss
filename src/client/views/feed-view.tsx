@@ -133,6 +133,9 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
           </>
         ) : null}
       </p>
+      {state.kind === 'loaded' && state.value.description ? (
+        <p className="feed-description">{state.value.description}</p>
+      ) : null}
       {state.kind === 'loading' ? (
         <LoadingNote className="empty-note feed-detail-state">loading the feed</LoadingNote>
       ) : null}
