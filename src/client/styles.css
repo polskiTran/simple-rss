@@ -403,6 +403,11 @@
     padding-bottom: 5px;
   }
 
+  /* The multiline variant keeps the line's look; rows fix its height, not a drag handle. */
+  textarea.field-input {
+    resize: none;
+  }
+
   .gate-actions {
     margin: 0;
   }
