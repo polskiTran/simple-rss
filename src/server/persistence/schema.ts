@@ -91,7 +91,13 @@ export const subscriptions = sqliteTable(
   (table) => [index('subscriptions_next_poll_at').on(table.nextPollAt)],
 )
 
-/** Requires a `subscriptions` join; left-join where the query can name unsubscribed Feeds. */
+/**
+ * Requires a `subscriptions` join; left-join where the query can name unsubscribed Feeds.
+ *
+ * The search index denormalizes this expression per Feed Item: triggers (migrations 6
+ * and 12) re-index a Feed's items when either side changes, and `rebuildSearchIndex`
+ * (search/search-service.ts) restates it from scratch.
+ */
 export const effectiveFeedTitle = sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`
 
 /** Same join rule; null when neither the User nor the Feed describes it. */
