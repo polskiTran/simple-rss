@@ -4,6 +4,8 @@ import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useState, type CSSProperties } from 'react'
 import {
+  MAX_FEED_DESCRIPTION_LENGTH,
+  MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
   type FeedAvailability,
   type FeedDetail,
@@ -296,11 +298,19 @@ function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (de
                 void save()
               }}
             >
-              <Field label="title" value={titleDraft} placeholder={detail.reportedTitle} onChange={setTitleDraft} />
+              <Field
+                label="title"
+                value={titleDraft}
+                placeholder={detail.reportedTitle}
+                maxLength={MAX_FEED_TITLE_LENGTH}
+                onChange={setTitleDraft}
+              />
               <Field
                 label="description"
                 value={descriptionDraft}
                 placeholder={detail.reportedDescription ?? undefined}
+                maxLength={MAX_FEED_DESCRIPTION_LENGTH}
+                multiline
                 onChange={setDescriptionDraft}
               />
               <p className="overlay-choice">
