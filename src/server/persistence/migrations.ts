@@ -188,6 +188,98 @@ export const migrations: readonly Migration[] = [
       UPDATE feeds SET etag = NULL, last_modified = NULL;
     `,
   },
+  {
+    version: 10,
+    name: 'subscription-custom-title',
+    sql: `
+      ALTER TABLE subscriptions ADD COLUMN custom_title TEXT
+        CHECK (custom_title IS NULL OR length(custom_title) BETWEEN 1 AND 512);
+    `,
+  },
+  {
+    version: 11,
+    name: 'feed-description',
+    sql: `
+      ALTER TABLE feeds ADD COLUMN description TEXT
+        CHECK (description IS NULL OR length(description) BETWEEN 1 AND 1024);
+
+      -- Dropping the validators makes the next poll unconditional, so existing
+      -- Feeds report their description without waiting for the document to change.
+      UPDATE feeds SET etag = NULL, last_modified = NULL;
+    `,
+  },
+  {
+    version: 12,
+    name: 'search-follows-custom-title',
+    sql: `
+      -- The index stores the effective title per Feed Item: every write path
+      -- resolves coalesce(custom_title, feeds.title) at write time.
+      DROP TRIGGER feed_item_search_after_insert;
+      CREATE TRIGGER feed_item_search_after_insert AFTER INSERT ON feed_items BEGIN
+        INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+        VALUES (new.id, new.title, new.summary, coalesce(
+          (SELECT custom_title FROM subscriptions WHERE feed_id = new.feed_id),
+          (SELECT title FROM feeds WHERE id = new.feed_id)));
+      END;
+
+      DROP TRIGGER feed_item_search_after_update;
+      CREATE TRIGGER feed_item_search_after_update AFTER UPDATE ON feed_items
+      WHEN old.title IS NOT new.title OR old.summary IS NOT new.summary BEGIN
+        DELETE FROM feed_item_search WHERE rowid = old.id;
+        INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+        VALUES (new.id, new.title, new.summary, coalesce(
+          (SELECT custom_title FROM subscriptions WHERE feed_id = new.feed_id),
+          (SELECT title FROM feeds WHERE id = new.feed_id)));
+      END;
+
+      -- A publisher rename reaches the index only while no Custom Title covers it.
+      DROP TRIGGER feed_item_search_after_feed_rename;
+      CREATE TRIGGER feed_item_search_after_feed_rename AFTER UPDATE OF title ON feeds
+      WHEN old.title IS NOT new.title AND NOT EXISTS (
+        SELECT 1 FROM subscriptions WHERE feed_id = new.id AND custom_title IS NOT NULL
+      ) BEGIN
+        UPDATE feed_item_search SET feed_title = new.title
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = new.id);
+      END;
+
+      CREATE TRIGGER feed_item_search_after_custom_title_change
+      AFTER UPDATE OF custom_title ON subscriptions
+      WHEN old.custom_title IS NOT new.custom_title BEGIN
+        UPDATE feed_item_search
+        SET feed_title = coalesce(new.custom_title, (SELECT title FROM feeds WHERE id = new.feed_id))
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = new.feed_id);
+      END;
+
+      -- Unsubscribing takes the Custom Title with it; retained Library items
+      -- fall back to matching on the reported title.
+      CREATE TRIGGER feed_item_search_after_unsubscribe AFTER DELETE ON subscriptions
+      WHEN old.custom_title IS NOT NULL BEGIN
+        UPDATE feed_item_search
+        SET feed_title = (SELECT title FROM feeds WHERE id = old.feed_id)
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = old.feed_id);
+      END;
+
+      UPDATE feed_item_search
+      SET feed_title = (
+        SELECT subscriptions.custom_title
+        FROM feed_items JOIN subscriptions ON subscriptions.feed_id = feed_items.feed_id
+        WHERE feed_items.id = feed_item_search.rowid
+      )
+      WHERE rowid IN (
+        SELECT feed_items.id
+        FROM feed_items JOIN subscriptions ON subscriptions.feed_id = feed_items.feed_id
+        WHERE subscriptions.custom_title IS NOT NULL
+      );
+    `,
+  },
+  {
+    version: 13,
+    name: 'subscription-custom-description',
+    sql: `
+      ALTER TABLE subscriptions ADD COLUMN custom_description TEXT
+        CHECK (custom_description IS NULL OR length(custom_description) BETWEEN 1 AND 1024);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

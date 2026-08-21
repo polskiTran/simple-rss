@@ -4,6 +4,7 @@ import {
   createSubscriptionResponseSchema,
   digestSchema,
   feedDetailSchema,
+  feedDetailsUpdateSchema,
   installationPreferencesSchema,
   libraryMembershipSchema,
   librarySchema,
@@ -19,6 +20,7 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type FeedDetail,
+  type FeedDetailsUpdate,
   type InstallationPreferences,
   type Library,
   type LibraryMembership,
@@ -31,6 +33,7 @@ import {
   type SearchResults,
   type SubscriptionList,
   type ServiceMeta,
+  type UpdateFeedDetailsRequest,
 } from '../shared/api.js'
 
 export class ApiError extends Error {
@@ -151,6 +154,16 @@ export async function fetchSubscriptions(signal?: AbortSignal): Promise<Subscrip
 export async function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<FeedDetail> {
   const response = await read(`/api/feeds/${feedId}`, signal)
   return feedDetailSchema.parse(await response.json())
+}
+
+/** Replaces both overrides; a null field means the reported value stands. */
+export async function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {
+  const response = await request(`/api/feeds/${feedId}/details`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(details),
+  })
+  return feedDetailsUpdateSchema.parse(await response.json())
 }
 
 export async function updatePollingInterval(

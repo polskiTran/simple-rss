@@ -36,6 +36,7 @@ export class SearchService {
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
+    // The coalesce restates `effectiveFeedTitle` (persistence/schema.ts) in raw SQL; keep them in step.
     const rows = this.#db
       .prepare(
         `SELECT
@@ -44,7 +45,7 @@ export class SearchService {
            feed_items.published_at  AS publishedAt,
            feed_items.first_seen_at AS firstSeenAt,
            feeds.id                 AS feedId,
-           feeds.title              AS feedTitle,
+           coalesce(subscriptions.custom_title, feeds.title) AS feedTitle,
            library_items.saved_at   AS savedAt,
            subscriptions.feed_id    AS subscribedFeedId
          FROM feed_item_search
@@ -105,8 +106,11 @@ export function rebuildSearchIndex(db: SqliteDatabase): number {
     return db
       .prepare(
         `INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
-         SELECT feed_items.id, feed_items.title, feed_items.summary, feeds.title
-         FROM feed_items JOIN feeds ON feeds.id = feed_items.feed_id`,
+         SELECT feed_items.id, feed_items.title, feed_items.summary,
+                coalesce(subscriptions.custom_title, feeds.title)
+         FROM feed_items
+         JOIN feeds ON feeds.id = feed_items.feed_id
+         LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id`,
       )
       .run().changes
   })()

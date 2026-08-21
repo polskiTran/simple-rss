@@ -6,7 +6,7 @@ import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
 import { beyondCursorSql, chronologySql, LIST_PAGE_SIZE, nextListCursor, type ListCursor } from '../digest/list-page.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 export class LibraryService {
   readonly #db: BetterSQLite3Database
@@ -54,7 +54,7 @@ export class LibraryService {
         feedItemId: feedItems.id,
         title: feedItems.title,
         feedId: feeds.id,
-        feedTitle: feeds.title,
+        feedTitle: effectiveFeedTitle,
         link: feedItems.link,
         publishedAt: feedItems.publishedAt,
         firstSeenAt: feedItems.firstSeenAt,

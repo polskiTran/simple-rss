@@ -100,6 +100,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
         headers: { 'content-type': 'application/rss+xml' },
         body: `<?xml version="1.0"?>
           <rss version="2.0"><channel><title>Field Notes</title>
+            <description>Notes from the field.</description>
             <item><guid>one</guid><title>First light</title>
               <link>https://publisher.example/first-light</link>
               <pubDate>${publishedAt.toUTCString()}</pubDate>

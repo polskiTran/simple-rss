@@ -111,6 +111,29 @@ const positiveIdParameterSchema = z
 export const feedIdParameterSchema = positiveIdParameterSchema
 export const feedItemIdParameterSchema = positiveIdParameterSchema
 
+/** Matches the bound the feeds table enforces on reported titles. */
+export const MAX_FEED_TITLE_LENGTH = 512
+
+/** One bound for both descriptions — the Feed Description and the Custom Description share the rule. */
+export const MAX_FEED_DESCRIPTION_LENGTH = 1024
+
+/** Replaces both overrides at once; null clears one so the reported value stands. */
+export const updateFeedDetailsRequestSchema = z.object({
+  customTitle: z.string().trim().min(1).max(MAX_FEED_TITLE_LENGTH).nullable(),
+  customDescription: z.string().trim().min(1).max(MAX_FEED_DESCRIPTION_LENGTH).nullable(),
+})
+export type UpdateFeedDetailsRequest = z.infer<typeof updateFeedDetailsRequestSchema>
+
+export const feedDetailsUpdateSchema = z.object({
+  /** Effective: the Custom Title when set, else the reported title. */
+  title: z.string(),
+  customTitle: z.string().nullable(),
+  /** Effective: the Custom Description when set, else the Feed Description. */
+  description: z.string().nullable(),
+  customDescription: z.string().nullable(),
+})
+export type FeedDetailsUpdate = z.infer<typeof feedDetailsUpdateSchema>
+
 export const createSubscriptionRequestSchema = z.object({
   url: z.string().min(1).max(2_048),
 })
@@ -135,7 +158,10 @@ export type OpmlImportReport = z.infer<typeof opmlImportReportSchema>
 
 export const feedSummarySchema = z.object({
   feedId: z.number().int().positive(),
+  /** Effective: the Custom Title when set, else the reported title. */
   title: z.string(),
+  /** Effective: the Custom Description when set, else the Feed Description; null when neither exists. */
+  description: z.string().nullable(),
   /** Host of the home page when the Feed declares one, else host of the Feed URL. */
   domain: z.string(),
   /** The publisher's site, for linking the domain. Null until a retrieval finds one. */
@@ -217,6 +243,12 @@ export type FeedItemRow = z.infer<typeof feedItemRowSchema>
 // `cadence` runs oldest to newest from the grid window's first day through
 // today, so a fixed dataset always draws the same grid.
 export const feedDetailSchema = feedSummarySchema.extend({
+  /** What the Feed document says, kept underneath any Custom Title. */
+  reportedTitle: z.string(),
+  customTitle: z.string().nullable(),
+  /** The Feed Description as reported, kept underneath any Custom Description. */
+  reportedDescription: z.string().nullable(),
+  customDescription: z.string().nullable(),
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
   cadence: z.array(cadenceObservationSchema),

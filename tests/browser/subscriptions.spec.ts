@@ -90,6 +90,41 @@ test.describe('desktop Feed and Digest rendering', () => {
     await expectOpenFeed(page)
   })
 
+  test('sets a custom title and description in the edit overlay, and clearing them restores the reported values', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    await expect(page.locator('.feed-description')).toHaveText('Notes from the field.')
+    await page.getByRole('button', { name: 'edit' }).click()
+
+    const title = page.getByRole('textbox', { name: 'title' })
+    const description = page.getByRole('textbox', { name: 'description' })
+    await expect(title).toHaveAttribute('placeholder', 'Field Notes')
+    await expect(description).toHaveAttribute('placeholder', 'Notes from the field.')
+    // The server's bounds cap the fields, so an over-long value cannot reach the 400.
+    await expect(title).toHaveAttribute('maxlength', '512')
+    await expect(description).toHaveAttribute('maxlength', '1024')
+    await title.fill('Tech tabloid')
+    await description.fill('read weekly')
+    await page.getByRole('button', { name: 'save', exact: true }).click()
+
+    await expect(page.locator('.feed-header-title')).toHaveText('Tech tabloid')
+    await expect(page.locator('.feed-description')).toHaveText('read weekly')
+    await page.getByRole('link', { name: '← feeds' }).click()
+    await page.getByRole('link', { name: 'Tech tabloid' }).click()
+
+    await page.getByRole('button', { name: 'edit' }).click()
+    await expect(title).toHaveValue('Tech tabloid')
+    await expect(description).toHaveValue('read weekly')
+    await title.fill('')
+    await description.fill('')
+    await page.getByRole('button', { name: 'save', exact: true }).click()
+    await expect(page.locator('.feed-header-title')).toHaveText('Field Notes')
+    await expect(page.locator('.feed-description')).toHaveText('Notes from the field.')
+  })
+
   test('colours the confirming word of the unsubscribe overlay, and only it', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'Field Notes' }).click()

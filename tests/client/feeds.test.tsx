@@ -24,6 +24,7 @@ const UNCHECKED = {
 const FEED = {
   feedId: 1,
   title: 'Field Notes',
+  description: null,
   domain: 'journal.example',
   homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
@@ -55,6 +56,11 @@ function feedDetail(availability: object, itemCount: number) {
   return {
     feedId: FEED.feedId,
     title: FEED.title,
+    description: null,
+    reportedTitle: FEED.title,
+    customTitle: null,
+    reportedDescription: null,
+    customDescription: null,
     domain: FEED.domain,
     homePageUrl: FEED.homePageUrl,
     enteredUrl: FEED.enteredUrl,
@@ -187,6 +193,26 @@ describe('Feeds', () => {
 
     await user.clear(screen.getByRole('textbox', { name: /search or add feeds/i }))
     expect(await screen.findByText('Other Wire')).toBeDefined()
+  })
+
+  it('finds a Feed by its effective description', async () => {
+    stubApi().on('GET /api/feeds', {
+      body: {
+        subscriptions: [
+          { ...FEED, description: 'read weekly' },
+          { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example' },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Other Wire')).toBeDefined()
+    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'weekly')
+
+    expect(screen.getByText('Field Notes')).toBeDefined()
+    expect(screen.queryByText('Other Wire')).toBeNull()
   })
 
   it('says calmly when no Feed matches the search', async () => {
