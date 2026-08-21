@@ -43,6 +43,7 @@ describe('Subscriptions', () => {
       subscription: {
         feedId: 1,
         title: 'journal.example',
+        description: null,
         domain: 'journal.example',
         homePageUrl: null,
         enteredUrl: ENTERED_URL,
@@ -73,6 +74,7 @@ describe('Subscriptions', () => {
         {
           feedId: 1,
           title: 'Field Notes',
+          description: 'Notes from the field',
           domain: 'journal.example',
           homePageUrl: 'https://journal.example/',
           enteredUrl: ENTERED_URL,

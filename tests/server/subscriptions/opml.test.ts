@@ -74,8 +74,8 @@ describe('serializeOpml', () => {
   it('writes active Subscriptions as standard outlines another reader can import', () => {
     const opml = serializeOpml(
       [
-        { title: 'Field Notes', resolvedUrl: 'https://feeds.example/journal.xml' },
-        { title: 'Atom Letters', resolvedUrl: 'https://atom.example/feed.xml' },
+        { title: 'Field Notes', description: 'Notes from the field', resolvedUrl: 'https://feeds.example/journal.xml' },
+        { title: 'Atom Letters', description: null, resolvedUrl: 'https://atom.example/feed.xml' },
       ],
       new Date('2026-08-08T09:00:00.000Z'),
     )
@@ -83,7 +83,8 @@ describe('serializeOpml', () => {
     expect(opml).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(opml).toContain('<opml version="2.0">')
     expect(opml).toContain(
-      '<outline type="rss" text="Field Notes" title="Field Notes" xmlUrl="https://feeds.example/journal.xml"/>',
+      '<outline type="rss" text="Field Notes" title="Field Notes" ' +
+        'description="Notes from the field" xmlUrl="https://feeds.example/journal.xml"/>',
     )
     expect(opml).toContain(
       '<outline type="rss" text="Atom Letters" title="Atom Letters" xmlUrl="https://atom.example/feed.xml"/>',
@@ -93,11 +94,18 @@ describe('serializeOpml', () => {
 
   it('escapes titles and URLs so a hostile Feed title cannot break the document', () => {
     const opml = serializeOpml(
-      [{ title: 'Tom & Jerry\'s "notes" <best>', resolvedUrl: 'https://feeds.example/a?b=1&c=2' }],
+      [
+        {
+          title: 'Tom & Jerry\'s "notes" <best>',
+          description: 'Cat & mouse, "daily"',
+          resolvedUrl: 'https://feeds.example/a?b=1&c=2',
+        },
+      ],
       new Date('2026-08-08T09:00:00.000Z'),
     )
 
     expect(opml).toContain('text="Tom &amp; Jerry&apos;s &quot;notes&quot; &lt;best&gt;"')
+    expect(opml).toContain('description="Cat &amp; mouse, &quot;daily&quot;"')
     expect(opml).toContain('xmlUrl="https://feeds.example/a?b=1&amp;c=2"')
     expect(parseOpml(opml)).toEqual([
       { url: 'https://feeds.example/a?b=1&c=2', title: 'Tom & Jerry\'s "notes" <best>' },
@@ -106,8 +114,8 @@ describe('serializeOpml', () => {
 
   it('round trips: its own export parses back to the same Feeds', () => {
     const subscriptions = [
-      { title: 'Field Notes', resolvedUrl: 'https://feeds.example/journal.xml' },
-      { title: 'Atom Letters', resolvedUrl: 'https://atom.example/feed.xml' },
+      { title: 'Field Notes', description: 'Notes from the field', resolvedUrl: 'https://feeds.example/journal.xml' },
+      { title: 'Atom Letters', description: null, resolvedUrl: 'https://atom.example/feed.xml' },
     ]
     expect(parseOpml(serializeOpml(subscriptions, new Date()))).toEqual([
       { url: 'https://feeds.example/journal.xml', title: 'Field Notes' },

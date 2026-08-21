@@ -16,6 +16,11 @@ const AVAILABLE = {
 const DETAIL = {
   feedId: 1,
   title: 'Field Notes',
+  description: null,
+  reportedTitle: 'Field Notes',
+  customTitle: null,
+  reportedDescription: null,
+  customDescription: null,
   domain: 'journal.example',
   homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
@@ -50,6 +55,7 @@ const DETAIL = {
 const LIST_FEED = {
   feedId: 1,
   title: 'Field Notes',
+  description: null,
   domain: DETAIL.domain,
   homePageUrl: DETAIL.homePageUrl,
   enteredUrl: DETAIL.enteredUrl,
@@ -77,6 +83,8 @@ describe('opening one Feed', () => {
     expect(window.location.pathname).toBe('/feeds/1')
     expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
     expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
+    // No Feed Description reported, so no line claims the space under the header.
+    expect(container.querySelector('.feed-description')).toBeNull()
 
     expect(container.querySelectorAll('.cadence-cell')).toHaveLength(181)
     expect(container.querySelectorAll('.cadence-cell[data-level="2"]')).toHaveLength(1)
@@ -94,6 +102,17 @@ describe('opening one Feed', () => {
     for (const meta of container.querySelectorAll('.feed-items .content-meta')) {
       expect(meta.textContent).not.toContain('Field Notes')
     }
+  })
+
+  it('shows the Feed Description under the header when the Feed reports one', async () => {
+    stubApi().on('GET /api/feeds/1', { body: { ...DETAIL, description: 'Notes from the field' } })
+    window.history.replaceState(null, '', '/feeds/1')
+    const { container } = render(<App />)
+
+    await screen.findByRole('group', { name: /26 weeks of publishing cadence/i })
+    const description = container.querySelector('.feed-description')
+    expect(description?.textContent).toBe('Notes from the field')
+    expect(description?.previousElementSibling?.className).toContain('feed-header')
   })
 
   it('saves and unsaves a retained item in place, from this Feed', async () => {
@@ -252,11 +271,7 @@ describe('managing one Feed', () => {
 
     await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
 
-    expect(
-      screen.getByText(
-        'this stops checking the feed and its items leave the digest — anything saved stays in your library',
-      ),
-    ).toBeDefined()
+    expect(screen.getByText('Removes the feed and its items except saved items.')).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
 
     await user.click(screen.getByRole('button', { name: 'cancel' }))

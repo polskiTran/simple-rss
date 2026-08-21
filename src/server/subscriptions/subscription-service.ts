@@ -4,17 +4,27 @@ import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   pollingIntervalMinutesSchema,
   type FeedDetail,
+  type FeedDetailsUpdate,
   type FeedItemRow,
   type PollingIntervalMinutes,
   type PollingSchedule,
   type SubscriptionSummary,
+  type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { feedItems, feeds, feedUrlAliases, libraryItems, subscriptions } from '../persistence/schema.js'
+import {
+  effectiveFeedDescription,
+  effectiveFeedTitle,
+  feedItems,
+  feeds,
+  feedUrlAliases,
+  libraryItems,
+  subscriptions,
+} from '../persistence/schema.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
@@ -41,9 +51,14 @@ export type SetPollingIntervalOutcome =
 
 export type UnsubscribeOutcome = { readonly kind: 'unsubscribed' } | { readonly kind: 'missing' }
 
+export type SetFeedDetailsOutcome =
+  | { readonly kind: 'updated'; readonly details: FeedDetailsUpdate }
+  | { readonly kind: 'missing' }
+
 interface FeedRecord {
   readonly feedId: number
   readonly title: string
+  readonly description: string | null
   readonly domain: string
   readonly homePageUrl: string | null
   readonly enteredUrl: string
@@ -55,6 +70,7 @@ interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {}
 const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
   title: feeds.title,
+  description: feeds.description,
   domain: feeds.domain,
   homePageUrl: feeds.homePageUrl,
   enteredUrl: feeds.enteredUrl,
@@ -63,6 +79,8 @@ const FEED_RECORD_COLUMNS = {
 
 const SUBSCRIBED_FEED_COLUMNS = {
   ...FEED_RECORD_COLUMNS,
+  title: effectiveFeedTitle,
+  description: effectiveFeedDescription,
   lastPolledAt: subscriptions.lastPolledAt,
   lastSuccessAt: subscriptions.lastSuccessAt,
   consecutiveFailures: subscriptions.consecutiveFailures,
@@ -126,6 +144,7 @@ export class SubscriptionService {
         return {
           feedId,
           title,
+          description: null,
           domain,
           homePageUrl: null,
           enteredUrl,
@@ -279,6 +298,36 @@ export class SubscriptionService {
     return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
   }
 
+  /** Replaces both overrides; the Feed's reported title and description keep being tracked underneath. */
+  setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): SetFeedDetailsOutcome {
+    const row = this.#db
+      .select({ reportedTitle: feeds.title, reportedDescription: feeds.description })
+      .from(subscriptions)
+      .innerJoin(feeds, eq(feeds.id, subscriptions.feedId))
+      .where(eq(subscriptions.feedId, feedId))
+      .limit(1)
+      .all()[0]
+    if (!row) return { kind: 'missing' }
+
+    const { customTitle, customDescription } = overrides
+    this.#db.update(subscriptions).set({ customTitle, customDescription }).where(eq(subscriptions.feedId, feedId)).run()
+
+    this.#logger.info('subscriptions.feed_details_changed', {
+      feedId,
+      customTitle: customTitle !== null,
+      customDescription: customDescription !== null,
+    })
+    return {
+      kind: 'updated',
+      details: {
+        title: customTitle ?? row.reportedTitle,
+        customTitle,
+        description: customDescription ?? row.reportedDescription,
+        customDescription,
+      },
+    }
+  }
+
   /**
    * Deletes only the Subscription row — polling and Digest membership hinge on it.
    * Retained rows wait for the retention sweep, which keeps saves and their attribution.
@@ -312,6 +361,10 @@ export class SubscriptionService {
     const record = this.#db
       .select({
         ...SUBSCRIBED_FEED_COLUMNS,
+        reportedTitle: feeds.title,
+        customTitle: subscriptions.customTitle,
+        reportedDescription: feeds.description,
+        customDescription: subscriptions.customDescription,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
         nextPollAt: subscriptions.nextPollAt,
       })
@@ -362,6 +415,11 @@ export class SubscriptionService {
     return {
       feedId: record.feedId,
       title: record.title,
+      description: record.description,
+      reportedTitle: record.reportedTitle,
+      customTitle: record.customTitle,
+      reportedDescription: record.reportedDescription,
+      customDescription: record.customDescription,
       domain: record.domain,
       homePageUrl: record.homePageUrl,
       enteredUrl: record.enteredUrl,
@@ -376,12 +434,13 @@ export class SubscriptionService {
     }
   }
 
+  /** Ordered by effective title — the order of the Feeds list and of OPML export alike. */
   #subscribedFeeds(): readonly SubscribedFeedRecord[] {
     return this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .orderBy(feeds.title)
+      .orderBy(effectiveFeedTitle)
       .all()
   }
 
@@ -451,6 +510,7 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
   return {
     feedId: record.feedId,
     title: record.title,
+    description: record.description,
     domain: record.domain,
     homePageUrl: record.homePageUrl,
     enteredUrl: record.enteredUrl,

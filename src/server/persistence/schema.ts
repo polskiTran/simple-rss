@@ -39,6 +39,8 @@ export const feeds = sqliteTable('feeds', {
   enteredUrl: text('entered_url').notNull().unique(),
   resolvedUrl: text('resolved_url').notNull().unique(),
   title: text('title').notNull(),
+  /** The Feed Description; null when the document reports none. Refreshed with the title. */
+  description: text('description'),
   /** The host shown for the Feed: the home page's when it declares one, else the Feed URL's. */
   domain: text('domain').notNull(),
   /** Null until a retrieval finds a site link that is not the Feed URL itself. */
@@ -69,6 +71,10 @@ export const subscriptions = sqliteTable(
     feedId: integer('feed_id')
       .primaryKey()
       .references(() => feeds.id, { onDelete: 'cascade' }),
+    /** The Custom Title; null means the Feed's reported title stands. */
+    customTitle: text('custom_title'),
+    /** The Custom Description; null means the Feed Description stands. */
+    customDescription: text('custom_description'),
     pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
     /** The persisted due-time frontier the scheduler wakes to query. */
     nextPollAt: text('next_poll_at').notNull(),
@@ -84,6 +90,20 @@ export const subscriptions = sqliteTable(
   },
   (table) => [index('subscriptions_next_poll_at').on(table.nextPollAt)],
 )
+
+/**
+ * Requires a `subscriptions` join; left-join where the query can name unsubscribed Feeds.
+ *
+ * The search index denormalizes this expression per Feed Item: triggers (migrations 6
+ * and 12) re-index a Feed's items when either side changes, and `rebuildSearchIndex`
+ * (search/search-service.ts) restates it from scratch.
+ */
+export const effectiveFeedTitle = sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`
+
+/** Same join rule; null when neither the User nor the Feed describes it. */
+export const effectiveFeedDescription = sql<
+  string | null
+>`coalesce(${subscriptions.customDescription}, ${feeds.description})`
 
 /** Normalized Feed Window entries, deduplicated only inside their Feed. */
 export const feedItems = sqliteTable(
