@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Clock } from '../clock.js'
-import { FeedDocumentError, parseFeedDocument, type ParsedFeedDocument } from '../ingestion/feed-document.js'
+import type { ParsedFeedDocument } from '../ingestion/feed-document.js'
 import { persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
@@ -15,6 +15,7 @@ import {
   type PolledFeed,
 } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
+import { proveFeed } from './prove-feed.js'
 import type { SubscriptionService } from './subscription-service.js'
 
 export type IngestFeedOutcome =
@@ -33,9 +34,9 @@ interface PollableFeed extends PolledFeed {
 }
 
 /**
- * One retrieval of one Feed, end to end: the conditional request, the parse, the
+ * One poll of one Feed, end to end: the conditional proof (`proveFeed`), the
  * Feed Window write, and the single Feed Availability write the outcome earns.
- * A retrieval that reveals a duplicate is handed back to `SubscriptionService`,
+ * A proof that reveals a duplicate is handed back to `SubscriptionService`,
  * which owns every Subscription write (ADR 0007).
  */
 export class FeedPoll {
@@ -75,42 +76,26 @@ export class FeedPoll {
   }
 
   async #poll(feed: PollableFeed): Promise<IngestFeedOutcome> {
-    const headers: Record<string, string> = {}
-    if (feed.etag) headers['if-none-match'] = feed.etag
-    if (feed.lastModified) headers['if-modified-since'] = feed.lastModified
-
-    const retrieved = await this.#retrieval.retrieveBytes({
+    const proof = await proveFeed({
+      retrieval: this.#retrieval,
       url: feed.resolvedUrl,
       operation: 'feed',
-      headers,
+      validators: { etag: feed.etag, lastModified: feed.lastModified },
+      priorUrls: [feed.enteredUrl],
     })
-    if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
 
-    if (retrieved.notModified) {
+    if (proof.kind === 'not-modified') {
       // A 304 may still rotate the validators; keeping the newest ones keeps
       // later requests conditional. No Feed Item row is touched.
-      this.#db
-        .update(feeds)
-        .set({
-          etag: retrieved.etag ?? feed.etag,
-          lastModified: retrieved.lastModified ?? feed.lastModified,
-        })
-        .where(eq(feeds.id, feed.feedId))
-        .run()
+      this.#db.update(feeds).set(proof.validators).where(eq(feeds.id, feed.feedId)).run()
       this.#logger.info('subscriptions.feed_unchanged', {
         feedId: feed.feedId,
         resolvedUrl: loggableUrl(feed.resolvedUrl),
       })
       return { kind: 'not-modified' }
     }
-
-    let parsed: ParsedFeedDocument
-    try {
-      parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
-    } catch (error) {
-      if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
-      throw error
-    }
+    if (proof.kind !== 'proven') return proof
+    const { retrieved, parsed } = proof
 
     // Two entered URLs can hide one Feed; the retrieval is what reveals it.
     // The later Subscription folds into the existing Feed (ADR 0007).
