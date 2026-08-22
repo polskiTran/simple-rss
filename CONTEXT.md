@@ -60,6 +60,10 @@ _Avoid_: Subtitle, blurb, about text
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch
 
+**Declared Feed**:
+A Feed a web page names in its own markup, so that pasting the page finds the Feed. A page may declare several; the first in the page is its default.
+_Avoid_: Alternative feed, autodiscovered feed, link-rel
+
 **Cadence**:
 A Feed's publishing rhythm, drawn from retained Feed Items as per-day counts in the installation timezone and rendered at four ink levels — a strip on the Feeds list, a 26-week grid on an opened Feed. The stat line's "posts" is display copy fixed by the design system; the domain term remains Feed Item.
 _Avoid_: Activity graph, contribution graph, frequency chart
