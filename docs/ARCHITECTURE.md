@@ -293,7 +293,7 @@ The client an attempt counts against is the **rightmost** `X-Forwarded-For` entr
 - Restrictive CSP and standard security headers
 - Render-time output escaping and Reader sanitization
 - Fetch destination and redirect validation to reduce SSRF, in one boundary every retrieval passes through — see [ADR 0005](adr/0005-one-hardened-outbound-retrieval-boundary.md)
-- Destination addresses validated inside the lookup the connection itself uses, so a name cannot resolve differently for the check and for the socket
+- Each hop's host resolved once, its judged addresses answering the socket's own lookup, so a name cannot resolve differently for the check and for the connection
 - `PUBLIC_ORIGIN` refused as a destination, so the reader cannot be steered into its own API
 - Body, timeout, concurrency, and content-type limits
 - No secrets, sessions, Feed summaries, Reader content, or full query strings in logs

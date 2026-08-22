@@ -1,4 +1,4 @@
-import { lookup as systemLookup, type LookupAddress } from 'node:dns'
+import { lookup as systemLookup, type LookupAddress, type LookupOptions } from 'node:dns'
 import { Agent as HttpAgent, request as httpRequest, type IncomingMessage, type OutgoingHttpHeaders } from 'node:http'
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
@@ -19,7 +19,7 @@ export interface NetworkHttpClientOptions {
 
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
-  const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
+  const resolvingLookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
   // A socket lives only while an admitted retrieval uses it, so the gates in
   // `retrieval.ts` are the socket budget. Keep-alive would leave idle sockets
   // no budget covers, and a cap on those can only block admitted work.
@@ -27,7 +27,7 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
   const httpAgent = new HttpAgent(agentOptions)
   const httpsAgent = new HttpsAgent(agentOptions)
 
-  return async (request) => {
+  return async (request, addresses) => {
     const url = new URL(request.url)
     const secure = url.protocol === 'https:'
     if (!secure && url.protocol !== 'http:') {
@@ -40,6 +40,8 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
     if (isIP(host) !== 0 && !isAllowed(host)) {
       throw new HttpClientError('blocked_destination', 'socket address is not globally reachable')
     }
+
+    const lookup = addresses ? preresolvedLookup(addresses, isAllowed) : resolvingLookup
 
     const headers: OutgoingHttpHeaders = {}
     request.headers.forEach((value, name) => {
@@ -94,21 +96,40 @@ export function guardedLookup(
       const answers: LookupAddress[] = Array.isArray(answer)
         ? answer
         : [{ address: answer, family: family === 6 ? 6 : 4 }]
-      const refused = answers.find((entry) => !isAllowed(entry.address))
-      if (refused) {
-        callback(new HttpClientError('blocked_destination', 'host resolves to a non-global address'), '', 0)
-        return
-      }
-      const first = answers[0]
-      if (!first) {
-        callback(new HttpClientError('unresolvable_host', 'host did not resolve'), '', 0)
-        return
-      }
-
-      if (options.all) callback(null, answers as never, 0)
-      else callback(null, first.address, first.family)
+      answerSocket(answers, isAllowed, options, callback)
     })
   }
+}
+
+function preresolvedLookup(
+  addresses: readonly [string, ...string[]],
+  isAllowed: (address: string) => boolean,
+): LookupFunction {
+  const answers = addresses.map((address) => ({ address, family: isIP(address) }))
+  return (_hostname, options, callback) => answerSocket(answers, isAllowed, options, callback)
+}
+
+type LookupCallback = Parameters<LookupFunction>[2]
+
+function answerSocket(
+  answers: readonly LookupAddress[],
+  isAllowed: (address: string) => boolean,
+  options: LookupOptions,
+  callback: LookupCallback,
+): void {
+  if (answers.some((entry) => !isAllowed(entry.address))) {
+    callback(new HttpClientError('blocked_destination', 'host resolves to a non-global address'), '', 0)
+    return
+  }
+
+  const first = answers[0]
+  if (!first) {
+    callback(new HttpClientError('unresolvable_host', 'host did not resolve'), '', 0)
+    return
+  }
+
+  if (options.all) callback(null, answers as never, 0)
+  else callback(null, first.address, first.family)
 }
 
 function toResponse(request: Request, response: IncomingMessage): Response {

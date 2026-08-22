@@ -29,6 +29,7 @@ export class UpstreamFixtures {
   readonly #responses = new Map<string, FixtureResponse | (() => FixtureResponse)>()
   readonly #requests: RecordedRequest[] = []
   readonly #aborted: string[] = []
+  readonly #resolutions: string[] = []
 
   /** Stubs one exact URL. Later calls to the same URL replace the earlier one. */
   stub(url: string, response: FixtureResponse): this {
@@ -58,12 +59,17 @@ export class UpstreamFixtures {
     return this.#aborted
   }
 
+  get resolutions(): readonly string[] {
+    return this.#resolutions
+  }
+
   /**
    * DNS for the stubbed world: stubbed hosts resolve to one public address,
    * anything else to nothing — a forgotten stub fails as an unresolvable host.
    */
   get resolve(): ResolveAddresses {
     return async (hostname) => {
+      this.#resolutions.push(hostname)
       const known = [...this.#responses.keys()].some((url) => safeHostname(url) === hostname)
       return known ? [STUBBED_HOST_ADDRESS] : []
     }

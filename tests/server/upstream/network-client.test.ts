@@ -44,10 +44,13 @@ function clientReachingTheTestServer(): HttpClient {
   return createNetworkHttpClient({ isAllowedAddress: () => true })
 }
 
-const testServerLookup: LookupFunction = (_hostname, options, callback) => {
-  const answer = { address: '127.0.0.1', family: 4 as const }
-  if (options.all) callback(null, [answer] as never, 0)
-  else callback(null, answer.address, answer.family)
+function testServerLookup(asked: string[] = []): LookupFunction {
+  return (hostname, options, callback) => {
+    asked.push(hostname)
+    const answer = { address: '127.0.0.1', family: 4 as const }
+    if (options.all) callback(null, [answer] as never, 0)
+    else callback(null, answer.address, answer.family)
+  }
 }
 
 describe('createNetworkHttpClient', () => {
@@ -120,11 +123,9 @@ describe('createNetworkHttpClient', () => {
       response.end(compressed)
     })
     const port = new URL(running.url).port
+    const client = createNetworkHttpClient({ isAllowedAddress: () => true })
     const retrieval = createRetrieval({
-      httpClient: createNetworkHttpClient({
-        isAllowedAddress: () => true,
-        lookup: testServerLookup,
-      }),
+      httpClient: (request) => client(request, ['127.0.0.1']),
       logger: createLogger({ level: 'error', sink: () => {} }),
       resolve: async () => ['93.184.216.34'],
       self: new URL('https://reader.test'),
@@ -286,6 +287,50 @@ describe('createNetworkHttpClient', () => {
 
     await expect(connectionClosed).resolves.toBeUndefined()
     expect(running.requests[0]?.headers.connection).toBe('close')
+  })
+
+  it('connects to an address it was handed without resolving the name a second time', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml' })
+      response.end('<rss></rss>')
+    })
+    const asked: string[] = []
+    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup(asked) })
+
+    const response = await client(new Request(`http://publisher.example:${new URL(running.url).port}/feed.xml`), [
+      '127.0.0.1',
+    ])
+
+    await expect(response.text()).resolves.toBe('<rss></rss>')
+    expect(asked).toEqual([])
+  })
+
+  it('resolves the name through the guarded lookup when it is handed no addresses', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml' })
+      response.end('<rss></rss>')
+    })
+    const asked: string[] = []
+    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup(asked) })
+
+    const response = await client(new Request(`http://publisher.example:${new URL(running.url).port}/feed.xml`))
+
+    await expect(response.text()).resolves.toBe('<rss></rss>')
+    expect(asked).toEqual(['publisher.example'])
+  })
+
+  it('refuses an address it was handed that no retrieval may reach', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml' })
+      response.end('<rss></rss>')
+    })
+
+    await expect(
+      createNetworkHttpClient()(new Request(`http://publisher.example:${new URL(running.url).port}/feed.xml`), [
+        '127.0.0.1',
+      ]),
+    ).rejects.toMatchObject({ code: 'blocked_destination' })
+    expect(running.requests).toHaveLength(0)
   })
 
   it('refuses a private address by default, before anything is connected to', async () => {

@@ -372,6 +372,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     try {
       response = await context.httpClient(
         new Request(url, { method: 'GET', headers, redirect: 'manual', signal: controller.signal }),
+        destination.addresses,
       )
     } catch (error) {
       if (abandoned) return fail(abandoned, abandonmentReason(abandoned), { host: url.host })

@@ -23,8 +23,8 @@ export interface AllowedDestination {
   readonly url: URL
   /** The name asked of the resolver, without a trailing dot or brackets. */
   readonly hostname: string
-  /** Every address the name answered with, each already judged public. */
-  readonly addresses: readonly string[]
+  /** Every address the name answered with, each already judged public; a name that answered none is refused. */
+  readonly addresses: readonly [string, ...string[]]
 }
 
 export interface RefusedDestination {
@@ -97,7 +97,7 @@ export async function validateDestination(
     return { ok: false, code: 'unresolvable_host', reason: 'host did not resolve' }
   }
 
-  if (addresses.length === 0) {
+  if (!nonEmpty(addresses)) {
     return { ok: false, code: 'unresolvable_host', reason: 'host did not resolve' }
   }
 
@@ -109,6 +109,10 @@ export async function validateDestination(
   }
 
   return { ok: true, url, hostname, addresses }
+}
+
+function nonEmpty<T>(values: readonly T[]): values is readonly [T, ...T[]] {
+  return values.length > 0
 }
 
 /** `URL` leaves a trailing dot alone; `example.com.` must not slip past a rule for `example.com`. */

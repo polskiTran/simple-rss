@@ -1,9 +1,9 @@
 /**
- * Internal transport seam; feature modules depend on `Retrieval`, never this.
- * An adapter must validate resolved socket addresses, follow no redirects,
- * honour the signal, and fully decode declared encodings.
+ * An adapter must validate every address it connects to — including any it was
+ * handed — follow no redirects, honour the signal, and fully decode declared
+ * encodings.
  */
-export type HttpClient = (request: Request) => Promise<Response>
+export type HttpClient = (request: Request, addresses?: readonly [string, ...string[]]) => Promise<Response>
 
 export type HttpClientFailureCode = 'blocked_destination' | 'unresolvable_host' | 'unsupported_content_encoding'
 
