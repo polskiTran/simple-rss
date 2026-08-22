@@ -13,57 +13,103 @@ import { createNetworkHttpClient } from './network-client.js'
 
 export const MAX_REDIRECTS = 5
 
-const DEFAULT_CAPACITY: RetrievalCapacity = { maxConcurrent: 6, maxQueued: 32 }
-
-export type RetrievalOperation = 'feed' | 'reader' | 'image'
+export type RetrievalOperation = 'feed' | 'reader' | 'image' | 'preview' | 'discovery'
 
 export interface RetrievalCapacity {
   readonly maxConcurrent: number
   readonly maxQueued: number
 }
 
+/**
+ * How a profile keeps time. `split` gives the answer and its body separate
+ * clocks, so a slow large body is not an unreachable host; `total` runs one
+ * clock from queueing through the last decoded byte.
+ */
+export type RetrievalDeadline =
+  | {
+      readonly kind: 'split'
+      /** Covers resolution, connection, every redirect hop, and the final response headers. */
+      readonly timeoutMs: number
+      readonly bodyTimeoutMs: number
+    }
+  | { readonly kind: 'total'; readonly timeoutMs: number }
+
 export interface RetrievalProfile {
   readonly accept: readonly string[]
   readonly maxBytes: number
-  /** Covers resolution, connection, every redirect hop, and the final response headers. */
-  readonly timeoutMs: number
-  /** Separate from timeoutMs: a slow large body is not an unreachable host. */
-  readonly bodyTimeoutMs: number
+  /** Past `maxBytes`: `refuse` fails `too_large`; `truncate` ends the body cleanly at the ceiling. */
+  readonly pastCeiling: 'refuse' | 'truncate'
+  readonly deadline: RetrievalDeadline
   readonly maxRedirects: number
   readonly capacity: RetrievalCapacity
 }
 
+const FEED_CONTENT_TYPES = ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml']
+const PAGE_CONTENT_TYPES = ['text/html', 'application/xhtml+xml']
+
 export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
   feed: {
-    accept: ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml'],
+    accept: FEED_CONTENT_TYPES,
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
-    timeoutMs: 10_000,
-    bodyTimeoutMs: 60_000,
+    pastCeiling: 'refuse',
+    deadline: { kind: 'split', timeoutMs: 10_000, bodyTimeoutMs: 60_000 },
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 24 },
   },
   reader: {
-    accept: ['text/html', 'application/xhtml+xml'],
+    accept: PAGE_CONTENT_TYPES,
     maxBytes: 5 * 1024 * 1024,
-    timeoutMs: 10_000,
-    bodyTimeoutMs: 30_000,
+    pastCeiling: 'refuse',
+    deadline: { kind: 'split', timeoutMs: 10_000, bodyTimeoutMs: 30_000 },
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 2, maxQueued: 8 },
   },
   image: {
     accept: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'],
     maxBytes: 5 * 1024 * 1024,
-    timeoutMs: 10_000,
-    bodyTimeoutMs: 30_000,
+    pastCeiling: 'refuse',
+    deadline: { kind: 'split', timeoutMs: 10_000, bodyTimeoutMs: 30_000 },
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
+  /** A pasted address proven before it is recorded: the Feed profile under one clock a User is waiting on. */
+  preview: {
+    accept: FEED_CONTENT_TYPES,
+    maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
+    pastCeiling: 'refuse',
+    deadline: { kind: 'total', timeoutMs: 15_000 },
+    maxRedirects: MAX_REDIRECTS,
+    capacity: { maxConcurrent: 2, maxQueued: 4 },
+  },
+  /** A pasted page read for its Declared Feeds; they sit in the head, so the tail past the ceiling is dropped. */
+  discovery: {
+    accept: PAGE_CONTENT_TYPES,
+    maxBytes: 1024 * 1024,
+    pastCeiling: 'truncate',
+    deadline: { kind: 'total', timeoutMs: 15_000 },
+    maxRedirects: MAX_REDIRECTS,
+    capacity: { maxConcurrent: 2, maxQueued: 4 },
+  },
+}
+
+/**
+ * Every operation at full tilt fits, so no budget can starve another; what
+ * the shared capacity bounds is queued work and DNS.
+ */
+const DEFAULT_CAPACITY: RetrievalCapacity = {
+  maxConcurrent: Object.values(RETRIEVAL_PROFILES).reduce(
+    (total, profile) => total + profile.capacity.maxConcurrent,
+    0,
+  ),
+  maxQueued: 32,
 }
 
 /** Can only tighten the operation profile; non-finite values are rejected. */
 export interface RetrievalLimits {
   readonly maxBytes?: number
+  /** On a `total` deadline this tightens the whole retrieval, body included. */
   readonly timeoutMs?: number
+  /** Only a `split` deadline has a body clock; a `total` one ignores this. */
   readonly bodyTimeoutMs?: number
   readonly maxRedirects?: number
 }
@@ -90,9 +136,9 @@ export type RetrievalFailureCode =
   | 'unsupported_content_encoding'
   | 'too_large'
   | 'http_error'
-  /** The publisher never answered. */
+  /** The publisher never answered — or, under a `total` deadline, never finished. */
   | 'timeout'
-  /** Answered, but the body did not finish arriving. */
+  /** Answered, but the body did not finish arriving; only a `split` deadline says this. */
   | 'body_timeout'
   | 'cancelled'
   | 'busy'
@@ -119,7 +165,7 @@ export interface RetrievalSuccess {
   readonly lastModified: string | undefined
   /** True when a conditional request was answered `304` and there is no body. */
   readonly notModified: boolean
-  /** Reading past the profile's byte ceiling errors the stream with a `RetrievalError`. */
+  /** Past the profile's byte ceiling the stream errors with a `RetrievalError`, or closes if the profile truncates. */
   readonly body: ReadableStream<Uint8Array>
 }
 
@@ -130,6 +176,8 @@ export interface RetrievalFailure {
   readonly reason: string
   /** Present for `http_error`, so a caller can tell 404 from 503. */
   readonly status?: number
+  /** Present for `unsupported_content_type`: the media type seen, `''` when none was declared. */
+  readonly contentType?: string
 }
 
 export type RetrievalResult = RetrievalSuccess | RetrievalFailure
@@ -181,6 +229,8 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
     feed: gateFor(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
     reader: gateFor(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
     image: gateFor(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
+    preview: gateFor(options.operationCapacity?.preview ?? RETRIEVAL_PROFILES.preview.capacity),
+    discovery: gateFor(options.operationCapacity?.discovery ?? RETRIEVAL_PROFILES.discovery.capacity),
   }
 
   const retrieve = (request: RetrievalRequest): Promise<RetrievalResult> =>
@@ -226,8 +276,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const limits = stricterLimits(profile, request.limits)
   const maxRedirects = limits?.maxRedirects ?? profile.maxRedirects
   const maxBytes = limits?.maxBytes ?? profile.maxBytes
-  const timeoutMs = limits?.timeoutMs ?? profile.timeoutMs
-  const bodyTimeoutMs = limits?.bodyTimeoutMs ?? profile.bodyTimeoutMs
+  const deadline = limits?.deadline ?? profile.deadline
   const headers = forwardableHeaders(request.headers, profile.accept)
 
   const controller = new AbortController()
@@ -237,10 +286,22 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     controller.abort(new RetrievalError(kind, message))
   }
 
-  let timer = setTimeout(() => abort('timeout', `no answer within ${timeoutMs}ms`), timeoutMs)
+  let timer = setTimeout(
+    () =>
+      abort(
+        'timeout',
+        deadline.kind === 'total'
+          ? `unfinished within ${deadline.timeoutMs}ms`
+          : `no answer within ${deadline.timeoutMs}ms`,
+      ),
+    deadline.timeoutMs,
+  )
 
+  // A `total` deadline keeps running; only a `split` one hands the body its own clock.
   const startBodyDeadline = (): void => {
+    if (deadline.kind !== 'split') return
     clearTimeout(timer)
+    const { bodyTimeoutMs } = deadline
     timer = setTimeout(() => abort('body_timeout', `body unfinished after ${bodyTimeoutMs}ms`), bodyTimeoutMs)
   }
 
@@ -271,11 +332,11 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     code: RetrievalFailureCode,
     reason: string,
     fields: Record<string, unknown> = {},
-    status?: number,
+    detail: Pick<RetrievalFailure, 'status' | 'contentType'> = {},
   ): RetrievalFailure => {
     settle()
-    log('upstream.retrieval_failed', { code, reason, ...fields })
-    return { ok: false, code, reason, ...(status === undefined ? {} : { status }) }
+    log('upstream.retrieval_failed', { code, reason, ...fields, ...detail })
+    return { ok: false, code, reason, ...detail }
   }
 
   if (!limits) return fail('invalid_request', 'retrieval limits must be finite numbers')
@@ -359,18 +420,19 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     if (!response.ok) {
       await discard(response)
       controller.abort(new RetrievalError('http_error', `upstream answered ${response.status}`))
-      return fail('http_error', `upstream answered ${response.status}`, answered, response.status)
+      return fail('http_error', `upstream answered ${response.status}`, answered, { status: response.status })
     }
 
     const contentType = mediaType(response.headers.get('content-type'))
     if (!accepted(contentType, profile.accept)) {
       await discard(response)
       controller.abort(new RetrievalError('unsupported_content_type', 'unusable content type'))
-      return fail('unsupported_content_type', contentType ? `content type ${contentType}` : 'no content type', answered)
+      const reason = contentType ? `content type ${contentType}` : 'no content type'
+      return fail('unsupported_content_type', reason, answered, { contentType })
     }
 
     const declared = Number(response.headers.get('content-length'))
-    if (Number.isFinite(declared) && declared > maxBytes) {
+    if (profile.pastCeiling === 'refuse' && Number.isFinite(declared) && declared > maxBytes) {
       await discard(response)
       controller.abort(new RetrievalError('too_large', 'declared length above the ceiling'))
       return fail('too_large', `declared ${declared} bytes above the ${maxBytes} ceiling`, answered)
@@ -388,35 +450,47 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       notModified: false,
       body: boundedBody(response, {
         maxBytes,
+        pastCeiling: profile.pastCeiling,
         signal: controller.signal,
         abandonedKind: () => abandoned,
         abort: (error) => controller.abort(error),
-        finish: (bytes, error) => {
+        finish: (outcome) => {
           settle()
-          if (error) log('upstream.retrieval_failed', { ...answered, code: error.code, reason: error.message, bytes })
-          else log('upstream.retrieval_completed', { ...answered, bytes, notModified: false })
+          if (outcome.error) {
+            const { error, bytes } = outcome
+            log('upstream.retrieval_failed', { ...answered, code: error.code, reason: error.message, bytes })
+          } else {
+            log('upstream.retrieval_completed', { ...answered, ...outcome, notModified: false })
+          }
         },
       }),
     }
   }
 }
 
+type BodyOutcome =
+  | { readonly bytes: number; readonly truncated?: true; readonly error?: undefined }
+  | { readonly bytes: number; readonly error: RetrievalError }
+
 interface BoundedBodyOptions {
   readonly maxBytes: number
+  readonly pastCeiling: RetrievalProfile['pastCeiling']
   readonly signal: AbortSignal
   readonly abandonedKind: () => Abandonment | undefined
   readonly abort: (error: RetrievalError) => void
-  readonly finish: (bytes: number, error: RetrievalError | undefined) => void
+  readonly finish: (outcome: BodyOutcome) => void
 }
 
 /**
- * Counts decoded bytes and tears the connection down past the ceiling.
- * `Content-Length` is only a hint: compressed bodies expand and hostile ones lie.
+ * Counts decoded bytes and tears the connection down past the ceiling —
+ * erroring the stream, or closing it on the ceiling's last byte when the
+ * profile truncates. `Content-Length` is only a hint: compressed bodies expand
+ * and hostile ones lie.
  */
 function boundedBody(response: Response, options: BoundedBodyOptions): ReadableStream<Uint8Array> {
   const source = response.body
   if (!source) {
-    options.finish(0, undefined)
+    options.finish({ bytes: 0 })
     return emptyStream()
   }
 
@@ -431,7 +505,7 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
     if (error) options.abort(error)
     void reader.cancel(error).catch(() => {})
     if (error) sink?.error(error)
-    options.finish(seen, error)
+    options.finish(error ? { bytes: seen, error } : { bytes: seen })
   }
 
   const stream = new ReadableStream<Uint8Array>({
@@ -444,7 +518,7 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
         if (chunk.done) {
           if (!done) {
             done = true
-            options.finish(seen, undefined)
+            options.finish({ bytes: seen })
           }
           controller.close()
           return
@@ -452,7 +526,17 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
 
         seen += chunk.value.byteLength
         if (seen > options.maxBytes) {
-          stop(new RetrievalError('too_large', `body passed the ${options.maxBytes} byte ceiling`))
+          if (options.pastCeiling === 'refuse') {
+            stop(new RetrievalError('too_large', `body passed the ${options.maxBytes} byte ceiling`))
+            return
+          }
+          const kept = chunk.value.subarray(0, chunk.value.byteLength - (seen - options.maxBytes))
+          seen = options.maxBytes
+          done = true
+          void reader.cancel().catch(() => {})
+          if (kept.byteLength > 0) controller.enqueue(kept)
+          controller.close()
+          options.finish({ bytes: seen, truncated: true })
           return
         }
 
@@ -606,8 +690,7 @@ class ConcurrencyGate {
 
 interface ResolvedLimits {
   readonly maxBytes: number
-  readonly timeoutMs: number
-  readonly bodyTimeoutMs: number
+  readonly deadline: RetrievalDeadline
   readonly maxRedirects: number
 }
 
@@ -615,18 +698,21 @@ function stricterLimits(profile: RetrievalProfile, requested: RetrievalLimits | 
   const values = [requested?.maxBytes, requested?.timeoutMs, requested?.bodyTimeoutMs, requested?.maxRedirects]
   if (values.some((value) => value !== undefined && !Number.isFinite(value))) return undefined
 
+  const { deadline } = profile
+  const timeoutMs = tightened(requested?.timeoutMs, deadline.timeoutMs, 1)
   return {
-    maxBytes: Math.max(1, Math.min(Math.floor(requested?.maxBytes ?? profile.maxBytes), profile.maxBytes)),
-    timeoutMs: Math.max(1, Math.min(Math.floor(requested?.timeoutMs ?? profile.timeoutMs), profile.timeoutMs)),
-    bodyTimeoutMs: Math.max(
-      1,
-      Math.min(Math.floor(requested?.bodyTimeoutMs ?? profile.bodyTimeoutMs), profile.bodyTimeoutMs),
-    ),
-    maxRedirects: Math.max(
-      0,
-      Math.min(Math.floor(requested?.maxRedirects ?? profile.maxRedirects), profile.maxRedirects),
-    ),
+    maxBytes: tightened(requested?.maxBytes, profile.maxBytes, 1),
+    deadline:
+      deadline.kind === 'total'
+        ? { kind: 'total', timeoutMs }
+        : { kind: 'split', timeoutMs, bodyTimeoutMs: tightened(requested?.bodyTimeoutMs, deadline.bodyTimeoutMs, 1) },
+    maxRedirects: tightened(requested?.maxRedirects, profile.maxRedirects, 0),
   }
+}
+
+/** The profile's value is the ceiling; a request can only come down from it. */
+function tightened(requested: number | undefined, ceiling: number, floor: number): number {
+  return Math.max(floor, Math.min(Math.floor(requested ?? ceiling), ceiling))
 }
 
 function validCapacity(capacity: RetrievalCapacity): RetrievalCapacity {

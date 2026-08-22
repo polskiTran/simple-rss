@@ -17,7 +17,8 @@ export interface NetworkHttpClientOptions {
   readonly lookup?: LookupFunction
 }
 
-const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 8
+/** The sum of the operation budgets in `retrieval.ts` (4 + 2 + 4 + 2 + 2): every one at full tilt holds a socket, even all on one protocol. */
+const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 14
 const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {

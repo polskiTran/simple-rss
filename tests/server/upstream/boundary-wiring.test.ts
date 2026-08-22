@@ -18,6 +18,33 @@ describe('the service boundary', () => {
     expect(service.upstream.requestsTo(FEED)).toHaveLength(1)
   })
 
+  it('serves a pasted page under discovery and its Declared Feed under preview, each with its own profile', async () => {
+    const service = await startTestService()
+    service.upstream.stub('https://blog.example.com/', {
+      headers: { 'content-type': 'text/html' },
+      body: '<html><head><link rel="alternate" type="application/rss+xml" href="/feed.xml"></head></html>',
+    })
+    service.upstream.stub('https://blog.example.com/feed.xml', {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: '<rss></rss>',
+    })
+
+    const page = await service.retrieval.retrieveBytes({ url: 'https://blog.example.com/', operation: 'discovery' })
+    const feed = await service.retrieval.retrieveBytes({
+      url: 'https://blog.example.com/feed.xml',
+      operation: 'preview',
+    })
+
+    expect(page).toMatchObject({ ok: true, contentType: 'text/html' })
+    expect(feed).toMatchObject({ ok: true, contentType: 'application/rss+xml' })
+    expect(service.upstream.requestsTo('https://blog.example.com/')[0]?.headers.accept).toBe(
+      'text/html, application/xhtml+xml',
+    )
+    expect(service.upstream.requestsTo('https://blog.example.com/feed.xml')[0]?.headers.accept).toBe(
+      'application/rss+xml, application/atom+xml, application/xml, text/xml',
+    )
+  })
+
   it('refuses a destination that points back at the installation itself', async () => {
     const service = await startTestService({ env: { PUBLIC_ORIGIN: 'https://reader.example.com' } })
     service.upstream.stub('https://reader.example.com/api/meta', { body: '{}' })

@@ -188,16 +188,19 @@ describe('retrieveBytes', () => {
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
       ok: false,
       code: 'unsupported_content_type',
+      contentType: 'text/html',
     })
   })
 
   it('refuses a body that declares no type at all', async () => {
     const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/feed.xml', { body: '<rss></rss>' })
+    // A byte body: `Response` would stamp `text/plain` onto a string one.
+    upstream.stub('https://example.com/feed.xml', { body: new TextEncoder().encode('<rss></rss>') })
 
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
       ok: false,
       code: 'unsupported_content_type',
+      contentType: '',
     })
   })
 
@@ -270,6 +273,37 @@ describe('retrieveBytes', () => {
         }),
       ),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
+  })
+
+  it('ends a discovery body cleanly at the ceiling instead of refusing it', async () => {
+    const { retrieval, upstream } = harness()
+    const chunk = new Uint8Array(256).fill(1)
+    upstream.stubDynamic('https://example.com/', () => ({
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: chunkedBody([chunk, chunk, chunk, chunk, chunk, chunk]),
+    }))
+
+    const result = await retrieval.retrieveBytes(
+      feedRequest('https://example.com/', { operation: 'discovery', maxBytes: 1000 }),
+    )
+
+    expect(result).toMatchObject({ ok: true, status: 200 })
+    expect(result.ok && result.bytes.byteLength).toBe(1000)
+  })
+
+  it('does not refuse a discovery page whose declared length is above the ceiling', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stub('https://example.com/', {
+      headers: { 'content-type': 'text/html', 'content-length': '5000' },
+      body: 'x'.repeat(5000),
+    })
+
+    const result = await retrieval.retrieveBytes(
+      feedRequest('https://example.com/', { operation: 'discovery', maxBytes: 1000 }),
+    )
+
+    expect(result).toMatchObject({ ok: true })
+    expect(result.ok && result.bytes.byteLength).toBe(1000)
   })
 
   it('reports an upstream error status without treating it as a body', async () => {
@@ -537,6 +571,21 @@ describe('giving up', () => {
     expect(upstream.aborted).toContain('https://example.com/feed.xml')
   })
 
+  it('keeps one clock over headers and body under preview, so a slow body is a timeout at the tightened total', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stubDynamic('https://example.com/feed.xml', () => ({
+      headers: { 'content-type': 'application/rss+xml' },
+      body: pacedBody([new Uint8Array(8), new Uint8Array(8), new Uint8Array(8), new Uint8Array(8)], { gapMs: 30 }),
+    }))
+
+    await expect(
+      retrieval.retrieveBytes(
+        feedRequest('https://example.com/feed.xml', { operation: 'preview', timeoutMs: 50, bodyTimeoutMs: 2_000 }),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: 'timeout' })
+    expect(upstream.aborted).toContain('https://example.com/feed.xml')
+  })
+
   it('counts the deadline across redirects rather than restarting it each hop', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/a', {
@@ -630,6 +679,37 @@ describe('capacity', () => {
     expect(refused).toMatchObject({ ok: false, code: 'busy' })
     expect(elsewhere).toMatchObject({ ok: true })
     await expect(held).resolves.toMatchObject({ ok: true })
+  })
+
+  it('keeps a preview slot free while feed, reader, and image run at full tilt', async () => {
+    const { retrieval, upstream } = harness()
+    const held = { delayMs: 100, headers: { 'content-type': 'application/xml' }, body: '<rss></rss>' }
+    upstream.stub('https://example.com/feed.xml', held)
+    upstream.stub('https://example.com/page', { ...held, headers: { 'content-type': 'text/html' } })
+    upstream.stub('https://example.com/photo.jpg', { ...held, headers: { 'content-type': 'image/jpeg' } })
+    upstream.stub('https://example.com/new.xml', {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: '<rss></rss>',
+    })
+    const busy = (operation: RetrievalOperation, url: string, count: number) =>
+      Array.from({ length: count }, () => retrieval.retrieveBytes(feedRequest(url, { operation })))
+    const finished: string[] = []
+
+    const occupied = [
+      ...busy('feed', 'https://example.com/feed.xml', RETRIEVAL_PROFILES.feed.capacity.maxConcurrent),
+      ...busy('reader', 'https://example.com/page', RETRIEVAL_PROFILES.reader.capacity.maxConcurrent),
+      ...busy('image', 'https://example.com/photo.jpg', RETRIEVAL_PROFILES.image.capacity.maxConcurrent),
+    ].map((retrieval) => retrieval.then(() => finished.push('occupied')))
+    const preview = retrieval
+      .retrieveBytes(feedRequest('https://example.com/new.xml', { operation: 'preview' }))
+      .then((result) => {
+        finished.push('preview')
+        return result
+      })
+
+    await expect(preview).resolves.toMatchObject({ ok: true })
+    expect(finished).toEqual(['preview'])
+    await Promise.all(occupied)
   })
 
   it('does not let work queued for an operation hold shared capacity', async () => {

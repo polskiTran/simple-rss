@@ -32,6 +32,8 @@ interface RetrievalSubject {
  */
 function retrievalAnswers(subject: RetrievalSubject): Readonly<Record<RetrievalFailureCode, FailureAnswer>> {
   const { noun, profile, unsafeDestination, unsupportedContent, unreachable, httpError = unreachable } = subject
+  const { deadline } = profile
+  const bodyTimeoutMs = deadline.kind === 'split' ? deadline.bodyTimeoutMs : deadline.timeoutMs
   return {
     invalid_request: unsafeDestination,
     invalid_url: unsafeDestination,
@@ -49,12 +51,12 @@ function retrievalAnswers(subject: RetrievalSubject): Readonly<Record<RetrievalF
     timeout: {
       status: 504,
       code: subject.timeoutCode,
-      message: `${noun} did not respond within ${Math.round(profile.timeoutMs / 1_000)} seconds`,
+      message: `${noun} did not respond within ${Math.round(deadline.timeoutMs / 1_000)} seconds`,
     },
     body_timeout: {
       status: 504,
       code: subject.bodyTimeoutCode,
-      message: `${noun} did not finish downloading within ${Math.round(profile.bodyTimeoutMs / 1_000)} seconds`,
+      message: `${noun} did not finish downloading within ${Math.round(bodyTimeoutMs / 1_000)} seconds`,
     },
     unresolvable_host: unreachable,
     http_error: httpError,
