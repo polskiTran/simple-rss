@@ -12,7 +12,7 @@ import type { FeedDocumentError } from '../ingestion/feed-document.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import { subscriptions } from '../persistence/schema.js'
-import type { RetrievalFailure } from '../upstream/retrieval.js'
+import type { RetrievalFailure, RetrievalFailureCode } from '../upstream/retrieval.js'
 import { loggableUrl } from './loggable-url.js'
 import { deferredPollTime, nextPollTime, nextRetryTime } from './polling-schedule.js'
 
@@ -36,6 +36,13 @@ export interface RecordedAvailability {
 export type FailedPoll =
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
   | { readonly kind: 'invalid-feed'; readonly code: FeedDocumentError['code'] }
+
+export type DeferralCode = Extract<RetrievalFailureCode, 'busy' | 'cancelled'>
+
+export type DeferredPoll = {
+  readonly kind: 'retrieval-failed'
+  readonly failure: RetrievalFailure & { readonly code: DeferralCode }
+}
 
 /**
  * Every write to a Subscription's Feed Availability, and the distinction that
@@ -98,12 +105,7 @@ export class FeedAvailability {
     })
   }
 
-  /**
-   * The publisher was never asked (boundary saturated, or the caller gave up), so
-   * nothing about Feed Availability moves — not even when it was last checked — and
-   * the attempt is due again one wake interval on, minutes rather than a Polling Interval.
-   */
-  recordDeferral(feed: PolledFeed, code: RetrievalFailure['code']): void {
+  recordDeferral(feed: PolledFeed, code: DeferralCode): void {
     this.#db
       .update(subscriptions)
       .set({ nextPollAt: deferredPollTime(this.#clock.now()) })
@@ -119,7 +121,7 @@ export class FeedAvailability {
 }
 
 /** True only where this installation refused the attempt, so the publisher was never contacted. */
-export function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPoll, { kind: 'retrieval-failed' }> {
+export function wasNeverAsked(outcome: FailedPoll): outcome is DeferredPoll {
   return (
     outcome.kind === 'retrieval-failed' && (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
   )

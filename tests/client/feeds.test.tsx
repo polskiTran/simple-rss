@@ -98,7 +98,6 @@ function useFakeClock(): { advanceTimers: (milliseconds: number) => void } {
   return { advanceTimers }
 }
 
-/** Fake time passing, with React flushing whatever the timers set off. */
 function elapse(milliseconds: number): Promise<void> {
   return act(async () => {
     await vi.advanceTimersByTimeAsync(milliseconds)

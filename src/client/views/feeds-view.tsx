@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
@@ -13,10 +13,6 @@ import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-contr
 const FIRST_CHECK_ATTEMPTS = 8
 const FIRST_CHECK_INTERVAL_MS = 2_000
 
-/**
- * While any row is unchecked the list refreshes on this ladder, then steadily, for as
- * long as the view is open; subscribing or an import report starts the ladder over.
- */
 const UNCHECKED_REFRESH_LADDER_MS = [3_000, 5_000] as const
 const UNCHECKED_REFRESH_STEADY_MS = 10_000
 
@@ -62,14 +58,13 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     return () => request.abort()
   }, [])
 
-  async function refreshList(): Promise<void> {
+  const refreshList = useCallback(async () => {
     try {
       const { subscriptions } = await fetchSubscriptions()
       setState({ kind: 'loaded', subscriptions })
     } catch {}
-  }
+  }, [])
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshList is recreated every render; depending on it would restart the refresh timer on every render.
   useEffect(() => {
     if (state.kind !== 'loaded') return
     if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
@@ -78,7 +73,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
       setRefreshRound((round) => round + 1)
     }, UNCHECKED_REFRESH_LADDER_MS[refreshRound] ?? UNCHECKED_REFRESH_STEADY_MS)
     return () => window.clearTimeout(timer)
-  }, [state, refreshRound])
+  }, [state, refreshRound, refreshList])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

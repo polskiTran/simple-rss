@@ -27,11 +27,6 @@ export interface HarnessOptions {
   readonly clientDir?: string
   /** Shrinks the polling batch or concurrency below the production defaults. */
   readonly scheduling?: PollSchedulerLimits
-  /**
-   * Wraps the boundary the service is handed. The fixtures stand in for
-   * publishers; an outcome this installation itself produces — a `busy`
-   * refusal — is staged here.
-   */
   readonly retrieval?: (boundary: Retrieval) => Retrieval
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
@@ -43,7 +38,6 @@ export interface TestService {
   readonly dataDir: string
   readonly clock: ManualClock
   readonly upstream: UpstreamFixtures
-  /** The boundary the service was handed: its own, or what `HarnessOptions.retrieval` wrapped it in. */
   readonly retrieval: Retrieval
   readonly settings: InstallationSettingsStore | undefined
   readonly database: SqliteDatabase | undefined

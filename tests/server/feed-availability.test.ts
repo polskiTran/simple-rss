@@ -6,6 +6,7 @@ import { openDatabase, type SqliteDatabase } from '../../src/server/persistence/
 import { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import { applyMigrations } from '../../src/server/persistence/migrations.js'
 import {
+  JITTER_CAP_MS,
   MAX_BACKOFF_MINUTES,
   backoffMinutes,
   nextPollTime,
@@ -434,11 +435,6 @@ describe('congestion at the retrieval boundary', () => {
 })
 
 describe('a deferred attempt', () => {
-  /**
-   * A service whose boundary refuses the next retrieval of every URL in
-   * `refusals`, as a saturated budget would — the one outcome the publisher
-   * fixtures cannot stage, because it is this installation's own.
-   */
   async function serviceWithRefusals(options: HarnessOptions = {}) {
     const refusals = new Set<string>()
     const service = await startTestService({
@@ -500,15 +496,13 @@ describe('a deferred attempt', () => {
     const urls = ['https://one.example/feed', 'https://two.example/feed', 'https://three.example/feed'] as const
     for (const url of urls) {
       await subscribed(user, service, url)
-      // Spaced past the jitter window, so the due order is one, two, three.
-      service.clock.advance(15 * 60_000)
+      service.clock.advance(JITTER_CAP_MS)
     }
     const retrievals = () => urls.map((url) => service.upstream.requestsTo(url).length)
 
     service.clock.advance(3 * 60 * 60_000)
     refusals.add(urls[0])
     await service.wakeScheduler()
-    // The first batch fills, so the drain looks again — and finds only the third Feed.
     expect(retrievals()).toEqual([1, 2, 2])
 
     service.clock.advance(60_000)

@@ -1,4 +1,4 @@
-const JITTER_CAP_MS = 15 * 60_000
+export const JITTER_CAP_MS = 15 * 60_000
 
 /**
  * Deterministic per-Feed offset in `[0, interval / 10)`: Subscriptions sharing a
@@ -13,14 +13,8 @@ export function nextPollTime(feedId: number, intervalMinutes: number, from: Date
   return new Date(from.getTime() + intervalMinutes * 60_000 + pollingJitterMs(feedId, intervalMinutes)).toISOString()
 }
 
-/** How often the scheduler looks at the due frontier. */
 export const WAKE_INTERVAL_MS = 60_000
 
-/**
- * Where a deferred attempt lands: one wake interval out, so the wake after next
- * reaches it. Not `now` — a nudged drain loops while anything is due and would
- * pick the same Feed up inside the same pass.
- */
 export function deferredPollTime(from: Date): string {
   return new Date(from.getTime() + WAKE_INTERVAL_MS).toISOString()
 }
