@@ -1,0 +1,250 @@
+/* PROTOTYPE — throwaway. Styles for the preview dialog variants and the
+   switcher bar. Everything the variants share with the product comes from
+   styles.css; only what a variant adds lives here.
+
+   This sheet is reached through the view graph, so it lands in the bundle
+   before styles.css; restating Tailwind's layer order keeps `base` beneath
+   `components` either way. */
+@layer theme, base, components, utilities;
+
+@layer components {
+  /* What the machine answers on its own clock enters on a breath (DESIGN §5). */
+  .preview-arrive {
+    animation: preview-arrive 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  @keyframes preview-arrive {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* ---- A: the row ---- */
+
+  .preview-a-title {
+    color: var(--color-ink-strong);
+  }
+
+  .preview-a-already {
+    color: var(--color-quiet);
+  }
+
+  .preview-a-alternatives {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin: 14px 0 0;
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--color-quiet);
+  }
+
+  .preview-a-alternative {
+    font-size: 12.5px;
+  }
+
+  .preview-a-items {
+    list-style: none;
+    margin: 24px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .preview-a-items li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .preview-a-item-title {
+    color: var(--color-ink);
+    text-wrap: pretty;
+  }
+
+  .preview-a-item-date {
+    flex: none;
+    font-size: 12.5px;
+    color: var(--color-quiet);
+  }
+
+  /* ---- B: the question ---- */
+
+  .preview-b-caption {
+    margin: 20px 0 10px;
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--color-quiet);
+  }
+
+  .preview-b-alternatives {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .preview-b-alternatives .preview-b-caption {
+    margin-bottom: 0;
+  }
+
+  .preview-b-alternative {
+    text-align: left;
+    line-height: 1.4;
+  }
+
+  .preview-b-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .preview-b-items li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .preview-b-item-title {
+    color: var(--color-ink);
+    text-wrap: pretty;
+  }
+
+  .preview-b-item-date {
+    flex: none;
+    font-size: 12.5px;
+    color: var(--color-quiet);
+  }
+
+  /* ---- C: the reading ---- */
+
+  /* Compound selector: this sheet precedes styles.css, so `.overlay-popup`'s
+     own max-width would otherwise win the tie. */
+  .overlay-popup.preview-c {
+    max-width: 560px;
+  }
+
+  .preview-c-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin: 0 0 28px;
+  }
+
+  .preview-c-tab {
+    font-size: 12.5px;
+    color: var(--color-meta);
+  }
+
+  .preview-c-tab[data-pressed] {
+    color: var(--color-ink-strong);
+  }
+
+  .preview-c-header {
+    margin-bottom: 32px;
+  }
+
+  .preview-c-header:has(+ .feed-description) {
+    margin-bottom: 10px;
+  }
+
+  .preview-c .feed-description {
+    margin-bottom: 32px;
+  }
+
+  .preview-c-items {
+    gap: 22px;
+  }
+
+  .preview-c-items .content-item-title {
+    font-size: 19px;
+    line-height: 1.44;
+  }
+
+  .preview-c .overlay-choice {
+    margin-top: 32px;
+  }
+
+  /* ---- the bar: deliberately not the product ---- */
+
+  .prototype-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: oklch(0.25 0.02 260);
+    color: oklch(0.97 0 0);
+    box-shadow: 0 8px 24px oklch(0 0 0 / 0.25);
+    font: 500 12px/1 ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .prototype-bar-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .prototype-bar-arrow,
+  .prototype-bar-chip {
+    border: 0;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: oklch(0.35 0.02 260);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .prototype-bar-chip {
+    font-weight: 400;
+  }
+
+  .prototype-bar-arrow:hover,
+  .prototype-bar-chip:hover {
+    background: oklch(0.45 0.03 260);
+  }
+
+  .prototype-bar-label {
+    white-space: nowrap;
+  }
+
+  .prototype-bar-scenarios {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .overlay-popup.preview-c {
+    max-width: none;
+  }
+
+  /* The overlay owns the bottom edge at this width; the bar moves out of its way. */
+  .prototype-bar {
+    top: 8px;
+    bottom: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-arrive {
+    animation-duration: 0s;
+  }
+}

@@ -9,6 +9,8 @@ import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 import { firstCheckFailure, retryFailure, subscriptionFailure, unavailableNote } from './feed-language.js'
 import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
+// PROTOTYPE (#41) — active only with `?variant=` in the address; remove with the branch.
+import { usePreviewPrototype } from './preview-dialog.prototype.js'
 
 const FIRST_CHECK_ATTEMPTS = 8
 const FIRST_CHECK_INTERVAL_MS = 2_000
@@ -33,6 +35,13 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
   const [refreshRound, setRefreshRound] = useState(0)
+
+  // PROTOTYPE (#41)
+  const prototype = usePreviewPrototype({
+    subscriptions: state.kind === 'loaded' ? state.subscriptions : [],
+    onOpenFeed,
+    onTry: setQuery,
+  })
 
   // Not `useResource`: this list is also written by subscribing, so the first load merges
   // into whatever landed while it was in flight rather than replacing it.
@@ -80,6 +89,12 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     event.preventDefault()
     const url = feedUrlOf(query)
     if (!url || subscribing) return
+
+    // PROTOTYPE (#41): the preview stands in for the subscribe.
+    if (prototype) {
+      prototype.start(url)
+      return
+    }
 
     setSubscribing(true)
     setNotice('subscribing…')
@@ -155,9 +170,16 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         />
       </form>
       <OpmlControls onOutcome={imported} />
-      <p className="notice feed-notice" aria-live="polite">
-        {notice}
-      </p>
+      {/* PROTOTYPE (#41): the notice line is the prototype's while it drives the page. */}
+      {prototype ? (
+        prototype.note
+      ) : (
+        <p className="notice feed-notice" aria-live="polite">
+          {notice}
+        </p>
+      )}
+      {prototype?.dialog}
+      {prototype?.bar}
       <ImportReport report={report} />
       <SubscriptionList
         state={state}
