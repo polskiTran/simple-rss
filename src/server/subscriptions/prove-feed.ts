@@ -16,15 +16,17 @@ export interface ProvenFeed {
 }
 
 /** The publisher answered 304. `validators` are the newest: rotated by the answer, else the ones sent. */
-export interface UnchangedFeed {
+export interface FeedNotModified {
   readonly kind: 'not-modified'
   readonly validators: FeedValidators
 }
 
 export type FeedProof = ProvenFeed | FailedPoll
+/** What a caller that passed validators can be answered. */
+export type ConditionalFeedProof = FeedProof | FeedNotModified
 
 interface ProveFeedOptions {
-  readonly retrieval: Pick<Retrieval, 'retrieveBytes'>
+  readonly retrieval: Retrieval
   readonly url: string
   readonly operation: RetrievalOperation
   /** Other URLs this Feed is known by, so a document naming one as its site is still the Feed itself. */
@@ -37,17 +39,19 @@ interface ProveFeedOptions {
  * under `operation`, parse what came back, answer the document or why there is
  * none. Nothing is written; the caller decides what a proof earns.
  *
- * Only a caller that sends validators can be told `not-modified`. A publisher
- * that answers 304 to an unconditional request has answered without a body,
- * which is an `http_error` like any other bodiless status.
+ * Only a caller that passes `validators` can be told `not-modified` — whatever
+ * those validators hold, since a Feed's first poll passes two nulls and still
+ * honours a 304. A caller that passes none and is answered 304 has met a
+ * publisher answering without a body, which is an `http_error` like any other
+ * bodiless status.
  */
 export function proveFeed(
   options: ProveFeedOptions & { readonly validators: FeedValidators },
-): Promise<FeedProof | UnchangedFeed>
+): Promise<ConditionalFeedProof>
 export function proveFeed(options: ProveFeedOptions): Promise<FeedProof>
 export async function proveFeed(
   options: ProveFeedOptions & { readonly validators?: FeedValidators },
-): Promise<FeedProof | UnchangedFeed> {
+): Promise<ConditionalFeedProof> {
   const { retrieval, url, operation, validators, priorUrls = [], signal } = options
 
   const headers: Record<string, string> = {}

@@ -15,7 +15,7 @@ import {
   type PolledFeed,
 } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
-import { proveFeed } from './prove-feed.js'
+import { type FeedValidators, proveFeed } from './prove-feed.js'
 import type { SubscriptionService } from './subscription-service.js'
 
 export type IngestFeedOutcome =
@@ -27,17 +27,15 @@ export type IngestFeedOutcome =
   | FailedPoll
 
 /** A subscribed Feed and what one attempt at it needs: its validators, its cadence, its failure run. */
-interface PollableFeed extends PolledFeed {
+interface PollableFeed extends PolledFeed, FeedValidators {
   readonly enteredUrl: string
-  readonly etag: string | null
-  readonly lastModified: string | null
 }
 
 /**
- * One poll of one Feed, end to end: the conditional proof (`proveFeed`), the
- * Feed Window write, and the single Feed Availability write the outcome earns.
- * A proof that reveals a duplicate is handed back to `SubscriptionService`,
- * which owns every Subscription write (ADR 0007).
+ * One poll of one Feed, end to end: the conditional retrieval and parse
+ * (`proveFeed`), the Feed Window write, and the single Feed Availability write
+ * the outcome earns. A retrieval that reveals a duplicate is handed back to
+ * `SubscriptionService`, which owns every Subscription write (ADR 0007).
  */
 export class FeedPoll {
   readonly #db: BetterSQLite3Database
