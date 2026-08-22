@@ -38,8 +38,13 @@ export default defineConfig({
     proxy: {
       // Regex keys, not prefixes: a plain '/api' would also capture the
       // client's own `/api.ts` module and hand it to the backend.
-      '^/api/': 'http://127.0.0.1:8080',
-      '^/health(/|$)': 'http://127.0.0.1:8080',
+      //
+      // Object targets, not strings: Vite turns a string into
+      // `{ changeOrigin: true }`, which rewrites `Host` to the target while the
+      // browser's `Origin` still names this port, and the server's same-origin
+      // guard refuses every unsafe method. The browser's `Host` passes through.
+      '^/api/': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '^/health(/|$)': { target: 'http://127.0.0.1:8080', changeOrigin: false },
     },
   },
 })
