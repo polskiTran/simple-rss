@@ -15,10 +15,6 @@ The canonical domain vocabulary is defined in [`CONTEXT.md`](../CONTEXT.md). Har
 - Prefer calm chronology over inbox and engagement mechanics.
 - Keep stored data portable.
 
-## Non-goals
-
-V1 does not include multiple users, read/unread state, native mobile applications, PWA or offline synchronization, Feed autodiscovery, tags, folders, ranking, notifications, persistent article content, horizontal scaling, high availability, or automatic updates.
-
 ## System shape
 
 ```text
