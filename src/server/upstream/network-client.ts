@@ -13,23 +13,17 @@ const ACCEPT_ENCODING = 'gzip, deflate, br'
 const BODILESS_STATUSES = new Set([204, 205, 304])
 
 export interface NetworkHttpClientOptions {
-  /** Active sockets per protocol. The boundary passes its shared concurrency, so every admitted retrieval can hold one. */
-  readonly maxSockets: number
   readonly isAllowedAddress?: (address: string) => boolean
   readonly lookup?: LookupFunction
 }
 
-const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
-
-export function createNetworkHttpClient(options: NetworkHttpClientOptions): HttpClient {
+export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
   const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
-  const agentOptions = {
-    keepAlive: true,
-    maxSockets: options.maxSockets,
-    maxTotalSockets: options.maxSockets,
-    maxFreeSockets: MAX_FREE_SOCKETS_PER_PROTOCOL,
-  }
+  // A socket lives only while an admitted retrieval uses it, so the gates in
+  // `retrieval.ts` are the socket budget. Keep-alive would leave idle sockets
+  // no budget covers, and a cap on those can only block admitted work.
+  const agentOptions = { keepAlive: false }
   const httpAgent = new HttpAgent(agentOptions)
   const httpsAgent = new HttpsAgent(agentOptions)
 

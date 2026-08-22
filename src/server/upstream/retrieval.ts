@@ -93,9 +93,9 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
 }
 
 /**
- * Every operation at full tilt fits, so no budget can starve another; what
- * the shared capacity bounds is queued work and DNS. The network adapter's
- * socket pool is sized from it.
+ * Every operation at full tilt fits, so no budget can starve another. What
+ * the shared capacity still bounds is DNS work, including lookups that
+ * outlive their caller's deadline.
  */
 const DEFAULT_CAPACITY: RetrievalCapacity = {
   maxConcurrent: Object.values(RETRIEVAL_PROFILES).reduce(
@@ -250,7 +250,7 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
 
 export function createNetworkRetrieval(options: { readonly logger: Logger; readonly self: URL }): Retrieval {
   return createRetrieval({
-    httpClient: createNetworkHttpClient({ maxSockets: DEFAULT_CAPACITY.maxConcurrent }),
+    httpClient: createNetworkHttpClient(),
     logger: options.logger,
     self: options.self,
   })
