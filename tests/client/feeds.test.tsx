@@ -153,7 +153,7 @@ describe('Feeds', () => {
     await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
-    expect(await screen.findByText('that Feed could not be reached')).toBeDefined()
+    expect(await screen.findByText('that feed could not be reached')).toBeDefined()
   })
 
   it('reads a Subscription that merged away during its first check as already subscribed', async () => {
@@ -317,6 +317,22 @@ describe('Feed Availability', () => {
     expect(await screen.findByText('the feed answered — availability restored')).toBeDefined()
     await waitFor(() => expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull())
     expect(api.requestsTo('POST /api/feeds/1/refresh')).toHaveLength(1)
+  })
+
+  it('says why a retry still failed, in the category the list speaks', async () => {
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
+    api.on('POST /api/feeds/1/refresh', {
+      status: 502,
+      body: { error: { code: 'http_error', message: 'The publisher answered with an error' } },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /retry now/i }))
+
+    expect(await screen.findByText('still unavailable — the publisher answered with an error')).toBeDefined()
+    expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
   })
 
   it('explains a retry the server asked to wait on', async () => {

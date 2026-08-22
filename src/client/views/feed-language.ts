@@ -1,6 +1,12 @@
-import { MAX_FEED_SIZE_MIB, type FeedAvailability, type FeedAvailabilityCategory } from '../../shared/api.js'
+import {
+  MAX_FEED_SIZE_MIB,
+  type FeedAvailability,
+  type FeedAvailabilityCategory,
+  type FeedProofFailureCode,
+} from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
+/** An ongoing state, said in the list and on the Feed itself. */
 export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'the feed cannot be reached',
   timeout: 'the feed is taking too long to respond',
@@ -10,42 +16,40 @@ export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string
   invalid_feed: 'the feed is returning unusable XML',
 }
 
-export const SUBSCRIPTION_FAILURE_COPY: Readonly<Record<string, string>> = {
+type FailureCode = FeedProofFailureCode | 'invalid_feed_url' | 'duplicate_subscription'
+
+/** One attempt that failed: a subscribe, a first check, or a retry by hand. */
+export const FAILURE_COPY: Readonly<Record<FailureCode, string>> = {
+  unreachable: 'that feed could not be reached',
+  timeout: 'that feed took too long to respond',
+  too_large: `that feed is larger than ${MAX_FEED_SIZE_MIB} MiB`,
+  unsupported_content: 'that address does not return a feed',
+  http_error: 'the publisher answered with an error',
+  invalid_feed: 'that feed contains unusable XML',
+  no_feed_found: 'no feed was found at that address',
+  invalid_feed_url: 'that address is not a public web address',
   duplicate_subscription: 'already subscribed',
-  invalid_feed_url: 'enter an exact RSS or Atom URL',
-  feed_too_large: `that Feed is larger than ${MAX_FEED_SIZE_MIB} MiB`,
-  unsupported_feed: 'that URL does not return supported RSS or Atom',
-  malformed_feed: 'that Feed contains malformed XML',
-  feed_timeout: 'that Feed took too long to respond',
-  feed_body_timeout: 'that Feed took too long to download',
-  feed_unreachable: 'that Feed could not be reached',
+}
+
+function isFailureCode(code: string): code is FailureCode {
+  return Object.hasOwn(FAILURE_COPY, code)
 }
 
 export function subscriptionFailure(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'the Feed could not be reached'
-  return SUBSCRIPTION_FAILURE_COPY[error.code] ?? 'that Feed could not be added'
-}
-
-const FIRST_CHECK_FAILURE_CODE: Readonly<Record<FeedAvailabilityCategory, string>> = {
-  unreachable: 'feed_unreachable',
-  timeout: 'feed_timeout',
-  too_large: 'feed_too_large',
-  unsupported_content: 'unsupported_feed',
-  http_error: 'feed_unreachable',
-  invalid_feed: 'malformed_feed',
+  if (!(error instanceof ApiError)) return 'the feed could not be reached'
+  return isFailureCode(error.code) ? FAILURE_COPY[error.code] : 'that feed could not be added'
 }
 
 export function firstCheckFailure(category: FeedAvailabilityCategory | null): string {
-  const code = category ? FIRST_CHECK_FAILURE_CODE[category] : undefined
-  return (code && SUBSCRIPTION_FAILURE_COPY[code]) || 'that Feed could not be added'
+  return category ? FAILURE_COPY[category] : 'that feed could not be added'
 }
 
 export function retryFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return 'still unavailable — the feed could not be retrieved'
   if (error.code === 'refresh_rate_limited') return 'checked a moment ago — wait a little before retrying'
-
-  const reason = SUBSCRIPTION_FAILURE_COPY[error.code]
-  return reason ? `still unavailable — ${reason}` : 'still unavailable — the feed could not be retrieved'
+  return isFailureCode(error.code)
+    ? `still unavailable — ${FAILURE_COPY[error.code]}`
+    : 'still unavailable — the feed could not be retrieved'
 }
 
 /** The one sentence an unavailable Feed gets, said the same in the list and on the Feed itself. */

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { feedAvailabilityCategorySchema } from '../../../src/shared/api.js'
 import { ARTICLE_ANSWERS, FEED_ANSWERS } from '../../../src/server/http/retrieval-answers.js'
+import { availabilityCategoryOf } from '../../../src/server/subscriptions/feed-availability.js'
 import type { RetrievalFailureCode } from '../../../src/server/upstream/retrieval.js'
 
-/** Every code, with the answer each subject gave before the two tables became one. */
+/** Every code: the Feed answers its Feed Availability category, the article its own vocabulary. */
 const ANSWERS: ReadonlyArray<readonly [RetrievalFailureCode, number, string, string]> = [
   ['invalid_request', 400, 'invalid_feed_url', 'article_link_unsafe'],
   ['invalid_url', 400, 'invalid_feed_url', 'article_link_unsafe'],
@@ -10,16 +12,16 @@ const ANSWERS: ReadonlyArray<readonly [RetrievalFailureCode, number, string, str
   ['invalid_redirect', 400, 'invalid_feed_url', 'article_link_unsafe'],
   ['too_many_redirects', 400, 'invalid_feed_url', 'article_link_unsafe'],
   ['redirect_loop', 400, 'invalid_feed_url', 'article_link_unsafe'],
-  ['unsupported_content_type', 415, 'unsupported_feed', 'unsupported_article'],
-  ['unsupported_content_encoding', 415, 'unsupported_feed', 'unsupported_article'],
-  ['too_large', 413, 'feed_too_large', 'article_too_large'],
-  ['timeout', 504, 'feed_timeout', 'article_timeout'],
-  ['body_timeout', 504, 'feed_body_timeout', 'article_body_timeout'],
-  ['unresolvable_host', 502, 'feed_unreachable', 'article_unreachable'],
-  ['http_error', 502, 'feed_unreachable', 'article_unreachable'],
-  ['cancelled', 502, 'feed_unreachable', 'article_unreachable'],
-  ['busy', 502, 'feed_unreachable', 'article_unreachable'],
-  ['unavailable', 502, 'feed_unreachable', 'article_unreachable'],
+  ['unsupported_content_type', 415, 'unsupported_content', 'unsupported_article'],
+  ['unsupported_content_encoding', 415, 'unsupported_content', 'unsupported_article'],
+  ['too_large', 413, 'too_large', 'article_too_large'],
+  ['timeout', 504, 'timeout', 'article_timeout'],
+  ['body_timeout', 504, 'timeout', 'article_body_timeout'],
+  ['unresolvable_host', 502, 'unreachable', 'article_unreachable'],
+  ['http_error', 502, 'http_error', 'article_unreachable'],
+  ['cancelled', 502, 'unreachable', 'article_unreachable'],
+  ['busy', 502, 'unreachable', 'article_unreachable'],
+  ['unavailable', 502, 'unreachable', 'article_unreachable'],
 ]
 
 describe('retrieval answers', () => {
@@ -33,6 +35,20 @@ describe('retrieval answers', () => {
     const covered = ANSWERS.map(([code]) => code)
     expect(Object.keys(FEED_ANSWERS).sort()).toEqual([...covered].sort())
     expect(Object.keys(ARTICLE_ANSWERS).sort()).toEqual([...covered].sort())
+  })
+
+  // A failed refresh is recorded under one category and answered under another
+  // table; the notice and the list must name the same thing. Only the destinations
+  // this installation refused answer outside the category vocabulary.
+  it('names the category the same failure would record', () => {
+    for (const [code, status] of ANSWERS) {
+      const answered = FEED_ANSWERS[code].code
+      if (status === 400) continue
+      expect(answered, code).toBe(
+        availabilityCategoryOf({ kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } }),
+      )
+      expect(feedAvailabilityCategorySchema.options).toContain(answered)
+    }
   })
 
   // The size and timing messages are read off the operation profile rather than

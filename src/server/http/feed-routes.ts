@@ -15,7 +15,6 @@ import {
   type SubscriptionList,
 } from '../../shared/api.js'
 import type { DigestService } from '../digest/digest-service.js'
-import type { FeedDocumentFailureCode } from '../ingestion/feed-document.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
@@ -23,7 +22,7 @@ import { readIdParam } from './id-param.js'
 import { readJsonBody } from './json-body.js'
 import { readListCursor } from './list-cursor.js'
 import { NO_STORE, notFound, retryAfter } from './responses.js'
-import { answer, FEED_ANSWERS } from './retrieval-answers.js'
+import { answer, FEED_ANSWERS, INVALID_FEED_ANSWERS } from './retrieval-answers.js'
 
 export interface FeedRouteDependencies {
   readonly subscriptions: SubscriptionService
@@ -171,18 +170,10 @@ function refreshFailure(
         retryAfter(outcome.retryAfterSeconds),
       )
     case 'invalid-feed':
-      return invalidFeed(c, outcome.code)
+      return answer(c, INVALID_FEED_ANSWERS[outcome.code])
     case 'retrieval-failed':
       return answer(c, FEED_ANSWERS[outcome.failure.code])
   }
-}
-
-function invalidFeed(c: Context, code: FeedDocumentFailureCode) {
-  const message =
-    code === 'malformed_feed'
-      ? 'The Feed returned malformed XML'
-      : 'The URL did not return a supported RSS or Atom Feed'
-  return c.json({ error: { code, message } }, 422, NO_STORE)
 }
 
 function opmlFailure(c: Context, code: OpmlFailureCode) {

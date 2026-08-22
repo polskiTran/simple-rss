@@ -233,6 +233,29 @@ describe('Feed Availability', () => {
     })
   })
 
+  // The refresh route's answer and the recorded category are one vocabulary, so
+  // the notice a retry shows and the category the list shows name the same thing.
+  it('answers a manual retry with the category it records', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    const url = 'https://one.example/feed'
+    const feedId = await subscribed(user, service, url)
+
+    service.upstream.stub(url, { headers: FEED_HEADERS, body: 'not a feed at all' })
+    service.clock.advance(61_000)
+    const malformed = await user.post(`/api/feeds/${feedId}/refresh`)
+    expect(malformed.status).toBe(422)
+    expect(await malformed.json()).toMatchObject({ error: { code: 'invalid_feed' } })
+    expect(await availabilityOf(user, feedId)).toMatchObject({ consecutiveFailures: 1, category: 'invalid_feed' })
+
+    service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: '' })
+    service.clock.advance(61_000)
+    const erroring = await user.post(`/api/feeds/${feedId}/refresh`)
+    expect(erroring.status).toBe(502)
+    expect(await erroring.json()).toMatchObject({ error: { code: 'http_error' } })
+    expect(await availabilityOf(user, feedId)).toMatchObject({ consecutiveFailures: 2, category: 'http_error' })
+  })
+
   it('keeps liveness and readiness untouched while Feeds fail', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
