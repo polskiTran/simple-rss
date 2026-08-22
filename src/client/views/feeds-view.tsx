@@ -13,8 +13,12 @@ import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-contr
 const FIRST_CHECK_ATTEMPTS = 8
 const FIRST_CHECK_INTERVAL_MS = 2_000
 
-const UNCHECKED_REFRESH_MS = 3_000
-const UNCHECKED_REFRESH_ROUNDS = 20
+/**
+ * While any row is unchecked the list refreshes on this ladder, then steadily, for as
+ * long as the view is open; subscribing or an import report starts the ladder over.
+ */
+const UNCHECKED_REFRESH_LADDER_MS = [3_000, 5_000] as const
+const UNCHECKED_REFRESH_STEADY_MS = 10_000
 
 type SubscriptionState =
   | { readonly kind: 'loading' }
@@ -65,14 +69,14 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     } catch {}
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshList is recreated every render; depending on it would restart the 3s timer on every render.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshList is recreated every render; depending on it would restart the refresh timer on every render.
   useEffect(() => {
-    if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
+    if (state.kind !== 'loaded') return
     if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
     const timer = window.setTimeout(async () => {
       await refreshList()
       setRefreshRound((round) => round + 1)
-    }, UNCHECKED_REFRESH_MS)
+    }, UNCHECKED_REFRESH_LADDER_MS[refreshRound] ?? UNCHECKED_REFRESH_STEADY_MS)
     return () => window.clearTimeout(timer)
   }, [state, refreshRound])
 

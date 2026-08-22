@@ -23,7 +23,7 @@ import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../.
 import { Device, claimedDevice } from '../support/device.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
+import { startTestService, type HarnessOptions, type TestService } from '../support/service-harness.js'
 import type { FixtureResponse } from '../support/upstream-fixtures.js'
 
 const START = '2026-08-08T09:00:00.000Z'
@@ -419,8 +419,6 @@ describe('congestion at the retrieval boundary', () => {
       expect(storedAvailabilityIn(database, 1)).toMatchObject({
         consecutiveFailures: 1,
         lastFailureCategory: 'http_error',
-        lastPolledAt: clock.now().toISOString(),
-        nextPollAt: nextPollTime(1, 120, clock.now()),
       })
 
       clock.advance(60_000)
@@ -432,6 +430,90 @@ describe('congestion at the retrieval boundary', () => {
     } finally {
       database.close()
     }
+  })
+})
+
+describe('a deferred attempt', () => {
+  /**
+   * A service whose boundary refuses the next retrieval of every URL in
+   * `refusals`, as a saturated budget would — the one outcome the publisher
+   * fixtures cannot stage, because it is this installation's own.
+   */
+  async function serviceWithRefusals(options: HarnessOptions = {}) {
+    const refusals = new Set<string>()
+    const service = await startTestService({
+      ...options,
+      retrieval: (boundary) => ({
+        retrieve: (request) => boundary.retrieve(request),
+        retrieveBytes: (request) =>
+          refusals.delete(String(request.url))
+            ? Promise.resolve({ ok: false, code: 'busy', reason: 'no retrieval slot available' })
+            : boundary.retrieveBytes(request),
+      }),
+    })
+    return { service, refusals }
+  }
+
+  it('lands one wake interval out with Feed Availability untouched, and a wake from then on retrieves the Feed', async () => {
+    const { service, refusals } = await serviceWithRefusals()
+    const user = await claimedDevice(service)
+    const url = 'https://one.example/feed'
+    const feedId = await subscribed(user, service, url)
+
+    service.clock.advance(3 * 60 * 60_000)
+    refusals.add(url)
+    await service.wakeScheduler()
+
+    expect(service.upstream.requestsTo(url)).toHaveLength(1)
+    expect(storedAvailability(service, feedId)).toEqual({
+      nextPollAt: '2026-08-08T12:01:00.000Z',
+      lastPolledAt: START,
+      lastSuccessAt: START,
+      lastFailureAt: null,
+      consecutiveFailures: 0,
+      lastFailureCategory: null,
+    })
+    expect(await availabilityOf(user, feedId)).toEqual({
+      state: 'available',
+      lastCheckedAt: START,
+      lastSuccessAt: START,
+      consecutiveFailures: 0,
+      category: null,
+    })
+
+    service.clock.advance(59_999)
+    await service.wakeScheduler()
+    expect(service.upstream.requestsTo(url)).toHaveLength(1)
+
+    service.clock.advance(1)
+    await service.wakeScheduler()
+    expect(service.upstream.requestsTo(url)).toHaveLength(2)
+    expect(await availabilityOf(user, feedId)).toMatchObject({
+      state: 'available',
+      lastSuccessAt: service.clock.now().toISOString(),
+    })
+  })
+
+  it('is not picked up again by the drain that deferred it', async () => {
+    const { service, refusals } = await serviceWithRefusals({ scheduling: { batchLimit: 2 } })
+    const user = await claimedDevice(service)
+    const urls = ['https://one.example/feed', 'https://two.example/feed', 'https://three.example/feed'] as const
+    for (const url of urls) {
+      await subscribed(user, service, url)
+      // Spaced past the jitter window, so the due order is one, two, three.
+      service.clock.advance(15 * 60_000)
+    }
+    const retrievals = () => urls.map((url) => service.upstream.requestsTo(url).length)
+
+    service.clock.advance(3 * 60 * 60_000)
+    refusals.add(urls[0])
+    await service.wakeScheduler()
+    // The first batch fills, so the drain looks again — and finds only the third Feed.
+    expect(retrievals()).toEqual([1, 2, 2])
+
+    service.clock.advance(60_000)
+    await service.wakeScheduler()
+    expect(retrievals()).toEqual([2, 2, 2])
   })
 })
 

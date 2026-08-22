@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -83,7 +83,27 @@ function feedDetail(availability: object, itemCount: number) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
+
+/**
+ * Vitest's fake clock, with Testing Library told how to advance it: its waits
+ * drain through a zero timer it only knows how to fire on Jest's clock. Returns
+ * what `userEvent.setup` needs to wait on the same clock.
+ */
+function useFakeClock(): { advanceTimers: (milliseconds: number) => void } {
+  const advanceTimers = (milliseconds: number) => void vi.advanceTimersByTime(milliseconds)
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  vi.stubGlobal('jest', { advanceTimersByTime: advanceTimers })
+  return { advanceTimers }
+}
+
+/** Fake time passing, with React flushing whatever the timers set off. */
+function elapse(milliseconds: number): Promise<void> {
+  return act(async () => {
+    await vi.advanceTimersByTimeAsync(milliseconds)
+  })
+}
 
 describe('Feeds', () => {
   it('shows the recorded Subscription immediately and the first check outcome as it lands', async () => {
@@ -290,6 +310,43 @@ describe('Feed Availability', () => {
     expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull()
   })
 
+  it('keeps refreshing while a row is unchecked — after 3 s, 5 s, then every 10 s for as long as it takes — and stops once none is', async () => {
+    useFakeClock()
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [UNCHECKED_FEED] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    expect(await screen.findByText('waiting for first check')).toBeDefined()
+    const listReads = () => api.requestsTo('GET /api/feeds').length
+    expect(listReads()).toBe(1)
+
+    await elapse(2_999)
+    expect(listReads()).toBe(1)
+    await elapse(1)
+    expect(listReads()).toBe(2)
+
+    await elapse(4_999)
+    expect(listReads()).toBe(2)
+    await elapse(1)
+    expect(listReads()).toBe(3)
+
+    await elapse(9_999)
+    expect(listReads()).toBe(3)
+    await elapse(1)
+    expect(listReads()).toBe(4)
+
+    for (let round = 0; round < 25; round += 1) await elapse(10_000)
+    expect(listReads()).toBe(29)
+
+    api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+    await elapse(10_000)
+    expect(listReads()).toBe(30)
+    expect(screen.getByText('Field Notes')).toBeDefined()
+    expect(screen.queryByText('waiting for first check')).toBeNull()
+
+    await elapse(60_000)
+    expect(listReads()).toBe(30)
+  })
+
   it('surfaces a calm note with the failure category, last success, and a retry action', async () => {
     stubApi().on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
     window.history.replaceState(null, '', '/feeds')
@@ -373,6 +430,33 @@ describe('OPML portability', () => {
     expect(screen.getByText(/not a url — not a usable feed url/i)).toBeDefined()
     expect(api.requestsTo('POST /api/subscriptions/import')).toMatchObject([{ body: { opml: OPML } }])
     expect(await screen.findByText('Field Notes')).toBeDefined()
+  })
+
+  it('starts the refresh ladder over when an import reports', async () => {
+    const clock = useFakeClock()
+    const api = stubApi()
+      .on('GET /api/feeds', { body: { subscriptions: [UNCHECKED_FEED] } })
+      .on('POST /api/subscriptions/import', { body: { added: 1, alreadySubscribed: 0, unusable: [] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup(clock)
+    expect(await screen.findByText('waiting for first check')).toBeDefined()
+    const listReads = () => api.requestsTo('GET /api/feeds').length
+
+    await elapse(3_000)
+    await elapse(5_000)
+    expect(listReads()).toBe(3)
+
+    const file = new File([OPML], 'subscriptions.opml', { type: 'text/x-opml' })
+    await user.upload(screen.getByLabelText(/import opml/i), file)
+    expect(await screen.findByText('imported — 1 added, 0 already subscribed')).toBeDefined()
+    await elapse(0)
+    expect(listReads()).toBe(4)
+
+    await elapse(2_999)
+    expect(listReads()).toBe(4)
+    await elapse(1)
+    expect(listReads()).toBe(5)
   })
 
   it('explains an upload the server refused', async () => {

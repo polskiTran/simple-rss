@@ -27,6 +27,12 @@ export interface HarnessOptions {
   readonly clientDir?: string
   /** Shrinks the polling batch or concurrency below the production defaults. */
   readonly scheduling?: PollSchedulerLimits
+  /**
+   * Wraps the boundary the service is handed. The fixtures stand in for
+   * publishers; an outcome this installation itself produces — a `busy`
+   * refusal — is staged here.
+   */
+  readonly retrieval?: (boundary: Retrieval) => Retrieval
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
 }
@@ -37,7 +43,7 @@ export interface TestService {
   readonly dataDir: string
   readonly clock: ManualClock
   readonly upstream: UpstreamFixtures
-  /** The service's own hardened boundary, wired from its configuration. */
+  /** The boundary the service was handed: its own, or what `HarnessOptions.retrieval` wrapped it in. */
   readonly retrieval: Retrieval
   readonly settings: InstallationSettingsStore | undefined
   readonly database: SqliteDatabase | undefined
@@ -86,12 +92,13 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       now: () => clock.now(),
       sink: (record) => void logs.push(record),
     })
-    const retrieval = createRetrieval({
+    const boundary = createRetrieval({
       httpClient: upstream.client,
       resolve: upstream.resolve,
       logger,
       self: new URL(config.publicOrigin),
     })
+    const retrieval = options.retrieval?.(boundary) ?? boundary
     const started = await startService({
       config,
       port: 0,

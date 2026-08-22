@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createLogger } from '../../../src/server/logger.js'
 import type { FeedRefresh } from '../../../src/server/subscriptions/feed-refresh.js'
-import { PollScheduler, WAKE_INTERVAL_MS } from '../../../src/server/subscriptions/poll-scheduler.js'
+import { PollScheduler } from '../../../src/server/subscriptions/poll-scheduler.js'
+import { WAKE_INTERVAL_MS } from '../../../src/server/subscriptions/polling-schedule.js'
 import type { SubscriptionService } from '../../../src/server/subscriptions/subscription-service.js'
 
 describe('poll scheduler wakes', () => {

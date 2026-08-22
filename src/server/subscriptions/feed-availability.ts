@@ -14,7 +14,7 @@ import type { SqliteDatabase } from '../persistence/database.js'
 import { subscriptions } from '../persistence/schema.js'
 import type { RetrievalFailure } from '../upstream/retrieval.js'
 import { loggableUrl } from './loggable-url.js'
-import { nextPollTime, nextRetryTime } from './polling-schedule.js'
+import { deferredPollTime, nextPollTime, nextRetryTime } from './polling-schedule.js'
 
 /** What recording an attempt needs to know about the Feed that was just polled. */
 export interface PolledFeed {
@@ -100,16 +100,13 @@ export class FeedAvailability {
 
   /**
    * The publisher was never asked (boundary saturated, or the caller gave up), so
-   * Feed Availability is left untouched and the attempt moves one Polling Interval on.
+   * nothing about Feed Availability moves — not even when it was last checked — and
+   * the attempt is due again one wake interval on, minutes rather than a Polling Interval.
    */
   recordDeferral(feed: PolledFeed, code: RetrievalFailure['code']): void {
-    const now = this.#clock.now()
     this.#db
       .update(subscriptions)
-      .set({
-        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
-        lastPolledAt: now.toISOString(),
-      })
+      .set({ nextPollAt: deferredPollTime(this.#clock.now()) })
       .where(eq(subscriptions.feedId, feed.feedId))
       .run()
 
