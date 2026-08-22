@@ -22,9 +22,8 @@ interface HarnessOptions {
   readonly addresses?: Record<string, readonly string[]>
   readonly resolve?: ResolveAddresses
   readonly self?: URL
-  readonly maxConcurrent?: number
-  readonly maxQueued?: number
   readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
+  readonly resolutionCapacity?: RetrievalCapacity
 }
 
 function harness(options: HarnessOptions = {}): Harness {
@@ -37,10 +36,8 @@ function harness(options: HarnessOptions = {}): Harness {
     logger: createLogger({ level: 'debug', sink: (record) => logs.push(record) }),
     resolve: options.resolve ?? (async (hostname) => addresses[hostname] ?? []),
     self: options.self ?? new URL('https://reader.test'),
-    ...(options.maxConcurrent === undefined
-      ? {}
-      : { capacity: { maxConcurrent: options.maxConcurrent, maxQueued: options.maxQueued ?? 0 } }),
     ...(options.operationCapacity ? { operationCapacity: options.operationCapacity } : {}),
+    ...(options.resolutionCapacity ? { resolutionCapacity: options.resolutionCapacity } : {}),
   })
 
   return { retrieval, upstream, logs }
@@ -477,8 +474,7 @@ describe('giving up', () => {
     try {
       let resolutions = 0
       const { retrieval } = harness({
-        maxConcurrent: 1,
-        maxQueued: 0,
+        resolutionCapacity: { maxConcurrent: 1, maxQueued: 0 },
         resolve: async () => {
           resolutions += 1
           return new Promise<readonly string[]>(() => {})
@@ -610,8 +606,8 @@ describe('giving up', () => {
 })
 
 describe('capacity', () => {
-  it('refuses work once the boundary and its queue are full', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 1, maxQueued: 0 })
+  it('refuses work once the operation budget and its queue are full', async () => {
+    const { retrieval, upstream } = harness({ operationCapacity: { feed: { maxConcurrent: 1, maxQueued: 0 } } })
     upstream.stub('https://example.com/feed.xml', {
       delayMs: 50,
       headers: { 'content-type': 'application/xml' },
@@ -626,7 +622,7 @@ describe('capacity', () => {
   })
 
   it('queues within the budget rather than refusing immediately', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 1, maxQueued: 4 })
+    const { retrieval, upstream } = harness({ operationCapacity: { feed: { maxConcurrent: 1, maxQueued: 4 } } })
     upstream.stub('https://example.com/feed.xml', {
       delayMs: 10,
       headers: { 'content-type': 'application/xml' },
@@ -643,7 +639,7 @@ describe('capacity', () => {
   })
 
   it('frees the slot again once a finished retrieval releases it', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 1, maxQueued: 0 })
+    const { retrieval, upstream } = harness({ operationCapacity: { feed: { maxConcurrent: 1, maxQueued: 0 } } })
     upstream.stub('https://example.com/feed.xml', {
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
@@ -655,12 +651,8 @@ describe('capacity', () => {
     })
   })
 
-  it('keeps an operation budget from consuming the whole boundary', async () => {
-    const { retrieval, upstream } = harness({
-      maxConcurrent: 4,
-      maxQueued: 0,
-      operationCapacity: { image: { maxConcurrent: 1, maxQueued: 0 } },
-    })
+  it('keeps a full operation budget from refusing work for another operation', async () => {
+    const { retrieval, upstream } = harness({ operationCapacity: { image: { maxConcurrent: 1, maxQueued: 0 } } })
     upstream.stub('https://example.com/photo.jpg', {
       delayMs: 50,
       headers: { 'content-type': 'image/jpeg' },
@@ -734,34 +726,8 @@ describe('capacity', () => {
     await Promise.all(occupied)
   })
 
-  it('does not let work queued for an operation hold shared capacity', async () => {
-    const { retrieval, upstream } = harness({
-      maxConcurrent: 2,
-      maxQueued: 0,
-      operationCapacity: { image: { maxConcurrent: 1, maxQueued: 4 } },
-    })
-    upstream.stub('https://example.com/photo.jpg', {
-      delayMs: 50,
-      headers: { 'content-type': 'image/jpeg' },
-      body: new Uint8Array([1, 2, 3]),
-    })
-    upstream.stub('https://example.com/feed.xml', {
-      headers: { 'content-type': 'application/xml' },
-      body: '<rss></rss>',
-    })
-    const imageRequest = feedRequest('https://example.com/photo.jpg', { operation: 'image' })
-
-    const images = [retrieval.retrieveBytes(imageRequest), retrieval.retrieveBytes(imageRequest)]
-    const queued = retrieval.retrieveBytes(imageRequest)
-
-    await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
-      ok: true,
-    })
-    for (const image of [...images, queued]) await expect(image).resolves.toMatchObject({ ok: true })
-  })
-
   it('releases the slot when a streamed body is abandoned without being read', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 1, maxQueued: 0 })
+    const { retrieval, upstream } = harness({ operationCapacity: { image: { maxConcurrent: 1, maxQueued: 0 } } })
     upstream.stubDynamic('https://example.com/photo.jpg', () => ({
       headers: { 'content-type': 'image/jpeg' },
       body: chunkedBody([new Uint8Array(8), new Uint8Array(8)]),
@@ -778,7 +744,7 @@ describe('capacity', () => {
   })
 
   it('releases the slot when a streamed body is cancelled unread', async () => {
-    const { retrieval, upstream } = harness({ maxConcurrent: 1, maxQueued: 0 })
+    const { retrieval, upstream } = harness({ operationCapacity: { image: { maxConcurrent: 1, maxQueued: 0 } } })
     upstream.stubDynamic('https://example.com/photo.jpg', () => ({
       headers: { 'content-type': 'image/jpeg' },
       body: chunkedBody([new Uint8Array(8), new Uint8Array(8)]),

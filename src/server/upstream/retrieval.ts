@@ -93,11 +93,11 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
 }
 
 /**
- * Every operation at full tilt fits, so no budget can starve another. What
- * the shared capacity still bounds is DNS work, including lookups that
- * outlive their caller's deadline.
+ * DNS is budgeted apart from the operations: every one of them at full tilt
+ * can be resolving at once, and the queue absorbs lookups that outlived the
+ * retrieval that asked for them.
  */
-const DEFAULT_CAPACITY: RetrievalCapacity = {
+const RESOLUTION_CAPACITY: RetrievalCapacity = {
   maxConcurrent: Object.values(RETRIEVAL_PROFILES).reduce(
     (total, profile) => total + profile.capacity.maxConcurrent,
     0,
@@ -201,8 +201,8 @@ interface RetrievalOptions {
   readonly resolve?: ResolveAddresses
   /** The installation's canonical public origin. */
   readonly self: URL
-  readonly capacity?: RetrievalCapacity
   readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
+  readonly resolutionCapacity?: RetrievalCapacity
 }
 
 /** Thrown into a body stream when it cannot be finished. Carries the same categories. */
@@ -222,16 +222,17 @@ export class RetrievalError extends Error {
  */
 export function createRetrieval(options: RetrievalOptions): Retrieval {
   const logger = options.logger.child({ component: 'upstream' })
-  const sharedCapacity = validCapacity(options.capacity ?? DEFAULT_CAPACITY)
-  const resolver = new BoundedResolver(options.resolve ?? systemResolver, sharedCapacity)
+  const resolver = new BoundedResolver(
+    options.resolve ?? systemResolver,
+    options.resolutionCapacity ?? RESOLUTION_CAPACITY,
+  )
   const policy: DestinationPolicy = { resolve: resolver.resolve, self: options.self }
-  const shared = new ConcurrencyGate(sharedCapacity.maxConcurrent, sharedCapacity.maxQueued)
-  const operationGates: Record<RetrievalOperation, ConcurrencyGate> = {
-    feed: gateFor(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
-    reader: gateFor(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
-    image: gateFor(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
-    preview: gateFor(options.operationCapacity?.preview ?? RETRIEVAL_PROFILES.preview.capacity),
-    discovery: gateFor(options.operationCapacity?.discovery ?? RETRIEVAL_PROFILES.discovery.capacity),
+  const gates: Record<RetrievalOperation, ConcurrencyGate> = {
+    feed: new ConcurrencyGate(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
+    reader: new ConcurrencyGate(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
+    image: new ConcurrencyGate(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
+    preview: new ConcurrencyGate(options.operationCapacity?.preview ?? RETRIEVAL_PROFILES.preview.capacity),
+    discovery: new ConcurrencyGate(options.operationCapacity?.discovery ?? RETRIEVAL_PROFILES.discovery.capacity),
   }
 
   const retrieve = (request: RetrievalRequest): Promise<RetrievalResult> =>
@@ -239,7 +240,7 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
       httpClient: options.httpClient,
       logger,
       policy,
-      gates: [operationGates[request.operation], shared],
+      gate: gates[request.operation],
     })
 
   return {
@@ -268,7 +269,7 @@ interface RunContext {
   readonly httpClient: HttpClient
   readonly logger: Logger
   readonly policy: DestinationPolicy
-  readonly gates: readonly ConcurrencyGate[]
+  readonly gate: ConcurrencyGate
 }
 
 async function run(request: RetrievalRequest, context: RunContext): Promise<RetrievalResult> {
@@ -309,7 +310,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const onCancel = () => abort('cancelled', 'caller abandoned the retrieval')
   request.signal?.addEventListener('abort', onCancel, { once: true })
 
-  let entered = 0
+  let entered = false
   let settled = false
 
   const settle = (): void => {
@@ -317,7 +318,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     settled = true
     clearTimeout(timer)
     request.signal?.removeEventListener('abort', onCancel)
-    for (let index = entered - 1; index >= 0; index -= 1) context.gates[index]?.leave()
+    if (entered) context.gate.leave()
   }
 
   const log = (event: string, fields: Record<string, unknown>): void => {
@@ -344,14 +345,12 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
   if (request.signal?.aborted) return fail('cancelled', 'caller abandoned the retrieval')
 
-  for (const gate of context.gates) {
-    if (!(await gate.enter(controller.signal))) {
-      return abandoned
-        ? fail(abandoned, `gave up waiting for a retrieval slot`)
-        : fail('busy', 'no retrieval slot available')
-    }
-    entered += 1
+  if (!(await context.gate.enter(controller.signal))) {
+    return abandoned
+      ? fail(abandoned, 'gave up waiting for a retrieval slot')
+      : fail('busy', 'no retrieval slot available')
   }
+  entered = true
 
   let target: string | URL = request.url
   const visited = new Set<string>()
@@ -652,12 +651,17 @@ class ConcurrencyGate {
   readonly #waiting: Array<(granted: boolean) => void> = []
   #active = 0
 
-  constructor(limit: number, queueLimit: number) {
-    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(queueLimit) || queueLimit < 0) {
+  constructor({ maxConcurrent, maxQueued }: RetrievalCapacity) {
+    if (
+      !Number.isSafeInteger(maxConcurrent) ||
+      maxConcurrent < 1 ||
+      !Number.isSafeInteger(maxQueued) ||
+      maxQueued < 0
+    ) {
       throw new Error('retrieval capacity must use finite non-negative integers')
     }
-    this.#limit = limit
-    this.#queueLimit = queueLimit
+    this.#limit = maxConcurrent
+    this.#queueLimit = maxQueued
   }
 
   /** Resolves true holding a slot; false when full or the caller aborted. */
@@ -716,23 +720,6 @@ function tightened(requested: number | undefined, ceiling: number, floor: number
   return Math.max(floor, Math.min(Math.floor(requested ?? ceiling), ceiling))
 }
 
-function validCapacity(capacity: RetrievalCapacity): RetrievalCapacity {
-  if (
-    !Number.isSafeInteger(capacity.maxConcurrent) ||
-    capacity.maxConcurrent < 1 ||
-    !Number.isSafeInteger(capacity.maxQueued) ||
-    capacity.maxQueued < 0
-  ) {
-    throw new Error('retrieval capacity must use finite non-negative integers')
-  }
-  return capacity
-}
-
-function gateFor(capacity: RetrievalCapacity): ConcurrencyGate {
-  const valid = validCapacity(capacity)
-  return new ConcurrencyGate(valid.maxConcurrent, valid.maxQueued)
-}
-
 /**
  * The DNS gate stays occupied until the OS lookup settles, even after the
  * caller's deadline: a broken resolver cannot pile up unbounded lookups.
@@ -743,7 +730,7 @@ class BoundedResolver {
 
   constructor(resolve: ResolveAddresses, capacity: RetrievalCapacity) {
     this.#resolve = resolve
-    this.#gate = gateFor(capacity)
+    this.#gate = new ConcurrencyGate(capacity)
   }
 
   readonly resolve: ResolveAddresses = async (hostname, signal) => {
