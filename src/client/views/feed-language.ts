@@ -6,7 +6,6 @@ import {
 } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
-/** An ongoing state, said in the list and on the Feed itself. */
 export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string>> = {
   unreachable: 'the feed cannot be reached',
   timeout: 'the feed is taking too long to respond',
@@ -18,7 +17,6 @@ export const AVAILABILITY_COPY: Readonly<Record<FeedAvailabilityCategory, string
 
 type FailureCode = FeedProofFailureCode | 'invalid_feed_url' | 'duplicate_subscription'
 
-/** One attempt that failed: a subscribe, a first check, or a retry by hand. */
 export const FAILURE_COPY: Readonly<Record<FailureCode, string>> = {
   unreachable: 'that feed could not be reached',
   timeout: 'that feed took too long to respond',

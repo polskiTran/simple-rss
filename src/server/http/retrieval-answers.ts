@@ -20,7 +20,6 @@ interface RetrievalSubject {
   readonly unsafeDestination: FailureAnswer
   readonly unsupportedContent: FailureAnswer
   readonly unreachable: FailureAnswer
-  /** The publisher answered, badly. The Feed names it apart from `unreachable`; left out, it reads as `unreachable`. */
   readonly httpError?: FailureAnswer
   readonly tooLargeCode: string
   readonly timeoutCode: string
@@ -65,11 +64,6 @@ function retrievalAnswers(subject: RetrievalSubject): Readonly<Record<RetrievalF
   }
 }
 
-/**
- * A Feed answers with its Feed Availability category as the code, so a retry's
- * notice and the list's category are one vocabulary. Only a destination this
- * installation refused answers outside it.
- */
 export const FEED_ANSWERS = retrievalAnswers({
   noun: 'The Feed',
   profile: RETRIEVAL_PROFILES.feed,
@@ -86,7 +80,6 @@ export const FEED_ANSWERS = retrievalAnswers({
   bodyTimeoutCode: 'timeout',
 })
 
-/** The Feed was retrieved but its document would not parse: one code, a message per way it failed. */
 export const INVALID_FEED_ANSWERS: Readonly<Record<FeedDocumentFailureCode, FailureAnswer>> = {
   malformed_feed: { status: 422, code: 'invalid_feed', message: 'The Feed returned malformed XML' },
   unsupported_feed: {

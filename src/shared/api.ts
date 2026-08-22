@@ -183,11 +183,6 @@ export const feedAvailabilityCategorySchema = z.enum([
 ])
 export type FeedAvailabilityCategory = z.infer<typeof feedAvailabilityCategorySchema>
 
-/**
- * Why a URL did not prove to be a usable Feed: a retrieval's category, or a page
- * that declares no Feed. A destination this installation refused answers
- * `invalid_feed_url` instead.
- */
 export const feedProofFailureCodeSchema = z.enum([...feedAvailabilityCategorySchema.options, 'no_feed_found'])
 export type FeedProofFailureCode = z.infer<typeof feedProofFailureCodeSchema>
 

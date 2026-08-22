@@ -233,8 +233,6 @@ describe('Feed Availability', () => {
     })
   })
 
-  // The refresh route's answer and the recorded category are one vocabulary, so
-  // the notice a retry shows and the category the list shows name the same thing.
   it('answers a manual retry with the category it records', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

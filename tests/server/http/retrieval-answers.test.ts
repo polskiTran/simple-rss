@@ -4,7 +4,6 @@ import { ARTICLE_ANSWERS, FEED_ANSWERS } from '../../../src/server/http/retrieva
 import { availabilityCategoryOf } from '../../../src/server/subscriptions/feed-availability.js'
 import type { RetrievalFailureCode } from '../../../src/server/upstream/retrieval.js'
 
-/** Every code: the Feed answers its Feed Availability category, the article its own vocabulary. */
 const ANSWERS: ReadonlyArray<readonly [RetrievalFailureCode, number, string, string]> = [
   ['invalid_request', 400, 'invalid_feed_url', 'article_link_unsafe'],
   ['invalid_url', 400, 'invalid_feed_url', 'article_link_unsafe'],
@@ -37,13 +36,10 @@ describe('retrieval answers', () => {
     expect(Object.keys(ARTICLE_ANSWERS).sort()).toEqual([...covered].sort())
   })
 
-  // A failed refresh is recorded under one category and answered under another
-  // table; the notice and the list must name the same thing. Only the destinations
-  // this installation refused answer outside the category vocabulary.
   it('names the category the same failure would record', () => {
-    for (const [code, status] of ANSWERS) {
+    for (const [code, , feedCode] of ANSWERS) {
+      if (feedCode === 'invalid_feed_url') continue
       const answered = FEED_ANSWERS[code].code
-      if (status === 400) continue
       expect(answered, code).toBe(
         availabilityCategoryOf({ kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } }),
       )
