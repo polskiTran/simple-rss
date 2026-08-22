@@ -681,6 +681,28 @@ describe('capacity', () => {
     await expect(held).resolves.toMatchObject({ ok: true })
   })
 
+  it('gives discovery a budget of its own, apart from preview', async () => {
+    const { retrieval, upstream } = harness({ operationCapacity: { discovery: { maxConcurrent: 1, maxQueued: 0 } } })
+    upstream.stub('https://example.com/', {
+      delayMs: 50,
+      headers: { 'content-type': 'text/html' },
+      body: '<html></html>',
+    })
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: '<rss></rss>',
+    })
+    const pageRequest = feedRequest('https://example.com/', { operation: 'discovery' })
+
+    const held = retrieval.retrieveBytes(pageRequest)
+    const refused = await retrieval.retrieveBytes(pageRequest)
+    const preview = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { operation: 'preview' }))
+
+    expect(refused).toMatchObject({ ok: false, code: 'busy' })
+    expect(preview).toMatchObject({ ok: true })
+    await expect(held).resolves.toMatchObject({ ok: true })
+  })
+
   it('keeps a preview slot free while feed, reader, and image run at full tilt', async () => {
     const { retrieval, upstream } = harness()
     const held = { delayMs: 100, headers: { 'content-type': 'application/xml' }, body: '<rss></rss>' }
@@ -699,7 +721,7 @@ describe('capacity', () => {
       ...busy('feed', 'https://example.com/feed.xml', RETRIEVAL_PROFILES.feed.capacity.maxConcurrent),
       ...busy('reader', 'https://example.com/page', RETRIEVAL_PROFILES.reader.capacity.maxConcurrent),
       ...busy('image', 'https://example.com/photo.jpg', RETRIEVAL_PROFILES.image.capacity.maxConcurrent),
-    ].map((retrieval) => retrieval.then(() => finished.push('occupied')))
+    ].map((pending) => pending.then(() => finished.push('occupied')))
     const preview = retrieval
       .retrieveBytes(feedRequest('https://example.com/new.xml', { operation: 'preview' }))
       .then((result) => {

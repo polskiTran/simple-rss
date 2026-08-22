@@ -41,7 +41,7 @@ async function origin(handler: Handler): Promise<Origin> {
 }
 
 function clientReachingTheTestServer(): HttpClient {
-  return createNetworkHttpClient({ isAllowedAddress: () => true })
+  return createNetworkHttpClient({ maxSockets: 8, isAllowedAddress: () => true })
 }
 
 const testServerLookup: LookupFunction = (_hostname, options, callback) => {
@@ -122,6 +122,7 @@ describe('createNetworkHttpClient', () => {
     const port = new URL(running.url).port
     const retrieval = createRetrieval({
       httpClient: createNetworkHttpClient({
+        maxSockets: 8,
         isAllowedAddress: () => true,
         lookup: testServerLookup,
       }),
@@ -276,7 +277,9 @@ describe('createNetworkHttpClient', () => {
       response.end('<rss></rss>')
     })
 
-    await expect(createNetworkHttpClient()(new Request(`${running.url}/feed.xml`))).rejects.toThrow(/refus|address/i)
+    await expect(createNetworkHttpClient({ maxSockets: 8 })(new Request(`${running.url}/feed.xml`))).rejects.toThrow(
+      /refus|address/i,
+    )
     expect(running.requests).toHaveLength(0)
   })
 })

@@ -13,21 +13,21 @@ const ACCEPT_ENCODING = 'gzip, deflate, br'
 const BODILESS_STATUSES = new Set([204, 205, 304])
 
 export interface NetworkHttpClientOptions {
+  /** Active sockets per protocol. The boundary passes its shared concurrency, so every admitted retrieval can hold one. */
+  readonly maxSockets: number
   readonly isAllowedAddress?: (address: string) => boolean
   readonly lookup?: LookupFunction
 }
 
-/** The sum of the operation budgets in `retrieval.ts` (4 + 2 + 4 + 2 + 2): every one at full tilt holds a socket, even all on one protocol. */
-const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 14
 const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
-export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
+export function createNetworkHttpClient(options: NetworkHttpClientOptions): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
   const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
   const agentOptions = {
     keepAlive: true,
-    maxSockets: MAX_TOTAL_SOCKETS_PER_PROTOCOL,
-    maxTotalSockets: MAX_TOTAL_SOCKETS_PER_PROTOCOL,
+    maxSockets: options.maxSockets,
+    maxTotalSockets: options.maxSockets,
     maxFreeSockets: MAX_FREE_SOCKETS_PER_PROTOCOL,
   }
   const httpAgent = new HttpAgent(agentOptions)
