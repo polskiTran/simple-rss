@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test'
 import {
+  claim,
   expect,
   expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
+  subscribe as subscribeThroughDialog,
   test,
   type Installation,
 } from './installation.js'
@@ -12,15 +12,8 @@ const LIGHT_PAPER = 'rgb(247, 247, 245)'
 const DARK_PAPER = 'rgb(18, 17, 15)'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+  await claim(page, installation)
+  await subscribeThroughDialog(page, installation.feedUrl, 'Field Notes')
 }
 
 async function openDigest(page: Page, installation: Installation): Promise<void> {
@@ -81,15 +74,8 @@ test.describe('the Digest presentation', () => {
   })
 
   test('ends at fifty items with `older items`, and one press extends the day', async ({ page, installation }) => {
-    await page.goto(installation.url)
-    await page.getByLabel('setup secret').fill(SETUP_SECRET)
-    await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-    await page.getByLabel('confirm password').fill(USER_PASSWORD)
-    await page.getByRole('button', { name: 'claim' }).click()
-    await page.getByRole('link', { name: 'feeds' }).click()
-    await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.longFeedUrl)
-    await page.keyboard.press('Enter')
-    await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
+    await claim(page, installation)
+    await subscribeThroughDialog(page, installation.longFeedUrl, 'Long Meadow')
     await page.getByRole('link', { name: 'digest' }).click()
 
     await expect(page.locator('.content-item')).toHaveCount(50)

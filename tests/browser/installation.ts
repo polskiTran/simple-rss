@@ -201,6 +201,28 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 
 export { expect } from '@playwright/test'
 
+/** Claims the installation on its setup screen, which lands the User signed in on the Digest. */
+export async function claim(page: Page, installation: Installation): Promise<void> {
+  await page.goto(installation.url)
+  await page.getByLabel('setup secret').fill(SETUP_SECRET)
+  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
+  await page.getByLabel('confirm password').fill(USER_PASSWORD)
+  await page.getByRole('button', { name: 'claim' }).click()
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+}
+
+/** Pastes a Feed URL on the Feeds list and subscribes through the preview dialog; ends with the row and the notice visible. */
+export async function subscribe(page: Page, feedUrl: string, title: string): Promise<void> {
+  await page.getByRole('link', { name: 'feeds' }).click()
+  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(feedUrl)
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: `subscribe to ${title}?` })).toBeVisible()
+  await page.getByRole('button', { name: 'subscribe' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByRole('heading', { name: title })).toBeVisible()
+  await expect(page.locator('.feed-notice')).toHaveText(/^subscribed — \d+ items? in the digest$/)
+}
+
 // Measured against the body, not the viewport: `scrollbar-gutter: stable`
 // keeps the scrollbar's width out of the content, so `innerWidth` would hide
 // an overflow that wide.

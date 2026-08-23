@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test'
 import {
+  claim,
   expect,
   expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
+  subscribe as subscribeThroughDialog,
   test,
   type Installation,
 } from './installation.js'
@@ -12,15 +12,8 @@ const LIGHT_ACCENT = 'rgb(36, 56, 216)'
 const QUIET_GREY = 'rgb(163, 162, 157)'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+  await claim(page, installation)
+  await subscribeThroughDialog(page, installation.feedUrl, 'Field Notes')
 }
 
 test.describe('the Library', () => {

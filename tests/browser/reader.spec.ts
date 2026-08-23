@@ -1,27 +1,24 @@
 import type { Page } from '@playwright/test'
 import {
+  claim,
   expect,
   expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
+  subscribe as subscribeThroughDialog,
   test,
   type Installation,
 } from './installation.js'
 
 async function subscribe(page: Page, installation: Installation, feedUrl = installation.feedUrl): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await subscribeTo(page, feedUrl)
+  await claim(page, installation)
+  await subscribeTo(page, installation, feedUrl)
 }
 
-async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
-  await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible()
+function subscribeTo(page: Page, installation: Installation, feedUrl: string): Promise<void> {
+  return subscribeThroughDialog(
+    page,
+    feedUrl,
+    feedUrl === installation.brokenArticleFeedUrl ? 'The Quiet Coast' : 'Field Notes',
+  )
 }
 
 test.describe('Reader View', () => {
@@ -145,7 +142,7 @@ test.describe('Reader View', () => {
 
   test('never dead-ends: next in the digest walks to the following item', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await subscribeTo(page, installation.brokenArticleFeedUrl)
+    await subscribeTo(page, installation, installation.brokenArticleFeedUrl)
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'First light' }).click()
 

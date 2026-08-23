@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test'
 import {
+  claim,
   expect,
   expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
+  subscribe as subscribeThroughDialog,
   test,
   type Installation,
 } from './installation.js'
@@ -12,15 +12,8 @@ const DANGER_RED = 'rgb(176, 43, 39)'
 const INK = 'rgb(18, 17, 15)'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+  await claim(page, installation)
+  await subscribeThroughDialog(page, installation.feedUrl, 'Field Notes')
 }
 
 async function expectFeedAndDigest(page: Page, installation: Installation): Promise<void> {
@@ -153,5 +146,31 @@ test.describe('phone Feed and Digest rendering', () => {
   test('keeps the whole cadence grid selectable inside the narrow paper', async ({ page, installation }) => {
     await subscribe(page, installation)
     await expectOpenFeed(page)
+  })
+
+  test('meets the thumb: the preview is anchored to the bottom edge, and cancel hands focus back to the field', async ({
+    page,
+    installation,
+  }) => {
+    await claim(page, installation)
+    await page.getByRole('link', { name: 'feeds' }).click()
+    const field = page.getByRole('textbox', { name: 'search or add feeds' })
+    await field.fill(installation.feedUrl)
+    await page.keyboard.press('Enter')
+
+    const popup = page.locator('.overlay-popup')
+    await expect(popup).toBeVisible()
+    const edges = await popup.evaluate((element) => ({
+      bottom: element.getBoundingClientRect().bottom,
+      viewport: window.innerHeight,
+    }))
+    expect(edges.bottom).toBe(edges.viewport)
+
+    await expect(page.getByRole('dialog', { name: 'subscribe to Field Notes?' })).toBeVisible()
+    await page.getByRole('button', { name: 'cancel' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(field).toBeFocused()
+    await expect(field).toHaveValue(installation.feedUrl)
+    await expect(page.getByText('no subscriptions yet')).toBeVisible()
   })
 })

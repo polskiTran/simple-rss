@@ -1,14 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, SETUP_SECRET, test, USER_PASSWORD, type Installation } from './installation.js'
-
-async function claim(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-}
+import { claim, expect, subscribe, test } from './installation.js'
 
 async function inkLevels(page: Page, scope = '.masthead'): Promise<string[]> {
   return page.$$eval(`${scope} .wordmark-cell`, (cells) => cells.map((cell) => getComputedStyle(cell).backgroundColor))
@@ -23,10 +14,7 @@ test.describe('the masthead mark', () => {
 
   test('leads back to the digest from a Feed Item', async ({ page, installation }) => {
     await claim(page, installation)
-    await page.getByRole('link', { name: 'feeds' }).click()
-    await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
-    await page.keyboard.press('Enter')
-    await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+    await subscribe(page, installation.feedUrl, 'Field Notes')
 
     await page.getByRole('link', { name: 'simple' }).click()
 

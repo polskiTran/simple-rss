@@ -1,27 +1,10 @@
 import type { Page } from '@playwright/test'
-import {
-  expect,
-  expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
-  test,
-  type Installation,
-} from './installation.js'
+import { claim, expect, expectNoHorizontalOverflow, subscribe, test, type Installation } from './installation.js'
 
 async function openDigest(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await page.getByRole('link', { name: 'feeds' }).click()
-  const control = page.getByRole('textbox', { name: 'search or add feeds' })
-  await control.fill(installation.feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
-  await control.fill(installation.brokenArticleFeedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'The Quiet Coast' })).toBeVisible()
+  await claim(page, installation)
+  await subscribe(page, installation.feedUrl, 'Field Notes')
+  await subscribe(page, installation.brokenArticleFeedUrl, 'The Quiet Coast')
   await page.getByRole('link', { name: 'digest' }).click()
   await expect(page.getByRole('heading', { name: 'today · 1 post' })).toBeVisible()
 }
