@@ -61,17 +61,9 @@ export class FeedAvailability {
   }
 
   recordSuccess(feed: PolledFeed): void {
-    const now = this.#clock.now()
     this.#db
       .update(subscriptions)
-      .set({
-        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
-        lastPolledAt: now.toISOString(),
-        lastSuccessAt: now.toISOString(),
-        lastFailureAt: null,
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-      })
+      .set(availabilityAfterSuccess(feed, this.#clock.now()))
       .where(eq(subscriptions.feedId, feed.feedId))
       .run()
   }
@@ -117,6 +109,22 @@ export class FeedAvailability {
       resolvedUrl: loggableUrl(feed.resolvedUrl),
       code,
     })
+  }
+}
+
+/**
+ * What a successful retrieval leaves on the row: the failure run cleared and the
+ * next poll one Polling Interval out. A Subscription proven inside its own
+ * request is inserted with these values rather than due-now then updated.
+ */
+export function availabilityAfterSuccess(feed: Pick<PolledFeed, 'feedId' | 'pollingIntervalMinutes'>, now: Date) {
+  return {
+    nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
+    lastPolledAt: now.toISOString(),
+    lastSuccessAt: now.toISOString(),
+    lastFailureAt: null,
+    consecutiveFailures: 0,
+    lastFailureCategory: null,
   }
 }
 

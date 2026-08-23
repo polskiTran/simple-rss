@@ -71,6 +71,8 @@ async function expectOpenFeed(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'check every 6 hours' }).click()
   await expect(page.getByText('now checked every 6 hours')).toBeVisible()
   await page.getByRole('button', { name: 'refresh now' }).click()
+  await expect(page.getByText('refreshed — the feed shows 1 item')).toBeVisible()
+  await page.getByRole('button', { name: 'refresh now' }).click()
   await expect(page.getByText('checked a moment ago — wait a little before retrying')).toBeVisible()
 
   await page.getByRole('link', { name: '← feeds' }).click()

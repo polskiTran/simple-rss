@@ -1,17 +1,14 @@
 import { Button } from '@base-ui/react/button'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
-import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
+import type { OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
+import { fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
-import { firstCheckFailure, retryFailure, subscriptionFailure, unavailableNote } from './feed-language.js'
+import { retryFailure, subscribedNotice, subscriptionFailure, unavailableNote } from './feed-language.js'
 import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
-
-const FIRST_CHECK_ATTEMPTS = 8
-const FIRST_CHECK_INTERVAL_MS = 2_000
 
 const UNCHECKED_REFRESH_LADDER_MS = [3_000, 5_000] as const
 const UNCHECKED_REFRESH_STEADY_MS = 10_000
@@ -83,19 +80,15 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     setSubscribing(true)
     setNotice('subscribing…')
     try {
-      const created = await subscribeToFeed(url)
+      // The request is the proof: the row answers already available, its items in the Digest.
+      const { subscription, observedItems } = await subscribeToFeed(url)
       setState((current) => {
-        if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions: [created.subscription] }
-        if (current.subscriptions.some((subscription) => subscription.feedId === created.subscription.feedId)) {
-          return current
-        }
-        return { kind: 'loaded', subscriptions: [...current.subscriptions, created.subscription] }
+        if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions: [subscription] }
+        if (current.subscriptions.some((existing) => existing.feedId === subscription.feedId)) return current
+        return { kind: 'loaded', subscriptions: [...current.subscriptions, subscription] }
       })
       setQuery('')
-      setNotice('subscribed — checking the feed…')
-      setRefreshRound(0)
-      setNotice(await watchFirstCheck(created.subscription.feedId))
-      await refreshList()
+      setNotice(subscribedNotice(observedItems))
     } catch (error) {
       setNotice(subscriptionFailure(error))
     } finally {
@@ -172,32 +165,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
 function feedUrlOf(query: string): string | undefined {
   const line = query.trim()
   return /^https?:\/\/\S+$/i.test(line) ? line : undefined
-}
-
-async function watchFirstCheck(feedId: number): Promise<string> {
-  for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
-    let detail: FeedDetail
-    try {
-      detail = await fetchFeedDetail(feedId)
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) return 'already subscribed'
-      continue
-    }
-    if (detail.availability.lastSuccessAt) {
-      return detail.items.length === 1
-        ? 'subscribed — 1 item in the digest'
-        : `subscribed — ${detail.items.length} items in the digest`
-    }
-    if (detail.availability.consecutiveFailures > 0) {
-      return firstCheckFailure(detail.availability.category)
-    }
-  }
-  return 'still checking — the feed will appear in the list'
-}
-
-function wait(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function SubscriptionList({

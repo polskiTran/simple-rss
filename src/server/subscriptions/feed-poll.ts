@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Clock } from '../clock.js'
 import type { ParsedFeedDocument } from '../ingestion/feed-document.js'
-import { persistFeedWindow } from '../ingestion/feed-window.js'
+import { observedItemCount, persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import { feedUrlAliases, feeds, subscriptions } from '../persistence/schema.js'
@@ -95,8 +95,9 @@ export class FeedPoll {
     if (proof.kind !== 'proven') return proof
     const { retrieved, parsed } = proof
 
-    // Two entered URLs can hide one Feed; the retrieval is what reveals it.
-    // The later Subscription folds into the existing Feed (ADR 0007).
+    // Two entered URLs can hide one Feed. Only a Feed recorded by OPML Import
+    // reaches its first retrieval without knowing where it resolves; the later
+    // Subscription folds into the existing Feed (ADR 0009).
     const existingFeedId = this.#aliasOwner(retrieved.url)
     if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
       this.#subscriptions.mergeInto(feed, existingFeedId)
@@ -111,7 +112,7 @@ export class FeedPoll {
     }
 
     if (!this.#write(feed.feedId, parsed, retrieved)) return { kind: 'missing' }
-    const observedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
+    const observedItems = observedItemCount(parsed)
     this.#logger.info('subscriptions.feed_window_ingested', {
       feedId: feed.feedId,
       enteredUrl: loggableUrl(feed.enteredUrl),

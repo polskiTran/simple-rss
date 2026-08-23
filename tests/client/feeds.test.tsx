@@ -52,35 +52,6 @@ const UNAVAILABLE_FEED = {
   },
 }
 
-function feedDetail(availability: object, itemCount: number) {
-  return {
-    feedId: FEED.feedId,
-    title: FEED.title,
-    description: null,
-    reportedTitle: FEED.title,
-    customTitle: null,
-    reportedDescription: null,
-    customDescription: null,
-    domain: FEED.domain,
-    homePageUrl: FEED.homePageUrl,
-    enteredUrl: FEED.enteredUrl,
-    resolvedUrl: FEED.resolvedUrl,
-    availability,
-    schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
-    cadence: [],
-    items: Array.from({ length: itemCount }, (_, index) => ({
-      feedItemId: index + 1,
-      title: `Item ${index + 1}`,
-      link: null,
-      publishedAt: null,
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      date: '2026-08-08',
-      displayDate: 'today',
-      saved: false,
-    })),
-  }
-}
-
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
@@ -105,17 +76,9 @@ function elapse(milliseconds: number): Promise<void> {
 }
 
 describe('Feeds', () => {
-  it('shows the recorded Subscription immediately and the first check outcome as it lands', async () => {
-    let releaseDetail: ((reply: Reply) => void) | undefined
-    const firstCheck = new Promise<Reply>((resolve) => {
-      releaseDetail = resolve
-    })
+  it('shows the subscribed row and how many items the request put in the Digest', async () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
-    api.on('POST /api/subscriptions', () => {
-      api.on('GET /api/feeds/1', () => firstCheck)
-      api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
-      return { status: 201, body: { subscription: UNCHECKED_FEED } }
-    })
+    api.on('POST /api/subscriptions', { status: 201, body: { subscription: FEED, observedItems: 1 } })
     window.history.replaceState(null, '', '/feeds')
     const { container } = render(<App />)
     const user = userEvent.setup()
@@ -123,15 +86,48 @@ describe('Feeds', () => {
     await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
-    expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
-    expect(screen.getByText('subscribed — checking the feed…')).toBeDefined()
-    expect(screen.getByText('waiting for first check')).toBeDefined()
-
-    releaseDetail?.({ body: feedDetail(AVAILABLE, 1) })
     expect(await screen.findByText('subscribed — 1 item in the digest')).toBeDefined()
-    expect(await screen.findByText('Field Notes')).toBeDefined()
+    expect(screen.getByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
+    expect(screen.getByRole('textbox', { name: /search or add feeds/i })).toHaveProperty('value', '')
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+    expect(api.requestsTo('GET /api/feeds/1')).toHaveLength(0)
+  })
+
+  it('counts the items in the plural', async () => {
+    stubApi()
+      .on('GET /api/feeds', { body: { subscriptions: [] } })
+      .on('POST /api/subscriptions', { status: 201, body: { subscription: FEED, observedItems: 12 } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('subscribed — 12 items in the digest')).toBeDefined()
+  })
+
+  it('says in one sentence why the address did not prove to be a Feed, and keeps it in the field', async () => {
+    stubApi()
+      .on('GET /api/feeds', { body: { subscriptions: [] } })
+      .on('POST /api/subscriptions', {
+        status: 422,
+        body: { error: { code: 'no_feed_found', message: 'No Feed was found at that address' } },
+      })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), 'https://journal.example/')
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('no feed was found at that address')).toBeDefined()
+    expect(screen.getByRole('textbox', { name: /search or add feeds/i })).toHaveProperty(
+      'value',
+      'https://journal.example/',
+    )
+    expect(screen.getByText('no subscriptions yet')).toBeDefined()
   })
 
   it('links the domain to the Feed’s home page, and leaves it plain text without one', async () => {
@@ -148,51 +144,6 @@ describe('Feeds', () => {
     expect(link.getAttribute('rel')).toBe('noopener noreferrer')
     expect(screen.getByText('wire.example').tagName).toBe('SPAN')
     expect(api.requestsTo('GET /api/feeds')).toHaveLength(1)
-  })
-
-  it('says in the same breath when the first check finds the URL wrong', async () => {
-    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
-    api.on('POST /api/subscriptions', () => {
-      api.on('GET /api/feeds/1', {
-        body: feedDetail({ ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' }, 0),
-      })
-      api.on('GET /api/feeds', {
-        body: {
-          subscriptions: [
-            { ...UNCHECKED_FEED, availability: { ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' } },
-          ],
-        },
-      })
-      return { status: 201, body: { subscription: UNCHECKED_FEED } }
-    })
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
-
-    expect(await screen.findByText('that feed could not be reached')).toBeDefined()
-  })
-
-  it('reads a Subscription that merged away during its first check as already subscribed', async () => {
-    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
-    api.on('POST /api/subscriptions', () => {
-      api.on('GET /api/feeds/2', { status: 404, body: { error: { code: 'not_found', message: 'Not found' } } })
-      return {
-        status: 201,
-        body: { subscription: { ...UNCHECKED_FEED, feedId: 2, enteredUrl: 'https://alias.example/feed' } },
-      }
-    })
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), 'https://alias.example/feed')
-    await user.keyboard('{Enter}')
-
-    expect(await screen.findByText('already subscribed')).toBeDefined()
-    await waitFor(() => expect(screen.getAllByText('Field Notes')).toHaveLength(1))
   })
 
   it('treats a line that is not a URL as a search, never as something to submit', async () => {
@@ -253,10 +204,9 @@ describe('Feeds', () => {
     })
     stubApi()
       .on('GET /api/feeds', () => staleList)
-      .on('GET /api/feeds/1', { body: feedDetail(AVAILABLE, 1) })
       .on('POST /api/subscriptions', {
         status: 201,
-        body: { subscription: FEED },
+        body: { subscription: FEED, observedItems: 1 },
       })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)

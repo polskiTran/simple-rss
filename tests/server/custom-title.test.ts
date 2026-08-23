@@ -104,6 +104,7 @@ describe('Custom Title', () => {
 
   it('refuses blank and oversized titles, and answers an unknown Feed with not found', async () => {
     const service = await startTestService()
+    service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
@@ -118,7 +119,7 @@ describe('Custom Title', () => {
     )
 
     const detail = await (await user.get('/api/feeds/1')).json()
-    expect(detail).toMatchObject({ title: 'journal.example', customTitle: null })
+    expect(detail).toMatchObject({ title: 'Field Notes', customTitle: null })
   })
 })
 

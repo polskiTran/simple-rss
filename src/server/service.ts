@@ -82,7 +82,7 @@ export function createService(options: ServiceOptions): Service {
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
     const availability = new FeedAvailability({ database, clock, logger })
-    const subscriptions = new SubscriptionService({ database, clock, settings, logger })
+    const subscriptions = new SubscriptionService({ database, retrieval, clock, settings, logger })
     const poll = new FeedPoll({ database, retrieval, clock, logger, subscriptions, availability })
     const refresh = new FeedRefresh({ clock, poll })
 

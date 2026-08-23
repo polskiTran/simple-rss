@@ -205,8 +205,11 @@ export const subscriptionSummarySchema = feedSummarySchema.extend({
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
 
+/** The Feed was proven inside the request: the Subscription is already `available` and its Feed Window is in the Digest. */
 export const createSubscriptionResponseSchema = z.object({
   subscription: subscriptionSummarySchema,
+  /** Size of the Feed Window the request wrote — what the notice counts. */
+  observedItems: z.number().int().nonnegative(),
 })
 export type CreateSubscriptionResponse = z.infer<typeof createSubscriptionResponseSchema>
 

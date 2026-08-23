@@ -26,7 +26,6 @@ export function persistFeedWindow(
   },
 ): boolean {
   const { feedId, parsed, resolvedUrl, validators, now } = options
-  const domain = new URL(parsed.homePageUrl ?? resolvedUrl).hostname
   return db.transaction((tx) => {
     const subscribed = tx
       .select({ feedId: subscriptions.feedId })
@@ -46,21 +45,28 @@ export function persistFeedWindow(
 
     tx.insert(feedUrlAliases).values({ url: resolvedUrl, feedId }).onConflictDoNothing().run()
     tx.update(feeds)
-      .set({
-        title: parsed.title,
-        description: parsed.description,
-        domain,
-        homePageUrl: parsed.homePageUrl,
-        resolvedUrl,
-        etag: validators.etag,
-        lastModified: validators.lastModified,
-        updatedAt: now,
-      })
+      .set({ ...feedColumnsOf(parsed, resolvedUrl), ...validators, updatedAt: now })
       .where(eq(feeds.id, feedId))
       .run()
     for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)
     return true
   })
+}
+
+/** What a retrieved document says about its Feed, as the `feeds` row holds it; the domain is the home page's when declared. */
+export function feedColumnsOf(parsed: ParsedFeedDocument, resolvedUrl: string) {
+  return {
+    title: parsed.title,
+    description: parsed.description,
+    domain: new URL(parsed.homePageUrl ?? resolvedUrl).hostname,
+    homePageUrl: parsed.homePageUrl,
+    resolvedUrl,
+  }
+}
+
+/** How many distinct Feed Items the window holds — what a subscribe or refresh reports back. */
+export function observedItemCount(parsed: ParsedFeedDocument): number {
+  return new Set(parsed.items.map((item) => item.dedupeKey)).size
 }
 
 /** Re-ingestion corrects mutable metadata; identity, first-seen time, and Library membership stay untouched. */

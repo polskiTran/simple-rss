@@ -90,6 +90,7 @@ describe('Custom Description', () => {
 
   it('refuses blank and oversized descriptions and a body missing the field', async () => {
     const service = await startTestService()
+    service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss(null) })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 

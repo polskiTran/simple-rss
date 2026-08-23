@@ -384,20 +384,22 @@ describe('congestion at the retrieval boundary', () => {
     applyMigrations(database, clock)
     const url = 'https://one.example/feed'
     const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
+    const retrieval = scriptedRetrieval([
+      feedBytes(url),
+      { ok: false, code: 'http_error', reason: 'upstream answered 500', status: 500 },
+      { ok: false, code: 'busy', reason: 'no retrieval slot available' },
+      feedBytes(url),
+    ])
     const subscriptions = new SubscriptionService({
       database,
+      retrieval,
       clock,
       settings: new InstallationSettingsStore(database),
       logger,
     })
     const poll = new FeedPoll({
       database,
-      retrieval: scriptedRetrieval([
-        feedBytes(url),
-        { ok: false, code: 'http_error', reason: 'upstream answered 500', status: 500 },
-        { ok: false, code: 'busy', reason: 'no retrieval slot available' },
-        feedBytes(url),
-      ]),
+      retrieval,
       clock,
       logger,
       subscriptions,
@@ -405,7 +407,7 @@ describe('congestion at the retrieval boundary', () => {
     })
 
     try {
-      expect(subscriptions.create(url).kind).toBe('created')
+      expect(subscriptions.record(url).kind).toBe('recorded')
       await poll.ingest(1)
 
       clock.advance(60_000)

@@ -17,18 +17,18 @@ import {
 import type { DigestService } from '../digest/digest-service.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
-import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
+import type { SubscribeOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
 import { readIdParam } from './id-param.js'
 import { readJsonBody } from './json-body.js'
 import { readListCursor } from './list-cursor.js'
 import { NO_STORE, notFound, retryAfter } from './responses.js'
-import { answer, FEED_ANSWERS, INVALID_FEED_ANSWERS } from './retrieval-answers.js'
+import { answer, FEED_ANSWERS, INVALID_FEED_ANSWERS, PREVIEW_ANSWERS } from './retrieval-answers.js'
 
 export interface FeedRouteDependencies {
   readonly subscriptions: SubscriptionService
   readonly refresh: FeedRefresh
   readonly digest: DigestService
-  /** Asks the scheduler to look at the due frontier now rather than next wake. */
+  /** Asks the scheduler to look at the due frontier now rather than next wake; only an OPML Import needs it. */
   readonly nudgeScheduler: () => void
 }
 
@@ -39,12 +39,12 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, createSubscriptionRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = deps.subscriptions.create(body.value.url)
-    if (outcome.kind === 'created') {
-      deps.nudgeScheduler()
-      return c.json<CreateSubscriptionResponse>({ subscription: outcome.subscription }, 201, NO_STORE)
+    const outcome = await deps.subscriptions.subscribe(body.value.url)
+    if (outcome.kind === 'subscribed') {
+      const { subscription, observedItems } = outcome
+      return c.json<CreateSubscriptionResponse>({ subscription, observedItems }, 201, NO_STORE)
     }
-    return createFailure(c, outcome)
+    return subscribeFailure(c, outcome)
   })
 
   app.post('/subscriptions/import', async (c) => {
@@ -136,7 +136,8 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   return app
 }
 
-function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, { kind: 'created' }>) {
+/** The status table of the proof: the failure's Feed Availability category is the code, a page is `no_feed_found`. */
+function subscribeFailure(c: Context, outcome: Exclude<SubscribeOutcome, { kind: 'subscribed' }>) {
   switch (outcome.kind) {
     case 'invalid-url':
       return c.json(
@@ -153,6 +154,12 @@ function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, {
         409,
         NO_STORE,
       )
+    case 'no-feed-found':
+      return c.json({ error: { code: 'no_feed_found', message: 'No Feed was found at that address' } }, 422, NO_STORE)
+    case 'invalid-feed':
+      return answer(c, INVALID_FEED_ANSWERS[outcome.code])
+    case 'retrieval-failed':
+      return answer(c, PREVIEW_ANSWERS[outcome.failure.code])
   }
 }
 

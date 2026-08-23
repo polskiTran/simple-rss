@@ -1,4 +1,4 @@
-import { and, eq, isNull, lte } from 'drizzle-orm'
+import { eq, lte } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
@@ -13,6 +13,7 @@ import {
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
+import { feedColumnsOf, observedItemCount, persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
@@ -25,15 +26,31 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
+import { RETRIEVAL_PROFILES, type Retrieval } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
+import {
+  availabilityAfterSuccess,
+  availabilityOf,
+  type FailedPoll,
+  type PolledFeed,
+  type RecordedAvailability,
+} from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
 import { nextPollTime } from './polling-schedule.js'
+import { proveFeed } from './prove-feed.js'
 
-export type CreateSubscriptionOutcome =
-  | { readonly kind: 'created'; readonly subscription: SubscriptionSummary }
+export type SubscribeOutcome =
+  | { readonly kind: 'subscribed'; readonly subscription: SubscriptionSummary; readonly observedItems: number }
   | { readonly kind: 'duplicate'; readonly subscription: SubscriptionSummary }
+  | { readonly kind: 'invalid-url' }
+  /** The address answered with a page, not a Feed. Subscribe does not discover; the preview does. */
+  | { readonly kind: 'no-feed-found' }
+  | FailedPoll
+
+export type RecordSubscriptionOutcome =
+  | { readonly kind: 'recorded' }
+  | { readonly kind: 'duplicate' }
   | { readonly kind: 'invalid-url' }
 
 export type ImportOpmlOutcome =
@@ -55,7 +72,7 @@ export type SetFeedDetailsOutcome =
   | { readonly kind: 'updated'; readonly details: FeedDetailsUpdate }
   | { readonly kind: 'missing' }
 
-interface FeedRecord {
+interface SubscribedFeedRecord extends RecordedAvailability {
   readonly feedId: number
   readonly title: string
   readonly description: string | null
@@ -65,22 +82,14 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
-interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {}
-
-const FEED_RECORD_COLUMNS = {
+const SUBSCRIBED_FEED_COLUMNS = {
   feedId: feeds.id,
-  title: feeds.title,
-  description: feeds.description,
+  title: effectiveFeedTitle,
+  description: effectiveFeedDescription,
   domain: feeds.domain,
   homePageUrl: feeds.homePageUrl,
   enteredUrl: feeds.enteredUrl,
   resolvedUrl: feeds.resolvedUrl,
-}
-
-const SUBSCRIBED_FEED_COLUMNS = {
-  ...FEED_RECORD_COLUMNS,
-  title: effectiveFeedTitle,
-  description: effectiveFeedDescription,
   lastPolledAt: subscriptions.lastPolledAt,
   lastSuccessAt: subscriptions.lastSuccessAt,
   consecutiveFailures: subscriptions.consecutiveFailures,
@@ -90,112 +99,146 @@ const SUBSCRIBED_FEED_COLUMNS = {
 /** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
 export class SubscriptionService {
   readonly #db: BetterSQLite3Database
+  readonly #retrieval: Retrieval
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
   readonly #logger: Logger
 
   constructor(options: {
     database: SqliteDatabase
+    retrieval: Retrieval
     clock: Clock
     settings: InstallationSettingsStore
     logger: Logger
   }) {
     this.#db = drizzle(options.database)
+    this.#retrieval = options.retrieval
     this.#clock = options.clock
     this.#settings = options.settings
     this.#logger = options.logger.child({ component: 'subscriptions' })
   }
 
-  /** Records the Subscription without contacting the Feed (ADR 0007): unchecked and immediately due. */
-  create(enteredUrl: string, offeredTitle?: string | null): CreateSubscriptionOutcome {
+  /**
+   * Proves the Feed inside the request (ADR 0009): retrieves and parses the
+   * URL under the `preview` operation, then writes the Feed, the Subscription,
+   * and the Feed Window in one transaction, so the row is `available` — with
+   * the values a successful poll writes — before the request answers. A URL
+   * that does not prove to be a Feed writes nothing.
+   *
+   * Duplicates are settled by one rule, after the proof and before any write:
+   * the alias owner of the resolved URL, else of the typed URL, is the Feed.
+   * Subscribed, it is a duplicate; dormant, it is revived under its own row so
+   * Library attribution keeps its identity; absent, a Feed is created.
+   */
+  async subscribe(enteredUrl: string): Promise<SubscribeOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
 
-    const existing = this.#feedByCanonicalUrl(requestedUrl)
-    if (existing) return { kind: 'duplicate', subscription: this.#withCadence(existing) }
+    const proof = await proveFeed({ retrieval: this.#retrieval, url: requestedUrl, operation: 'preview' })
+    if (proof.kind !== 'proven') return answeredWithPage(proof) ? { kind: 'no-feed-found' } : proof
+    const { retrieved, parsed } = proof
 
-    const now = this.#clock.now().toISOString()
+    const owner = this.#aliasOwner(retrieved.url, requestedUrl)
+    if (owner?.subscribed) return { kind: 'duplicate', subscription: this.#subscribed(owner.feedId) }
 
-    const dormant = this.#dormantFeedByUrl(requestedUrl)
-    if (dormant) return this.#resubscribe(dormant, now)
-
-    // Both stand in for what the Feed document will say: nothing has been
-    // retrieved yet (ADR 0007), so the Feed URL is all there is to go on.
-    const domain = new URL(requestedUrl).hostname
-    const title = offeredTitle?.trim() || domain
-    let created: SubscribedFeedRecord
+    const now = this.#clock.now()
+    const provenAt = now.toISOString()
+    let feedId: number
     try {
-      created = this.#db.transaction((tx) => {
-        const inserted = tx
-          .insert(feeds)
+      feedId = this.#db.transaction((tx) => {
+        const feedId =
+          owner?.feedId ??
+          Number(
+            tx
+              .insert(feeds)
+              .values({ enteredUrl, ...feedColumnsOf(parsed, retrieved.url), createdAt: provenAt, updatedAt: provenAt })
+              .run().lastInsertRowid,
+          )
+        tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).onConflictDoNothing().run()
+        tx.insert(subscriptions)
           .values({
-            enteredUrl,
-            resolvedUrl: requestedUrl,
-            title,
-            domain,
-            createdAt: now,
-            updatedAt: now,
+            feedId,
+            pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES,
+            createdAt: provenAt,
+            ...availabilityAfterSuccess({ feedId, pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES }, now),
           })
           .run()
-        const feedId = Number(inserted.lastInsertRowid)
-
-        tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).run()
-        tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
-        return {
+        persistFeedWindow(tx, {
           feedId,
-          title,
-          description: null,
-          domain,
-          homePageUrl: null,
-          enteredUrl,
-          resolvedUrl: requestedUrl,
-          lastPolledAt: null,
-          lastSuccessAt: null,
-          consecutiveFailures: 0,
-          lastFailureCategory: null,
-        }
+          parsed,
+          resolvedUrl: retrieved.url,
+          validators: { etag: retrieved.etag ?? null, lastModified: retrieved.lastModified ?? null },
+          now: provenAt,
+        })
+        return feedId
       })
     } catch (error) {
-      const raced = this.#feedByCanonicalUrl(requestedUrl)
-      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
+      // A concurrent subscribe of the same Feed committed first; its row answers.
+      const raced = this.#aliasOwner(retrieved.url, requestedUrl)
+      if (raced?.subscribed) return { kind: 'duplicate', subscription: this.#subscribed(raced.feedId) }
       throw error
     }
 
+    const observedItems = observedItemCount(parsed)
     this.#logger.info('subscriptions.subscription_created', {
-      feedId: created.feedId,
+      feedId,
       enteredUrl: loggableUrl(enteredUrl),
+      resolvedUrl: loggableUrl(retrieved.url),
+      revived: owner !== undefined,
+      observedItems,
     })
-    return { kind: 'created', subscription: this.#withCadence(created) }
+    return { kind: 'subscribed', subscription: this.#subscribed(feedId), observedItems }
   }
 
   /**
-   * Revives a retained Feed under the same row — so Library items keep the
-   * identity they were saved from — with a fresh default schedule.
+   * The OPML Import path (ADR 0009): records the Subscription without
+   * contacting the Feed — unchecked and immediately due, so the scheduler makes
+   * the first retrieval. The offered title and the host stand in for what the
+   * document will say. A dormant Feed is revived under its own row.
    */
-  #resubscribe(feed: FeedRecord, now: string): CreateSubscriptionOutcome {
+  record(enteredUrl: string, offeredTitle?: string | null): RecordSubscriptionOutcome {
+    const requestedUrl = canonicalFeedUrl(enteredUrl)
+    if (!requestedUrl) return { kind: 'invalid-url' }
+
+    const owner = this.#aliasOwner(requestedUrl)
+    if (owner?.subscribed) return { kind: 'duplicate' }
+
+    const now = this.#clock.now().toISOString()
+    const domain = new URL(requestedUrl).hostname
+    let feedId: number
     try {
-      this.#db.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
+      feedId = this.#db.transaction((tx) => {
+        const feedId =
+          owner?.feedId ??
+          Number(
+            tx
+              .insert(feeds)
+              .values({
+                enteredUrl,
+                resolvedUrl: requestedUrl,
+                title: offeredTitle?.trim() || domain,
+                domain,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .run().lastInsertRowid,
+          )
+        tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).onConflictDoNothing().run()
+        tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
+        return feedId
+      })
     } catch (error) {
-      const raced = this.#feedByCanonicalUrl(feed.resolvedUrl) ?? this.#feedByCanonicalUrl(feed.enteredUrl)
-      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
+      if (this.#aliasOwner(requestedUrl)?.subscribed) return { kind: 'duplicate' }
       throw error
     }
 
     this.#logger.info('subscriptions.subscription_created', {
-      feedId: feed.feedId,
-      enteredUrl: loggableUrl(feed.enteredUrl),
-      revived: true,
+      feedId,
+      enteredUrl: loggableUrl(enteredUrl),
+      revived: owner !== undefined,
+      imported: true,
     })
-    return {
-      kind: 'created',
-      subscription: this.#withCadence({
-        ...feed,
-        lastPolledAt: null,
-        lastSuccessAt: null,
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-      }),
-    }
+    return { kind: 'recorded' }
   }
 
   importOpml(opml: string): ImportOpmlOutcome {
@@ -211,8 +254,8 @@ export class SubscriptionService {
     let alreadySubscribed = 0
     const unusable: string[] = []
     for (const outline of outlines) {
-      const outcome = this.create(outline.url, outline.title)
-      if (outcome.kind === 'created') added += 1
+      const outcome = this.record(outline.url, outline.title)
+      if (outcome.kind === 'recorded') added += 1
       else if (outcome.kind === 'duplicate') alreadySubscribed += 1
       else unusable.push(outline.url)
     }
@@ -231,9 +274,12 @@ export class SubscriptionService {
   }
 
   /**
-   * Folds a duplicate Subscription into the Feed its retrieval revealed (ADR 0007).
-   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor:
-   * the poll discovers the duplicate, but the Subscription writes belong here.
+   * Folds a duplicate Subscription into the Feed its retrieval revealed. Only a
+   * Feed recorded by OPML Import can reach its first retrieval without knowing
+   * where it resolves (ADR 0009); a subscribe settles that before it writes.
+   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the
+   * survivor: the poll discovers the duplicate, but the Subscription writes
+   * belong here.
    */
   mergeInto(duplicate: PolledFeed, existingFeedId: number): void {
     const now = this.#clock.now().toISOString()
@@ -444,30 +490,35 @@ export class SubscriptionService {
       .all()
   }
 
-  #withCadence(feed: SubscribedFeedRecord): SubscriptionSummary {
-    return summaryOf(feed, this.#cadenceByFeed())
-  }
-
-  #feedByCanonicalUrl(url: string): SubscribedFeedRecord | undefined {
-    return this.#db
+  /** The summary of a Feed that is subscribed; a caller names a `feedId` it just read or wrote. */
+  #subscribed(feedId: number): SubscriptionSummary {
+    const record = this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)
-      .from(feedUrlAliases)
-      .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
+      .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .where(eq(feedUrlAliases.url, url))
+      .where(eq(feeds.id, feedId))
       .limit(1)
       .all()[0]
+    if (!record) throw new Error(`Feed ${feedId} is not subscribed`)
+    return summaryOf(record, this.#cadenceByFeed())
   }
 
-  #dormantFeedByUrl(url: string): FeedRecord | undefined {
-    return this.#db
-      .select(FEED_RECORD_COLUMNS)
-      .from(feedUrlAliases)
-      .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
-      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .where(and(eq(feedUrlAliases.url, url), isNull(subscriptions.feedId)))
-      .limit(1)
-      .all()[0]
+  /**
+   * The Feed owning the first of `urls` any Feed owns — subscribed, or retained
+   * for Library attribution; undefined when none is owned.
+   */
+  #aliasOwner(...urls: readonly string[]): { readonly feedId: number; readonly subscribed: boolean } | undefined {
+    for (const url of urls) {
+      const row = this.#db
+        .select({ feedId: feedUrlAliases.feedId, subscribedFeedId: subscriptions.feedId })
+        .from(feedUrlAliases)
+        .leftJoin(subscriptions, eq(subscriptions.feedId, feedUrlAliases.feedId))
+        .where(eq(feedUrlAliases.url, url))
+        .limit(1)
+        .all()[0]
+      if (row) return { feedId: row.feedId, subscribed: row.subscribedFeedId !== null }
+    }
+    return undefined
   }
 
   #cadenceByFeed(): Map<number, number[]> {
@@ -496,7 +547,7 @@ export class SubscriptionService {
   }
 }
 
-/** Shared by first subscription and revival: due immediately — the first retrieval is scheduler work (ADR 0007). */
+/** An imported Subscription is due immediately: its first retrieval is scheduler work. */
 function newSubscription(feedId: number, now: string) {
   return {
     feedId,
@@ -518,6 +569,15 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
     cadence: cadence.get(record.feedId) ?? emptyCadence(),
     availability: availabilityOf(record),
   }
+}
+
+/** The address answered with a page — what the discovery operation reads and a subscribe refuses. */
+function answeredWithPage(proof: FailedPoll): boolean {
+  return (
+    proof.kind === 'retrieval-failed' &&
+    proof.failure.code === 'unsupported_content_type' &&
+    RETRIEVAL_PROFILES.discovery.accept.includes(proof.failure.contentType ?? '')
+  )
 }
 
 function canonicalFeedUrl(value: string): string | undefined {

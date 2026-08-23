@@ -66,9 +66,8 @@ function retrievalAnswers(subject: RetrievalSubject): Readonly<Record<RetrievalF
   }
 }
 
-export const FEED_ANSWERS = retrievalAnswers({
+const FEED_SUBJECT = {
   noun: 'The Feed',
-  profile: RETRIEVAL_PROFILES.feed,
   unsafeDestination: {
     status: 400,
     code: 'invalid_feed_url',
@@ -80,7 +79,13 @@ export const FEED_ANSWERS = retrievalAnswers({
   tooLargeCode: 'too_large',
   timeoutCode: 'timeout',
   bodyTimeoutCode: 'timeout',
-})
+} satisfies Omit<RetrievalSubject, 'profile'>
+
+/** A Feed polled or refreshed: the `feed` profile's split deadline. */
+export const FEED_ANSWERS = retrievalAnswers({ ...FEED_SUBJECT, profile: RETRIEVAL_PROFILES.feed })
+
+/** A Feed proven inside a subscribe: the same words under the `preview` profile's one deadline. */
+export const PREVIEW_ANSWERS = retrievalAnswers({ ...FEED_SUBJECT, profile: RETRIEVAL_PROFILES.preview })
 
 export const INVALID_FEED_ANSWERS: Readonly<Record<FeedDocumentFailureCode, FailureAnswer>> = {
   malformed_feed: { status: 422, code: 'invalid_feed', message: 'The Feed returned malformed XML' },
