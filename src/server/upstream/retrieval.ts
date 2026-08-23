@@ -45,7 +45,8 @@ export interface RetrievalProfile {
 }
 
 const FEED_CONTENT_TYPES = ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml']
-const PAGE_CONTENT_TYPES = ['text/html', 'application/xhtml+xml']
+/** What the discovery operation accepts, and what a Feed operation names when it was answered with a page instead. */
+export const PAGE_CONTENT_TYPES = ['text/html', 'application/xhtml+xml']
 
 export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
   feed: {

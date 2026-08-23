@@ -95,9 +95,7 @@ export class FeedPoll {
     if (proof.kind !== 'proven') return proof
     const { retrieved, parsed } = proof
 
-    // Two entered URLs can hide one Feed. Only a Feed recorded by OPML Import
-    // reaches its first retrieval without knowing where it resolves; the later
-    // Subscription folds into the existing Feed (ADR 0009).
+    // Two entered URLs can hide one Feed; the later Subscription folds into the existing Feed (ADR 0009).
     const existingFeedId = this.#aliasOwner(retrieved.url)
     if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
       this.#subscriptions.mergeInto(feed, existingFeedId)

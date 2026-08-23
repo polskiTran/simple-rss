@@ -407,7 +407,7 @@ describe('congestion at the retrieval boundary', () => {
     })
 
     try {
-      expect(subscriptions.record(url).kind).toBe('recorded')
+      expect(subscriptions.recordImported(url).kind).toBe('recorded')
       await poll.ingest(1)
 
       clock.advance(60_000)

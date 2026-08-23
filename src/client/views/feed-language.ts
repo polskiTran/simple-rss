@@ -38,7 +38,6 @@ export function subscriptionFailure(error: unknown): string {
   return isFailureCode(error.code) ? FAILURE_COPY[error.code] : 'that feed could not be added'
 }
 
-/** What a subscribe that proved its Feed says: the size of the Feed Window the request wrote. */
 export function subscribedNotice(observedItems: number): string {
   return observedItems === 1 ? 'subscribed — 1 item in the digest' : `subscribed — ${observedItems} items in the digest`
 }

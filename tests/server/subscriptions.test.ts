@@ -105,7 +105,6 @@ describe('Subscriptions', () => {
       nextCursor: null,
     })
 
-    // Nothing is due: the request was the first retrieval, so a wake — nudged or not — retrieves nothing.
     await service.wakeScheduler()
     expect(service.upstream.requests.map((request) => request.url)).toEqual([ENTERED_URL, RESOLVED_URL])
     expect(service.logs).not.toContainEqual(expect.objectContaining({ message: 'scheduler.feed_polled' }))
@@ -175,7 +174,6 @@ describe('Subscriptions', () => {
       { headers: { 'content-type': 'text/html; charset=utf-8' }, body: '<html><body>a page</body></html>' },
     ],
   ] as const)('answers %s as %i and leaves no row', async (code, status, response) => {
-    // The preview deadline is tightened so the slow publisher times out in test time.
     const service = await startTestService({
       retrieval: (boundary) => ({
         retrieve: (request) => boundary.retrieve(request),

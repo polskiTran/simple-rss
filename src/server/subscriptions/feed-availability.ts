@@ -112,11 +112,6 @@ export class FeedAvailability {
   }
 }
 
-/**
- * What a successful retrieval leaves on the row: the failure run cleared and the
- * next poll one Polling Interval out. A Subscription proven inside its own
- * request is inserted with these values rather than due-now then updated.
- */
 export function availabilityAfterSuccess(feed: Pick<PolledFeed, 'feedId' | 'pollingIntervalMinutes'>, now: Date) {
   return {
     nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),

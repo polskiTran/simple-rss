@@ -81,10 +81,8 @@ const FEED_SUBJECT = {
   bodyTimeoutCode: 'timeout',
 } satisfies Omit<RetrievalSubject, 'profile'>
 
-/** A Feed polled or refreshed: the `feed` profile's split deadline. */
 export const FEED_ANSWERS = retrievalAnswers({ ...FEED_SUBJECT, profile: RETRIEVAL_PROFILES.feed })
 
-/** A Feed proven inside a subscribe: the same words under the `preview` profile's one deadline. */
 export const PREVIEW_ANSWERS = retrievalAnswers({ ...FEED_SUBJECT, profile: RETRIEVAL_PROFILES.preview })
 
 export const INVALID_FEED_ANSWERS: Readonly<Record<FeedDocumentFailureCode, FailureAnswer>> = {

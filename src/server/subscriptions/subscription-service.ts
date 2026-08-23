@@ -26,7 +26,7 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
-import { RETRIEVAL_PROFILES, type Retrieval } from '../upstream/retrieval.js'
+import { PAGE_CONTENT_TYPES, type Retrieval } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import {
   availabilityAfterSuccess,
@@ -44,7 +44,6 @@ export type SubscribeOutcome =
   | { readonly kind: 'subscribed'; readonly subscription: SubscriptionSummary; readonly observedItems: number }
   | { readonly kind: 'duplicate'; readonly subscription: SubscriptionSummary }
   | { readonly kind: 'invalid-url' }
-  /** The address answered with a page, not a Feed. Subscribe does not discover; the preview does. */
   | { readonly kind: 'no-feed-found' }
   | FailedPoll
 
@@ -118,18 +117,7 @@ export class SubscriptionService {
     this.#logger = options.logger.child({ component: 'subscriptions' })
   }
 
-  /**
-   * Proves the Feed inside the request (ADR 0009): retrieves and parses the
-   * URL under the `preview` operation, then writes the Feed, the Subscription,
-   * and the Feed Window in one transaction, so the row is `available` — with
-   * the values a successful poll writes — before the request answers. A URL
-   * that does not prove to be a Feed writes nothing.
-   *
-   * Duplicates are settled by one rule, after the proof and before any write:
-   * the alias owner of the resolved URL, else of the typed URL, is the Feed.
-   * Subscribed, it is a duplicate; dormant, it is revived under its own row so
-   * Library attribution keeps its identity; absent, a Feed is created.
-   */
+  /** Proves the Feed inside the request (ADR 0009). */
   async subscribe(enteredUrl: string): Promise<SubscribeOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
@@ -173,7 +161,6 @@ export class SubscriptionService {
         return feedId
       })
     } catch (error) {
-      // A concurrent subscribe of the same Feed committed first; its row answers.
       const raced = this.#aliasOwner(retrieved.url, requestedUrl)
       if (raced?.subscribed) return { kind: 'duplicate', subscription: this.#subscribed(raced.feedId) }
       throw error
@@ -190,13 +177,8 @@ export class SubscriptionService {
     return { kind: 'subscribed', subscription: this.#subscribed(feedId), observedItems }
   }
 
-  /**
-   * The OPML Import path (ADR 0009): records the Subscription without
-   * contacting the Feed — unchecked and immediately due, so the scheduler makes
-   * the first retrieval. The offered title and the host stand in for what the
-   * document will say. A dormant Feed is revived under its own row.
-   */
-  record(enteredUrl: string, offeredTitle?: string | null): RecordSubscriptionOutcome {
+  /** Records without contacting the Feed (ADR 0009). */
+  recordImported(enteredUrl: string, offeredTitle?: string | null): RecordSubscriptionOutcome {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
 
@@ -254,7 +236,7 @@ export class SubscriptionService {
     let alreadySubscribed = 0
     const unusable: string[] = []
     for (const outline of outlines) {
-      const outcome = this.record(outline.url, outline.title)
+      const outcome = this.recordImported(outline.url, outline.title)
       if (outcome.kind === 'recorded') added += 1
       else if (outcome.kind === 'duplicate') alreadySubscribed += 1
       else unusable.push(outline.url)
@@ -274,9 +256,7 @@ export class SubscriptionService {
   }
 
   /**
-   * Folds a duplicate Subscription into the Feed its retrieval revealed. Only a
-   * Feed recorded by OPML Import can reach its first retrieval without knowing
-   * where it resolves (ADR 0009); a subscribe settles that before it writes.
+   * Folds a duplicate Subscription into the Feed its retrieval revealed (ADR 0009).
    * Called by `FeedPoll`, which then writes the retrieved Feed Window to the
    * survivor: the poll discovers the duplicate, but the Subscription writes
    * belong here.
@@ -490,7 +470,6 @@ export class SubscriptionService {
       .all()
   }
 
-  /** The summary of a Feed that is subscribed; a caller names a `feedId` it just read or wrote. */
   #subscribed(feedId: number): SubscriptionSummary {
     const record = this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)
@@ -503,10 +482,6 @@ export class SubscriptionService {
     return summaryOf(record, this.#cadenceByFeed())
   }
 
-  /**
-   * The Feed owning the first of `urls` any Feed owns — subscribed, or retained
-   * for Library attribution; undefined when none is owned.
-   */
   #aliasOwner(...urls: readonly string[]): { readonly feedId: number; readonly subscribed: boolean } | undefined {
     for (const url of urls) {
       const row = this.#db
@@ -547,7 +522,6 @@ export class SubscriptionService {
   }
 }
 
-/** An imported Subscription is due immediately: its first retrieval is scheduler work. */
 function newSubscription(feedId: number, now: string) {
   return {
     feedId,
@@ -571,12 +545,11 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
   }
 }
 
-/** The address answered with a page — what the discovery operation reads and a subscribe refuses. */
 function answeredWithPage(proof: FailedPoll): boolean {
   return (
     proof.kind === 'retrieval-failed' &&
     proof.failure.code === 'unsupported_content_type' &&
-    RETRIEVAL_PROFILES.discovery.accept.includes(proof.failure.contentType ?? '')
+    PAGE_CONTENT_TYPES.includes(proof.failure.contentType ?? '')
   )
 }
 

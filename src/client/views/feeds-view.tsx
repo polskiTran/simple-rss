@@ -80,7 +80,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     setSubscribing(true)
     setNotice('subscribing…')
     try {
-      // The request is the proof: the row answers already available, its items in the Digest.
       const { subscription, observedItems } = await subscribeToFeed(url)
       setState((current) => {
         if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions: [subscription] }

@@ -28,7 +28,7 @@ export interface FeedRouteDependencies {
   readonly subscriptions: SubscriptionService
   readonly refresh: FeedRefresh
   readonly digest: DigestService
-  /** Asks the scheduler to look at the due frontier now rather than next wake; only an OPML Import needs it. */
+  /** Asks the scheduler to look at the due frontier now rather than next wake. */
   readonly nudgeScheduler: () => void
 }
 
@@ -136,7 +136,6 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   return app
 }
 
-/** The status table of the proof: the failure's Feed Availability category is the code, a page is `no_feed_found`. */
 function subscribeFailure(c: Context, outcome: Exclude<SubscribeOutcome, { kind: 'subscribed' }>) {
   switch (outcome.kind) {
     case 'invalid-url':

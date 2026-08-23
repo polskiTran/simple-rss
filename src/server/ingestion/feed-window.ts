@@ -53,7 +53,6 @@ export function persistFeedWindow(
   })
 }
 
-/** What a retrieved document says about its Feed, as the `feeds` row holds it; the domain is the home page's when declared. */
 export function feedColumnsOf(parsed: ParsedFeedDocument, resolvedUrl: string) {
   return {
     title: parsed.title,
@@ -64,7 +63,6 @@ export function feedColumnsOf(parsed: ParsedFeedDocument, resolvedUrl: string) {
   }
 }
 
-/** How many distinct Feed Items the window holds — what a subscribe or refresh reports back. */
 export function observedItemCount(parsed: ParsedFeedDocument): number {
   return new Set(parsed.items.map((item) => item.dedupeKey)).size
 }
