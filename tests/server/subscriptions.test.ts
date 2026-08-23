@@ -313,7 +313,7 @@ describe('Subscriptions', () => {
       headers: { 'content-type': 'application/rss+xml' },
       body: RSS,
     })
-    service.database?.exec(`
+    service.database?.$client.exec(`
       CREATE TRIGGER reject_feed_item
       BEFORE INSERT ON feed_items
       BEGIN
@@ -326,7 +326,7 @@ describe('Subscriptions', () => {
     await service.wakeScheduler()
 
     expect(await (await user.get('/api/digest')).json()).toMatchObject({ today: { volume: 0 } })
-    service.database?.exec('DROP TRIGGER reject_feed_item')
+    service.database?.$client.exec('DROP TRIGGER reject_feed_item')
     service.clock.advance(60_000)
     await service.wakeScheduler()
 
@@ -349,7 +349,7 @@ describe('Subscriptions', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     await service.wakeScheduler()
-    service.database?.exec(`
+    service.database?.$client.exec(`
       INSERT INTO library_items (feed_item_id, saved_at)
       SELECT id, '2026-08-08T09:30:00.000Z' FROM feed_items;
     `)
@@ -382,7 +382,9 @@ describe('Subscriptions', () => {
       'fingerprint',
     ])
     expect(digest.groups[0].items[2]).toMatchObject({ title: 'fingerprint', summary: 'corrected body' })
-    const persisted = service.database?.prepare('SELECT first_seen_at FROM feed_items ORDER BY id').all() as Array<{
+    const persisted = service.database?.$client
+      .prepare('SELECT first_seen_at FROM feed_items ORDER BY id')
+      .all() as Array<{
       first_seen_at: string
     }>
     expect(persisted.map((item) => item.first_seen_at)).toEqual([
@@ -390,7 +392,7 @@ describe('Subscriptions', () => {
       '2026-08-08T09:00:00.000Z',
       '2026-08-08T09:00:00.000Z',
     ])
-    expect(service.database?.prepare('SELECT count(*) AS count FROM library_items').get()).toEqual({ count: 3 })
+    expect(service.database?.$client.prepare('SELECT count(*) AS count FROM library_items').get()).toEqual({ count: 3 })
   })
 
   it('accepts Atom and normalizes its accepted content shape', async () => {

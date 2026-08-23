@@ -10,7 +10,7 @@ import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, type Logger } from './logger.js'
-import { openDatabase, type SqliteDatabase } from './persistence/database.js'
+import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderService } from './reader/reader-service.js'
@@ -43,7 +43,7 @@ export interface Service {
   /** The single outbound HTTP boundary (ADR 0005), shared by every retrieval. */
   readonly retrieval: Retrieval
   /** Undefined only when startup failed to open the database. */
-  readonly database: SqliteDatabase | undefined
+  readonly database: DrizzleDatabase | undefined
   readonly settings: InstallationSettingsStore | undefined
   /** The in-process background poller; absent only when startup failed. */
   readonly scheduler: PollScheduler | undefined
@@ -71,39 +71,39 @@ export function createService(options: ServiceOptions): Service {
   let services: Services | undefined
 
   try {
-    const database = openDatabase(config.databasePath)
-    const applied = applyMigrations(database, clock)
-    const settings = new InstallationSettingsStore(database)
+    const db = openDatabase(config.databasePath)
+    const applied = applyMigrations(db, clock)
+    const settings = new InstallationSettingsStore(db)
     const authentication = createAuthentication({
-      database,
+      db,
       clock,
       logger,
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    const availability = new FeedAvailabilityLedger({ database, clock, logger })
-    const subscriptions = new SubscriptionService({ database, clock, settings, logger })
-    const poll = new FeedPoll({ database, retrieval, clock, logger, subscriptions, availability })
+    const availability = new FeedAvailabilityLedger({ db, clock, logger })
+    const subscriptions = new SubscriptionService({ db, clock, settings, logger })
+    const poll = new FeedPoll({ db, retrieval, clock, logger, subscriptions, availability })
     const refresh = new FeedRefresh({ clock, poll })
 
-    const digest = new DigestService({ database, clock, settings })
-    const library = new LibraryService({ database, clock, settings })
+    const digest = new DigestService({ db, clock, settings })
+    const library = new LibraryService({ db, clock, settings })
     const imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
-    const images = new ImageService({ database, retrieval })
+    const images = new ImageService({ db, retrieval })
     const reader = new ReaderService({
-      database,
+      db,
       clock,
       settings,
       retrieval,
       digest,
       signImageUrl: imageSignature.sign,
     })
-    const search = new SearchService({ database, clock, settings })
-    const retention = new RetentionService({ database, clock, logger, ...options.retention })
+    const search = new SearchService({ db, clock, settings })
+    const retention = new RetentionService({ db, clock, logger, ...options.retention })
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
 
     services = {
-      database,
+      db,
       authentication,
       settings,
       subscriptions,
@@ -138,7 +138,7 @@ export function createService(options: ServiceOptions): Service {
     readiness,
     retrieval,
     get database() {
-      return services?.database
+      return services?.db
     },
     get settings() {
       return services?.settings
@@ -149,7 +149,7 @@ export function createService(options: ServiceOptions): Service {
     close() {
       scheduler?.stop()
       scheduler = undefined
-      services?.database.close()
+      services?.db.$client.close()
       services = undefined
     },
   }

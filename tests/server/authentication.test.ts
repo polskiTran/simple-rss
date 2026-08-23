@@ -9,11 +9,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const MINUTE_MS = 60 * 1000
 
 function storedSessions(service: TestService): Array<{ token_hash: string }> {
-  return service.database!.prepare('SELECT token_hash FROM sessions').all() as Array<{ token_hash: string }>
+  return service.database!.$client.prepare('SELECT token_hash FROM sessions').all() as Array<{ token_hash: string }>
 }
 
 function storedVerifier(service: TestService): string | undefined {
-  const rows = service.database!.prepare('SELECT password_hash FROM user_auth').all() as Array<{
+  const rows = service.database!.$client.prepare('SELECT password_hash FROM user_auth').all() as Array<{
     password_hash: string
   }>
   return rows.length === 1 ? rows[0]?.password_hash : undefined

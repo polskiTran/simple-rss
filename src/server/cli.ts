@@ -4,7 +4,7 @@ import { createAuthentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
 import { createLogger, type Logger } from './logger.js'
-import { openDatabase, type SqliteDatabase } from './persistence/database.js'
+import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations, appliedVersions } from './persistence/migrations.js'
 import { restoreSnapshot, writeSnapshot } from './persistence/snapshot.js'
@@ -92,7 +92,7 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       }
     }
   } finally {
-    db.close()
+    db.$client.close()
   }
 }
 
@@ -136,7 +136,7 @@ function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function resetPassword(db: SqliteDatabase, argument: string | undefined, context: CliContext): Promise<number> {
+async function resetPassword(db: DrizzleDatabase, argument: string | undefined, context: CliContext): Promise<number> {
   const password = argument ?? context.env?.[NEW_PASSWORD_VARIABLE]
 
   if (!password) {
@@ -154,7 +154,7 @@ async function resetPassword(db: SqliteDatabase, argument: string | undefined, c
   applyMigrations(db, context.clock)
 
   const authentication = createAuthentication({
-    database: db,
+    db,
     clock: context.clock,
     // Audit output goes to stderr: stdout is this command's result channel,
     // and a log line interleaved with the JSON report would break piping to `jq`.

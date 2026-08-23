@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { USER_EXPORT_FORMAT, USER_EXPORT_VERSION } from '../../src/server/export/user-export.js'
-import { migrations } from '../../src/server/persistence/migrations.js'
+import { USER_EXPORT_FORMAT, USER_EXPORT_VERSION, userExportSchema } from '../../src/shared/api.js'
 import { VERSION } from '../../src/shared/version.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
@@ -49,10 +48,9 @@ describe('the JSON export', () => {
     expect(exported.headers.get('content-disposition')).toBe('attachment; filename="simple-rss-export.json"')
     expect(exported.headers.get('cache-control')).toBe('no-store')
 
-    const document = await exported.json()
+    const document = userExportSchema.parse(await exported.json())
     expect(document.format).toBe(USER_EXPORT_FORMAT)
     expect(document.exportVersion).toBe(USER_EXPORT_VERSION)
-    expect(document.schemaVersion).toBe(migrations[migrations.length - 1]!.version)
     expect(document.applicationVersion).toBe(VERSION)
   })
 
@@ -72,13 +70,14 @@ describe('the JSON export', () => {
     const detail = await (await user.get(`/api/feeds/${fieldNotes.feedId}`)).json()
     expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
 
-    const document = await (await user.get('/api/export')).json()
+    const document = userExportSchema.parse(await (await user.get('/api/export')).json())
 
     expect(document.installation).toEqual({ timezone: 'Europe/Berlin' })
     expect(document.exportedAt).toBe(service.clock.now().toISOString())
 
     expect(document.feeds).toHaveLength(2)
     const exportedRss = document.feeds.find((feed: { title: string }) => feed.title === 'Field Notes')
+    if (!exportedRss) throw new Error('the RSS Feed was absent from the export')
     expect(exportedRss).toMatchObject({
       enteredUrl: RSS_URL,
       resolvedUrl: RSS_URL,
@@ -101,13 +100,16 @@ describe('the JSON export', () => {
     ])
 
     const exportedAtom = document.feeds.find((feed: { title: string }) => feed.title === 'Atom Letters')
+    if (!exportedAtom) throw new Error('the Atom Feed was absent from the export')
     expect(exportedAtom.subscription).toEqual({
       pollingIntervalMinutes: 120,
       customTitle: null,
       customDescription: null,
       createdAt: expect.any(String),
     })
-    expect(exportedAtom.items[0].savedAt).toBeNull()
+    const firstAtomItem = exportedAtom.items[0]
+    if (!firstAtomItem) throw new Error('the Atom Feed Item was absent from the export')
+    expect(firstAtomItem.savedAt).toBeNull()
   })
 
   it('carries the Feed Description and both overrides faithfully, under the bumped version', async () => {
@@ -129,7 +131,7 @@ describe('the JSON export', () => {
 
     const document = await (await user.get('/api/export')).json()
 
-    expect(document.exportVersion).toBe(2)
+    expect(document.exportVersion).toBe(3)
     expect(document.feeds[0]).toMatchObject({
       title: 'Field Notes',
       description: 'From the field',
@@ -175,7 +177,6 @@ describe('the JSON export', () => {
       'feeds',
       'format',
       'installation',
-      'schemaVersion',
     ])
     expect(Object.keys(document.feeds[0]).sort()).toEqual([
       'createdAt',
@@ -189,10 +190,10 @@ describe('the JSON export', () => {
       'title',
     ])
 
-    const storedHash = service.database?.prepare('SELECT password_hash FROM user_auth').get() as {
+    const storedHash = service.database?.$client.prepare('SELECT password_hash FROM user_auth').get() as {
       password_hash: string
     }
-    const storedSession = service.database?.prepare('SELECT token_hash FROM sessions').get() as {
+    const storedSession = service.database?.$client.prepare('SELECT token_hash FROM sessions').get() as {
       token_hash: string
     }
     expect(text).not.toContain(storedHash.password_hash)

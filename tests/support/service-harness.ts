@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { afterEach } from 'vitest'
 import { DATABASE_FILE, loadConfig, type Config } from '../../src/server/config.js'
 import { createLogger, type LogRecord } from '../../src/server/logger.js'
-import type { SqliteDatabase } from '../../src/server/persistence/database.js'
+import type { DrizzleDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import type { RetentionLimits } from '../../src/server/retention/retention-service.js'
 import { startService, type RunningService } from '../../src/server/server.js'
@@ -40,7 +40,7 @@ export interface TestService {
   /** The service's own hardened boundary, wired from its configuration. */
   readonly retrieval: Retrieval
   readonly settings: InstallationSettingsStore | undefined
-  readonly database: SqliteDatabase | undefined
+  readonly database: DrizzleDatabase | undefined
   readonly logs: readonly LogRecord[]
   /**
    * Every progressive login delay the service asked for, in order. Nothing

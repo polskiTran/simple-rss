@@ -1,6 +1,5 @@
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { and, eq, sql } from 'drizzle-orm'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { userAuth, sessions } from '../persistence/schema.js'
 
 const SINGLETON_ID = 1
@@ -19,10 +18,10 @@ export type VerifierChangeOutcome =
   | { readonly kind: 'stale-verifier' }
 
 export class UserAuthStore {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
 
-  constructor(db: SqliteDatabase) {
-    this.#db = drizzle(db)
+  constructor(db: DrizzleDatabase) {
+    this.#db = db
   }
 
   read(): UserAuthRecord | undefined {

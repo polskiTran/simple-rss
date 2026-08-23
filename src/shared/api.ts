@@ -317,6 +317,57 @@ export const librarySchema = z.object({
 })
 export type Library = z.infer<typeof librarySchema>
 
+export const USER_EXPORT_FORMAT = 'simple-rss-export'
+
+/** Version 3 dropped migration bookkeeping; the document version names only its own shape. */
+export const USER_EXPORT_VERSION = 3
+
+export const userExportItemSchema = z.object({
+  dedupeKey: z.string(),
+  identityKind: z.enum(['guid', 'link', 'content']),
+  title: z.string().nullable(),
+  link: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  summary: z.string().nullable(),
+  firstSeenAt: z.string(),
+  lastObservedAt: z.string(),
+  savedAt: z.string().nullable(),
+})
+export type UserExportItem = z.infer<typeof userExportItemSchema>
+
+/** `subscription` is null for a Feed kept only because Library saves still attribute to it. */
+export const userExportFeedSchema = z.object({
+  enteredUrl: z.string(),
+  resolvedUrl: z.string(),
+  /** The reported title and Feed Description; the User's overrides live on `subscription`. */
+  title: z.string(),
+  description: z.string().nullable(),
+  domain: z.string(),
+  homePageUrl: z.string().nullable(),
+  createdAt: z.string(),
+  subscription: z
+    .object({
+      pollingIntervalMinutes: pollingIntervalMinutesSchema,
+      customTitle: z.string().nullable(),
+      customDescription: z.string().nullable(),
+      createdAt: z.string(),
+    })
+    .nullable(),
+  items: z.array(userExportItemSchema),
+})
+export type UserExportFeed = z.infer<typeof userExportFeedSchema>
+
+export const userExportSchema = z.object({
+  format: z.literal(USER_EXPORT_FORMAT),
+  exportVersion: z.literal(USER_EXPORT_VERSION),
+  applicationVersion: z.string(),
+  exportedAt: z.string(),
+  installation: installationPreferencesSchema,
+  feeds: z.array(userExportFeedSchema),
+})
+export type UserExport = z.infer<typeof userExportSchema>
+
 export const MAX_SEARCH_QUERY_LENGTH = 256
 
 export const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)

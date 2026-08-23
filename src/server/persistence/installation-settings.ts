@@ -1,6 +1,5 @@
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq, sql } from 'drizzle-orm'
-import type { SqliteDatabase } from './database.js'
+import type { DrizzleDatabase } from './database.js'
 import { installationSettings } from './schema.js'
 
 const SINGLETON_ID = 1
@@ -13,10 +12,10 @@ export interface InstallationSettings {
 }
 
 export class InstallationSettingsStore {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
 
-  constructor(db: SqliteDatabase) {
-    this.#db = drizzle(db)
+  constructor(db: DrizzleDatabase) {
+    this.#db = db
   }
 
   read(): InstallationSettings | undefined {
