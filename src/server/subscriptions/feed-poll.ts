@@ -11,7 +11,7 @@ import {
   availabilityCategoryOf,
   wasNeverAsked,
   type FailedPoll,
-  type FeedAvailability,
+  type FeedAvailabilityLedger,
   type PolledFeed,
 } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
@@ -44,7 +44,7 @@ export class FeedPoll {
   readonly #clock: Clock
   readonly #logger: Logger
   readonly #subscriptions: Pick<SubscriptionService, 'mergeInto'>
-  readonly #availability: FeedAvailability
+  readonly #availability: FeedAvailabilityLedger
 
   constructor(options: {
     database: SqliteDatabase
@@ -52,7 +52,7 @@ export class FeedPoll {
     clock: Clock
     logger: Logger
     subscriptions: Pick<SubscriptionService, 'mergeInto'>
-    availability: FeedAvailability
+    availability: FeedAvailabilityLedger
   }) {
     this.#db = drizzle(options.database)
     this.#retrieval = options.retrieval

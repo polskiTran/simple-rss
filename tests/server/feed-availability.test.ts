@@ -11,12 +11,7 @@ import {
   nextPollTime,
   nextRetryTime,
 } from '../../src/server/subscriptions/polling-schedule.js'
-// Aliased: the class writes the state, while the same-named shared type imported
-// above is what a read of it looks like, which the HTTP tests below assert on.
-import {
-  FeedAvailability as FeedAvailabilityWrites,
-  availabilityCategoryOf,
-} from '../../src/server/subscriptions/feed-availability.js'
+import { FeedAvailabilityLedger, availabilityCategoryOf } from '../../src/server/subscriptions/feed-availability.js'
 import { FeedPoll } from '../../src/server/subscriptions/feed-poll.js'
 import { SubscriptionService } from '../../src/server/subscriptions/subscription-service.js'
 import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../src/server/upstream/retrieval.js'
@@ -379,7 +374,7 @@ describe('congestion at the retrieval boundary', () => {
       clock,
       logger,
       subscriptions,
-      availability: new FeedAvailabilityWrites({ database, clock, logger }),
+      availability: new FeedAvailabilityLedger({ database, clock, logger }),
     })
 
     try {

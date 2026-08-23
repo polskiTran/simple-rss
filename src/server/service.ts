@@ -16,7 +16,7 @@ import { applyMigrations } from './persistence/migrations.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
-import { FeedAvailability } from './subscriptions/feed-availability.js'
+import { FeedAvailabilityLedger } from './subscriptions/feed-availability.js'
 import { FeedPoll } from './subscriptions/feed-poll.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
@@ -81,7 +81,7 @@ export function createService(options: ServiceOptions): Service {
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    const availability = new FeedAvailability({ database, clock, logger })
+    const availability = new FeedAvailabilityLedger({ database, clock, logger })
     const subscriptions = new SubscriptionService({ database, clock, settings, logger })
     const poll = new FeedPoll({ database, retrieval, clock, logger, subscriptions, availability })
     const refresh = new FeedRefresh({ clock, poll })
