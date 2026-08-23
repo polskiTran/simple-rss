@@ -22,7 +22,7 @@ export type IngestFeedOutcome =
   | { readonly kind: 'updated'; readonly observedItems: number }
   | { readonly kind: 'not-modified' }
   | { readonly kind: 'missing' }
-  /** The retrieval resolved onto a URL another Feed owns: the quiet merge (ADR 0009), which lives on the poll path. */
+  /** The retrieval resolved onto a URL another Feed owns, so this poll ends in the quiet merge (ADR 0009). */
   | { readonly kind: 'merged'; readonly intoFeedId: number }
   | FailedPoll
 
@@ -34,8 +34,8 @@ interface PollableFeed extends PolledFeed, FeedValidators {
 /**
  * One poll of one Feed, end to end: the conditional retrieval and parse
  * (`proveFeed`), the Feed Window write, and the single Feed Availability write
- * the outcome earns. A retrieval that reveals a duplicate is handed back for
- * the quiet merge (ADR 0009) to `SubscriptionService`, which owns every
+ * the outcome earns. A retrieval that reveals a duplicate goes back to
+ * `SubscriptionService` for the quiet merge (ADR 0009). That class owns every
  * Subscription write.
  */
 export class FeedPoll {
