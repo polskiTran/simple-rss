@@ -697,6 +697,54 @@
     margin: 20px 0 0;
   }
 
+  /* What the machine answers on its own clock enters on a breath (docs/DESIGN.md §5): the
+     preview's body fades in where the wait stood, opacity only. */
+  .preview-arrived {
+    animation: preview-arrive 150ms ease-out;
+  }
+
+  @keyframes preview-arrive {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .preview-caption {
+    margin: 20px 0 10px;
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--color-quiet);
+  }
+
+  .preview-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .preview-items li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .preview-item-title {
+    color: var(--color-ink);
+    text-wrap: pretty;
+  }
+
+  .preview-item-date {
+    flex: none;
+    font-size: 12.5px;
+    color: var(--color-quiet);
+  }
+
   .edit-details-form {
     display: flex;
     flex-direction: column;
@@ -1285,6 +1333,10 @@
   .overlay-backdrop[data-ending-style],
   .overlay-popup[data-ending-style] {
     transition-duration: 0s;
+  }
+
+  .preview-arrived {
+    animation-duration: 0s;
   }
 
   .wordmark-cell {

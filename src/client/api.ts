@@ -5,6 +5,7 @@ import {
   digestSchema,
   feedDetailSchema,
   feedDetailsUpdateSchema,
+  feedPreviewSchema,
   installationPreferencesSchema,
   libraryMembershipSchema,
   librarySchema,
@@ -21,6 +22,7 @@ import {
   type Digest,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedPreview,
   type InstallationPreferences,
   type Library,
   type LibraryMembership,
@@ -91,11 +93,12 @@ function read(path: string, signal: AbortSignal | undefined): Promise<Response> 
   return request(path, signal ? { signal } : {})
 }
 
-function post(path: string, body: unknown): Promise<Response> {
+function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   return request(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    ...(signal && { signal }),
   })
 }
 
@@ -129,6 +132,12 @@ export async function signOut(): Promise<void> {
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthStatus> {
   return status(await post('/api/auth/password', { currentPassword, newPassword }))
+}
+
+/** Asks what subscribing to `url` would get; nothing is recorded. Aborting `signal` cancels the retrieval. */
+export async function previewFeed(url: string, signal: AbortSignal): Promise<FeedPreview> {
+  const response = await post('/api/feeds/preview', { url }, signal)
+  return feedPreviewSchema.parse(await response.json())
 }
 
 export async function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {

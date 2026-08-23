@@ -5,6 +5,8 @@ export interface StubbedRequest {
   readonly method: string
   readonly path: string
   readonly body: unknown
+  /** The caller's signal, so a test can see a request it walked away from. */
+  readonly signal: AbortSignal | undefined
 }
 
 export type Reply = { readonly status?: number; readonly body?: unknown; readonly headers?: Record<string, string> }
@@ -48,7 +50,7 @@ export class StubbedApi {
         const path = String(input)
         const method = init.method ?? 'GET'
         const body = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
-        const request: StubbedRequest = { method, path, body }
+        const request: StubbedRequest = { method, path, body, signal: init.signal ?? undefined }
         this.#requests.push(request)
 
         const route = this.#routes.get(`${method} ${path}`)

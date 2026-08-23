@@ -76,50 +76,157 @@ function elapse(milliseconds: number): Promise<void> {
   })
 }
 
+const PREVIEW = {
+  url: FEED.enteredUrl,
+  title: 'Field Notes',
+  description: 'Notes from the field',
+  domain: 'journal.example',
+  homePageUrl: 'https://journal.example/',
+  items: [
+    {
+      title: 'First light',
+      link: 'https://journal.example/first-light',
+      publishedAt: '2026-08-08T07:15:00.000Z',
+      displayDate: 'today',
+    },
+    { title: 'Undated note', link: null, publishedAt: null, displayDate: 'undated' },
+  ],
+  declaredFeeds: [],
+  subscribed: null,
+}
+
+const FIELD = { name: /search or add feeds/i }
+
+async function submitUrl(url: string) {
+  const user = userEvent.setup()
+  await user.type(await screen.findByRole('textbox', FIELD), url)
+  await user.keyboard('{Enter}')
+  return user
+}
+
 describe('Feeds', () => {
-  it('shows the subscribed row and how many items the request put in the Digest', async () => {
-    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
-    api.on('POST /api/subscriptions', { status: 201, body: { subscription: FEED, observedItems: 1 } })
+  it('opens the preview in progress as soon as a URL is submitted, and stop abandons it', async () => {
+    const api = stubApi().on('POST /api/feeds/preview', () => new Promise(() => {}))
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    const user = await submitUrl(FEED.enteredUrl)
+
+    const dialog = await screen.findByRole('dialog', { name: 'previewing journal.example' })
+    expect(dialog.textContent).toContain('reading the feed — this can take a few seconds')
+    expect(api.requestsTo('POST /api/feeds/preview')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+
+    await user.click(screen.getByRole('button', { name: 'stop' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(api.requestsTo('POST /api/feeds/preview')[0]?.signal?.aborted).toBe(true)
+    expect(document.activeElement).toBe(screen.getByRole('textbox', FIELD))
+    expect(screen.getByRole('textbox', FIELD)).toHaveProperty('value', FEED.enteredUrl)
+  })
+
+  it('asks subscribe to <title>? with the host, the description, and the recent items', async () => {
+    const api = stubApi().on('POST /api/feeds/preview', { body: PREVIEW })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    await submitUrl(FEED.enteredUrl)
+
+    const dialog = await screen.findByRole('dialog', { name: 'subscribe to Field Notes?' })
+    expect(dialog.textContent).toContain('journal.example — Notes from the field')
+    expect(dialog.textContent).toContain('recent items')
+    expect(dialog.textContent).toContain('First light')
+    expect(dialog.textContent).toContain('today')
+    expect(dialog.textContent).toContain('Undated note')
+    expect(dialog.textContent).toContain('undated')
+    expect(screen.getByRole('button', { name: 'subscribe' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'cancel' })).toBeDefined()
+    expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
+  })
+
+  it('says the host alone when the Feed has no description', async () => {
+    stubApi().on('POST /api/feeds/preview', { body: { ...PREVIEW, description: null } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    await submitUrl(FEED.enteredUrl)
+
+    const dialog = await screen.findByRole('dialog', { name: 'subscribe to Field Notes?' })
+    expect(dialog.querySelector('.overlay-description')?.textContent).toBe('journal.example')
+  })
+
+  it('offers open feed instead of subscribe when the Feed is already subscribed', async () => {
+    const api = stubApi()
+      .on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+      .on('POST /api/feeds/preview', { body: { ...PREVIEW, subscribed: { feedId: 1 } } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    const user = await submitUrl(FEED.enteredUrl)
+
+    await screen.findByRole('dialog', { name: 'already subscribed to Field Notes' })
+    expect(screen.queryByRole('button', { name: 'subscribe' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'open feed' }))
+
+    expect(window.location.pathname).toBe('/feeds/1')
+    expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
+  })
+
+  it('closes on a failed preview, says why under the field, and puts the cursor back in it', async () => {
+    stubApi().on('POST /api/feeds/preview', {
+      status: 422,
+      body: { error: { code: 'no_feed_found', message: 'No Feed was found at that address' } },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    await submitUrl('https://journal.example/')
+
+    expect(await screen.findByText('no feed was found at that address')).toBeDefined()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('textbox', FIELD))
+    expect(screen.getByRole('textbox', FIELD)).toHaveProperty('value', 'https://journal.example/')
+    expect(screen.getByText('no subscriptions yet')).toBeDefined()
+  })
+
+  it('subscribes from the dialog: both words disable while it is in flight, then the row and the notice arrive', async () => {
+    let release: ((reply: Reply) => void) | undefined
+    const api = stubApi()
+      .on('POST /api/feeds/preview', { body: PREVIEW })
+      .on(
+        'POST /api/subscriptions',
+        () =>
+          new Promise<Reply>((resolve) => {
+            release = resolve
+          }),
+      )
     window.history.replaceState(null, '', '/feeds')
     const { container } = render(<App />)
-    const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    const user = await submitUrl(FEED.enteredUrl)
+    await user.click(await screen.findByRole('button', { name: 'subscribe' }))
+
+    const subscribing = screen.getByRole('button', { name: 'subscribing…' })
+    expect(subscribing.getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'cancel' }).getAttribute('aria-disabled')).toBe('true')
+    expect(document.activeElement).toBe(subscribing)
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeDefined()
+
+    release?.({ status: 201, body: { subscription: FEED, observedItems: 1 } })
 
     expect(await screen.findByText('subscribed — 1 item in the digest')).toBeDefined()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
-    expect(screen.getByRole('textbox', { name: /search or add feeds/i })).toHaveProperty('value', '')
-    expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+    expect(screen.getByRole('textbox', FIELD)).toHaveProperty('value', '')
+    expect(document.activeElement).toBe(screen.getByRole('textbox', FIELD))
+    expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: PREVIEW.url } }])
     expect(api.requestsTo('GET /api/feeds/1')).toHaveLength(0)
   })
 
   it('counts the items in the plural', () => {
     expect(subscribedNotice(12)).toBe('subscribed — 12 items in the digest')
     expect(subscribedNotice(0)).toBe('subscribed — 0 items in the digest')
-  })
-
-  it('says in one sentence why the address did not prove to be a Feed, and keeps it in the field', async () => {
-    stubApi()
-      .on('GET /api/feeds', { body: { subscriptions: [] } })
-      .on('POST /api/subscriptions', {
-        status: 422,
-        body: { error: { code: 'no_feed_found', message: 'No Feed was found at that address' } },
-      })
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), 'https://journal.example/')
-    await user.keyboard('{Enter}')
-
-    expect(await screen.findByText('no feed was found at that address')).toBeDefined()
-    expect(screen.getByRole('textbox', { name: /search or add feeds/i })).toHaveProperty(
-      'value',
-      'https://journal.example/',
-    )
-    expect(screen.getByText('no subscriptions yet')).toBeDefined()
   })
 
   it('links the domain to the Feed’s home page, and leaves it plain text without one', async () => {
@@ -138,7 +245,7 @@ describe('Feeds', () => {
     expect(api.requestsTo('GET /api/feeds')).toHaveLength(1)
   })
 
-  it('treats a line that is not a URL as a search, never as something to submit', async () => {
+  it('treats a line that is not a URL as a search, never as something to preview', async () => {
     const api = stubApi().on('GET /api/feeds', {
       body: { subscriptions: [FEED, { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example' }] },
     })
@@ -147,13 +254,13 @@ describe('Feeds', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText('Other Wire')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'field{Enter}')
+    await user.type(screen.getByRole('textbox', FIELD), 'field{Enter}')
 
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(screen.queryByText('Other Wire')).toBeNull()
-    expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
+    expect(api.requestsTo('POST /api/feeds/preview')).toHaveLength(0)
 
-    await user.clear(screen.getByRole('textbox', { name: /search or add feeds/i }))
+    await user.clear(screen.getByRole('textbox', FIELD))
     expect(await screen.findByText('Other Wire')).toBeDefined()
   })
 
@@ -171,7 +278,7 @@ describe('Feeds', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText('Other Wire')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'weekly')
+    await user.type(screen.getByRole('textbox', FIELD), 'weekly')
 
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(screen.queryByText('Other Wire')).toBeNull()
@@ -184,7 +291,7 @@ describe('Feeds', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText('Field Notes')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'nothing like this')
+    await user.type(screen.getByRole('textbox', FIELD), 'nothing like this')
 
     expect(await screen.findByText('no feeds match')).toBeDefined()
   })
@@ -196,36 +303,35 @@ describe('Feeds', () => {
     })
     stubApi()
       .on('GET /api/feeds', () => staleList)
-      .on('POST /api/subscriptions', {
-        status: 201,
-        body: { subscription: FEED, observedItems: 1 },
-      })
+      .on('POST /api/feeds/preview', { body: PREVIEW })
+      .on('POST /api/subscriptions', { status: 201, body: { subscription: FEED, observedItems: 1 } })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
-    const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    const user = await submitUrl(FEED.enteredUrl)
+    await user.click(await screen.findByRole('button', { name: 'subscribe' }))
     expect(await screen.findByText('Field Notes')).toBeDefined()
 
     release?.({ body: { subscriptions: [] } })
     await waitFor(() => expect(screen.getByText('Field Notes')).toBeDefined())
   })
-  it('keeps a useful duplicate outcome in place', async () => {
+
+  it('closes with already subscribed when subscribing loses the race', async () => {
     stubApi()
       .on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+      .on('POST /api/feeds/preview', { body: PREVIEW })
       .on('POST /api/subscriptions', {
         status: 409,
         body: { error: { code: 'duplicate_subscription', message: 'Already subscribed' } },
       })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
-    const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    const user = await submitUrl(FEED.enteredUrl)
+    await user.click(await screen.findByRole('button', { name: 'subscribe' }))
 
     expect(await screen.findByText('already subscribed')).toBeDefined()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getAllByText('Field Notes')).toHaveLength(1)
   })
 })

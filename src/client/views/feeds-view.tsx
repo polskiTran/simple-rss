@@ -1,14 +1,15 @@
 import { Button } from '@base-ui/react/button'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
-import { fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
+import { fetchSubscriptions, refreshFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
-import { retryFailure, subscribedNotice, subscriptionFailure, unavailableNote } from './feed-language.js'
+import { retryFailure, subscribedNotice, unavailableNote } from './feed-language.js'
 import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
+import { PreviewDialog } from './preview-dialog.js'
 
 const UNCHECKED_REFRESH_LADDER_MS = [3_000, 5_000] as const
 const UNCHECKED_REFRESH_STEADY_MS = 10_000
@@ -26,7 +27,8 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [state, setState] = useState<SubscriptionState>({ kind: 'loading' })
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
-  const [subscribing, setSubscribing] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined)
+  const field = useRef<HTMLInputElement>(null)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
   const [refreshRound, setRefreshRound] = useState(0)
@@ -72,27 +74,30 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     return () => window.clearTimeout(timer)
   }, [state, refreshRound, refreshList])
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const url = feedUrlOf(query)
-    if (!url || subscribing) return
+    if (!url || previewUrl !== undefined) return
+    setNotice('')
+    setPreviewUrl(url)
+  }
 
-    setSubscribing(true)
-    setNotice('subscribing…')
-    try {
-      const { subscription, observedItems } = await subscribeToFeed(url)
-      setState((current) => {
-        if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions: [subscription] }
-        if (current.subscriptions.some((existing) => existing.feedId === subscription.feedId)) return current
-        return { kind: 'loaded', subscriptions: [...current.subscriptions, subscription] }
-      })
-      setQuery('')
-      setNotice(subscribedNotice(observedItems))
-    } catch (error) {
-      setNotice(subscriptionFailure(error))
-    } finally {
-      setSubscribing(false)
-    }
+  const closePreview = useCallback(() => setPreviewUrl(undefined), [])
+
+  const previewFailed = useCallback((sentence: string) => {
+    setNotice(sentence)
+    setPreviewUrl(undefined)
+  }, [])
+
+  function subscribed(subscription: SubscriptionSummary, observedItems: number) {
+    setState((current) => {
+      if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions: [subscription] }
+      if (current.subscriptions.some((existing) => existing.feedId === subscription.feedId)) return current
+      return { kind: 'loaded', subscriptions: [...current.subscriptions, subscription] }
+    })
+    setQuery('')
+    setNotice(subscribedNotice(observedItems))
+    setPreviewUrl(undefined)
   }
 
   function imported(outcome: OpmlImportOutcome) {
@@ -134,6 +139,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     <div className="view measure feeds-view">
       <form className="search-form" onSubmit={submit}>
         <input
+          ref={field}
           className="field-input search-input"
           type="text"
           inputMode="url"
@@ -145,6 +151,17 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
           onChange={(event) => setQuery(event.target.value)}
         />
       </form>
+      <PreviewDialog
+        url={previewUrl}
+        field={field}
+        onClose={closePreview}
+        onSubscribed={subscribed}
+        onFailed={previewFailed}
+        onOpenFeed={(feedId) => {
+          setPreviewUrl(undefined)
+          onOpenFeed(feedId)
+        }}
+      />
       <OpmlControls onOutcome={imported} />
       <p className="notice feed-notice" aria-live="polite">
         {notice}
