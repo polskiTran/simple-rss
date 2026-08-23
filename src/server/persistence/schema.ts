@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { desc, sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
 
 /**
@@ -169,7 +169,7 @@ export const feedItems = sqliteTable(
   },
   (table) => [
     unique('feed_items_feed_dedupe').on(table.feedId, table.dedupeKey),
-    index('feed_items_chronology').on(table.publishedAt, table.firstSeenAt),
+    index('feed_items_chronology').on(desc(table.publishedAt), desc(table.firstSeenAt)),
     index('feed_items_last_observed').on(table.lastObservedAt),
     check('feed_items_identity_kind', sql`${table.identityKind} IN ('guid', 'link', 'content')`),
   ],

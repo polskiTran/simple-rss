@@ -7,7 +7,7 @@ import { runCli, NEW_PASSWORD_VARIABLE, type CliContext } from '../../src/server
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger, type Logger } from '../../src/server/logger.js'
 import { openDatabase } from '../../src/server/persistence/database.js'
-import { applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
+import { appliedVersions, applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
@@ -202,6 +202,24 @@ describe('runCli reset-password', () => {
 
     const record = inspect(({ user }) => user.read())
     expect(await argon2idHasher().verify(record!.passwordHash, 'the-argument-one')).toBe(true)
+  })
+
+  it('does not migrate an older database before validating the password', async () => {
+    const older = openDatabase(context.config.databasePath)
+    try {
+      applyMigrations(older, context.clock, migrations.slice(0, 3))
+    } finally {
+      older.$client.close()
+    }
+
+    expect(await runCli(['reset-password', 'short'], context)).toBe(1)
+
+    const inspected = openDatabase(context.config.databasePath)
+    try {
+      expect(appliedVersions(inspected)).toEqual([1, 2, 3])
+    } finally {
+      inspected.$client.close()
+    }
   })
 
   it('explains itself rather than resetting to nothing', async () => {

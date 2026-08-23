@@ -84,7 +84,6 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
         return 0
       }
       case 'reset-password': {
-        applyMigrations(db, context.clock)
         return await resetPassword(db, rest[0], context)
       }
       default: {
@@ -151,6 +150,8 @@ async function resetPassword(db: DrizzleDatabase, argument: string | undefined, 
     )
     return 1
   }
+
+  applyMigrations(db, context.clock)
 
   const authentication = createAuthentication({
     db,
