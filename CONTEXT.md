@@ -64,6 +64,10 @@ _Avoid_: RSS fetch window, current batch
 A Feed a web page names in its own markup, so that pasting the page finds the Feed. A page may declare several; the first in the page is its default.
 _Avoid_: Alternative feed, autodiscovered feed, link-rel
 
+**Quiet Merge**:
+Folding a Subscription into the Feed its retrieval turned out to be, when two addresses hide one Feed. Nothing retained is deleted and the User is never asked, so a merged duplicate that had items goes dormant like any unsubscribed Feed.
+_Avoid_: Deduplication, feed collapse, alias fixup
+
 **Cadence**:
 A Feed's publishing rhythm, drawn from retained Feed Items as per-day counts in the installation timezone and rendered at four ink levels — a strip on the Feeds list, a 26-week grid on an opened Feed. The stat line's "posts" is display copy fixed by the design system; the domain term remains Feed Item.
 _Avoid_: Activity graph, contribution graph, frequency chart
