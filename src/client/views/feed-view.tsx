@@ -49,7 +49,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   const [confirmingUnsubscribe, setConfirmingUnsubscribe] = useState(false)
   const [unsubscribing, setUnsubscribing] = useState(false)
 
-  // A Feed the User is not subscribed to answers 404, which is a different note, not a failure.
   const missing = state.kind === 'unavailable' && state.error instanceof ApiError && state.error.status === 404
   const failed = state.kind === 'unavailable' || state.kind === 'unreachable'
 
@@ -245,7 +244,6 @@ function OpenFeed({
   )
 }
 
-/* Custom Title and Custom Description dialog: each placeholder shows the reported value, and a blank field clears that override back to it. */
 function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: FeedDetailsUpdate) => void }) {
   const [open, setOpen] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -317,7 +315,6 @@ function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (de
                 <Button className="text-button" type="submit" focusableWhenDisabled disabled={saving}>
                   {saving ? 'saving…' : 'save'}
                 </Button>
-                {/* Composed onto Button exactly as the unsubscribe overlay's dismissing word is. */}
                 <Dialog.Close className="text-button" disabled={saving} render={<Button focusableWhenDisabled />}>
                   cancel
                 </Dialog.Close>
@@ -333,7 +330,6 @@ function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (de
   )
 }
 
-/* Unsubscribing confirmation dialog */
 function Unsubscribe({
   feedTitle,
   confirming,
@@ -367,8 +363,6 @@ function Unsubscribe({
               >
                 {working ? 'unsubscribing…' : 'confirm'}
               </Button>
-              {/* Composed onto Button: Dialog.Close takes native button props only,
-                  so the dismissing word borrows the focus its own press would cost it. */}
               <Dialog.Close className="text-button" disabled={working} render={<Button focusableWhenDisabled />}>
                 cancel
               </Dialog.Close>
@@ -418,7 +412,6 @@ function Grid({ grid, title, onShowDay }: { grid: CadenceGrid; title: string; on
   )
 }
 
-/** An opened Feed says nothing while checking works, and nothing about a first check either. */
 function UnavailableNote({ availability }: { availability: FeedAvailability }) {
   if (availability.state !== 'unavailable') return null
 
@@ -477,7 +470,6 @@ function Items({
   )
 }
 
-/** Blank input is not a value: it clears the override so the reported value stands. */
 function overrideOf(draft: string): string | null {
   const trimmed = draft.trim()
   return trimmed === '' ? null : trimmed

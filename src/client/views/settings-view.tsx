@@ -11,7 +11,6 @@ export interface SettingsViewProps {
   onAccessChanged(status: AuthStatus): void
 }
 
-/** The sheet: unrelated preferences, one row each, none of them the reading shape. */
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   const [changing, setChanging] = useState(false)
 

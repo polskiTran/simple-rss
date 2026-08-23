@@ -95,9 +95,12 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   )
 }
 
-/** Extraction refuses a second attempt too soon; the wait it names is the User's cue. */
+const DEFAULT_WAIT_SECONDS = 30
+
 function waitSecondsOf(error: unknown): number | undefined {
-  return error instanceof ApiError && error.status === 429 ? (error.retryAfterSeconds ?? 30) : undefined
+  return error instanceof ApiError && error.status === 429
+    ? (error.retryAfterSeconds ?? DEFAULT_WAIT_SECONDS)
+    : undefined
 }
 
 interface FallbackProps {
