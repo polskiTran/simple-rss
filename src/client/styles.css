@@ -5,14 +5,8 @@
 @import '@fontsource/literata/latin-500.css';
 @import '@fontsource/literata/latin-300-italic.css';
 
-/* The Markdown renderer styles articles with its own Tailwind classes, so
-   its files are one of this stylesheet's sources. */
 @source "../../node_modules/streamdown/dist/*.js";
 
-/* The renderer's `dark:` variants (Shiki's dark token colours among them) ask
-   the device by default, which would put dark code on light paper for a User
-   who pinned an appearance. Rebound to the palette's rule: the device decides
-   unless the document says otherwise. */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
     &:where(:not([data-appearance='light'], [data-appearance='light'] *)) {
@@ -38,9 +32,7 @@
   --color-danger: #b02b27;
   --color-hairline: rgb(18 17 15 / 0.15);
 
-  /* The renderer's tokens, under the names its classes ask for (shadcn's).
-     `muted` and `sidebar` are surfaces, not inks: what `bg-muted` and
-     `bg-sidebar` fill with. */
+  /* The renderer's tokens, under the names its classes ask for (shadcn's). */
   --color-background: var(--color-paper);
   --color-foreground: var(--color-ink);
   --color-border: var(--color-hairline);
@@ -403,7 +395,6 @@
     padding-bottom: 5px;
   }
 
-  /* The multiline variant keeps the line's look; rows fix its height, not a drag handle. */
   textarea.field-input {
     resize: none;
   }
@@ -423,9 +414,6 @@
     cursor: pointer;
   }
 
-  /* A control that stays focusable while its request is in flight is refused
-     through `aria-disabled`, not the `disabled` attribute — so both spell the
-     same quiet word. */
   .text-button:disabled,
   .text-button[aria-disabled='true'] {
     color: var(--color-quiet);
@@ -468,8 +456,6 @@
     opacity: 1;
   }
 
-  /* `type=search` keeps the searchbox semantics; the browser's cancel cross
-     and decoration are not drawn. */
   .search-input::-webkit-search-cancel-button,
   .search-input::-webkit-search-decoration {
     -webkit-appearance: none;
@@ -498,8 +484,6 @@
     color: var(--color-ink-strong);
   }
 
-  /* When a Feed Description follows, it takes over the header's 40px to the
-     content below; the header keeps only the 10px between the two lines. */
   .feed-header:has(+ .feed-description) {
     margin-bottom: 10px;
   }
@@ -626,14 +610,6 @@
     margin-top: 44px;
   }
 
-  /* An overlay is the one place in this interface where motion runs on exit —
-     150ms in, 120ms out, opacity only, both zero under reduced motion. Every
-     other dismissal is instant (docs/DESIGN.md §5), so an exit transition
-     copied out of this block belongs nowhere else.
-
-     The paper is drawn again with no border, no radius and no shadow: the
-     dimmed backdrop is the whole of its edge, which is separation by dim
-     rather than an exception to separation by whitespace. */
   .overlay-backdrop,
   .overlay-viewport {
     position: fixed;
@@ -704,7 +680,6 @@
     margin: 20px 0 0;
   }
 
-  /* Inside the form the column gap already separates it. */
   .edit-details-form .overlay-choice {
     margin: 0;
   }
@@ -731,18 +706,8 @@
     cursor: pointer;
   }
 
-  /* Off screen rather than `display: none`, so the input keeps the keyboard:
-     Tab still reaches it and Enter still opens the file picker. */
   .opml-file-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    border: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+    @apply sr-only;
   }
 
   .opml-import:focus-within {
@@ -988,9 +953,8 @@
     font-size: 1.05em;
   }
 
-  /* An equation wider than the measure scrolls in place, like `pre` and
-     tables. The 2px keeps the scroller from clipping the pixels KaTeX hangs
-     outside its own box. */
+  /* The 2px keeps the scroller from clipping the pixels KaTeX hangs outside
+     its own box. */
   .article-body .katex-display {
     margin: 0 0 28px;
     padding-block: 2px;
@@ -1169,8 +1133,6 @@
     line-height: 1.24;
   }
 
-  /* Only the prose steps down; the renderer sizes its blocks in rem, so an
-     article's headings and code hold their desktop scale. */
   .article-body,
   .reader-summary {
     font-size: 17px;
@@ -1246,8 +1208,6 @@
     flex-wrap: wrap;
   }
 
-  /* One overlay at every width — the same component, met at the thumb rather
-     than in the middle of the screen. */
   .overlay-viewport {
     align-items: end;
     padding: 0;

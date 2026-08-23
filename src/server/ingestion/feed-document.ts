@@ -174,18 +174,7 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
   const imageUrl = normalizeHttpUrl(imageOf(record, atom), baseUrl)
   const guid = plainValue(recordField(record, atom ? ['id', 'atom:id'] : ['guid']))
 
-  // The content fingerprint leaves the summary out: publishers correct it most, and
-  // hashing it would turn every correction into a new identity instead of an update.
-  const identity = guid
-    ? { kind: 'guid' as const, key: `guid:${guid}` }
-    : link
-      ? { kind: 'link' as const, key: `link:${link}` }
-      : {
-          kind: 'content' as const,
-          key: `content:${createHash('sha256')
-            .update(JSON.stringify([title, publishedAt]))
-            .digest('hex')}`,
-        }
+  const identity = itemIdentity(guid, link, title, publishedAt)
 
   return {
     dedupeKey: identity.key,
@@ -196,6 +185,24 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
     imageUrl,
     summary,
   }
+}
+
+/**
+ * Guid wins, then link, then a fingerprint of the content. The fingerprint
+ * leaves the summary out: publishers correct it most, and hashing it would turn
+ * every correction into a new identity instead of an update.
+ */
+function itemIdentity(guid: string | null, link: string | null, title: string | null, publishedAt: string | null) {
+  return guid
+    ? { kind: 'guid' as const, key: `guid:${guid}` }
+    : link
+      ? { kind: 'link' as const, key: `link:${link}` }
+      : {
+          kind: 'content' as const,
+          key: `content:${createHash('sha256')
+            .update(JSON.stringify([title, publishedAt]))
+            .digest('hex')}`,
+        }
 }
 
 function imageOf(record: Record<string, unknown>, atom: boolean): unknown {

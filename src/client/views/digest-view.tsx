@@ -56,7 +56,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' })
   const line = query.trim()
 
-  // The search waits for the typing to settle, which is why it stays its own effect.
   useEffect(() => {
     if (line === '') {
       setSearch({ kind: 'idle' })

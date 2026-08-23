@@ -3,7 +3,6 @@ import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useState } from 'react'
 import { APPEARANCE_OPTIONS, chooseAppearance, storedAppearance, type Appearance } from '../../appearance.js'
 
-/** This device's own choice: never sent to the installation, and system is the absence of one. */
 export function AppearanceChoice() {
   const [appearance, setAppearance] = useState<Appearance>(storedAppearance)
 

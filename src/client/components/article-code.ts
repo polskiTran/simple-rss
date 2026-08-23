@@ -2,12 +2,6 @@ import type { BundledLanguage } from 'shiki'
 import type { HighlighterCore } from 'shiki/core'
 import type { CodeHighlighterPlugin, ThemeInput } from 'streamdown'
 
-/**
- * Shiki's full bundle registers 200+ grammars up front; naming a handful here
- * keeps the rest out of the build, and a grammar loads only when a fenced
- * block asks for it.
- */
-
 const GRAMMARS = {
   bash: () => import('shiki/langs/bash.mjs'),
   css: () => import('shiki/langs/css.mjs'),
@@ -66,8 +60,6 @@ async function createCore(): Promise<HighlighterCore> {
   return createHighlighterCore({
     themes: [light.default, dark.default],
     langs: [],
-    // JavaScript engine, not Oniguruma: no WebAssembly to fetch, and
-    // `forgiving` keeps an uncompilable grammar from failing the block.
     engine: createJavaScriptRegexEngine({ forgiving: true }),
   })
 }
@@ -92,8 +84,6 @@ export const articleCode: CodeHighlighterPlugin = {
   getSupportedLanguages: () => Object.keys(GRAMMARS) as BundledLanguage[],
   supportsLanguage: (language) => grammarFor(language) !== undefined,
 
-  // Always asynchronous: first paint is the unhighlighted code, colour arrives
-  // with the grammar. Unsupported languages keep the first paint.
   highlight({ code, language }, callback) {
     const grammar = grammarFor(language)
     if (!grammar || !callback) return null

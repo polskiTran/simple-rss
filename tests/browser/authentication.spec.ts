@@ -101,8 +101,6 @@ test.describe('a page on another origin', () => {
     await page.goto(foreign.url)
     await page.waitForURL(`${installation.url}/api/auth/password`)
 
-    // A form post needs no preflight, so it does reach the server — and the
-    // Origin check is what turns it away.
     await expect(page.locator('body')).toContainText('forbidden_origin')
     await page.goto(installation.url)
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
@@ -121,8 +119,6 @@ test.describe('a page on another origin', () => {
 
     await page.goto(foreign.url)
 
-    // No `Access-Control-Allow-Origin`, so the browser never hands the body
-    // over — the service enables no credentialed cross-origin access at all.
     await expect(page.locator('#outcome')).toHaveText('blocked')
   })
 })

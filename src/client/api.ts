@@ -68,7 +68,6 @@ const UNAUTHENTICATED = 'unauthenticated'
 const REQUEST_TIMEOUT_MS = 30_000
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  // Every request carries the deadline; a caller's own signal only adds to it.
   const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   const response = await fetch(path, {
     ...init,
@@ -86,7 +85,6 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   throw new ApiError(response.status, code, retryAfterOf(response))
 }
 
-/** A read a view can abandon: `useResource` hands its signal down, so leaving cancels the request. */
 function read(path: string, signal: AbortSignal | undefined): Promise<Response> {
   return request(path, signal ? { signal } : {})
 }
@@ -156,7 +154,6 @@ export async function fetchFeedDetail(feedId: number, signal?: AbortSignal): Pro
   return feedDetailSchema.parse(await response.json())
 }
 
-/** Replaces both overrides; a null field means the reported value stands. */
 export async function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {
   const response = await request(`/api/feeds/${feedId}/details`, {
     method: 'PUT',

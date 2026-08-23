@@ -10,7 +10,6 @@ const BAYER_4 = [
 export const BAND_WIDTH_PX = 708
 export const BAND_HEIGHT_PX = 114
 
-/** Centre-to-centre spacing of the dots. `.daily-band-field` sizes each dot from it. */
 const PITCH_PX = 5
 
 export function DailyBand({ date, volume }: { date: string; volume: number }) {

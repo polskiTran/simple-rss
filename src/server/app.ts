@@ -189,7 +189,6 @@ function requestLogging(logger: Logger) {
     await next()
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
 
-    // Health probes run every few seconds; at info they would drown out everything else.
     const level = c.req.path.startsWith('/health/') ? 'debug' : 'info'
     scoped[level]('request.completed', {
       method: c.req.method,

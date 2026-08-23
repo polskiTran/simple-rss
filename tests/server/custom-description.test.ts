@@ -47,7 +47,6 @@ describe('Custom Description', () => {
       customDescription: 'read weekly',
     })
 
-    // The override outlives a poll that refreshes what the Feed reports.
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
       body: rss('New words from the publisher'),
