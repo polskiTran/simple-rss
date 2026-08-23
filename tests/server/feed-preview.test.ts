@@ -246,3 +246,196 @@ describe('Feed preview', () => {
     await vi.waitFor(() => expect(service.upstream.aborted).toContain(FEED_URL))
   })
 })
+
+const PAGE_URL = 'https://journal.example/'
+const COMMENTS_URL = 'https://journal.example/comments/feed'
+
+function page(head: string, body = ''): { headers: Record<string, string>; body: string } {
+  return {
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    body: `<!doctype html><html><head><meta charset="utf-8"><title>Field Notes</title>${head}</head><body>${body}</body></html>`,
+  }
+}
+
+function declaration(href: string, title?: string, type = 'application/rss+xml'): string {
+  return `<link rel="alternate" type="${type}" href="${href}"${title === undefined ? '' : ` title="${title}"`}>`
+}
+
+describe('Feed preview of a page', () => {
+  it('follows the first Declared Feed and lists every declaration in document order, deduped', async () => {
+    const service = await startTestService()
+    service.upstream
+      .stub(
+        PAGE_URL,
+        page(
+          '<base href="/notes/"><base href="https://elsewhere.example/">' +
+            declaration('../feed', 'Field Notes » Posts') +
+            declaration('https://journal.example/feed', 'the same feed again') +
+            declaration('/feed.json', 'JSON', 'application/feed+json') +
+            declaration('/text.xml', 'text/xml', 'text/xml'),
+          `<p>a page</p>${declaration('../comments/feed', 'Field Notes » Comments', 'application/atom+xml')}`,
+        ),
+      )
+      .stub(FEED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: rss(item('today', 'First light', 'Sat, 08 Aug 2026 07:15:00 GMT')),
+      })
+    const user = await claimedDevice(service)
+
+    const previewed = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(previewed.status).toBe(200)
+    expect(await previewed.json()).toMatchObject({
+      url: FEED_URL,
+      title: 'Field Notes',
+      items: [{ title: 'First light' }],
+      declaredFeeds: [
+        { url: FEED_URL, title: 'Field Notes » Posts' },
+        { url: COMMENTS_URL, title: 'Field Notes » Comments' },
+      ],
+      subscribed: null,
+    })
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL, PAGE_URL, FEED_URL])
+    expect(service.upstream.requests.map((request) => request.headers.accept)).toEqual([
+      expect.stringContaining('application/rss+xml'),
+      expect.stringContaining('text/html'),
+      expect.stringContaining('application/rss+xml'),
+    ])
+    expect(service.database?.prepare('SELECT count(*) AS count FROM feeds').get()).toEqual({ count: 0 })
+  })
+
+  it('resolves a relative declaration against the post-redirect address when the page sets no <base>', async () => {
+    const service = await startTestService()
+    const movedUrl = 'https://www.journal.example/'
+    service.upstream
+      .stub(PAGE_URL, { status: 301, headers: { location: movedUrl, 'content-type': 'text/plain' } })
+      .stub(movedUrl, page(declaration('feed')))
+      .stub('https://www.journal.example/feed', {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: rss(item('today', 'First light', 'Sat, 08 Aug 2026 07:15:00 GMT')),
+      })
+    const user = await claimedDevice(service)
+
+    const previewed = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(previewed.status).toBe(200)
+    expect(await previewed.json()).toMatchObject({
+      url: 'https://www.journal.example/feed',
+      declaredFeeds: [{ url: 'https://www.journal.example/feed', title: null }],
+    })
+  })
+
+  it('reads a page cut at the discovery ceiling as it stands and answers 200', async () => {
+    const service = await startTestService()
+    const filler = `<p>${'x'.repeat(1024 * 1024)}</p>`
+    service.upstream
+      .stub(PAGE_URL, page(declaration('/feed', 'Posts'), `${filler}${declaration('/comments/feed', 'Comments')}`))
+      .stub(FEED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: rss(item('today', 'First light', 'Sat, 08 Aug 2026 07:15:00 GMT')),
+      })
+    const user = await claimedDevice(service)
+
+    const previewed = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(previewed.status).toBe(200)
+    expect(await previewed.json()).toMatchObject({ url: FEED_URL, declaredFeeds: [{ url: FEED_URL, title: 'Posts' }] })
+  })
+
+  it('answers a page that declares nothing as no_feed_found', async () => {
+    const service = await startTestService()
+    service.upstream.stub(PAGE_URL, page('<link rel="stylesheet" href="/site.css">', '<p>no feed here</p>'))
+    const user = await claimedDevice(service)
+
+    const refused = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(refused.status).toBe(422)
+    expect(await refused.json()).toMatchObject({ error: { code: 'no_feed_found' } })
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL, PAGE_URL])
+  })
+
+  it('answers with the Declared Feed’s own failure when it fails to prove', async () => {
+    const service = await startTestService()
+    service.upstream
+      .stub(PAGE_URL, page(declaration('/feed')))
+      .stub(FEED_URL, { status: 404, headers: { 'content-type': 'text/plain' }, body: 'gone' })
+    const user = await claimedDevice(service)
+
+    const refused = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(refused.status).toBe(502)
+    expect(await refused.json()).toMatchObject({ error: { code: 'http_error' } })
+  })
+
+  it('does not read a document that is neither a Feed nor a page: one request, 415', async () => {
+    const service = await startTestService()
+    service.upstream.stub(PAGE_URL, { headers: { 'content-type': 'application/pdf' }, body: '%PDF-1.7' })
+    const user = await claimedDevice(service)
+
+    const refused = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(refused.status).toBe(415)
+    expect(await refused.json()).toMatchObject({ error: { code: 'unsupported_content' } })
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL])
+  })
+
+  it('spends one 15 s budget on the whole page path, handing each later retrieval the remainder', async () => {
+    const budgets: Array<{ operation: string; timeoutMs: number | undefined }> = []
+    const service = await startTestService({
+      retrieval: (boundary) => ({
+        retrieve: (request) => boundary.retrieve(request),
+        retrieveBytes: (request) => {
+          budgets.push({ operation: request.operation, timeoutMs: request.limits?.timeoutMs })
+          return boundary.retrieveBytes(request)
+        },
+      }),
+    })
+    service.upstream.stub(PAGE_URL, { ...page(declaration('/feed')), delayMs: 150 }).stub(FEED_URL, {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: rss(item('today', 'First light', 'Sat, 08 Aug 2026 07:15:00 GMT')),
+    })
+    const user = await claimedDevice(service)
+
+    expect((await user.post('/api/feeds/preview', { url: PAGE_URL })).status).toBe(200)
+
+    expect(budgets.map((budget) => budget.operation)).toEqual(['preview', 'discovery', 'preview'])
+    const [, discovery, feed] = budgets
+    expect(discovery?.timeoutMs).toBeLessThanOrEqual(15_000 - 150)
+    expect(feed?.timeoutMs).toBeLessThanOrEqual((discovery?.timeoutMs ?? 0) - 150)
+    expect(feed?.timeoutMs).toBeGreaterThan(0)
+  })
+
+  it('re-discovers a page pasted again, reads subscribed for the default, and never aliases the page', async () => {
+    const service = await startTestService()
+    service.upstream
+      .stub(PAGE_URL, page(declaration('/feed', 'Posts') + declaration('/comments/feed', 'Comments')))
+      .stub(FEED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: rss(item('today', 'First light', 'Sat, 08 Aug 2026 07:15:00 GMT')),
+      })
+    const user = await claimedDevice(service)
+    const first = await (await user.post('/api/feeds/preview', { url: PAGE_URL })).json()
+    expect((await user.post('/api/subscriptions', { url: first.url })).status).toBe(201)
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,
+    ).toBe(200)
+    const askedBefore = service.upstream.requests.length
+
+    const previewed = await user.post('/api/feeds/preview', { url: PAGE_URL })
+
+    expect(previewed.status).toBe(200)
+    expect(await previewed.json()).toMatchObject({
+      url: FEED_URL,
+      title: 'Tech tabloid',
+      declaredFeeds: [
+        { url: FEED_URL, title: 'Posts' },
+        { url: COMMENTS_URL, title: 'Comments' },
+      ],
+      subscribed: { feedId: 1 },
+    })
+    expect(service.upstream.requests.slice(askedBefore).map((request) => request.url)).toEqual([PAGE_URL, PAGE_URL])
+    expect(service.database?.prepare('SELECT url FROM feed_url_aliases ORDER BY url').all()).toEqual([
+      { url: FEED_URL },
+    ])
+  })
+})

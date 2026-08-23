@@ -3,6 +3,7 @@ import {
   PAGE_CONTENT_TYPES,
   type Retrieval,
   type RetrievalBytes,
+  type RetrievalLimits,
   type RetrievalOperation,
 } from '../upstream/retrieval.js'
 import type { FailedPoll } from './feed-availability.js'
@@ -37,6 +38,8 @@ interface ProveFeedOptions {
   /** Other URLs this Feed is known by, so a document naming one as its site is still the Feed itself. */
   readonly priorUrls?: readonly string[]
   readonly signal?: AbortSignal
+  /** Tightens the operation's profile — what is left of a budget an earlier retrieval already spent from. */
+  readonly limits?: RetrievalLimits
 }
 
 /**
@@ -57,13 +60,19 @@ export function proveFeed(options: ProveFeedOptions): Promise<FeedProof>
 export async function proveFeed(
   options: ProveFeedOptions & { readonly validators?: FeedValidators },
 ): Promise<ConditionalFeedProof> {
-  const { retrieval, url, operation, validators, priorUrls = [], signal } = options
+  const { retrieval, url, operation, validators, priorUrls = [], signal, limits } = options
 
   const headers: Record<string, string> = {}
   if (validators?.etag) headers['if-none-match'] = validators.etag
   if (validators?.lastModified) headers['if-modified-since'] = validators.lastModified
 
-  const retrieved = await retrieval.retrieveBytes({ url, operation, headers, ...(signal && { signal }) })
+  const retrieved = await retrieval.retrieveBytes({
+    url,
+    operation,
+    headers,
+    ...(signal && { signal }),
+    ...(limits && { limits }),
+  })
   if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
 
   if (retrieved.notModified) {
