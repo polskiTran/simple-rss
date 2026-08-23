@@ -110,8 +110,6 @@ export class FeedPoll {
     if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
       this.#subscriptions.mergeInto(feed, existingFeedId)
       const survivor = this.#pollableFeed(existingFeedId)
-      // The Feed Window just retrieved belongs to the survivor, and reaching it
-      // is the success the survivor's own schedule should count.
       if (survivor) {
         this.#write(survivor.feedId, parsed, retrieved)
         this.#availability.recordSuccess(survivor)

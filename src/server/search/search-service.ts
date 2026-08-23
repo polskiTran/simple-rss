@@ -1,29 +1,29 @@
+import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { SearchResults } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, inDigestOrder, metaRowDate, plausibleHorizon } from '../digest/chronology.js'
+import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
+import { chronologySql } from '../digest/list-page.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import {
+  effectiveFeedTitle,
+  feedItems,
+  feedItemSearch,
+  feeds,
+  libraryItems,
+  subscriptions,
+} from '../persistence/schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
 
-interface MatchRow {
-  feedItemId: number
-  title: string | null
-  publishedAt: string | null
-  firstSeenAt: string
-  feedId: number
-  feedTitle: string
-  savedAt: string | null
-  subscribedFeedId: number | null
-}
-
 export class SearchService {
-  readonly #db: SqliteDatabase
+  readonly #db: BetterSQLite3Database
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
 
   constructor(options: { database: SqliteDatabase; clock: Clock; settings: InstallationSettingsStore }) {
-    this.#db = options.database
+    this.#db = drizzle(options.database)
     this.#clock = options.clock
     this.#settings = options.settings
   }
@@ -36,35 +36,30 @@ export class SearchService {
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
 
-    // The coalesce restates `effectiveFeedTitle` (persistence/schema.ts) in raw SQL; keep them in step.
     const rows = this.#db
-      .prepare(
-        `SELECT
-           feed_items.id            AS feedItemId,
-           feed_items.title         AS title,
-           feed_items.published_at  AS publishedAt,
-           feed_items.first_seen_at AS firstSeenAt,
-           feeds.id                 AS feedId,
-           coalesce(subscriptions.custom_title, feeds.title) AS feedTitle,
-           library_items.saved_at   AS savedAt,
-           subscriptions.feed_id    AS subscribedFeedId
-         FROM feed_item_search
-         JOIN feed_items ON feed_items.id = feed_item_search.rowid
-         JOIN feeds ON feeds.id = feed_items.feed_id
-         LEFT JOIN library_items ON library_items.feed_item_id = feed_items.id
-         LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id
-         WHERE feed_item_search MATCH ?
-           AND (subscriptions.feed_id IS NOT NULL OR library_items.feed_item_id IS NOT NULL)
-         ORDER BY
-           CASE
-             WHEN feed_items.published_at IS NOT NULL AND feed_items.published_at <= ?
-             THEN feed_items.published_at
-             ELSE feed_items.first_seen_at
-           END DESC,
-           feed_items.id DESC
-         LIMIT ?`,
+      .select({
+        feedItemId: feedItems.id,
+        title: feedItems.title,
+        publishedAt: feedItems.publishedAt,
+        firstSeenAt: feedItems.firstSeenAt,
+        feedId: feeds.id,
+        feedTitle: effectiveFeedTitle,
+        savedAt: libraryItems.savedAt,
+      })
+      .from(feedItemSearch)
+      .innerJoin(feedItems, eq(feedItems.id, feedItemSearch.rowid))
+      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .where(
+        and(
+          sql`${feedItemSearch} MATCH ${match}`,
+          or(isNotNull(subscriptions.feedId), isNotNull(libraryItems.feedItemId)),
+        ),
       )
-      .all(match, plausibleHorizon(now), SEARCH_RESULT_LIMIT) as MatchRow[]
+      .orderBy(sql`${chronologySql(now)} DESC`, desc(feedItems.id))
+      .limit(SEARCH_RESULT_LIMIT)
+      .all()
 
     const results = inDigestOrder(rows, now).map(({ row, chronology }) => {
       const instant = new Date(chronology)
