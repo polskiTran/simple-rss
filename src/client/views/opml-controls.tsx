@@ -7,7 +7,6 @@ export type OpmlImportOutcome =
   | { readonly kind: 'imported'; readonly report: OpmlImportReport }
   | { readonly kind: 'failed'; readonly notice: string }
 
-/** Carrying subscriptions in and out: a file to read, a link to leave by. */
 export function OpmlControls({ onOutcome }: { onOutcome(outcome: OpmlImportOutcome): void }) {
   const [importing, setImporting] = useState(false)
 

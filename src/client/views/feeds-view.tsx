@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
 import { cadenceLevel } from '../cadence.js'
@@ -7,6 +7,7 @@ import { HomePageLink } from '../components/home-page-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
+import { type Resource, useResource } from '../use-resource.js'
 import { firstCheckFailure, retryFailure, subscriptionFailure, unavailableNote } from './feed-language.js'
 import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
 
@@ -16,17 +17,15 @@ const FIRST_CHECK_INTERVAL_MS = 2_000
 const UNCHECKED_REFRESH_MS = 3_000
 const UNCHECKED_REFRESH_ROUNDS = 20
 
-type SubscriptionState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'loaded'; readonly subscriptions: readonly SubscriptionSummary[] }
-  | { readonly kind: 'unavailable' }
-
 export interface FeedsViewProps {
   onOpenFeed(feedId: number): void
 }
 
 export function FeedsView({ onOpenFeed }: FeedsViewProps) {
-  const [state, setState] = useState<SubscriptionState>({ kind: 'loading' })
+  const [state, { retry: reload, set }] = useResource(
+    async (signal) => (await fetchSubscriptions(signal)).subscriptions,
+    [],
+  )
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
   const [subscribing, setSubscribing] = useState(false)
@@ -34,45 +33,26 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
   const [refreshRound, setRefreshRound] = useState(0)
 
-  // Not `useResource`: this list is also written by subscribing, so the first load merges
-  // into whatever landed while it was in flight rather than replacing it.
-  useEffect(() => {
-    const request = new AbortController()
-    void fetchSubscriptions(request.signal)
-      .then(({ subscriptions }) => {
-        if (request.signal.aborted) return
-        setState((current) => {
-          if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions }
-          const merged = new Map(current.subscriptions.map((subscription) => [subscription.feedId, subscription]))
-          for (const subscription of subscriptions) {
-            if (!merged.has(subscription.feedId)) merged.set(subscription.feedId, subscription)
-          }
-          return { kind: 'loaded', subscriptions: [...merged.values()] }
-        })
-      })
-      .catch(() => {
-        if (!request.signal.aborted) {
-          setState((current) => (current.kind === 'loaded' ? current : { kind: 'unavailable' }))
-        }
-      })
-    return () => request.abort()
-  }, [])
-
   async function refreshList(): Promise<void> {
+    if (state.kind !== 'loaded') {
+      reload()
+      return
+    }
     try {
       const { subscriptions } = await fetchSubscriptions()
-      setState({ kind: 'loaded', subscriptions })
+      set(() => subscriptions)
     } catch {}
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshList is recreated every render; depending on it would restart the 3s timer on every render.
+  const pollUnchecked = useEffectEvent(async () => {
+    await refreshList()
+    setRefreshRound((round) => round + 1)
+  })
+
   useEffect(() => {
     if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
-    if (!state.subscriptions.some((subscription) => subscription.availability.state === 'unchecked')) return
-    const timer = window.setTimeout(async () => {
-      await refreshList()
-      setRefreshRound((round) => round + 1)
-    }, UNCHECKED_REFRESH_MS)
+    if (!state.value.some((subscription) => subscription.availability.state === 'unchecked')) return
+    const timer = window.setTimeout(pollUnchecked, UNCHECKED_REFRESH_MS)
     return () => window.clearTimeout(timer)
   }, [state, refreshRound])
 
@@ -85,13 +65,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     setNotice('subscribing…')
     try {
       const created = await subscribeToFeed(url)
-      setState((current) => {
-        if (current.kind !== 'loaded') return { kind: 'loaded', subscriptions: [created.subscription] }
-        if (current.subscriptions.some((subscription) => subscription.feedId === created.subscription.feedId)) {
-          return current
-        }
-        return { kind: 'loaded', subscriptions: [...current.subscriptions, created.subscription] }
-      })
+      await refreshList()
       setQuery('')
       setNotice('subscribed — checking the feed…')
       setRefreshRound(0)
@@ -133,10 +107,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     } finally {
       setRetryingFeedId(undefined)
     }
-    try {
-      const { subscriptions } = await fetchSubscriptions()
-      setState({ kind: 'loaded', subscriptions })
-    } catch {}
+    await refreshList()
   }
 
   return (
@@ -208,7 +179,7 @@ function SubscriptionList({
   onRetry,
   onOpen,
 }: {
-  state: SubscriptionState
+  state: Resource<readonly SubscriptionSummary[]>
   query: string
   retryingFeedId: number | undefined
   onRetry: (feedId: number) => void
@@ -216,11 +187,10 @@ function SubscriptionList({
 }) {
   if (state.kind === 'loading')
     return <LoadingNote className="empty-note subscription-list-state">loading feeds</LoadingNote>
-  if (state.kind === 'unavailable') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
-  if (state.subscriptions.length === 0)
-    return <p className="empty-note subscription-list-state">no subscriptions yet</p>
+  if (state.kind !== 'loaded') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
+  if (state.value.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
 
-  const shown = state.subscriptions.filter((subscription) => matches(subscription, query))
+  const shown = state.value.filter((subscription) => matches(subscription, query))
   if (shown.length === 0) return <p className="empty-note subscription-list-state">no feeds match</p>
 
   return (

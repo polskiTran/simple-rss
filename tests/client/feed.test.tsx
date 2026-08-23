@@ -83,7 +83,6 @@ describe('opening one Feed', () => {
     expect(window.location.pathname).toBe('/feeds/1')
     expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
     expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
-    // No Feed Description reported, so no line claims the space under the header.
     expect(container.querySelector('.feed-description')).toBeNull()
 
     expect(container.querySelectorAll('.cadence-cell')).toHaveLength(181)

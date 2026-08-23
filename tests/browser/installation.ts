@@ -201,9 +201,6 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 
 export { expect } from '@playwright/test'
 
-// Measured against the body, not the viewport: `scrollbar-gutter: stable`
-// keeps the scrollbar's width out of the content, so `innerWidth` would hide
-// an overflow that wide.
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.body.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)

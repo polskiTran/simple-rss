@@ -103,7 +103,6 @@ test.describe('desktop Feed and Digest rendering', () => {
     const description = page.getByRole('textbox', { name: 'description' })
     await expect(title).toHaveAttribute('placeholder', 'Field Notes')
     await expect(description).toHaveAttribute('placeholder', 'Notes from the field.')
-    // The server's bounds cap the fields, so an over-long value cannot reach the 400.
     await expect(title).toHaveAttribute('maxlength', '512')
     await expect(description).toHaveAttribute('maxlength', '1024')
     await title.fill('Tech tabloid')
