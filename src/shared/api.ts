@@ -143,7 +143,7 @@ export const MAX_FEED_SIZE_MIB = 20
 
 export const PREVIEW_ITEM_COUNT = 5
 
-/** A Feed a page names in `<link rel="alternate">`; document order, deduped by URL. */
+/** A Feed a page names in `<link rel="alternate">`. */
 export const declaredFeedSchema = z.object({
   url: z.string(),
   title: z.string().nullable(),
@@ -161,7 +161,7 @@ export type PreviewItem = z.infer<typeof previewItemSchema>
 
 /** What `POST /api/feeds/preview` answers; nothing was recorded. */
 export const feedPreviewSchema = z.object({
-  /** The Feed URL the preview fetched — the typed URL, or the Declared Feed it followed. What subscribe sends. */
+  /** The Feed URL the preview fetched — never the redirect target. What subscribe sends. */
   url: z.string(),
   title: z.string(),
   description: z.string().nullable(),
@@ -170,7 +170,7 @@ export const feedPreviewSchema = z.object({
   homePageUrl: z.string().nullable(),
   /** Newest first by `publishedAt`; undated items after, in document order. */
   items: z.array(previewItemSchema).max(PREVIEW_ITEM_COUNT),
-  /** Every Declared Feed when the typed URL was a page, the followed one included; empty when it was a Feed. */
+  /** The Feeds a page declares. Empty until page discovery lands: a typed Feed URL declares none. */
   declaredFeeds: z.array(declaredFeedSchema),
   /** Set when the Feed is already subscribed — found before the fetch, or revealed by a redirect after it. */
   subscribed: z.object({ feedId: z.number().int().positive() }).nullable(),

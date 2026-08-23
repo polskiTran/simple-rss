@@ -9,7 +9,7 @@ import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 import { retryFailure, subscribedNotice, unavailableNote } from './feed-language.js'
 import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
-import { PreviewDialog } from './preview-dialog.js'
+import { PreviewDialog, type PreviewRequest } from './preview-dialog.js'
 
 const UNCHECKED_REFRESH_LADDER_MS = [3_000, 5_000] as const
 const UNCHECKED_REFRESH_STEADY_MS = 10_000
@@ -27,7 +27,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [state, setState] = useState<SubscriptionState>({ kind: 'loading' })
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
-  const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined)
+  const [preview, setPreview] = useState<PreviewRequest | undefined>(undefined)
   const field = useRef<HTMLInputElement>(null)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
@@ -77,17 +77,12 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const url = feedUrlOf(query)
-    if (!url || previewUrl !== undefined) return
+    if (!url) return
     setNotice('')
-    setPreviewUrl(url)
+    setPreview({ url })
   }
 
-  const closePreview = useCallback(() => setPreviewUrl(undefined), [])
-
-  const previewFailed = useCallback((sentence: string) => {
-    setNotice(sentence)
-    setPreviewUrl(undefined)
-  }, [])
+  const previewFailed = useCallback((sentence: string) => setNotice(sentence), [])
 
   function subscribed(subscription: SubscriptionSummary, observedItems: number) {
     setState((current) => {
@@ -97,7 +92,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     })
     setQuery('')
     setNotice(subscribedNotice(observedItems))
-    setPreviewUrl(undefined)
   }
 
   function imported(outcome: OpmlImportOutcome) {
@@ -152,15 +146,11 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         />
       </form>
       <PreviewDialog
-        url={previewUrl}
+        request={preview}
         field={field}
-        onClose={closePreview}
         onSubscribed={subscribed}
         onFailed={previewFailed}
-        onOpenFeed={(feedId) => {
-          setPreviewUrl(undefined)
-          onOpenFeed(feedId)
-        }}
+        onOpenFeed={onOpenFeed}
       />
       <OpmlControls onOutcome={imported} />
       <p className="notice feed-notice" aria-live="polite">

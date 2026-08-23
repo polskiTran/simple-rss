@@ -697,8 +697,9 @@
     margin: 20px 0 0;
   }
 
-  /* What the machine answers on its own clock enters on a breath (docs/DESIGN.md §5): the
-     preview's body fades in where the wait stood, opacity only. */
+  /* The preview's body fades in where the wait stood, opacity only. It lives inside an
+     overlay, so under reduced motion it goes instant with the overlay's own fades
+     (docs/DESIGN.md §5) rather than keeping a view's gentler one. */
   .preview-arrived {
     animation: preview-arrive 150ms ease-out;
   }

@@ -19,7 +19,7 @@ export type PreviewOutcome =
   | { readonly kind: 'no-feed-found' }
   | FailedPoll
 
-/** What a subscribed Feed contributes to its own preview: the name the User knows it by. */
+/** A subscribed Feed as the store presents it: the effective title and description, and the domain the list shows. */
 interface SubscribedFeed {
   readonly feedId: number
   readonly title: string
@@ -170,9 +170,9 @@ interface UnpresentedItem {
 
 /** Dated items newest first; undated ones after, still in document order. */
 function newestFirst<Item extends UnpresentedItem>(items: readonly Item[]): Item[] {
-  const dated = items.filter((item) => item.publishedAt !== null)
+  const dated = items.filter((item): item is Item & { publishedAt: string } => item.publishedAt !== null)
   const undated = items.filter((item) => item.publishedAt === null)
-  dated.sort((left, right) => Date.parse(right.publishedAt ?? '') - Date.parse(left.publishedAt ?? ''))
+  dated.sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))
   return [...dated, ...undated]
 }
 

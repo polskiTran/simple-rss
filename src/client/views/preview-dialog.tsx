@@ -6,17 +6,19 @@ import { previewFeed, subscribeToFeed } from '../api.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { subscriptionFailure } from './feed-language.js'
 
+/** One submission of the field. A fresh object reopens the dialog, even for the address just abandoned. */
+export interface PreviewRequest {
+  readonly url: string
+}
+
 type Phase =
-  | { readonly kind: 'previewing' }
   | { readonly kind: 'arrived'; readonly preview: FeedPreview }
   | { readonly kind: 'subscribing'; readonly preview: FeedPreview }
 
 export interface PreviewDialogProps {
-  /** The address being previewed; the dialog is closed while this is undefined. */
-  readonly url: string | undefined
+  readonly request: PreviewRequest | undefined
   /** Where focus lands when the dialog closes, whatever closed it. */
   readonly field: RefObject<HTMLInputElement | null>
-  onClose(): void
   onSubscribed(subscription: SubscriptionSummary, observedItems: number): void
   /** One sentence for under the field — the preview or the subscribe did not go through. */
   onFailed(sentence: string): void
@@ -27,49 +29,66 @@ export interface PreviewDialogProps {
  * The question asked before anything is written: `subscribe to <title>?`,
  * with the Feed's host, description, and recent items. Opens at once in its
  * in-progress state; a failed preview closes it with the sentence handed up.
+ * What it shows is keyed to the request it answered, so the body holds still
+ * through the exit fade and the next request opens on the wait, not on the
+ * last answer.
  */
-export function PreviewDialog({ url, field, onClose, onSubscribed, onFailed, onOpenFeed }: PreviewDialogProps) {
-  const [phase, setPhase] = useState<Phase>({ kind: 'previewing' })
+export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFeed }: PreviewDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [answer, setAnswer] = useState<{ readonly request: PreviewRequest; readonly phase: Phase }>()
+  const inFlight = useRef<AbortController>(undefined)
   const popup = useRef<HTMLDivElement>(null)
+  const phase = answer && answer.request === request ? answer.phase : undefined
 
   useEffect(() => {
-    setPhase({ kind: 'previewing' })
-    if (url === undefined) return
-    const request = new AbortController()
-    previewFeed(url, request.signal)
-      .then((preview) => setPhase({ kind: 'arrived', preview }))
+    if (!request) return
+    const controller = new AbortController()
+    inFlight.current = controller
+    setOpen(true)
+    previewFeed(request.url, controller.signal)
+      .then((preview) => setAnswer({ request, phase: { kind: 'arrived', preview } }))
       .catch((error: unknown) => {
-        if (!request.signal.aborted) onFailed(subscriptionFailure(error))
+        if (controller.signal.aborted) return
+        setOpen(false)
+        onFailed(subscriptionFailure(error))
       })
-    return () => request.abort()
-  }, [url, onFailed])
+    return () => controller.abort()
+  }, [request, onFailed])
+
+  function close() {
+    inFlight.current?.abort()
+    setOpen(false)
+  }
 
   async function subscribe(preview: FeedPreview) {
-    setPhase({ kind: 'subscribing', preview })
+    if (!request) return
+    setAnswer({ request, phase: { kind: 'subscribing', preview } })
     try {
       const { subscription, observedItems } = await subscribeToFeed(preview.url)
+      setOpen(false)
       onSubscribed(subscription, observedItems)
     } catch (error) {
+      setOpen(false)
       onFailed(subscriptionFailure(error))
     }
   }
 
-  const subscribing = phase.kind === 'subscribing'
+  const subscribing = phase?.kind === 'subscribing'
 
   return (
     <Dialog.Root
-      open={url !== undefined}
+      open={open}
       onOpenChange={(next) => {
-        if (!next && !subscribing) onClose()
+        if (!next && !subscribing) close()
       }}
     >
       <Dialog.Portal>
         <Dialog.Backdrop className="overlay-backdrop" />
         <Dialog.Viewport className="overlay-viewport">
           <Dialog.Popup className="overlay-popup" ref={popup} initialFocus={popup} finalFocus={field}>
-            {phase.kind === 'previewing' ? (
+            {phase === undefined ? (
               <>
-                <Dialog.Title className="overlay-title">previewing {hostOf(url ?? '')}</Dialog.Title>
+                <Dialog.Title className="overlay-title">previewing {hostOf(request?.url ?? '')}</Dialog.Title>
                 <LoadingNote className="overlay-description" announce>
                   reading the feed — this can take a few seconds
                 </LoadingNote>
@@ -84,7 +103,10 @@ export function PreviewDialog({ url, field, onClose, onSubscribed, onFailed, onO
                 preview={phase.preview}
                 subscribing={subscribing}
                 onSubscribe={() => void subscribe(phase.preview)}
-                onOpenFeed={onOpenFeed}
+                onOpenFeed={(feedId) => {
+                  setOpen(false)
+                  onOpenFeed(feedId)
+                }}
               />
             )}
           </Dialog.Popup>
@@ -147,10 +169,10 @@ function Arrived({
   )
 }
 
-/** The typed line stands in for a host that will not parse; the server answers 400 for it. */
+/** The same host the Feeds list would show; the typed line stands in for one that will not parse. */
 function hostOf(url: string): string {
   try {
-    return new URL(url).host
+    return new URL(url).hostname
   } catch {
     return url
   }
