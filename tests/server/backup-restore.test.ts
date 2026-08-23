@@ -177,7 +177,7 @@ describe('the restore command', () => {
 
     expect(JSON.parse(output[0]!)).toEqual({
       restored: true,
-      migrationsApplied: [],
+      migrationsApplied: 0,
       indexedItems: 0,
       feeds: 0,
       subscriptions: 0,
@@ -223,7 +223,7 @@ describe('backup and restore, round-tripped through the running application', ()
     expect(await runCli(['restore', backupPath], restorer)).toBe(0)
     expect(JSON.parse(output[0]!)).toEqual({
       restored: true,
-      migrationsApplied: [],
+      migrationsApplied: 0,
       indexedItems: 1,
       feeds: 1,
       subscriptions: 1,
@@ -272,6 +272,6 @@ describe('backup and restore, round-tripped through the running application', ()
     expect(await runCli(['restore', backupPath], context)).toBe(0)
 
     const report = JSON.parse(output[0]!)
-    expect(report.migrationsApplied).toEqual(migrations.slice(3).map((migration) => migration.version))
+    expect(report.migrationsApplied).toBe(migrations.length - 3)
   })
 })

@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import type { Clock } from '../clock.js'
 import { buildUserExport } from '../export/user-export.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { NO_STORE } from './responses.js'
 
 export interface ExportRouteDependencies {
-  readonly database: SqliteDatabase
+  readonly db: DrizzleDatabase
   readonly settings: InstallationSettingsStore
   readonly clock: Clock
 }
@@ -19,7 +19,7 @@ export function exportRoutes(deps: ExportRouteDependencies): Hono {
   const app = new Hono()
 
   app.get('/export', (c) => {
-    const document = buildUserExport({ database: deps.database, settings: deps.settings, clock: deps.clock })
+    const document = buildUserExport({ db: deps.db, settings: deps.settings, clock: deps.clock })
     return c.body(JSON.stringify(document, null, 2), 200, {
       ...NO_STORE,
       'Content-Type': 'application/json; charset=utf-8',
