@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_POLLING_INTERVAL_MINUTES, MAX_FEED_SIZE_MIB } from '../../src/shared/api.js'
 import { nextPollTime } from '../../src/server/subscriptions/polling-schedule.js'
 import { claimedDevice } from '../support/device.js'
@@ -111,6 +111,28 @@ describe('Subscriptions', () => {
     expect(service.logs).not.toContainEqual(expect.objectContaining({ message: 'scheduler.feed_polled' }))
   })
 
+  it('does not nudge the scheduler: a Feed due meanwhile waits for the wake', async () => {
+    const service = await startTestService({ scheduling: { nudges: true } })
+    const importedUrl = 'https://atom.example/feed.xml'
+    service.upstream
+      .stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+      .stub(importedUrl, {
+        headers: { 'content-type': 'application/atom+xml' },
+        body: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Atom Letters</title></feed>',
+      })
+    const user = await claimedDevice(service)
+    const opml = `<?xml version="1.0"?><opml version="2.0"><body><outline type="rss" xmlUrl="${importedUrl}"/></body></opml>`
+    expect((await user.post('/api/subscriptions/import', { opml })).status).toBe(200)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(importedUrl)).toHaveLength(1))
+    service.clock.advance(3 * 60 * 60_000)
+
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+
+    expect(service.upstream.requestsTo(importedUrl)).toHaveLength(1)
+    await service.wakeScheduler()
+    expect(service.upstream.requestsTo(importedUrl)).toHaveLength(2)
+  })
+
   it('asks unconditionally: the proof carries no validators', async () => {
     const service = await startTestService()
     service.upstream.stub(ENTERED_URL, {
@@ -171,6 +193,19 @@ describe('Subscriptions', () => {
     expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
   })
 
+  it('answers an address that is not a public web address with 400 and never asks anyone', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+
+    for (const url of ['not a URL', 'ftp://journal.example/feed', 'https://user:secret@journal.example/feed']) {
+      const refused = await user.post('/api/subscriptions', { url })
+      expect(refused.status, url).toBe(400)
+      expect(await refused.json()).toMatchObject({ error: { code: 'invalid_feed_url' } })
+    }
+    expect(service.upstream.requests).toHaveLength(0)
+    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
+  })
+
   it('answers 409 when the URL redirects onto a Feed already subscribed', async () => {
     const service = await startTestService()
     service.upstream.stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
@@ -201,14 +236,17 @@ describe('Subscriptions', () => {
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
 
     service.clock.advance(60 * 60_000)
-    service.upstream.stub(RESOLVED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: RSS.replace(
-        '</item>',
-        '</item><item><guid>entry-2</guid><title>Second light</title><pubDate>Fri, 08 Aug 2026 09:30:00 GMT</pubDate></item>',
-      ),
-    })
-    const revived = await user.post('/api/subscriptions', { url: RESOLVED_URL })
+    const mirrorUrl = 'https://mirror.example/feed'
+    service.upstream
+      .stub(mirrorUrl, { status: 301, headers: { location: RESOLVED_URL, 'content-type': 'text/plain' } })
+      .stub(RESOLVED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: RSS.replace(
+          '</item>',
+          '</item><item><guid>entry-2</guid><title>Second light</title><pubDate>Fri, 08 Aug 2026 09:30:00 GMT</pubDate></item>',
+        ),
+      })
+    const revived = await user.post('/api/subscriptions', { url: mirrorUrl })
 
     expect(revived.status).toBe(201)
     expect(await revived.json()).toMatchObject({
@@ -221,6 +259,11 @@ describe('Subscriptions', () => {
       observedItems: 2,
     })
     expect(service.database?.prepare('SELECT count(*) AS count FROM feeds').get()).toEqual({ count: 1 })
+    expect(service.database?.prepare('SELECT url FROM feed_url_aliases WHERE feed_id = 1 ORDER BY url').all()).toEqual([
+      { url: RESOLVED_URL },
+      { url: ENTERED_URL },
+      { url: mirrorUrl },
+    ])
     const library = await (await user.get('/api/library')).json()
     expect(library.items).toMatchObject([{ title: 'First light', feedTitle: 'Field Notes', subscribed: true }])
     const digest = await (await user.get('/api/digest')).json()

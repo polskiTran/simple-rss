@@ -3,6 +3,7 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { dailyShadows } from '../../src/client/components/daily-band.js'
+import { subscribedNotice } from '../../src/client/views/feed-language.js'
 import { stubApi, type Reply } from './stub-api.js'
 
 const AVAILABLE = {
@@ -94,18 +95,9 @@ describe('Feeds', () => {
     expect(api.requestsTo('GET /api/feeds/1')).toHaveLength(0)
   })
 
-  it('counts the items in the plural', async () => {
-    stubApi()
-      .on('GET /api/feeds', { body: { subscriptions: [] } })
-      .on('POST /api/subscriptions', { status: 201, body: { subscription: FEED, observedItems: 12 } })
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
-
-    expect(await screen.findByText('subscribed — 12 items in the digest')).toBeDefined()
+  it('counts the items in the plural', () => {
+    expect(subscribedNotice(12)).toBe('subscribed — 12 items in the digest')
+    expect(subscribedNotice(0)).toBe('subscribed — 0 items in the digest')
   })
 
   it('says in one sentence why the address did not prove to be a Feed, and keeps it in the field', async () => {
