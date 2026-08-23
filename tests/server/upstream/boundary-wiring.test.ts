@@ -18,7 +18,7 @@ describe('the service boundary', () => {
     expect(service.upstream.requestsTo(FEED)).toHaveLength(1)
   })
 
-  it('serves a pasted page under discovery and its Declared Feed under preview, each with its own profile', async () => {
+  it('serves a pasted page and a Feed under preview, asking for either', async () => {
     const service = await startTestService()
     service.upstream.stub('https://blog.example.com/', {
       headers: { 'content-type': 'text/html' },
@@ -29,7 +29,7 @@ describe('the service boundary', () => {
       body: '<rss></rss>',
     })
 
-    const page = await service.retrieval.retrieveBytes({ url: 'https://blog.example.com/', operation: 'discovery' })
+    const page = await service.retrieval.retrieveBytes({ url: 'https://blog.example.com/', operation: 'preview' })
     const feed = await service.retrieval.retrieveBytes({
       url: 'https://blog.example.com/feed.xml',
       operation: 'preview',
@@ -38,10 +38,7 @@ describe('the service boundary', () => {
     expect(page).toMatchObject({ ok: true, contentType: 'text/html' })
     expect(feed).toMatchObject({ ok: true, contentType: 'application/rss+xml' })
     expect(service.upstream.requestsTo('https://blog.example.com/')[0]?.headers.accept).toBe(
-      'text/html, application/xhtml+xml',
-    )
-    expect(service.upstream.requestsTo('https://blog.example.com/feed.xml')[0]?.headers.accept).toBe(
-      'application/rss+xml, application/atom+xml, application/xml, text/xml',
+      'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html, application/xhtml+xml',
     )
   })
 

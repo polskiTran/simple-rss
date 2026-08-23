@@ -13,11 +13,11 @@ import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedDescription, effectiveFeedTitle, feedItems, feeds, subscriptions } from '../persistence/schema.js'
-import { RETRIEVAL_PROFILES, type Retrieval, type RetrievalLimits } from '../upstream/retrieval.js'
+import { RETRIEVAL_PROFILES, type Retrieval } from '../upstream/retrieval.js'
 import { aliasOwnerOf, canonicalFeedUrl } from './feed-aliases.js'
 import type { FailedPoll } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
-import { answeredWithPage, proveFeed, type ProvenFeed } from './prove-feed.js'
+import { proveFeed, type ProvenFeed } from './prove-feed.js'
 
 export type PreviewOutcome =
   | { readonly kind: 'previewed'; readonly preview: PresentedPreview }
@@ -56,20 +56,15 @@ export class FeedPreview {
   }
 
   /**
-   * A pasted Feed is proven under `preview`. A pasted page is read again under
-   * `discovery` and its first Declared Feed proven in turn — the three
-   * retrievals share the preview profile's one deadline, each handed what the
-   * earlier ones left. A Feed already subscribed, pasted or declared, is
-   * answered from the store without asking the publisher.
+   * Proven under `preview`, which accepts a Feed or a page. A page is read for
+   * its Declared Feeds and the first is proven in turn, handed what is left of
+   * the profile's one deadline. A Feed already subscribed, pasted or declared,
+   * is answered from the store without asking the publisher.
    */
   async preview(enteredUrl: string, signal?: AbortSignal): Promise<PreviewOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
-    // One clock over every retrieval this preview makes; the boundary floors a spent budget at its minimum.
     const startedAt = performance.now()
-    const remaining = (): RetrievalLimits => ({
-      timeoutMs: RETRIEVAL_PROFILES.preview.deadline.timeoutMs - (performance.now() - startedAt),
-    })
 
     const known = this.#knownSubscription(requestedUrl)
     if (known) return this.#answerFromStore(requestedUrl, known, [])
@@ -81,15 +76,9 @@ export class FeedPreview {
       ...(signal && { signal }),
     })
     if (proof.kind === 'proven') return this.#answerFromProof(requestedUrl, proof, [])
-    if (!answeredWithPage(proof)) return proof
+    if (proof.kind !== 'page') return proof
 
-    const page = await this.#retrieval.retrieveBytes({
-      url: requestedUrl,
-      operation: 'discovery',
-      ...(signal && { signal }),
-      limits: remaining(),
-    })
-    if (!page.ok) return { kind: 'retrieval-failed', failure: page }
+    const { retrieved: page } = proof
     const declared = declaredFeeds(page.bytes, page.url, page.charset)
     const [first] = declared
     if (!first) {
@@ -105,8 +94,9 @@ export class FeedPreview {
       url: first.url,
       operation: 'preview',
       ...(signal && { signal }),
-      limits: remaining(),
+      limits: { timeoutMs: RETRIEVAL_PROFILES.preview.deadline.timeoutMs - (performance.now() - startedAt) },
     })
+    if (declaredProof.kind === 'page') return { kind: 'no-feed-found' }
     if (declaredProof.kind !== 'proven') return declaredProof
     return this.#answerFromProof(first.url, declaredProof, declared)
   }

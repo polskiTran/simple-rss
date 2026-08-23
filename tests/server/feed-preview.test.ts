@@ -295,12 +295,7 @@ describe('Feed preview of a page', () => {
       ],
       subscribed: null,
     })
-    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL, PAGE_URL, FEED_URL])
-    expect(service.upstream.requests.map((request) => request.headers.accept)).toEqual([
-      expect.stringContaining('application/rss+xml'),
-      expect.stringContaining('text/html'),
-      expect.stringContaining('application/rss+xml'),
-    ])
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL, FEED_URL])
     expect(service.database?.prepare('SELECT count(*) AS count FROM feeds').get()).toEqual({ count: 0 })
   })
 
@@ -325,23 +320,6 @@ describe('Feed preview of a page', () => {
     })
   })
 
-  it('reads a page cut at the discovery ceiling as it stands and answers 200', async () => {
-    const service = await startTestService()
-    const filler = `<p>${'x'.repeat(1024 * 1024)}</p>`
-    service.upstream
-      .stub(PAGE_URL, page(declaration('/feed', 'Posts'), `${filler}${declaration('/comments/feed', 'Comments')}`))
-      .stub(FEED_URL, {
-        headers: { 'content-type': 'application/rss+xml' },
-        body: rss(item('today', 'First light', 'Sat, 08 Aug 2026 07:15:00 GMT')),
-      })
-    const user = await claimedDevice(service)
-
-    const previewed = await user.post('/api/feeds/preview', { url: PAGE_URL })
-
-    expect(previewed.status).toBe(200)
-    expect(await previewed.json()).toMatchObject({ url: FEED_URL, declaredFeeds: [{ url: FEED_URL, title: 'Posts' }] })
-  })
-
   it('answers a page that declares nothing as no_feed_found', async () => {
     const service = await startTestService()
     service.upstream.stub(PAGE_URL, page('<link rel="stylesheet" href="/site.css">', '<p>no feed here</p>'))
@@ -351,7 +329,7 @@ describe('Feed preview of a page', () => {
 
     expect(refused.status).toBe(422)
     expect(await refused.json()).toMatchObject({ error: { code: 'no_feed_found' } })
-    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL, PAGE_URL])
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL])
   })
 
   it('answers with the Declared Feed’s own failure when it fails to prove', async () => {
@@ -379,7 +357,7 @@ describe('Feed preview of a page', () => {
     expect(service.upstream.requests.map((request) => request.url)).toEqual([PAGE_URL])
   })
 
-  it('spends one 15 s budget on the whole page path, handing each later retrieval the remainder', async () => {
+  it('spends one 15 s budget on the whole page path, handing the Declared Feed the remainder', async () => {
     const budgets: Array<{ operation: string; timeoutMs: number | undefined }> = []
     const service = await startTestService({
       retrieval: (boundary) => ({
@@ -398,11 +376,11 @@ describe('Feed preview of a page', () => {
 
     expect((await user.post('/api/feeds/preview', { url: PAGE_URL })).status).toBe(200)
 
-    expect(budgets.map((budget) => budget.operation)).toEqual(['preview', 'discovery', 'preview'])
-    const [, discovery, feed] = budgets
-    expect(discovery?.timeoutMs).toBeLessThanOrEqual(15_000 - 150)
-    expect(feed?.timeoutMs).toBeLessThanOrEqual((discovery?.timeoutMs ?? 0) - 150)
-    expect(feed?.timeoutMs).toBeGreaterThan(0)
+    expect(budgets.map((budget) => budget.operation)).toEqual(['preview', 'preview'])
+    const [pasted, followed] = budgets
+    expect(pasted?.timeoutMs).toBeUndefined()
+    expect(followed?.timeoutMs).toBeLessThanOrEqual(15_000 - 150)
+    expect(followed?.timeoutMs).toBeGreaterThan(0)
   })
 
   it('re-discovers a page pasted again, reads subscribed for the default, and never aliases the page', async () => {
@@ -433,7 +411,7 @@ describe('Feed preview of a page', () => {
       ],
       subscribed: { feedId: 1 },
     })
-    expect(service.upstream.requests.slice(askedBefore).map((request) => request.url)).toEqual([PAGE_URL, PAGE_URL])
+    expect(service.upstream.requests.slice(askedBefore).map((request) => request.url)).toEqual([PAGE_URL])
     expect(service.database?.prepare('SELECT url FROM feed_url_aliases ORDER BY url').all()).toEqual([
       { url: FEED_URL },
     ])

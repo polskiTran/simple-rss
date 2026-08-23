@@ -39,7 +39,7 @@ import { aliasOwnerOf, canonicalFeedUrl } from './feed-aliases.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
 import { nextPollTime } from './polling-schedule.js'
-import { answeredWithPage, proveFeed } from './prove-feed.js'
+import { proveFeed } from './prove-feed.js'
 
 export type SubscribeOutcome =
   | { readonly kind: 'subscribed'; readonly subscription: SubscriptionSummary; readonly observedItems: number }
@@ -124,7 +124,8 @@ export class SubscriptionService {
     if (!requestedUrl) return { kind: 'invalid-url' }
 
     const proof = await proveFeed({ retrieval: this.#retrieval, url: requestedUrl, operation: 'preview' })
-    if (proof.kind !== 'proven') return answeredWithPage(proof) ? { kind: 'no-feed-found' } : proof
+    if (proof.kind === 'page') return { kind: 'no-feed-found' }
+    if (proof.kind !== 'proven') return proof
     const { retrieved, parsed } = proof
 
     const owner = aliasOwnerOf(this.#db, retrieved.url, requestedUrl)

@@ -185,7 +185,6 @@ describe('retrieveBytes', () => {
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
       ok: false,
       code: 'unsupported_content_type',
-      contentType: 'text/html',
     })
   })
 
@@ -197,7 +196,6 @@ describe('retrieveBytes', () => {
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
       ok: false,
       code: 'unsupported_content_type',
-      contentType: '',
     })
   })
 
@@ -270,37 +268,6 @@ describe('retrieveBytes', () => {
         }),
       ),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
-  })
-
-  it('ends a discovery body cleanly at the ceiling instead of refusing it', async () => {
-    const { retrieval, upstream } = harness()
-    const chunk = new Uint8Array(256).fill(1)
-    upstream.stubDynamic('https://example.com/', () => ({
-      headers: { 'content-type': 'text/html; charset=utf-8' },
-      body: chunkedBody([chunk, chunk, chunk, chunk, chunk, chunk]),
-    }))
-
-    const result = await retrieval.retrieveBytes(
-      feedRequest('https://example.com/', { operation: 'discovery', maxBytes: 1000 }),
-    )
-
-    expect(result).toMatchObject({ ok: true, status: 200 })
-    expect(result.ok && result.bytes.byteLength).toBe(1000)
-  })
-
-  it('does not refuse a discovery page whose declared length is above the ceiling', async () => {
-    const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/', {
-      headers: { 'content-type': 'text/html', 'content-length': '5000' },
-      body: 'x'.repeat(5000),
-    })
-
-    const result = await retrieval.retrieveBytes(
-      feedRequest('https://example.com/', { operation: 'discovery', maxBytes: 1000 }),
-    )
-
-    expect(result).toMatchObject({ ok: true })
-    expect(result.ok && result.bytes.byteLength).toBe(1000)
   })
 
   it('reports an upstream error status without treating it as a body', async () => {
@@ -670,28 +637,6 @@ describe('capacity', () => {
 
     expect(refused).toMatchObject({ ok: false, code: 'busy' })
     expect(elsewhere).toMatchObject({ ok: true })
-    await expect(held).resolves.toMatchObject({ ok: true })
-  })
-
-  it('gives discovery a budget of its own, apart from preview', async () => {
-    const { retrieval, upstream } = harness({ operationCapacity: { discovery: { maxConcurrent: 1, maxQueued: 0 } } })
-    upstream.stub('https://example.com/', {
-      delayMs: 50,
-      headers: { 'content-type': 'text/html' },
-      body: '<html></html>',
-    })
-    upstream.stub('https://example.com/feed.xml', {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: '<rss></rss>',
-    })
-    const pageRequest = feedRequest('https://example.com/', { operation: 'discovery' })
-
-    const held = retrieval.retrieveBytes(pageRequest)
-    const refused = await retrieval.retrieveBytes(pageRequest)
-    const preview = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { operation: 'preview' }))
-
-    expect(refused).toMatchObject({ ok: false, code: 'busy' })
-    expect(preview).toMatchObject({ ok: true })
     await expect(held).resolves.toMatchObject({ ok: true })
   })
 

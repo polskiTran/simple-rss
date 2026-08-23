@@ -8,8 +8,8 @@ const DECLARED_FEED_TYPES = new Set(['application/rss+xml', 'application/atom+xm
 /**
  * The Feeds a page declares in `<link rel="alternate">`, in document order and
  * deduped by resolved URL — the first is the page's default. The whole document
- * is scanned, `<body>` included; a truncated document yields what arrived
- * before the cut. `href` resolves against the first `<base href>` (itself
+ * is scanned, `<body>` included, and a document cut short yields what
+ * arrived before the cut. `href` resolves against the first `<base href>` (itself
  * against `documentUrl`), else `documentUrl`, which is the post-redirect
  * address. Only web addresses are kept; `title` is the attribute verbatim, or
  * null when absent or blank.

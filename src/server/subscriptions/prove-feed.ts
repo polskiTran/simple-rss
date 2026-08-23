@@ -27,6 +27,12 @@ export interface FeedNotModified {
   readonly validators: FeedValidators
 }
 
+/** The address was a page, not a Feed; only `preview` accepts one. Its body is for the Declared Feeds. */
+export interface AnsweredWithPage {
+  readonly kind: 'page'
+  readonly retrieved: RetrievalBytes
+}
+
 export type FeedProof = ProvenFeed | FailedPoll
 /** What a caller that passed validators can be answered. */
 export type ConditionalFeedProof = FeedProof | FeedNotModified
@@ -51,15 +57,19 @@ interface ProveFeedOptions {
  * those validators hold, since a Feed's first poll passes two nulls and still
  * honours a 304. A caller that passes none and is answered 304 has met a
  * publisher answering without a body, which is an `http_error` like any other
- * bodiless status.
+ * bodiless status. Only a `preview` caller can be answered `page`, since only
+ * that profile accepts one.
  */
 export function proveFeed(
   options: ProveFeedOptions & { readonly validators: FeedValidators },
 ): Promise<ConditionalFeedProof>
+export function proveFeed(
+  options: ProveFeedOptions & { readonly operation: 'preview' },
+): Promise<FeedProof | AnsweredWithPage>
 export function proveFeed(options: ProveFeedOptions): Promise<FeedProof>
 export async function proveFeed(
   options: ProveFeedOptions & { readonly validators?: FeedValidators },
-): Promise<ConditionalFeedProof> {
+): Promise<ConditionalFeedProof | AnsweredWithPage> {
   const { retrieval, url, operation, validators, priorUrls = [], signal, limits } = options
 
   const headers: Record<string, string> = {}
@@ -91,18 +101,12 @@ export async function proveFeed(
     }
   }
 
+  if (PAGE_CONTENT_TYPES.includes(retrieved.contentType)) return { kind: 'page', retrieved }
+
   try {
     return { kind: 'proven', retrieved, parsed: parseFeedDocument(retrieved.bytes, retrieved.url, [url, ...priorUrls]) }
   } catch (error) {
     if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
     throw error
   }
-}
-
-export function answeredWithPage(proof: FailedPoll): boolean {
-  return (
-    proof.kind === 'retrieval-failed' &&
-    proof.failure.code === 'unsupported_content_type' &&
-    PAGE_CONTENT_TYPES.includes(proof.failure.contentType ?? '')
-  )
 }
