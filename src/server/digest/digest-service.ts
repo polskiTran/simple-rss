@@ -1,20 +1,19 @@
 import { desc, eq, sql, type SQL } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Digest, DigestItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { chronologyTime, dateKey, dayAfter, dayBefore, dayStartUtc, inDigestOrder, timeLabel } from './chronology.js'
 import { beyondCursorSql, chronologySql, LIST_PAGE_SIZE, nextListCursor, type ListCursor } from './list-page.js'
 
 export class DigestService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
 
-  constructor(options: { database: SqliteDatabase; clock: Clock; settings: InstallationSettingsStore }) {
-    this.#db = drizzle(options.database)
+  constructor(options: { db: DrizzleDatabase; clock: Clock; settings: InstallationSettingsStore }) {
+    this.#db = options.db
     this.#clock = options.clock
     this.#settings = options.settings
   }

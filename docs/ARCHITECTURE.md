@@ -107,7 +107,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Client:** views, interactions, browser caching, and same-origin API calls
 - **HTTP:** routing, cookies, request validation, rate limiting, and response policy
 - **Authentication:** setup, credentials, sessions, and emergency reset
-- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` owns every Subscription write (create, OPML, unsubscribe, polling interval), `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailability` owns the three Feed Availability writes (`recordSuccess`, `recordFailure`, `recordDeferral`)
+- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` owns every Subscription write (create, OPML, unsubscribe, polling interval), `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailabilityLedger` owns every Feed Availability write (`record` settles a poll outcome, and `recordSuccess` covers the merge survivor)
 - **Retrieval:** the one hardened boundary every outbound request passes through — destination and redirect validation, deadlines, decoded-size ceilings, and retrieval budgets
 - **Ingestion:** parsing, normalization, identity, and polling state
 - **Digest:** chronology and date grouping
@@ -319,7 +319,7 @@ OPML is the interoperability format for Subscriptions. A versioned JSON export i
 - Retained Feed Items
 - Library membership
 - Installation preferences
-- Export/schema version
+- Export version
 
 Exports exclude password verifiers, setup secrets, sessions, rate-limit state, caches, FTS tables, and migration internals.
 

@@ -10,7 +10,7 @@ describe('openDatabase', () => {
     const dataDir = await makeTempDataDir()
 
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
-    db.close()
+    db.$client.close()
 
     expect(existsSync(join(dataDir, 'simple-rss.db'))).toBe(true)
   })
@@ -19,7 +19,7 @@ describe('openDatabase', () => {
     const dataDir = await makeTempDataDir()
 
     const db = openDatabase(join(dataDir, 'nested', 'simple-rss.db'))
-    db.close()
+    db.$client.close()
 
     expect(existsSync(join(dataDir, 'nested', 'simple-rss.db'))).toBe(true)
   })
@@ -28,8 +28,8 @@ describe('openDatabase', () => {
     const dataDir = await makeTempDataDir()
 
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
-    const [row] = db.pragma('journal_mode') as Array<{ journal_mode: string }>
-    db.close()
+    const [row] = db.$client.pragma('journal_mode') as Array<{ journal_mode: string }>
+    db.$client.close()
 
     expect(row?.journal_mode).toBe('wal')
   })
@@ -38,8 +38,8 @@ describe('openDatabase', () => {
     const dataDir = await makeTempDataDir()
 
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
-    const [row] = db.pragma('busy_timeout') as Array<{ timeout: number }>
-    db.close()
+    const [row] = db.$client.pragma('busy_timeout') as Array<{ timeout: number }>
+    db.$client.close()
 
     expect(row?.timeout).toBeGreaterThanOrEqual(5000)
   })
@@ -48,8 +48,8 @@ describe('openDatabase', () => {
     const dataDir = await makeTempDataDir()
 
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
-    const [row] = db.pragma('foreign_keys') as Array<{ foreign_keys: number }>
-    db.close()
+    const [row] = db.$client.pragma('foreign_keys') as Array<{ foreign_keys: number }>
+    db.$client.close()
 
     expect(row?.foreign_keys).toBe(1)
   })

@@ -1,7 +1,10 @@
-import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { desc, sql } from 'drizzle-orm'
+import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
 
-/** Typed mirror of the tables the server queries; migrations remain the source of truth. */
+/**
+ * Typed mirror of the tables the server queries; migrations remain the source of
+ * truth, and tests/server/persistence/schema-mirror.test.ts holds the two in step.
+ */
 export const installationSettings = sqliteTable(
   'installation_settings',
   {
@@ -25,32 +28,56 @@ export const userAuth = sqliteTable(
   (table) => [check('user_auth_singleton', sql`${table.id} = 1`)],
 )
 
+/** Readiness' reusable write target (`assertWritable`); one row, rewritten in place. */
+export const writeProbe = sqliteTable(
+  'write_probe',
+  {
+    id: integer('id').primaryKey(),
+    checkedAt: text('checked_at').notNull(),
+  },
+  (table) => [check('write_probe_singleton', sql`${table.id} = 1`)],
+)
+
 /** One signed-in device, keyed by the hash of the token it presents. */
-export const sessions = sqliteTable('sessions', {
-  tokenHash: text('token_hash').primaryKey(),
-  createdAt: text('created_at').notNull(),
-  lastSeenAt: text('last_seen_at').notNull(),
-  expiresAt: text('expires_at').notNull(),
-})
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    createdAt: text('created_at').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (table) => [index('sessions_expires_at').on(table.expiresAt)],
+)
 
 /** Publisher-owned Feed metadata and the two intentionally distinct URLs. */
-export const feeds = sqliteTable('feeds', {
-  id: integer('id').primaryKey(),
-  enteredUrl: text('entered_url').notNull().unique(),
-  resolvedUrl: text('resolved_url').notNull().unique(),
-  title: text('title').notNull(),
-  /** The Feed Description; null when the document reports none. Refreshed with the title. */
-  description: text('description'),
-  /** The host shown for the Feed: the home page's when it declares one, else the Feed URL's. */
-  domain: text('domain').notNull(),
-  /** Null until a retrieval finds a site link that is not the Feed URL itself. */
-  homePageUrl: text('home_page_url'),
-  /** Validators from the last successful retrieval, for conditional requests. */
-  etag: text('etag'),
-  lastModified: text('last_modified'),
-  createdAt: text('created_at').notNull(),
-  updatedAt: text('updated_at').notNull(),
-})
+export const feeds = sqliteTable(
+  'feeds',
+  {
+    id: integer('id').primaryKey(),
+    enteredUrl: text('entered_url').notNull().unique(),
+    resolvedUrl: text('resolved_url').notNull().unique(),
+    title: text('title').notNull(),
+    /** The Feed Description; null when the document reports none. Refreshed with the title. */
+    description: text('description'),
+    /** The host shown for the Feed: the home page's when it declares one, else the Feed URL's. */
+    domain: text('domain').notNull(),
+    /** Null until a retrieval finds a site link that is not the Feed URL itself. */
+    homePageUrl: text('home_page_url'),
+    /** Validators from the last successful retrieval, for conditional requests. */
+    etag: text('etag'),
+    lastModified: text('last_modified'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    check('feeds_title_length', sql`length(${table.title}) BETWEEN 1 AND 512`),
+    check(
+      'feeds_description_length',
+      sql`${table.description} IS NULL OR length(${table.description}) BETWEEN 1 AND 1024`,
+    ),
+  ],
+)
 
 /** Canonical request and redirect targets, unique across both URL roles. */
 export const feedUrlAliases = sqliteTable(
@@ -77,7 +104,7 @@ export const subscriptions = sqliteTable(
     customDescription: text('custom_description'),
     pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
     /** The persisted due-time frontier the scheduler wakes to query. */
-    nextPollAt: text('next_poll_at').notNull(),
+    nextPollAt: text('next_poll_at').notNull().default('1970-01-01T00:00:00.000Z'),
     lastPolledAt: text('last_polled_at'),
     /** Feed Availability: how the recent attempts went, in safe categories. */
     lastSuccessAt: text('last_success_at'),
@@ -88,7 +115,24 @@ export const subscriptions = sqliteTable(
     }),
     createdAt: text('created_at').notNull(),
   },
-  (table) => [index('subscriptions_next_poll_at').on(table.nextPollAt)],
+  (table) => [
+    index('subscriptions_next_poll_at').on(table.nextPollAt),
+    // Keep in step with pollingIntervalMinutesSchema (shared/api.ts).
+    check('subscriptions_polling_interval', sql`${table.pollingIntervalMinutes} IN (30, 60, 120, 360, 720, 1440)`),
+    check('subscriptions_consecutive_failures', sql`${table.consecutiveFailures} >= 0`),
+    check(
+      'subscriptions_failure_category',
+      sql`${table.lastFailureCategory} IN ('unreachable', 'timeout', 'too_large', 'unsupported_content', 'http_error', 'invalid_feed')`,
+    ),
+    check(
+      'subscriptions_custom_title_length',
+      sql`${table.customTitle} IS NULL OR length(${table.customTitle}) BETWEEN 1 AND 512`,
+    ),
+    check(
+      'subscriptions_custom_description_length',
+      sql`${table.customDescription} IS NULL OR length(${table.customDescription}) BETWEEN 1 AND 1024`,
+    ),
+  ],
 )
 
 /**
@@ -124,22 +168,12 @@ export const feedItems = sqliteTable(
     lastObservedAt: text('last_observed_at').notNull(),
   },
   (table) => [
-    uniqueIndex('feed_items_feed_dedupe').on(table.feedId, table.dedupeKey),
-    index('feed_items_chronology').on(table.publishedAt, table.firstSeenAt),
+    unique('feed_items_feed_dedupe').on(table.feedId, table.dedupeKey),
+    index('feed_items_chronology').on(desc(table.publishedAt), desc(table.firstSeenAt)),
     index('feed_items_last_observed').on(table.lastObservedAt),
+    check('feed_items_identity_kind', sql`${table.identityKind} IN ('guid', 'link', 'content')`),
   ],
 )
-
-/**
- * FTS5 index over Feed Items; `rowid` mirrors `feed_items.id`. Declared for
- * querying only — the migration 6 and 12 triggers keep it in step.
- */
-export const feedItemSearch = sqliteTable('feed_item_search', {
-  rowid: integer('rowid').notNull(),
-  itemTitle: text('item_title'),
-  summary: text('summary'),
-  feedTitle: text('feed_title'),
-})
 
 /** Explicit Library membership; ingestion never rewrites this table. */
 export const libraryItems = sqliteTable('library_items', {

@@ -6,15 +6,15 @@ import type { PasswordHasher } from '../../../src/server/auth/password.js'
 import { LoginRateLimiter } from '../../../src/server/auth/rate-limit.js'
 import { SessionStore } from '../../../src/server/auth/sessions.js'
 import { createLogger } from '../../../src/server/logger.js'
-import { openDatabase, type SqliteDatabase } from '../../../src/server/persistence/database.js'
+import { type DrizzleDatabase, openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations } from '../../../src/server/persistence/migrations.js'
 import { ManualClock } from '../../support/manual-clock.js'
 import { makeTempDataDir } from '../../support/temp-dir.js'
 
 describe('credential rotation races', () => {
-  let database: SqliteDatabase | undefined
+  let database: DrizzleDatabase | undefined
 
-  afterEach(() => database?.close())
+  afterEach(() => database?.$client.close())
 
   it('does not issue a session after the verifier that accepted it was reset', async () => {
     const dataDir = await makeTempDataDir()

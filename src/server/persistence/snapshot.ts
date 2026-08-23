@@ -1,8 +1,11 @@
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { count, sql } from 'drizzle-orm'
+import type { AnySQLiteTable } from 'drizzle-orm/sqlite-core'
 import type { Clock } from '../clock.js'
-import { assertWritable, openDatabase, type SqliteDatabase } from './database.js'
+import { assertWritable, type DrizzleDatabase, openDatabase } from './database.js'
 import { applyMigrations } from './migrations.js'
+import { feedItems, feeds, libraryItems, subscriptions, userAuth } from './schema.js'
 
 function sidecarsOf(path: string): string[] {
   return [`${path}-wal`, `${path}-shm`]
@@ -27,9 +30,9 @@ export function writeSnapshot(source: string, destination: string): { bytes: num
 
     const db = openDatabase(source)
     try {
-      db.prepare('VACUUM INTO ?').run(partial)
+      db.run(sql`VACUUM INTO ${partial}`)
     } finally {
-      db.close()
+      db.$client.close()
     }
 
     renameSync(partial, destination)
@@ -44,7 +47,8 @@ export function writeSnapshot(source: string, destination: string): { bytes: num
 /** What a completed restore left on the volume, for the operator to verify. */
 export interface RestoreReport {
   readonly restored: true
-  readonly migrationsApplied: number[]
+  /** How many schema migrations the snapshot needed to reach the current schema. */
+  readonly migrationsApplied: number
   readonly indexedItems: number
   readonly feeds: number
   readonly subscriptions: number
@@ -63,7 +67,7 @@ export interface RestoreReport {
 export function restoreSnapshot(
   backupPath: string,
   databasePath: string,
-  options: { clock: Clock; rebuildIndex: (db: SqliteDatabase) => number },
+  options: { clock: Clock; rebuildIndex: (db: DrizzleDatabase) => number },
 ): RestoreReport {
   const { clock, rebuildIndex } = options
 
@@ -91,10 +95,10 @@ export function restoreSnapshot(
 
     const db = openDatabase(staging)
     try {
-      if (db.pragma('integrity_check', { simple: true }) !== 'ok') {
+      if (db.get<{ integrity_check: string }>(sql`PRAGMA integrity_check`)?.integrity_check !== 'ok') {
         throw new Error('the snapshot failed its integrity check')
       }
-      const migrationsApplied = applyMigrations(db, clock)
+      const migrationsApplied = applyMigrations(db, clock).length
       const indexedItems = rebuildIndex(db)
       assertWritable(db, clock.now())
 
@@ -102,14 +106,14 @@ export function restoreSnapshot(
         restored: true,
         migrationsApplied,
         indexedItems,
-        feeds: countRows(db, 'feeds'),
-        subscriptions: countRows(db, 'subscriptions'),
-        feedItems: countRows(db, 'feed_items'),
-        libraryItems: countRows(db, 'library_items'),
-        claimed: countRows(db, 'user_auth') > 0,
+        feeds: countRows(db, feeds),
+        subscriptions: countRows(db, subscriptions),
+        feedItems: countRows(db, feedItems),
+        libraryItems: countRows(db, libraryItems),
+        claimed: countRows(db, userAuth) > 0,
       }
     } finally {
-      db.close()
+      db.$client.close()
     }
 
     // Closing checkpoints the WAL and removes the sidecars.
@@ -128,9 +132,6 @@ export function restoreSnapshot(
   return report
 }
 
-function countRows(
-  db: SqliteDatabase,
-  table: 'feeds' | 'subscriptions' | 'feed_items' | 'library_items' | 'user_auth',
-): number {
-  return (db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as { count: number }).count
+function countRows(db: DrizzleDatabase, table: AnySQLiteTable): number {
+  return db.select({ count: count() }).from(table).get()?.count ?? 0
 }

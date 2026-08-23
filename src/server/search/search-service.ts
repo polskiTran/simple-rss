@@ -1,29 +1,22 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { SearchResults } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
 import { chronologySql } from '../digest/list-page.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import {
-  effectiveFeedTitle,
-  feedItems,
-  feedItemSearch,
-  feeds,
-  libraryItems,
-  subscriptions,
-} from '../persistence/schema.js'
+import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
 
 export class SearchService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
 
-  constructor(options: { database: SqliteDatabase; clock: Clock; settings: InstallationSettingsStore }) {
-    this.#db = drizzle(options.database)
+  constructor(options: { db: DrizzleDatabase; clock: Clock; settings: InstallationSettingsStore }) {
+    this.#db = options.db
     this.#clock = options.clock
     this.#settings = options.settings
   }
@@ -95,18 +88,24 @@ function matchExpressionOf(query: string): string | undefined {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }
 
-export function rebuildSearchIndex(db: SqliteDatabase): number {
-  return db.transaction(() => {
-    db.exec('DELETE FROM feed_item_search')
-    return db
-      .prepare(
-        `INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
-         SELECT feed_items.id, feed_items.title, feed_items.summary,
-                coalesce(subscriptions.custom_title, feeds.title)
-         FROM feed_items
-         JOIN feeds ON feeds.id = feed_items.feed_id
-         LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id`,
+/** Rebuilds the derived FTS5 index from its canonical tables. */
+export function rebuildSearchIndex(db: DrizzleDatabase): number {
+  return db.transaction((tx) => {
+    tx.delete(feedItemSearch).run()
+    return tx
+      .insert(feedItemSearch)
+      .select(
+        tx
+          .select({
+            rowid: feedItems.id,
+            itemTitle: feedItems.title,
+            summary: feedItems.summary,
+            feedTitle: effectiveFeedTitle.as('feed_title'),
+          })
+          .from(feedItems)
+          .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+          .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id)),
       )
       .run().changes
-  })()
+  })
 }

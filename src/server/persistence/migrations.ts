@@ -1,5 +1,6 @@
+import { sql } from 'drizzle-orm'
 import { systemClock, type Clock } from '../clock.js'
-import type { SqliteDatabase } from './database.js'
+import type { DrizzleDatabase } from './database.js'
 
 export interface Migration {
   /** 1-based, contiguous, and never reused or reordered once released. */
@@ -291,11 +292,9 @@ const MIGRATION_TABLE = `
 `
 
 /** Versions already recorded in this database, ascending. */
-export function appliedVersions(db: SqliteDatabase): number[] {
-  db.exec(MIGRATION_TABLE)
-  const rows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
-    version: number
-  }>
+export function appliedVersions(db: DrizzleDatabase): number[] {
+  db.run(sql.raw(MIGRATION_TABLE))
+  const rows = db.all<{ version: number }>(sql`SELECT version FROM schema_migrations ORDER BY version`)
   return rows.map((row) => row.version)
 }
 
@@ -304,7 +303,7 @@ export function appliedVersions(db: SqliteDatabase): number[] {
  * last complete version.
  */
 export function applyMigrations(
-  db: SqliteDatabase,
+  db: DrizzleDatabase,
   clock: Clock = systemClock,
   pending: readonly Migration[] = migrations,
 ): number[] {
@@ -314,15 +313,14 @@ export function applyMigrations(
   for (const migration of pending) {
     if (already.has(migration.version)) continue
 
-    const run = db.transaction(() => {
-      db.exec(migration.sql)
-      db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)').run(
-        migration.version,
-        migration.name,
-        clock.now().toISOString(),
+    db.transaction((tx) => {
+      // Drizzle deliberately exposes its driver for multi-statement migrations.
+      db.$client.exec(migration.sql)
+      tx.run(
+        sql`INSERT INTO schema_migrations (version, name, applied_at)
+            VALUES (${migration.version}, ${migration.name}, ${clock.now().toISOString()})`,
       )
     })
-    run()
     applied.push(migration.version)
   }
 

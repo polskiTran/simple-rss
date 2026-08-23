@@ -196,7 +196,7 @@ describe('searching retained reading metadata', () => {
       (await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid', customDescription: null })).status,
     ).toBe(200)
 
-    service.database?.exec('DELETE FROM feed_item_search')
+    service.database?.$client.exec('DELETE FROM feed_item_search')
     if (!service.database) throw new Error('the service has no open database')
     rebuildSearchIndex(service.database)
 
@@ -234,8 +234,8 @@ describe('searching retained reading metadata', () => {
     expect((await user.signIn()).status).toBe(200)
     expect(await foundTitles(user, 'kept')).toEqual(['Kept'])
     expect(await foundTitles(user, 'dropped')).toEqual([])
-    const orphaned = service.database
-      ?.prepare("SELECT count(*) AS rows FROM feed_item_search WHERE feed_item_search MATCH 'dropped'")
+    const orphaned = service.database?.$client
+      .prepare("SELECT count(*) AS rows FROM feed_item_search WHERE feed_item_search MATCH 'dropped'")
       .get() as { rows: number }
     expect(orphaned.rows).toBe(0)
   })
@@ -253,7 +253,7 @@ describe('searching retained reading metadata', () => {
     const before = await search(user, 'notes')
     expect(before.results).toHaveLength(2)
 
-    service.database?.exec('DELETE FROM feed_item_search')
+    service.database?.$client.exec('DELETE FROM feed_item_search')
     expect(await search(user, 'notes')).toEqual({ results: [] })
 
     if (!service.database) throw new Error('the service has no open database')

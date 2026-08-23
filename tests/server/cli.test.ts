@@ -7,7 +7,7 @@ import { runCli, NEW_PASSWORD_VARIABLE, type CliContext } from '../../src/server
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger, type Logger } from '../../src/server/logger.js'
 import { openDatabase } from '../../src/server/persistence/database.js'
-import { applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
+import { appliedVersions, applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
 import { ManualClock } from '../support/manual-clock.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
@@ -78,7 +78,7 @@ describe('runCli', () => {
   it('rebuilds the search index from the canonical tables', async () => {
     await runCli(['migrate'], context)
     const db = openDatabase(context.config.databasePath)
-    db.exec(`
+    db.$client.exec(`
       INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
       VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes',
               'journal.example', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z');
@@ -87,7 +87,7 @@ describe('runCli', () => {
       -- The derived index is lost; the canonical rows are not.
       DELETE FROM feed_item_search;
     `)
-    db.close()
+    db.$client.close()
     output.length = 0
 
     expect(await runCli(['rebuild-search'], context)).toBe(0)
@@ -130,7 +130,7 @@ describe('runCli reset-password', () => {
       applyMigrations(db)
       return read({ user: new UserAuthStore(db), sessions: new SessionStore(db) })
     } finally {
-      db.close()
+      db.$client.close()
     }
   }
 
@@ -202,6 +202,24 @@ describe('runCli reset-password', () => {
 
     const record = inspect(({ user }) => user.read())
     expect(await argon2idHasher().verify(record!.passwordHash, 'the-argument-one')).toBe(true)
+  })
+
+  it('does not migrate an older database before validating the password', async () => {
+    const older = openDatabase(context.config.databasePath)
+    try {
+      applyMigrations(older, context.clock, migrations.slice(0, 3))
+    } finally {
+      older.$client.close()
+    }
+
+    expect(await runCli(['reset-password', 'short'], context)).toBe(1)
+
+    const inspected = openDatabase(context.config.databasePath)
+    try {
+      expect(appliedVersions(inspected)).toEqual([1, 2, 3])
+    } finally {
+      inspected.$client.close()
+    }
   })
 
   it('explains itself rather than resetting to nothing', async () => {

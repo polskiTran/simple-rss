@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
 import { RetrievalError, type Retrieval, type RetrievalFailure } from '../upstream/retrieval.js'
 
@@ -11,11 +10,11 @@ export type ImageOutcome =
   | { readonly kind: 'image'; readonly contentType: string; readonly body: ReadableStream<Uint8Array> }
 
 export class ImageService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #retrieval: Retrieval
 
-  constructor(options: { database: SqliteDatabase; retrieval: Retrieval }) {
-    this.#db = drizzle(options.database)
+  constructor(options: { db: DrizzleDatabase; retrieval: Retrieval }) {
+    this.#db = options.db
     this.#retrieval = options.retrieval
   }
 

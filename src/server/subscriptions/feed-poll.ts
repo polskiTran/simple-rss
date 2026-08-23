@@ -1,10 +1,9 @@
 import { eq } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Clock } from '../clock.js'
 import { FeedDocumentError, parseFeedDocument, type ParsedFeedDocument } from '../ingestion/feed-document.js'
 import { persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedUrlAliases, feeds, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalBytes } from '../upstream/retrieval.js'
 import type { FailedPoll, FeedAvailabilityLedger, PolledFeed } from './feed-availability.js'
@@ -33,7 +32,7 @@ interface PollableFeed extends PolledFeed {
  * which owns every Subscription write (ADR 0007).
  */
 export class FeedPoll {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #retrieval: Retrieval
   readonly #clock: Clock
   readonly #logger: Logger
@@ -41,14 +40,14 @@ export class FeedPoll {
   readonly #availability: FeedAvailabilityLedger
 
   constructor(options: {
-    database: SqliteDatabase
+    db: DrizzleDatabase
     retrieval: Retrieval
     clock: Clock
     logger: Logger
     subscriptions: Pick<SubscriptionService, 'mergeInto'>
     availability: FeedAvailabilityLedger
   }) {
-    this.#db = drizzle(options.database)
+    this.#db = options.db
     this.#retrieval = options.retrieval
     this.#clock = options.clock
     this.#logger = options.logger.child({ component: 'subscriptions' })
