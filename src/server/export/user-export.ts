@@ -1,12 +1,14 @@
+import { eq } from 'drizzle-orm'
 import { VERSION } from '../../shared/version.js'
 import type { Clock } from '../clock.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { appliedVersions } from '../persistence/migrations.js'
+import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-export const USER_EXPORT_VERSION = 2
+/** 3 dropped `schemaVersion`: the export names its own shape, not migration bookkeeping. */
+export const USER_EXPORT_VERSION = 3
 
 export interface UserExportItem {
   readonly dedupeKey: string
@@ -43,81 +45,67 @@ export interface UserExportFeed {
 export interface UserExport {
   readonly format: typeof USER_EXPORT_FORMAT
   readonly exportVersion: typeof USER_EXPORT_VERSION
-  /** The highest applied migration, naming the schema the data came from. */
-  readonly schemaVersion: number
   readonly applicationVersion: string
   readonly exportedAt: string
   readonly installation: { readonly timezone: string }
   readonly feeds: readonly UserExportFeed[]
 }
 
-interface FeedRow {
-  id: number
-  enteredUrl: string
-  resolvedUrl: string
-  title: string
-  description: string | null
-  domain: string
-  homePageUrl: string | null
-  createdAt: string
-  pollingIntervalMinutes: number | null
-  customTitle: string | null
-  customDescription: string | null
-  subscribedAt: string | null
-}
-
-interface ItemRow extends Omit<UserExportItem, 'identityKind'> {
-  identityKind: string
-}
-
 export function buildUserExport(options: {
-  database: SqliteDatabase
+  db: DrizzleDatabase
   settings: InstallationSettingsStore
   clock: Clock
 }): UserExport {
-  const { database, settings, clock } = options
+  const { db, settings, clock } = options
 
-  return database.transaction((): UserExport => {
-    const feedRows = database
-      .prepare(
-        `SELECT
-           feeds.id                               AS id,
-           feeds.entered_url                      AS enteredUrl,
-           feeds.resolved_url                     AS resolvedUrl,
-           feeds.title                            AS title,
-           feeds.description                      AS description,
-           feeds.domain                           AS domain,
-           feeds.home_page_url                    AS homePageUrl,
-           feeds.created_at                       AS createdAt,
-           subscriptions.polling_interval_minutes AS pollingIntervalMinutes,
-           subscriptions.custom_title             AS customTitle,
-           subscriptions.custom_description       AS customDescription,
-           subscriptions.created_at               AS subscribedAt
-         FROM feeds
-         LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id
-         ORDER BY feeds.id`,
-      )
-      .all() as FeedRow[]
+  return db.transaction((tx): UserExport => {
+    const feedRows = tx
+      .select({
+        id: feeds.id,
+        enteredUrl: feeds.enteredUrl,
+        resolvedUrl: feeds.resolvedUrl,
+        title: feeds.title,
+        description: feeds.description,
+        domain: feeds.domain,
+        homePageUrl: feeds.homePageUrl,
+        createdAt: feeds.createdAt,
+        pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
+        customTitle: subscriptions.customTitle,
+        customDescription: subscriptions.customDescription,
+        subscribedAt: subscriptions.createdAt,
+      })
+      .from(feeds)
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .orderBy(feeds.id)
+      .all()
 
-    const itemsOfFeed = database.prepare(
-      `SELECT
-         feed_items.dedupe_key       AS dedupeKey,
-         feed_items.identity_kind    AS identityKind,
-         feed_items.title            AS title,
-         feed_items.link             AS link,
-         feed_items.published_at     AS publishedAt,
-         feed_items.image_url        AS imageUrl,
-         feed_items.summary          AS summary,
-         feed_items.first_seen_at    AS firstSeenAt,
-         feed_items.last_observed_at AS lastObservedAt,
-         library_items.saved_at      AS savedAt
-       FROM feed_items
-       LEFT JOIN library_items ON library_items.feed_item_id = feed_items.id
-       WHERE feed_items.feed_id = ?
-       ORDER BY feed_items.id`,
-    )
+    const itemRows = tx
+      .select({
+        feedId: feedItems.feedId,
+        dedupeKey: feedItems.dedupeKey,
+        identityKind: feedItems.identityKind,
+        title: feedItems.title,
+        link: feedItems.link,
+        publishedAt: feedItems.publishedAt,
+        imageUrl: feedItems.imageUrl,
+        summary: feedItems.summary,
+        firstSeenAt: feedItems.firstSeenAt,
+        lastObservedAt: feedItems.lastObservedAt,
+        savedAt: libraryItems.savedAt,
+      })
+      .from(feedItems)
+      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+      .orderBy(feedItems.id)
+      .all()
 
-    const feeds = feedRows.map(
+    const itemsOfFeed = new Map<number, UserExportItem[]>()
+    for (const { feedId, ...item } of itemRows) {
+      const bucket = itemsOfFeed.get(feedId)
+      if (bucket) bucket.push(item)
+      else itemsOfFeed.set(feedId, [item])
+    }
+
+    const exportedFeeds = feedRows.map(
       (feed): UserExportFeed => ({
         enteredUrl: feed.enteredUrl,
         resolvedUrl: feed.resolvedUrl,
@@ -135,20 +123,17 @@ export function buildUserExport(options: {
                 customDescription: feed.customDescription,
                 createdAt: feed.subscribedAt,
               },
-        items: (itemsOfFeed.all(feed.id) as ItemRow[]).map(
-          (item): UserExportItem => ({ ...item, identityKind: item.identityKind as UserExportItem['identityKind'] }),
-        ),
+        items: itemsOfFeed.get(feed.id) ?? [],
       }),
     )
 
     return {
       format: USER_EXPORT_FORMAT,
       exportVersion: USER_EXPORT_VERSION,
-      schemaVersion: Math.max(0, ...appliedVersions(database)),
       applicationVersion: VERSION,
       exportedAt: clock.now().toISOString(),
       installation: { timezone: settings.effectiveTimezone() },
-      feeds,
+      feeds: exportedFeeds,
     }
-  })()
+  })
 }

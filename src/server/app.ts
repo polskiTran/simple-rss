@@ -109,7 +109,7 @@ export function createApp(deps: AppDependencies): Hono {
 
     app.route('/api', settingsRoutes({ settings: services.settings, clock: deps.clock }))
 
-    app.route('/api', exportRoutes({ database: services.database, settings: services.settings, clock: deps.clock }))
+    app.route('/api', exportRoutes({ db: services.db, settings: services.settings, clock: deps.clock }))
 
     app.route(
       '/api',

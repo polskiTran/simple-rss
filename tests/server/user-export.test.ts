@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { USER_EXPORT_FORMAT, USER_EXPORT_VERSION } from '../../src/server/export/user-export.js'
-import { migrations } from '../../src/server/persistence/migrations.js'
 import { VERSION } from '../../src/shared/version.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
@@ -52,7 +51,6 @@ describe('the JSON export', () => {
     const document = await exported.json()
     expect(document.format).toBe(USER_EXPORT_FORMAT)
     expect(document.exportVersion).toBe(USER_EXPORT_VERSION)
-    expect(document.schemaVersion).toBe(migrations[migrations.length - 1]!.version)
     expect(document.applicationVersion).toBe(VERSION)
   })
 
@@ -129,7 +127,7 @@ describe('the JSON export', () => {
 
     const document = await (await user.get('/api/export')).json()
 
-    expect(document.exportVersion).toBe(2)
+    expect(document.exportVersion).toBe(3)
     expect(document.feeds[0]).toMatchObject({
       title: 'Field Notes',
       description: 'From the field',
@@ -175,7 +173,6 @@ describe('the JSON export', () => {
       'feeds',
       'format',
       'installation',
-      'schemaVersion',
     ])
     expect(Object.keys(document.feeds[0]).sort()).toEqual([
       'createdAt',

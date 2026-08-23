@@ -44,7 +44,8 @@ export function writeSnapshot(source: string, destination: string): { bytes: num
 /** What a completed restore left on the volume, for the operator to verify. */
 export interface RestoreReport {
   readonly restored: true
-  readonly migrationsApplied: number[]
+  /** How many schema migrations the snapshot needed to reach the current schema. */
+  readonly migrationsApplied: number
   readonly indexedItems: number
   readonly feeds: number
   readonly subscriptions: number
@@ -94,7 +95,7 @@ export function restoreSnapshot(
       if (db.pragma('integrity_check', { simple: true }) !== 'ok') {
         throw new Error('the snapshot failed its integrity check')
       }
-      const migrationsApplied = applyMigrations(db, clock)
+      const migrationsApplied = applyMigrations(db, clock).length
       const indexedItems = rebuildIndex(db)
       assertWritable(db, clock.now())
 
