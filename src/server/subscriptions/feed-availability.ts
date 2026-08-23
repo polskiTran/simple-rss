@@ -2,9 +2,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   FEED_UNAVAILABLE_AFTER_FAILURES,
-  // What a read of this state looks like on the wire. It shares its name with the
-  // class below, which is the thing that writes it.
-  type FeedAvailability as PresentedAvailability,
+  type FeedAvailability,
   type FeedAvailabilityCategory,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
@@ -42,7 +40,7 @@ export type FailedPoll =
  * makes them three methods rather than two: a publisher that answered badly is
  * not a publisher we never asked.
  */
-export class FeedAvailability {
+export class FeedAvailabilityLedger {
   readonly #db: BetterSQLite3Database
   readonly #clock: Clock
   readonly #logger: Logger
@@ -151,7 +149,7 @@ export function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCat
 }
 
 /** The presented state is derived from the stored run of failures, never stored itself. */
-export function availabilityOf(record: RecordedAvailability): PresentedAvailability {
+export function availabilityOf(record: RecordedAvailability): FeedAvailability {
   return {
     state:
       record.consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES
