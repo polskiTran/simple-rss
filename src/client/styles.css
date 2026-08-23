@@ -714,13 +714,25 @@
     color: var(--color-quiet);
   }
 
-  .preview-items {
+  .preview-items,
+  .preview-declared {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  /* Each Declared Feed is one text button, no wider than its words. */
+  .preview-declared {
+    align-items: flex-start;
+  }
+
+  .preview-declared .text-button {
+    line-height: 1.4;
+    text-align: left;
+    text-wrap: pretty;
   }
 
   .preview-items li {

@@ -171,6 +171,58 @@ describe('Feeds', () => {
     expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
   })
 
+  it('offers the Declared Feeds of a page and re-previews in place when one is chosen', async () => {
+    const PAGE_URL = 'https://journal.example/'
+    const COMMENTS_URL = 'https://journal.example/comments/feed'
+    const declaredFeeds = [
+      { url: FEED.enteredUrl, title: 'Field Notes » Posts' },
+      { url: COMMENTS_URL, title: null },
+    ]
+    let release: ((reply: Reply) => void) | undefined
+    const api = stubApi().on('POST /api/feeds/preview', ({ body }) => {
+      if ((body as { url: string }).url === PAGE_URL) return { body: { ...PREVIEW, declaredFeeds } }
+      return new Promise<Reply>((resolve) => {
+        release = resolve
+      })
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    const user = await submitUrl(PAGE_URL)
+
+    const dialog = await screen.findByRole('dialog', { name: 'subscribe to Field Notes?' })
+    expect(dialog.textContent).toContain('this page declares 2 feeds')
+    expect(screen.getByRole('button', { name: 'Field Notes » Posts' })).toHaveProperty('disabled', true)
+
+    await user.click(screen.getByRole('button', { name: '/comments/feed' }))
+
+    expect(screen.getByRole('dialog', { name: 'previewing journal.example' })).toBeDefined()
+    expect(api.requestsTo('POST /api/feeds/preview')).toMatchObject([
+      { body: { url: PAGE_URL } },
+      { body: { url: COMMENTS_URL } },
+    ])
+
+    release?.({ body: { ...PREVIEW, url: COMMENTS_URL, title: 'Field Notes » Comments', declaredFeeds } })
+
+    expect(await screen.findByRole('dialog', { name: 'subscribe to Field Notes » Comments?' })).toBeDefined()
+    expect(screen.getByRole('button', { name: '/comments/feed' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Field Notes » Posts' })).toHaveProperty('disabled', false)
+  })
+
+  it('shows no chooser for a page that declares one Feed', async () => {
+    stubApi().on('POST /api/feeds/preview', {
+      body: { ...PREVIEW, declaredFeeds: [{ url: FEED.enteredUrl, title: 'Field Notes » Posts' }] },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    await submitUrl('https://journal.example/')
+
+    const dialog = await screen.findByRole('dialog', { name: 'subscribe to Field Notes?' })
+    expect(dialog.textContent).not.toContain('this page declares')
+    expect(screen.queryByRole('button', { name: 'Field Notes » Posts' })).toBeNull()
+  })
+
   it('closes on a failed preview, says why under the field, and puts the cursor back in it', async () => {
     stubApi().on('POST /api/feeds/preview', {
       status: 422,

@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { Dialog } from '@base-ui/react/dialog'
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import type { FeedPreview, SubscriptionSummary } from '../../shared/api.js'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import type { DeclaredFeed, FeedPreview, SubscriptionSummary } from '../../shared/api.js'
 import { previewFeed, subscribeToFeed } from '../api.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { subscriptionFailure } from './feed-language.js'
@@ -11,7 +11,9 @@ export interface PreviewRequest {
   readonly url: string
 }
 
+/** Absent while the request's own preview is on its way; `previewing` is a Declared Feed chosen in its place. */
 type Phase =
+  | { readonly kind: 'previewing'; readonly url: string }
   | { readonly kind: 'arrived'; readonly preview: FeedPreview }
   | { readonly kind: 'subscribing'; readonly preview: FeedPreview }
 
@@ -34,20 +36,36 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
   // its request so the body holds still then, and the next request opens on the wait.
   const phase = answer && answer.request === request ? answer.phase : undefined
 
+  /** One preview in flight at a time: starting another abandons the last. */
+  const load = useCallback(
+    (request: PreviewRequest, url: string) => {
+      inFlight.current?.abort()
+      const controller = new AbortController()
+      inFlight.current = controller
+      previewFeed(url, controller.signal)
+        .then((preview) => setAnswer({ request, phase: { kind: 'arrived', preview } }))
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          setOpen(false)
+          onFailed(subscriptionFailure(error))
+        })
+      return controller
+    },
+    [onFailed],
+  )
+
   useEffect(() => {
     if (!request) return
-    const controller = new AbortController()
-    inFlight.current = controller
     setOpen(true)
-    previewFeed(request.url, controller.signal)
-      .then((preview) => setAnswer({ request, phase: { kind: 'arrived', preview } }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        setOpen(false)
-        onFailed(subscriptionFailure(error))
-      })
+    const controller = load(request, request.url)
     return () => controller.abort()
-  }, [request, onFailed])
+  }, [request, load])
+
+  function choose(url: string) {
+    if (!request) return
+    setAnswer({ request, phase: { kind: 'previewing', url } })
+    load(request, url)
+  }
 
   function close() {
     inFlight.current?.abort()
@@ -80,9 +98,11 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
         <Dialog.Backdrop className="overlay-backdrop" />
         <Dialog.Viewport className="overlay-viewport">
           <Dialog.Popup className="overlay-popup" ref={popup} initialFocus={popup} finalFocus={field}>
-            {phase === undefined ? (
+            {phase === undefined || phase.kind === 'previewing' ? (
               <>
-                <Dialog.Title className="overlay-title">previewing {hostOf(request?.url ?? '')}</Dialog.Title>
+                <Dialog.Title className="overlay-title">
+                  previewing {hostOf(phase?.url ?? request?.url ?? '')}
+                </Dialog.Title>
                 <LoadingNote className="overlay-description" announce>
                   reading the feed — this can take a few seconds
                 </LoadingNote>
@@ -97,6 +117,7 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
                 preview={phase.preview}
                 subscribing={subscribing}
                 onSubscribe={() => void subscribe(phase.preview)}
+                onChoose={choose}
                 onOpenFeed={(feedId) => {
                   setOpen(false)
                   onOpenFeed(feedId)
@@ -114,11 +135,13 @@ function Arrived({
   preview,
   subscribing,
   onSubscribe,
+  onChoose,
   onOpenFeed,
 }: {
   preview: FeedPreview
   subscribing: boolean
   onSubscribe: () => void
+  onChoose: (url: string) => void
   onOpenFeed: (feedId: number) => void
 }) {
   const { subscribed } = preview
@@ -130,6 +153,24 @@ function Arrived({
       <Dialog.Description className="overlay-description">
         {preview.description ? `${preview.domain} — ${preview.description}` : preview.domain}
       </Dialog.Description>
+      {preview.declaredFeeds.length > 1 ? (
+        <>
+          <p className="preview-caption">this page declares {preview.declaredFeeds.length} feeds</p>
+          <ul className="preview-declared">
+            {preview.declaredFeeds.map((feed) => (
+              <li key={feed.url}>
+                <Button
+                  className="text-button"
+                  disabled={feed.url === preview.url || subscribing}
+                  onClick={() => onChoose(feed.url)}
+                >
+                  {declaredFeedName(feed)}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {preview.items.length > 0 ? (
         <>
           <p className="preview-caption">recent items</p>
@@ -167,5 +208,15 @@ function hostOf(url: string): string {
     return new URL(url).hostname
   } catch {
     return url
+  }
+}
+
+/** The publisher's title verbatim; a declaration without one reads as its path. */
+function declaredFeedName(feed: DeclaredFeed): string {
+  if (feed.title) return feed.title
+  try {
+    return new URL(feed.url).pathname
+  } catch {
+    return feed.url
   }
 }
