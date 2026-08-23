@@ -35,10 +35,14 @@ export type FailedPoll =
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
   | { readonly kind: 'invalid-feed'; readonly code: FeedDocumentError['code'] }
 
+/** A poll that reached its verdict: the Feed answered — well or badly — or this installation never asked. */
+export type SettledPoll = { readonly kind: 'updated' } | { readonly kind: 'not-modified' } | FailedPoll
+
 /**
- * Every write to a Subscription's Feed Availability, and the distinction that
- * makes them three methods rather than two: a publisher that answered badly is
- * not a publisher we never asked.
+ * Every write to a Subscription's Feed Availability. `record` settles a poll on
+ * its own — holding the distinction that a publisher that answered badly is not
+ * a publisher we never asked — while `recordSuccess` stands alone for the merge
+ * survivor, whose success arrives without a poll of its own (ADR 0007).
  */
 export class FeedAvailabilityLedger {
   readonly #db: BetterSQLite3Database
@@ -49,6 +53,12 @@ export class FeedAvailabilityLedger {
     this.#db = drizzle(options.database)
     this.#clock = options.clock
     this.#logger = options.logger.child({ component: 'subscriptions' })
+  }
+
+  record(feed: PolledFeed, outcome: SettledPoll): void {
+    if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.recordSuccess(feed)
+    else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
+    else this.#recordFailure(feed, availabilityCategoryOf(outcome))
   }
 
   recordSuccess(feed: PolledFeed): void {
@@ -71,7 +81,7 @@ export class FeedAvailabilityLedger {
    * A failure only lengthens the wait; the User can retry by hand. The Subscription
    * survives — a failing Feed stays subscribed and its Feed Items stay in the Digest.
    */
-  recordFailure(feed: PolledFeed, category: FeedAvailabilityCategory): void {
+  #recordFailure(feed: PolledFeed, category: FeedAvailabilityCategory): void {
     const now = this.#clock.now()
     const consecutiveFailures = feed.consecutiveFailures + 1
     const nextPollAt = nextRetryTime(feed.feedId, feed.pollingIntervalMinutes, consecutiveFailures, now)
@@ -100,7 +110,7 @@ export class FeedAvailabilityLedger {
    * The publisher was never asked (boundary saturated, or the caller gave up), so
    * Feed Availability is left untouched and the attempt moves one Polling Interval on.
    */
-  recordDeferral(feed: PolledFeed, code: RetrievalFailure['code']): void {
+  #recordDeferral(feed: PolledFeed, code: RetrievalFailure['code']): void {
     const now = this.#clock.now()
     this.#db
       .update(subscriptions)
@@ -120,7 +130,7 @@ export class FeedAvailabilityLedger {
 }
 
 /** True only where this installation refused the attempt, so the publisher was never contacted. */
-export function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPoll, { kind: 'retrieval-failed' }> {
+function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPoll, { kind: 'retrieval-failed' }> {
   return (
     outcome.kind === 'retrieval-failed' && (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
   )
@@ -130,7 +140,7 @@ export function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPol
  * Everything the network refused to answer collapses into `unreachable`; the
  * finer distinctions are transport detail the User cannot act on.
  */
-export function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {
+function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {
   if (outcome.kind === 'invalid-feed') return 'invalid_feed'
   switch (outcome.failure.code) {
     case 'timeout':
