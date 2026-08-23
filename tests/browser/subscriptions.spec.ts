@@ -120,6 +120,22 @@ test.describe('desktop Feed and Digest rendering', () => {
     await expect(page.locator('.feed-description')).toHaveText('Notes from the field.')
   })
 
+  test('says no feed was found when the pasted page declares none, and leaves no row', async ({
+    page,
+    installation,
+  }) => {
+    await claim(page, installation)
+    await page.getByRole('link', { name: 'feeds' }).click()
+    const field = page.getByRole('textbox', { name: 'search or add feeds' })
+    await field.fill(installation.barePageUrl)
+    await page.keyboard.press('Enter')
+
+    await expect(page.getByText('no feed was found at that address')).toBeVisible()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(field).toBeFocused()
+    await expect(page.getByText('no subscriptions yet')).toBeVisible()
+  })
+
   test('colours the confirming word of the unsubscribe overlay, and only it', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'Field Notes' }).click()
@@ -141,22 +157,6 @@ test.describe('phone Feed and Digest rendering', () => {
     }))
     expect(paper.width).toBe(paper.contentWidth)
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-  })
-
-  test('says no feed was found when the pasted page declares none, and leaves no row', async ({
-    page,
-    installation,
-  }) => {
-    await claim(page, installation)
-    await page.getByRole('link', { name: 'feeds' }).click()
-    const field = page.getByRole('textbox', { name: 'search or add feeds' })
-    await field.fill(installation.barePageUrl)
-    await page.keyboard.press('Enter')
-
-    await expect(page.getByText('no feed was found at that address')).toBeVisible()
-    await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(field).toBeFocused()
-    await expect(page.getByText('no subscriptions yet')).toBeVisible()
   })
 
   test('keeps the whole cadence grid selectable inside the narrow paper', async ({ page, installation }) => {

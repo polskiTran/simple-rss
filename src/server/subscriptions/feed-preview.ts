@@ -65,7 +65,11 @@ export class FeedPreview {
   async preview(enteredUrl: string, signal?: AbortSignal): Promise<PreviewOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
-    const budget = startBudget(RETRIEVAL_PROFILES.preview.deadline.timeoutMs)
+    // One clock over every retrieval this preview makes; the boundary floors a spent budget at its minimum.
+    const startedAt = performance.now()
+    const remaining = (): RetrievalLimits => ({
+      timeoutMs: RETRIEVAL_PROFILES.preview.deadline.timeoutMs - (performance.now() - startedAt),
+    })
 
     const known = this.#knownSubscription(requestedUrl)
     if (known) return this.#answerFromStore(requestedUrl, known, [])
@@ -83,7 +87,7 @@ export class FeedPreview {
       url: requestedUrl,
       operation: 'discovery',
       ...(signal && { signal }),
-      limits: budget.remaining(),
+      limits: remaining(),
     })
     if (!page.ok) return { kind: 'retrieval-failed', failure: page }
     const declared = declaredFeeds(page.bytes, page.url, page.charset)
@@ -101,7 +105,7 @@ export class FeedPreview {
       url: first.url,
       operation: 'preview',
       ...(signal && { signal }),
-      limits: budget.remaining(),
+      limits: remaining(),
     })
     if (declaredProof.kind !== 'proven') return declaredProof
     return this.#answerFromProof(first.url, declaredProof, declared)
@@ -199,12 +203,6 @@ interface UnpresentedItem {
   readonly title: string | null
   readonly link: string | null
   readonly publishedAt: string | null
-}
-
-/** One clock over every retrieval a preview makes; the boundary floors a spent budget at its minimum. */
-function startBudget(totalMs: number): { remaining(): RetrievalLimits } {
-  const startedAt = performance.now()
-  return { remaining: () => ({ timeoutMs: totalMs - (performance.now() - startedAt) }) }
 }
 
 function newestFirst<Item extends UnpresentedItem>(items: readonly Item[]): Item[] {

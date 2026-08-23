@@ -11,9 +11,13 @@ export interface PreviewRequest {
   readonly url: string
 }
 
-/** Absent while the request's own preview is on its way; `previewing` is a Declared Feed chosen in its place. */
+/**
+ * Absent while the request's own preview is on its way; `previewing` is a
+ * Declared Feed chosen in its place, carrying the page's list so the chooser
+ * outlives the answer — which, being a Feed's, declares nothing.
+ */
 type Phase =
-  | { readonly kind: 'previewing'; readonly url: string }
+  | { readonly kind: 'previewing'; readonly url: string; readonly declaredFeeds: DeclaredFeed[] }
   | { readonly kind: 'arrived'; readonly preview: FeedPreview }
   | { readonly kind: 'subscribing'; readonly preview: FeedPreview }
 
@@ -38,12 +42,17 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
 
   /** One preview in flight at a time: starting another abandons the last. */
   const load = useCallback(
-    (request: PreviewRequest, url: string) => {
+    (request: PreviewRequest, url: string, declaredFeeds?: DeclaredFeed[]) => {
       inFlight.current?.abort()
       const controller = new AbortController()
       inFlight.current = controller
       previewFeed(url, controller.signal)
-        .then((preview) => setAnswer({ request, phase: { kind: 'arrived', preview } }))
+        .then((preview) =>
+          setAnswer({
+            request,
+            phase: { kind: 'arrived', preview: declaredFeeds ? { ...preview, declaredFeeds } : preview },
+          }),
+        )
         .catch((error: unknown) => {
           if (controller.signal.aborted) return
           setOpen(false)
@@ -61,10 +70,10 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
     return () => controller.abort()
   }, [request, load])
 
-  function choose(url: string) {
+  function choose(url: string, declaredFeeds: DeclaredFeed[]) {
     if (!request) return
-    setAnswer({ request, phase: { kind: 'previewing', url } })
-    load(request, url)
+    setAnswer({ request, phase: { kind: 'previewing', url, declaredFeeds } })
+    load(request, url, declaredFeeds)
   }
 
   function close() {
@@ -117,7 +126,7 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
                 preview={phase.preview}
                 subscribing={subscribing}
                 onSubscribe={() => void subscribe(phase.preview)}
-                onChoose={choose}
+                onChoose={(url) => choose(url, phase.preview.declaredFeeds)}
                 onOpenFeed={(feedId) => {
                   setOpen(false)
                   onOpenFeed(feedId)

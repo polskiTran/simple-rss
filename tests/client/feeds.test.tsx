@@ -202,7 +202,8 @@ describe('Feeds', () => {
       { body: { url: COMMENTS_URL } },
     ])
 
-    release?.({ body: { ...PREVIEW, url: COMMENTS_URL, title: 'Field Notes » Comments', declaredFeeds } })
+    // The chosen address is a Feed, so its own answer declares nothing; the chooser still stands.
+    release?.({ body: { ...PREVIEW, url: COMMENTS_URL, title: 'Field Notes » Comments', declaredFeeds: [] } })
 
     expect(await screen.findByRole('dialog', { name: 'subscribe to Field Notes » Comments?' })).toBeDefined()
     expect(screen.getByRole('button', { name: '/comments/feed' })).toHaveProperty('disabled', true)

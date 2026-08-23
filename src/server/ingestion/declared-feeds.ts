@@ -2,7 +2,7 @@ import { parseHTML } from 'linkedom'
 import type { DeclaredFeed } from '../../shared/api.js'
 import { decodeHtml } from './html-text.js'
 
-/** The two types every autodiscovery spec names; `text/xml`, `application/xml`, and JSON Feed are not declarations. */
+/** The two types the RSS and Atom specs name for a declaration; `text/xml`, `application/xml`, and JSON Feed are not. */
 const DECLARED_FEED_TYPES = new Set(['application/rss+xml', 'application/atom+xml'])
 
 /**
