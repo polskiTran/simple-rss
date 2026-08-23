@@ -1,23 +1,22 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import Database from 'better-sqlite3'
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import type SQLite from 'better-sqlite3'
+import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3'
+import { writeProbe } from './schema.js'
 
-export type SqliteDatabase = Database.Database
-
-/** The typed handle domain services query through; the raw handle stays in persistence and operational code. */
-export type DrizzleDatabase = BetterSQLite3Database
+/** The one database handle used throughout the process. */
+export type DrizzleDatabase = BetterSQLite3Database & { readonly $client: SQLite.Database }
 
 const BUSY_TIMEOUT_MS = 5_000
 
-export function openDatabase(path: string): SqliteDatabase {
+export function openDatabase(path: string): DrizzleDatabase {
   mkdirSync(dirname(path), { recursive: true })
 
-  const db = new Database(path)
-  db.pragma('journal_mode = WAL')
-  db.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`)
-  db.pragma('foreign_keys = ON')
-  db.pragma('synchronous = NORMAL')
+  const db = drizzle(path)
+  db.$client.pragma('journal_mode = WAL')
+  db.$client.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`)
+  db.$client.pragma('foreign_keys = ON')
+  db.$client.pragma('synchronous = NORMAL')
   return db
 }
 
@@ -25,6 +24,12 @@ export function openDatabase(path: string): SqliteDatabase {
  * A read-only or full volume opens fine and only fails on the first write, so
  * readiness performs a real write against a single reused row. Throws on failure.
  */
-export function assertWritable(db: SqliteDatabase, now: Date): void {
-  db.prepare('INSERT OR REPLACE INTO write_probe (id, checked_at) VALUES (1, ?)').run(now.toISOString())
+export function assertWritable(db: DrizzleDatabase, now: Date): void {
+  db.insert(writeProbe)
+    .values({ id: 1, checkedAt: now.toISOString() })
+    .onConflictDoUpdate({
+      target: writeProbe.id,
+      set: { checkedAt: now.toISOString() },
+    })
+    .run()
 }

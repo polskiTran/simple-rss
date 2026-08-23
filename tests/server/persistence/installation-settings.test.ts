@@ -1,7 +1,6 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { openDatabase, type SqliteDatabase } from '../../../src/server/persistence/database.js'
+import { type DrizzleDatabase, openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations } from '../../../src/server/persistence/migrations.js'
 import { InstallationSettingsStore } from '../../../src/server/persistence/installation-settings.js'
 import { makeTempDataDir } from '../../support/temp-dir.js'
@@ -11,14 +10,14 @@ const LATER = new Date('2026-08-09T09:00:00.000Z')
 
 describe('InstallationSettingsStore', () => {
   let dataDir: string
-  let db: SqliteDatabase
+  let db: DrizzleDatabase
   let store: InstallationSettingsStore
 
   beforeEach(async () => {
     dataDir = await makeTempDataDir()
     db = openDatabase(join(dataDir, 'simple-rss.db'))
     applyMigrations(db)
-    store = new InstallationSettingsStore(drizzle(db))
+    store = new InstallationSettingsStore(db)
   })
 
   it('reports no settings before the installation is seeded', () => {
@@ -45,7 +44,7 @@ describe('InstallationSettingsStore', () => {
       createdAt: AT.toISOString(),
       updatedAt: LATER.toISOString(),
     })
-    expect(db.prepare('SELECT COUNT(*) AS count FROM installation_settings').get()).toEqual({ count: 1 })
+    expect(db.$client.prepare('SELECT COUNT(*) AS count FROM installation_settings').get()).toEqual({ count: 1 })
   })
 
   it('rejects a timezone the platform cannot resolve', () => {
@@ -55,12 +54,12 @@ describe('InstallationSettingsStore', () => {
 
   it('reads back what a previous process wrote to the same file', () => {
     store.setTimezone('Europe/Berlin', AT)
-    db.close()
+    db.$client.close()
 
     const reopened = openDatabase(join(dataDir, 'simple-rss.db'))
     applyMigrations(reopened)
 
-    expect(new InstallationSettingsStore(drizzle(reopened)).read()?.timezone).toBe('Europe/Berlin')
-    reopened.close()
+    expect(new InstallationSettingsStore(reopened).read()?.timezone).toBe('Europe/Berlin')
+    reopened.$client.close()
   })
 })

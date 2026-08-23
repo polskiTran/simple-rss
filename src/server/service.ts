@@ -10,8 +10,7 @@ import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, type Logger } from './logger.js'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { openDatabase, type SqliteDatabase } from './persistence/database.js'
+import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderService } from './reader/reader-service.js'
@@ -44,7 +43,7 @@ export interface Service {
   /** The single outbound HTTP boundary (ADR 0005), shared by every retrieval. */
   readonly retrieval: Retrieval
   /** Undefined only when startup failed to open the database. */
-  readonly database: SqliteDatabase | undefined
+  readonly database: DrizzleDatabase | undefined
   readonly settings: InstallationSettingsStore | undefined
   /** The in-process background poller; absent only when startup failed. */
   readonly scheduler: PollScheduler | undefined
@@ -72,10 +71,8 @@ export function createService(options: ServiceOptions): Service {
   let services: Services | undefined
 
   try {
-    const database = openDatabase(config.databasePath)
-    const applied = applyMigrations(database, clock)
-    // The typed handle every domain service queries through.
-    const db = drizzle(database)
+    const db = openDatabase(config.databasePath)
+    const applied = applyMigrations(db, clock)
     const settings = new InstallationSettingsStore(db)
     const authentication = createAuthentication({
       db,
@@ -106,7 +103,6 @@ export function createService(options: ServiceOptions): Service {
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
 
     services = {
-      database,
       db,
       authentication,
       settings,
@@ -142,7 +138,7 @@ export function createService(options: ServiceOptions): Service {
     readiness,
     retrieval,
     get database() {
-      return services?.database
+      return services?.db
     },
     get settings() {
       return services?.settings
@@ -153,7 +149,7 @@ export function createService(options: ServiceOptions): Service {
     close() {
       scheduler?.stop()
       scheduler = undefined
-      services?.database.close()
+      services?.db.$client.close()
       services = undefined
     },
   }

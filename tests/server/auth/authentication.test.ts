@@ -1,4 +1,3 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Authentication } from '../../../src/server/auth/authentication.js'
@@ -7,15 +6,15 @@ import type { PasswordHasher } from '../../../src/server/auth/password.js'
 import { LoginRateLimiter } from '../../../src/server/auth/rate-limit.js'
 import { SessionStore } from '../../../src/server/auth/sessions.js'
 import { createLogger } from '../../../src/server/logger.js'
-import { openDatabase, type SqliteDatabase } from '../../../src/server/persistence/database.js'
+import { type DrizzleDatabase, openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations } from '../../../src/server/persistence/migrations.js'
 import { ManualClock } from '../../support/manual-clock.js'
 import { makeTempDataDir } from '../../support/temp-dir.js'
 
 describe('credential rotation races', () => {
-  let database: SqliteDatabase | undefined
+  let database: DrizzleDatabase | undefined
 
-  afterEach(() => database?.close())
+  afterEach(() => database?.$client.close())
 
   it('does not issue a session after the verifier that accepted it was reset', async () => {
     const dataDir = await makeTempDataDir()
@@ -23,8 +22,8 @@ describe('credential rotation races', () => {
     const clock = new ManualClock('2026-08-08T09:00:00.000Z')
     applyMigrations(database, clock)
 
-    const user = new UserAuthStore(drizzle(database))
-    const sessions = new SessionStore(drizzle(database))
+    const user = new UserAuthStore(database)
+    const sessions = new SessionStore(database)
     user.claim('hash:old-password', clock.now())
 
     let verificationStarted!: () => void

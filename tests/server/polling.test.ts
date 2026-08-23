@@ -52,13 +52,11 @@ interface StoredSchedule {
 }
 
 function scheduleOf(service: TestService, feedId: number): StoredSchedule {
-  const row = service.database
-    ?.prepare(
-      `SELECT polling_interval_minutes AS pollingIntervalMinutes,
-              next_poll_at            AS nextPollAt,
-              last_polled_at          AS lastPolledAt
-         FROM subscriptions WHERE feed_id = ?`,
-    )
+  const row = service.database?.$client
+    .prepare(`SELECT polling_interval_minutes AS pollingIntervalMinutes,
+          next_poll_at            AS nextPollAt,
+          last_polled_at          AS lastPolledAt
+     FROM subscriptions WHERE feed_id = ?`)
     .get(feedId)
   if (!row) throw new Error(`no subscription for feed ${feedId}`)
   return row as StoredSchedule
@@ -151,7 +149,9 @@ describe('background polling', () => {
       'if-modified-since': 'Fri, 08 Aug 2026 07:00:00 GMT',
     })
 
-    const items = service.database?.prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items').all()
+    const items = service.database?.$client
+      .prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items')
+      .all()
     expect(items).toEqual([{ title: 'First light', lastObservedAt: START }])
 
     expect(scheduleOf(service, 1).nextPollAt).toBe(nextPollTime(1, 120, service.clock.now()))

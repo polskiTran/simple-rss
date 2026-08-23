@@ -66,12 +66,12 @@ describe('the backup command', () => {
     const { context, output } = cliOn(dataDir)
     await runCli(['migrate'], context)
     const live = openDatabase(context.config.databasePath)
-    live.exec(`
+    live.$client.exec(`
       INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
       VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes',
               'journal.example', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z');
     `)
-    live.close()
+    live.$client.close()
     output.length = 0
 
     expect(await runCli(['backup', destination], context)).toBe(0)
@@ -80,8 +80,8 @@ describe('the backup command', () => {
     expect(report).toEqual({ backupCreated: true, destination, bytes: expect.any(Number) })
     expect(report.bytes).toBeGreaterThan(0)
     const snapshot = openDatabase(destination)
-    expect(snapshot.prepare('SELECT title FROM feeds').all()).toEqual([{ title: 'Field Notes' }])
-    snapshot.close()
+    expect(snapshot.$client.prepare('SELECT title FROM feeds').all()).toEqual([{ title: 'Field Notes' }])
+    snapshot.$client.close()
     expect(existsSync(context.config.databasePath)).toBe(true)
   })
 
@@ -211,8 +211,8 @@ describe('backup and restore, round-tripped through the running application', ()
     await service.stop()
 
     const live = openDatabase(databasePathOf(service))
-    live.exec('DELETE FROM feed_item_search')
-    live.close()
+    live.$client.exec('DELETE FROM feed_item_search')
+    live.$client.close()
 
     const backupPath = join(await makeTempDataDir(), 'pre-upgrade.db')
     const { context: operator } = cliOn(service.dataDir)
@@ -263,7 +263,7 @@ describe('backup and restore, round-tripped through the running application', ()
     const { context: seed } = cliOn(dataDir)
     const older = openDatabase(seed.config.databasePath)
     applyMigrations(older, seed.clock, migrations.slice(0, 3))
-    older.close()
+    older.$client.close()
     const backupPath = join(await makeTempDataDir(), 'older-release.db')
     expect(await runCli(['backup', backupPath], seed)).toBe(0)
 

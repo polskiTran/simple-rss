@@ -9,7 +9,7 @@ import type { ImageService } from './images/image-service.js'
 import type { ImageUrlSignature } from './images/image-url-signature.js'
 import type { LibraryService } from './library/library-service.js'
 import type { Logger } from './logger.js'
-import { assertWritable, type DrizzleDatabase, type SqliteDatabase } from './persistence/database.js'
+import { assertWritable, type DrizzleDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderService } from './reader/reader-service.js'
 import type { Readiness } from './readiness.js'
@@ -37,8 +37,7 @@ import { staticAssets } from './http/static-assets.js'
  * whether one piece of it arrived.
  */
 export interface Services {
-  /** The raw handle, for the readiness write probe and close; queries go through `db`. */
-  readonly database: SqliteDatabase
+  /** The process-wide Drizzle handle shared by routes and operational checks. */
   readonly db: DrizzleDatabase
   readonly authentication: Authentication
   readonly settings: InstallationSettingsStore
@@ -166,11 +165,11 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   if (state.kind === 'starting') return 'starting'
   if (state.kind === 'failed') return state.reason
 
-  const database = deps.services?.database
-  if (!database) return 'database is not open'
+  const db = deps.services?.db
+  if (!db) return 'database is not open'
 
   try {
-    assertWritable(database, deps.clock.now())
+    assertWritable(db, deps.clock.now())
   } catch (error) {
     deps.logger.error('readiness.write_probe_failed', { error })
     return 'database is not writable'

@@ -49,7 +49,7 @@ describe('saving Feed Items to the Library', () => {
     expect(repeat.status).toBe(200)
     expect(libraryMembershipSchema.parse(await repeat.json())).toEqual(membership)
 
-    const rows = service.database?.prepare('select count(*) as saved from library_items').get() as {
+    const rows = service.database?.$client.prepare('select count(*) as saved from library_items').get() as {
       saved: number
     }
     expect(rows.saved).toBe(1)

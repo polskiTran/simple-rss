@@ -26,7 +26,7 @@ describe('service lifecycle', () => {
 
     await service.stop()
 
-    expect(db.open).toBe(false)
+    expect(db.$client.open).toBe(false)
   })
 
   it('logs the shutdown sequence in order', async () => {
@@ -63,7 +63,7 @@ describe('service lifecycle', () => {
 
   it('closes readiness when the volume stops accepting writes', async () => {
     const service = await startTestService()
-    service.database!.exec('DROP TABLE write_probe')
+    service.database!.$client.exec('DROP TABLE write_probe')
 
     const response = await service.fetch('/health/ready')
 

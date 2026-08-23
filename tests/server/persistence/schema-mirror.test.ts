@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { is } from 'drizzle-orm'
 import { getTableConfig, SQLiteSyncDialect, SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { openDatabase, type SqliteDatabase } from '../../../src/server/persistence/database.js'
+import { type DrizzleDatabase, openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations } from '../../../src/server/persistence/migrations.js'
 import * as schema from '../../../src/server/persistence/schema.js'
 import { makeTempDataDir } from '../../support/temp-dir.js'
@@ -37,21 +37,19 @@ interface IndexInfo {
 
 const mirrored = Object.values<unknown>(schema).filter((value): value is SQLiteTable => is(value, SQLiteTable))
 
-let db: SqliteDatabase
+let db: DrizzleDatabase
 
 beforeAll(async () => {
   db = openDatabase(join(await makeTempDataDir(), 'simple-rss.db'))
   applyMigrations(db)
-  return () => db.close()
+  return () => db.$client.close()
 })
 
 function migratedTables(): Map<string, string> {
-  const rows = db
-    .prepare(
-      `SELECT name, sql FROM sqlite_master
-       WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-         AND name != 'schema_migrations' AND name NOT LIKE 'feed_item_search%'`,
-    )
+  const rows = db.$client
+    .prepare(`SELECT name, sql FROM sqlite_master
+   WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+     AND name != 'schema_migrations' AND name NOT LIKE 'feed_item_search%'`)
     .all() as Array<{ name: string; sql: string }>
   return new Map(rows.map((row) => [row.name, row.sql]))
 }
@@ -73,7 +71,7 @@ describe('the schema mirror', () => {
   it('mirrors every column: name, type, nullability, primary key, and default', () => {
     for (const table of mirrored) {
       const config = getTableConfig(table)
-      const actual = db.prepare(`PRAGMA table_info(${config.name})`).all() as ColumnInfo[]
+      const actual = db.$client.prepare(`PRAGMA table_info(${config.name})`).all() as ColumnInfo[]
       const actualByName = new Map(actual.map((column) => [column.name, column]))
 
       expect(config.columns.map((column) => column.name).sort(), config.name).toEqual([...actualByName.keys()].sort())
@@ -95,7 +93,7 @@ describe('the schema mirror', () => {
   it('mirrors foreign keys and their delete behavior', () => {
     for (const table of mirrored) {
       const config = getTableConfig(table)
-      const actual = db.prepare(`PRAGMA foreign_key_list(${config.name})`).all() as Array<{
+      const actual = db.$client.prepare(`PRAGMA foreign_key_list(${config.name})`).all() as Array<{
         table: string
         from: string
         to: string
@@ -128,7 +126,7 @@ describe('the schema mirror', () => {
   it('mirrors every created index by name, columns, and uniqueness', () => {
     for (const table of mirrored) {
       const config = getTableConfig(table)
-      const listed = db.prepare(`PRAGMA index_list(${config.name})`).all() as IndexInfo[]
+      const listed = db.$client.prepare(`PRAGMA index_list(${config.name})`).all() as IndexInfo[]
 
       const created = listed
         .filter((entry) => entry.origin === 'c')
@@ -150,7 +148,7 @@ describe('the schema mirror', () => {
   it('mirrors every unique column group', () => {
     for (const table of mirrored) {
       const config = getTableConfig(table)
-      const listed = db.prepare(`PRAGMA index_list(${config.name})`).all() as IndexInfo[]
+      const listed = db.$client.prepare(`PRAGMA index_list(${config.name})`).all() as IndexInfo[]
 
       const real = listed.filter((entry) => entry.origin === 'u').map((entry) => columnsOfIndex(entry.name).join(','))
       const declared = [
@@ -184,7 +182,7 @@ describe('the schema mirror', () => {
 })
 
 function columnsOfIndex(name: string): string[] {
-  const rows = db.prepare(`PRAGMA index_info(${name})`).all() as Array<{ seqno: number; name: string }>
+  const rows = db.$client.prepare(`PRAGMA index_info(${name})`).all() as Array<{ seqno: number; name: string }>
   return rows.sort((a, b) => a.seqno - b.seqno).map((row) => row.name)
 }
 

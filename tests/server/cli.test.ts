@@ -1,4 +1,3 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { UserAuthStore } from '../../src/server/auth/user-auth.js'
@@ -79,7 +78,7 @@ describe('runCli', () => {
   it('rebuilds the search index from the canonical tables', async () => {
     await runCli(['migrate'], context)
     const db = openDatabase(context.config.databasePath)
-    db.exec(`
+    db.$client.exec(`
       INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
       VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes',
               'journal.example', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z');
@@ -88,7 +87,7 @@ describe('runCli', () => {
       -- The derived index is lost; the canonical rows are not.
       DELETE FROM feed_item_search;
     `)
-    db.close()
+    db.$client.close()
     output.length = 0
 
     expect(await runCli(['rebuild-search'], context)).toBe(0)
@@ -129,9 +128,9 @@ describe('runCli reset-password', () => {
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
     try {
       applyMigrations(db)
-      return read({ user: new UserAuthStore(drizzle(db)), sessions: new SessionStore(drizzle(db)) })
+      return read({ user: new UserAuthStore(db), sessions: new SessionStore(db) })
     } finally {
-      db.close()
+      db.$client.close()
     }
   }
 

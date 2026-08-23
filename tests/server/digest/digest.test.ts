@@ -65,8 +65,8 @@ describe('the chronological Digest', () => {
       displayTime: '08:00',
     })
 
-    const stored = service.database
-      ?.prepare('select published_at as publishedAt, first_seen_at as firstSeenAt from feed_items')
+    const stored = service.database?.$client
+      .prepare('select published_at as publishedAt, first_seen_at as firstSeenAt from feed_items')
       .get() as { publishedAt: string; firstSeenAt: string }
     expect(stored.publishedAt).toBe('2026-08-07T20:00:00.000Z')
     expect(stored.firstSeenAt).toBe('2026-08-08T09:00:00.000Z')
