@@ -1,29 +1,22 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { SearchResults } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
 import { chronologySql } from '../digest/list-page.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase, SqliteDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import {
-  effectiveFeedTitle,
-  feedItems,
-  feedItemSearch,
-  feeds,
-  libraryItems,
-  subscriptions,
-} from '../persistence/schema.js'
+import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
 
 export class SearchService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
 
-  constructor(options: { database: SqliteDatabase; clock: Clock; settings: InstallationSettingsStore }) {
-    this.#db = drizzle(options.database)
+  constructor(options: { db: DrizzleDatabase; clock: Clock; settings: InstallationSettingsStore }) {
+    this.#db = options.db
     this.#clock = options.clock
     this.#settings = options.settings
   }
@@ -95,6 +88,10 @@ function matchExpressionOf(query: string): string | undefined {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }
 
+/**
+ * Restates `effectiveFeedTitle` (persistence/schema.ts) in raw SQL; keep them in
+ * step. Raw because its callers — the CLI and restore — hold only the raw handle.
+ */
 export function rebuildSearchIndex(db: SqliteDatabase): number {
   return db.transaction(() => {
     db.exec('DELETE FROM feed_item_search')

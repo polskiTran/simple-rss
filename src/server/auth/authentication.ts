@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Clock } from '../clock.js'
 import type { Logger } from '../logger.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { UserAuthStore } from './user-auth.js'
 import { argon2idHasher, type PasswordHasher } from './password.js'
 import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
@@ -226,7 +226,7 @@ export class Authentication {
 }
 
 export interface AuthenticationDependencies {
-  readonly database: SqliteDatabase
+  readonly db: DrizzleDatabase
   readonly clock: Clock
   readonly logger: Logger
   readonly setupSecret: string | undefined
@@ -234,12 +234,12 @@ export interface AuthenticationDependencies {
 }
 
 export function createAuthentication(deps: AuthenticationDependencies): Authentication {
-  const sessions = new SessionStore(deps.database)
+  const sessions = new SessionStore(deps.db)
 
   sessions.prune(deps.clock.now())
 
   return new Authentication({
-    user: new UserAuthStore(deps.database),
+    user: new UserAuthStore(deps.db),
     sessions,
     hasher: argon2idHasher(),
     limiter: new LoginRateLimiter(deps.clock),

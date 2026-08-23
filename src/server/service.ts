@@ -10,6 +10,7 @@ import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, type Logger } from './logger.js'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { openDatabase, type SqliteDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
@@ -73,37 +74,40 @@ export function createService(options: ServiceOptions): Service {
   try {
     const database = openDatabase(config.databasePath)
     const applied = applyMigrations(database, clock)
-    const settings = new InstallationSettingsStore(database)
+    // The typed handle every domain service queries through.
+    const db = drizzle(database)
+    const settings = new InstallationSettingsStore(db)
     const authentication = createAuthentication({
-      database,
+      db,
       clock,
       logger,
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    const availability = new FeedAvailabilityLedger({ database, clock, logger })
-    const subscriptions = new SubscriptionService({ database, clock, settings, logger })
-    const poll = new FeedPoll({ database, retrieval, clock, logger, subscriptions, availability })
+    const availability = new FeedAvailabilityLedger({ db, clock, logger })
+    const subscriptions = new SubscriptionService({ db, clock, settings, logger })
+    const poll = new FeedPoll({ db, retrieval, clock, logger, subscriptions, availability })
     const refresh = new FeedRefresh({ clock, poll })
 
-    const digest = new DigestService({ database, clock, settings })
-    const library = new LibraryService({ database, clock, settings })
+    const digest = new DigestService({ db, clock, settings })
+    const library = new LibraryService({ db, clock, settings })
     const imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
-    const images = new ImageService({ database, retrieval })
+    const images = new ImageService({ db, retrieval })
     const reader = new ReaderService({
-      database,
+      db,
       clock,
       settings,
       retrieval,
       digest,
       signImageUrl: imageSignature.sign,
     })
-    const search = new SearchService({ database, clock, settings })
-    const retention = new RetentionService({ database, clock, logger, ...options.retention })
+    const search = new SearchService({ db, clock, settings })
+    const retention = new RetentionService({ db, clock, logger, ...options.retention })
     scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
 
     services = {
       database,
+      db,
       authentication,
       settings,
       subscriptions,

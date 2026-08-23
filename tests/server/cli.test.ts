@@ -1,3 +1,4 @@
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { UserAuthStore } from '../../src/server/auth/user-auth.js'
@@ -128,7 +129,7 @@ describe('runCli reset-password', () => {
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
     try {
       applyMigrations(db)
-      return read({ user: new UserAuthStore(db), sessions: new SessionStore(db) })
+      return read({ user: new UserAuthStore(drizzle(db)), sessions: new SessionStore(drizzle(db)) })
     } finally {
       db.close()
     }

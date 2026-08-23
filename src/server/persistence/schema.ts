@@ -130,17 +130,6 @@ export const feedItems = sqliteTable(
   ],
 )
 
-/**
- * FTS5 index over Feed Items; `rowid` mirrors `feed_items.id`. Declared for
- * querying only — the migration 6 and 12 triggers keep it in step.
- */
-export const feedItemSearch = sqliteTable('feed_item_search', {
-  rowid: integer('rowid').notNull(),
-  itemTitle: text('item_title'),
-  summary: text('summary'),
-  feedTitle: text('feed_title'),
-})
-
 /** Explicit Library membership; ingestion never rewrites this table. */
 export const libraryItems = sqliteTable('library_items', {
   feedItemId: integer('feed_item_id')

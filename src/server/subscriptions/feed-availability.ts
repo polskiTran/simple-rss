@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   FEED_UNAVAILABLE_AFTER_FAILURES,
   type FeedAvailability,
@@ -8,7 +7,7 @@ import {
 import type { Clock } from '../clock.js'
 import type { FeedDocumentError } from '../ingestion/feed-document.js'
 import type { Logger } from '../logger.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { subscriptions } from '../persistence/schema.js'
 import type { RetrievalFailure } from '../upstream/retrieval.js'
 import { loggableUrl } from './loggable-url.js'
@@ -45,12 +44,12 @@ export type SettledPoll = { readonly kind: 'updated' } | { readonly kind: 'not-m
  * survivor, whose success arrives without a poll of its own (ADR 0007).
  */
 export class FeedAvailabilityLedger {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #logger: Logger
 
-  constructor(options: { database: SqliteDatabase; clock: Clock; logger: Logger }) {
-    this.#db = drizzle(options.database)
+  constructor(options: { db: DrizzleDatabase; clock: Clock; logger: Logger }) {
+    this.#db = options.db
     this.#clock = options.clock
     this.#logger = options.logger.child({ component: 'subscriptions' })
   }

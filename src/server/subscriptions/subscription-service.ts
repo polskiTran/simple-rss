@@ -1,5 +1,4 @@
 import { and, eq, isNull, lte } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   pollingIntervalMinutesSchema,
@@ -14,7 +13,7 @@ import {
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import type { Logger } from '../logger.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import {
   effectiveFeedDescription,
@@ -89,18 +88,18 @@ const SUBSCRIBED_FEED_COLUMNS = {
 
 /** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
 export class SubscriptionService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
   readonly #logger: Logger
 
   constructor(options: {
-    database: SqliteDatabase
+    db: DrizzleDatabase
     clock: Clock
     settings: InstallationSettingsStore
     logger: Logger
   }) {
-    this.#db = drizzle(options.database)
+    this.#db = options.db
     this.#clock = options.clock
     this.#settings = options.settings
     this.#logger = options.logger.child({ component: 'subscriptions' })
