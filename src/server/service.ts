@@ -114,8 +114,6 @@ export function createService(options: ServiceOptions): Service {
       search,
       images,
       imageSignature,
-      // Reads the binding rather than capturing the scheduler, so a nudge after
-      // close() is the no-op it has always been.
       nudgeScheduler: () => scheduler?.nudge(),
     }
 

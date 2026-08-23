@@ -40,8 +40,6 @@ export function createLogger(options: LoggerOptions): Logger {
   function build(bound: LogFields): Logger {
     const emit = (level: LogLevel, message: string, fields?: LogFields) => {
       if (RANK[level] < threshold) return
-      // Level, message, and time are written last so a caller-supplied field
-      // can never spoof them.
       write({ ...bound, ...serialiseFields(fields), level, message, time: now().toISOString() })
     }
 

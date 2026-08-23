@@ -15,9 +15,7 @@ export function encodeListCursor(cursor: ListCursor): string {
   return Buffer.from(JSON.stringify([cursor.chronology, cursor.feedItemId]), 'utf8').toString('base64url')
 }
 
-// Exactly `toISOString()` output. The SQL keyset filter compares instants as
-// text, which is only a time comparison between strings of this one shape.
-const CURSOR_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+const STORED_ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 /** `undefined` for anything this module never issued. */
 export function decodeListCursor(value: string): ListCursor | undefined {
@@ -30,7 +28,11 @@ export function decodeListCursor(value: string): ListCursor | undefined {
   if (!Array.isArray(parsed) || parsed.length !== 2) return undefined
 
   const [chronology, feedItemId] = parsed as [unknown, unknown]
-  if (typeof chronology !== 'string' || !CURSOR_INSTANT.test(chronology) || !Number.isFinite(Date.parse(chronology)))
+  if (
+    typeof chronology !== 'string' ||
+    !STORED_ISO_INSTANT.test(chronology) ||
+    !Number.isFinite(Date.parse(chronology))
+  )
     return undefined
   if (typeof feedItemId !== 'number' || !Number.isSafeInteger(feedItemId) || feedItemId <= 0) return undefined
   return { chronology, feedItemId }
