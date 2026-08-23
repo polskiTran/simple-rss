@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { claimedDevice } from '../support/device.js'
 import { startTestService } from '../support/service-harness.js'
+import { STUBBED_HOST_ADDRESS } from '../support/upstream-fixtures.js'
 
 const ENTERED_URL = 'https://journal.example/feed'
 const RESOLVED_URL = 'https://feeds.example/journal.xml'
@@ -192,6 +193,10 @@ describe('Subscriptions', () => {
     await service.wakeScheduler()
 
     expect(service.upstream.resolutions).toEqual(['journal.example', 'feeds.example'])
+    expect(service.upstream.requests.map((request) => request.addresses)).toEqual([
+      [STUBBED_HOST_ADDRESS],
+      [STUBBED_HOST_ADDRESS],
+    ])
   })
 
   it('preserves the exact entered URL and dedupes on its canonical form', async () => {

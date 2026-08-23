@@ -1,7 +1,7 @@
 import type { ResolveAddresses } from '../../src/server/upstream/destination.js'
 import type { HttpClient } from '../../src/server/upstream/http-client.js'
 
-const STUBBED_HOST_ADDRESS = '93.184.216.34'
+export const STUBBED_HOST_ADDRESS = '93.184.216.34'
 
 export interface FixtureResponse {
   readonly status?: number
@@ -18,6 +18,8 @@ export interface RecordedRequest {
   readonly method: string
   readonly url: string
   readonly headers: Record<string, string>
+  /** The judged addresses the boundary handed over for this hop; absent when it handed none. */
+  readonly addresses: readonly string[] | undefined
 }
 
 /**
@@ -76,11 +78,12 @@ export class UpstreamFixtures {
   }
 
   get client(): HttpClient {
-    return async (request) => {
+    return async (request, addresses) => {
       this.#requests.push({
         method: request.method,
         url: request.url,
         headers: Object.fromEntries(request.headers.entries()),
+        addresses,
       })
 
       const stubbed = this.#responses.get(request.url)

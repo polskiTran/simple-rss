@@ -77,11 +77,7 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
   }
 }
 
-/**
- * Checks addresses inside the lookup the socket itself performs, closing the
- * re-resolution window between check and connect; one refused address refuses
- * the whole name.
- */
+/** Resolves and judges a name inside the socket's own lookup, for a hop that arrives without judged addresses. */
 export function guardedLookup(
   isAllowed: (address: string) => boolean = isPublicAddress,
   lookup: LookupFunction = systemLookup,
