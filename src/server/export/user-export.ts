@@ -1,55 +1,17 @@
 import { eq } from 'drizzle-orm'
+import {
+  pollingIntervalMinutesSchema,
+  type UserExport,
+  type UserExportFeed,
+  type UserExportItem,
+  USER_EXPORT_FORMAT,
+  USER_EXPORT_VERSION,
+} from '../../shared/api.js'
 import { VERSION } from '../../shared/version.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-
-export const USER_EXPORT_FORMAT = 'simple-rss-export'
-
-/** 3 dropped `schemaVersion`: the export names its own shape, not migration bookkeeping. */
-export const USER_EXPORT_VERSION = 3
-
-export interface UserExportItem {
-  readonly dedupeKey: string
-  readonly identityKind: 'guid' | 'link' | 'content'
-  readonly title: string | null
-  readonly link: string | null
-  readonly publishedAt: string | null
-  readonly imageUrl: string | null
-  readonly summary: string | null
-  readonly firstSeenAt: string
-  readonly lastObservedAt: string
-  readonly savedAt: string | null
-}
-
-/** `subscription` is null for a Feed kept only because Library saves still attribute to it. */
-export interface UserExportFeed {
-  readonly enteredUrl: string
-  readonly resolvedUrl: string
-  /** The reported title and Feed Description; the User's overrides live on `subscription`. */
-  readonly title: string
-  readonly description: string | null
-  readonly domain: string
-  readonly homePageUrl: string | null
-  readonly createdAt: string
-  readonly subscription: {
-    readonly pollingIntervalMinutes: number
-    readonly customTitle: string | null
-    readonly customDescription: string | null
-    readonly createdAt: string
-  } | null
-  readonly items: readonly UserExportItem[]
-}
-
-export interface UserExport {
-  readonly format: typeof USER_EXPORT_FORMAT
-  readonly exportVersion: typeof USER_EXPORT_VERSION
-  readonly applicationVersion: string
-  readonly exportedAt: string
-  readonly installation: { readonly timezone: string }
-  readonly feeds: readonly UserExportFeed[]
-}
 
 export function buildUserExport(options: {
   db: DrizzleDatabase
@@ -118,7 +80,7 @@ export function buildUserExport(options: {
           feed.pollingIntervalMinutes === null || feed.subscribedAt === null
             ? null
             : {
-                pollingIntervalMinutes: feed.pollingIntervalMinutes,
+                pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(feed.pollingIntervalMinutes),
                 customTitle: feed.customTitle,
                 customDescription: feed.customDescription,
                 createdAt: feed.subscribedAt,

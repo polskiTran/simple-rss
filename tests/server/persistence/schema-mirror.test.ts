@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { is } from 'drizzle-orm'
-import { getTableConfig, SQLiteSyncDialect, SQLiteTable } from 'drizzle-orm/sqlite-core'
+import { getTableConfig, type IndexColumn, SQLiteSyncDialect, SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { type DrizzleDatabase, openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations } from '../../../src/server/persistence/migrations.js'
@@ -11,10 +11,8 @@ import { makeTempDataDir } from '../../support/temp-dir.js'
  * The drift test behind schema.ts' "typed mirror" claim: migrations stay the
  * source of truth, and this walks a fully migrated database to prove the mirror
  * still matches it — tables, columns, defaults, foreign keys, indexes, unique
- * groups, and CHECK expressions. Index column *direction* is the one thing
- * pragmas don't expose, so the chronology indexes' DESC is not compared;
- * partial-index WHERE clauses are also outside the comparison, and no index
- * declares one today.
+ * groups, and CHECK expressions. Partial-index WHERE clauses are outside the
+ * comparison, and no index declares one today.
  *
  * Deliberately outside the comparison: `schema_migrations` (the runner's own
  * ledger) and `feed_item_search` with its FTS5 shadow tables — search DDL
@@ -35,7 +33,20 @@ interface IndexInfo {
   origin: 'c' | 'u' | 'pk'
 }
 
+interface IndexedColumn {
+  name: string
+  descending: boolean
+}
+
+interface IndexColumnInfo {
+  seqno: number
+  name: string
+  desc: number
+  key: number
+}
+
 const mirrored = Object.values<unknown>(schema).filter((value): value is SQLiteTable => is(value, SQLiteTable))
+const dialect = new SQLiteSyncDialect()
 
 let db: DrizzleDatabase
 
@@ -138,7 +149,7 @@ describe('the schema mirror', () => {
       const declared = config.indexes.map((index) => ({
         name: index.config.name,
         unique: index.config.unique,
-        columns: index.config.columns.map((column) => ('name' in column ? column.name : String(column))),
+        columns: index.config.columns.map((column) => configuredIndexColumn(column, config.name)),
       }))
 
       expect(declared.sort(byName), config.name).toEqual(created.sort(byName))
@@ -150,7 +161,13 @@ describe('the schema mirror', () => {
       const config = getTableConfig(table)
       const listed = db.$client.prepare(`PRAGMA index_list(${config.name})`).all() as IndexInfo[]
 
-      const real = listed.filter((entry) => entry.origin === 'u').map((entry) => columnsOfIndex(entry.name).join(','))
+      const real = listed
+        .filter((entry) => entry.origin === 'u')
+        .map((entry) =>
+          columnsOfIndex(entry.name)
+            .map((column) => column.name)
+            .join(','),
+        )
       const declared = [
         ...config.uniqueConstraints.map((constraint) => constraint.columns.map((column) => column.name).join(',')),
         ...config.columns.filter((column) => column.isUnique).map((column) => column.name),
@@ -161,7 +178,6 @@ describe('the schema mirror', () => {
   })
 
   it('mirrors every CHECK constraint expression', () => {
-    const dialect = new SQLiteSyncDialect()
     const tables = migratedTables()
 
     for (const table of mirrored) {
@@ -181,9 +197,25 @@ describe('the schema mirror', () => {
   })
 })
 
-function columnsOfIndex(name: string): string[] {
-  const rows = db.$client.prepare(`PRAGMA index_info(${name})`).all() as Array<{ seqno: number; name: string }>
-  return rows.sort((a, b) => a.seqno - b.seqno).map((row) => row.name)
+function columnsOfIndex(name: string): IndexedColumn[] {
+  const rows = db.$client.prepare(`PRAGMA index_xinfo(${name})`).all() as IndexColumnInfo[]
+  return rows
+    .filter((row) => row.key === 1)
+    .sort((a, b) => a.seqno - b.seqno)
+    .map((row) => ({ name: row.name, descending: row.desc === 1 }))
+}
+
+function configuredIndexColumn(column: IndexColumn, tableName: string): IndexedColumn {
+  if ('name' in column) return { name: column.name, descending: false }
+
+  const query = dialect.sqlToQuery(column)
+  expect(query.params, `${tableName}: an index expression must not carry bound parameters`).toEqual([])
+  const expression = comparableExpression(query.sql, tableName)
+  const match = /^([a-z0-9_]+) (asc|desc)$/.exec(expression)
+  if (!match?.[1] || !match[2]) {
+    throw new Error(`${tableName}: unsupported index expression ${expression}`)
+  }
+  return { name: match[1], descending: match[2] === 'desc' }
 }
 
 function byName(a: { name: string }, b: { name: string }): number {

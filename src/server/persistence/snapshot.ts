@@ -1,9 +1,11 @@
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { sql } from 'drizzle-orm'
+import { count, sql } from 'drizzle-orm'
+import type { AnySQLiteTable } from 'drizzle-orm/sqlite-core'
 import type { Clock } from '../clock.js'
 import { assertWritable, type DrizzleDatabase, openDatabase } from './database.js'
 import { applyMigrations } from './migrations.js'
+import { feedItems, feeds, libraryItems, subscriptions, userAuth } from './schema.js'
 
 function sidecarsOf(path: string): string[] {
   return [`${path}-wal`, `${path}-shm`]
@@ -104,11 +106,11 @@ export function restoreSnapshot(
         restored: true,
         migrationsApplied,
         indexedItems,
-        feeds: countRows(db, 'feeds'),
-        subscriptions: countRows(db, 'subscriptions'),
-        feedItems: countRows(db, 'feed_items'),
-        libraryItems: countRows(db, 'library_items'),
-        claimed: countRows(db, 'user_auth') > 0,
+        feeds: countRows(db, feeds),
+        subscriptions: countRows(db, subscriptions),
+        feedItems: countRows(db, feedItems),
+        libraryItems: countRows(db, libraryItems),
+        claimed: countRows(db, userAuth) > 0,
       }
     } finally {
       db.$client.close()
@@ -130,9 +132,6 @@ export function restoreSnapshot(
   return report
 }
 
-function countRows(
-  db: DrizzleDatabase,
-  table: 'feeds' | 'subscriptions' | 'feed_items' | 'library_items' | 'user_auth',
-): number {
-  return db.get<{ count: number }>(sql.raw(`SELECT count(*) AS count FROM ${table}`))?.count ?? 0
+function countRows(db: DrizzleDatabase, table: AnySQLiteTable): number {
+  return db.select({ count: count() }).from(table).get()?.count ?? 0
 }

@@ -88,21 +88,24 @@ function matchExpressionOf(query: string): string | undefined {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }
 
-/**
- * Restates `effectiveFeedTitle` (persistence/schema.ts) in SQL; keep them in
- * step. FTS5 is outside the schema mirror, but the operation still uses the
- * process-wide Drizzle handle.
- */
+/** Rebuilds the derived FTS5 index from its canonical tables. */
 export function rebuildSearchIndex(db: DrizzleDatabase): number {
   return db.transaction((tx) => {
-    tx.run(sql`DELETE FROM feed_item_search`)
-    return tx.run(sql`
-      INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
-      SELECT feed_items.id, feed_items.title, feed_items.summary,
-             coalesce(subscriptions.custom_title, feeds.title)
-      FROM feed_items
-      JOIN feeds ON feeds.id = feed_items.feed_id
-      LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id
-    `).changes
+    tx.delete(feedItemSearch).run()
+    return tx
+      .insert(feedItemSearch)
+      .select(
+        tx
+          .select({
+            rowid: feedItems.id,
+            itemTitle: feedItems.title,
+            summary: feedItems.summary,
+            feedTitle: effectiveFeedTitle.as('feed_title'),
+          })
+          .from(feedItems)
+          .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+          .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id)),
+      )
+      .run().changes
   })
 }
