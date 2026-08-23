@@ -36,7 +36,6 @@ export class Device {
     return this.#send(path, 'GET')
   }
 
-  /** `signal` lets a test walk away mid-request, as a browser that closed the dialog does. */
   post(path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
     return this.#send(path, 'POST', body, signal)
   }

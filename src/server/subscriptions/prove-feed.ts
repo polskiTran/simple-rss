@@ -90,7 +90,6 @@ export async function proveFeed(
   }
 }
 
-/** The address answered with an HTML page rather than a Feed — what a pasted home page looks like from here. */
 export function answeredWithPage(proof: FailedPoll): boolean {
   return (
     proof.kind === 'retrieval-failed' &&

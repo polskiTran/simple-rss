@@ -697,9 +697,6 @@
     margin: 20px 0 0;
   }
 
-  /* The preview's body fades in where the wait stood, opacity only. It lives inside an
-     overlay, so under reduced motion it goes instant with the overlay's own fades
-     (docs/DESIGN.md §5) rather than keeping a view's gentler one. */
   .preview-arrived {
     animation: preview-arrive 150ms ease-out;
   }
@@ -1336,6 +1333,7 @@
     transition-duration: 0s;
   }
 
+  /* Inside an overlay: instant, not the view fade's gentler version (docs/DESIGN.md §5). */
   .preview-arrived {
     animation-duration: 0s;
   }

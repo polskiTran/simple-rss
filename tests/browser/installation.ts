@@ -201,7 +201,6 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
 
 export { expect } from '@playwright/test'
 
-/** Claims the installation on its setup screen, which lands the User signed in on the Digest. */
 export async function claim(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('setup secret').fill(SETUP_SECRET)
@@ -211,7 +210,6 @@ export async function claim(page: Page, installation: Installation): Promise<voi
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
-/** Pastes a Feed URL on the Feeds list and subscribes through the preview dialog; ends with the row and the notice visible. */
 export async function subscribe(page: Page, feedUrl: string, title: string): Promise<void> {
   await page.getByRole('link', { name: 'feeds' }).click()
   await page.getByRole('textbox', { name: 'search or add feeds' }).fill(feedUrl)

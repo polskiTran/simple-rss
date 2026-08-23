@@ -170,7 +170,7 @@ export const feedPreviewSchema = z.object({
   homePageUrl: z.string().nullable(),
   /** Newest first by `publishedAt`; undated items after, in document order. */
   items: z.array(previewItemSchema).max(PREVIEW_ITEM_COUNT),
-  /** The Feeds a page declares. Empty until page discovery lands: a typed Feed URL declares none. */
+  /** The Feeds a page declares; a typed Feed URL declares none. */
   declaredFeeds: z.array(declaredFeedSchema),
   /** Set when the Feed is already subscribed — found before the fetch, or revealed by a redirect after it. */
   subscribed: z.object({ feedId: z.number().int().positive() }).nullable(),

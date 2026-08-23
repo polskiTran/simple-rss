@@ -5,7 +5,6 @@ export interface StubbedRequest {
   readonly method: string
   readonly path: string
   readonly body: unknown
-  /** The caller's signal, so a test can see a request it walked away from. */
   readonly signal: AbortSignal | undefined
 }
 

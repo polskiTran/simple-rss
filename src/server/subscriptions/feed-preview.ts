@@ -19,7 +19,6 @@ export type PreviewOutcome =
   | { readonly kind: 'no-feed-found' }
   | FailedPoll
 
-/** A subscribed Feed as the store presents it: the effective title and description, and the domain the list shows. */
 interface SubscribedFeed {
   readonly feedId: number
   readonly title: string
@@ -28,11 +27,7 @@ interface SubscribedFeed {
   readonly homePageUrl: string | null
 }
 
-/**
- * The question the dialog asks before anything is written (ADR 0009): what
- * would subscribing to this address get? Reads the store and the publisher;
- * never writes either.
- */
+/** Reads the store and the publisher; never writes either (ADR 0009). */
 export class FeedPreview {
   readonly #db: BetterSQLite3Database
   readonly #retrieval: Retrieval
@@ -54,12 +49,6 @@ export class FeedPreview {
     this.#logger = options.logger.child({ component: 'subscriptions' })
   }
 
-  /**
-   * A typed URL that is already a subscribed Feed's alias answers from the
-   * store without asking the publisher. Otherwise the Feed is proven under the
-   * `preview` operation, and only then is the resolved URL looked up — a
-   * redirect can land on a Feed the typed URL never named.
-   */
   async preview(enteredUrl: string, signal?: AbortSignal): Promise<PreviewOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
@@ -133,7 +122,6 @@ export class FeedPreview {
     return feed
   }
 
-  /** The Feed's retained items in the chronology the Digest uses, so the dialog agrees with the opened Feed. */
   #retainedItems(feedId: number): PreviewItem[] {
     const rows = this.#db
       .select({
@@ -168,7 +156,6 @@ interface UnpresentedItem {
   readonly publishedAt: string | null
 }
 
-/** Dated items newest first; undated ones after, still in document order. */
 function newestFirst<Item extends UnpresentedItem>(items: readonly Item[]): Item[] {
   const dated = items.filter((item): item is Item & { publishedAt: string } => item.publishedAt !== null)
   const undated = items.filter((item) => item.publishedAt === null)
@@ -178,7 +165,6 @@ function newestFirst<Item extends UnpresentedItem>(items: readonly Item[]): Item
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
-/** `today` · `yesterday` · `N days ago` · `N weeks ago` · `N months ago`, by calendar days in the installation timezone. */
 function relativeDate(publishedAt: string | null, today: string, timezone: string): string {
   if (publishedAt === null) return 'undated'
   const published = Date.parse(publishedAt)

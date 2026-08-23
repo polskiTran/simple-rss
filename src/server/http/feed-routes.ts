@@ -60,7 +60,6 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     return proofFailure(c, outcome)
   })
 
-  /** A client that gives up takes its abort with it: the signal reaches the retrieval. */
   app.post('/feeds/preview', async (c) => {
     const body = await readJsonBody(c, createSubscriptionRequestSchema)
     if (!body.ok) return body.response
@@ -159,7 +158,6 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   return app
 }
 
-/** Why the address did not prove to be a Feed — the one vocabulary preview and subscribe share. */
 function proofFailure(c: Context, outcome: Exclude<PreviewOutcome, { kind: 'previewed' }>) {
   switch (outcome.kind) {
     case 'invalid-url':

@@ -25,19 +25,13 @@ export interface PreviewDialogProps {
   onOpenFeed(feedId: number): void
 }
 
-/**
- * The question asked before anything is written: `subscribe to <title>?`,
- * with the Feed's host, description, and recent items. Opens at once in its
- * in-progress state; a failed preview closes it with the sentence handed up.
- * What it shows is keyed to the request it answered, so the body holds still
- * through the exit fade and the next request opens on the wait, not on the
- * last answer.
- */
 export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFeed }: PreviewDialogProps) {
   const [open, setOpen] = useState(false)
   const [answer, setAnswer] = useState<{ readonly request: PreviewRequest; readonly phase: Phase }>()
   const inFlight = useRef<AbortController>(undefined)
   const popup = useRef<HTMLDivElement>(null)
+  // Base UI keeps the popup mounted through its exit fade: an answer stays keyed to
+  // its request so the body holds still then, and the next request opens on the wait.
   const phase = answer && answer.request === request ? answer.phase : undefined
 
   useEffect(() => {
@@ -160,7 +154,6 @@ function Arrived({
             {subscribing ? 'subscribing…' : 'subscribe'}
           </Button>
         )}
-        {/* Composed onto Button, as every overlay's dismissing word is, so it keeps focus while disabled. */}
         <Dialog.Close className="text-button" disabled={subscribing} render={<Button focusableWhenDisabled />}>
           cancel
         </Dialog.Close>
@@ -169,7 +162,6 @@ function Arrived({
   )
 }
 
-/** The same host the Feeds list would show; the typed line stands in for one that will not parse. */
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname
