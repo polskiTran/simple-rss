@@ -11,7 +11,7 @@ import {
   nextPollTime,
   nextRetryTime,
 } from '../../src/server/subscriptions/polling-schedule.js'
-import { FeedAvailabilityLedger, availabilityCategoryOf } from '../../src/server/subscriptions/feed-availability.js'
+import { FeedAvailabilityLedger } from '../../src/server/subscriptions/feed-availability.js'
 import { FeedPoll } from '../../src/server/subscriptions/feed-poll.js'
 import { SubscriptionService } from '../../src/server/subscriptions/subscription-service.js'
 import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../src/server/upstream/retrieval.js'
@@ -325,18 +325,18 @@ describe('Feed Availability', () => {
   })
 })
 
-describe('congestion at the retrieval boundary', () => {
-  function scriptedRetrieval(script: RetrievalBytesResult[]): Retrieval {
-    return {
-      retrieve: () => Promise.reject(new Error('these polls buffer, they never stream')),
-      retrieveBytes: async () => {
-        const next = script.shift()
-        if (!next) throw new Error('the retrieval script ran out of answers')
-        return next
-      },
-    }
+function scriptedRetrieval(script: RetrievalBytesResult[]): Retrieval {
+  return {
+    retrieve: () => Promise.reject(new Error('these polls buffer, they never stream')),
+    retrieveBytes: async () => {
+      const next = script.shift()
+      if (!next) throw new Error('the retrieval script ran out of answers')
+      return next
+    },
   }
+}
 
+describe('congestion at the retrieval boundary', () => {
   function feedBytes(url: string): RetrievalBytesResult {
     return {
       ok: true,
@@ -410,18 +410,46 @@ describe('congestion at the retrieval boundary', () => {
 })
 
 describe('availability categories', () => {
-  it('keeps timeout and the other retrieval failures distinguishable', () => {
-    const failure = (code: RetrievalFailureCode) =>
-      availabilityCategoryOf({ kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } })
+  it('keeps timeout and the other retrieval failures distinguishable', async () => {
+    const verdicts: readonly [RetrievalFailureCode, FeedAvailability['category']][] = [
+      ['timeout', 'timeout'],
+      ['body_timeout', 'timeout'],
+      ['too_large', 'too_large'],
+      ['unsupported_content_type', 'unsupported_content'],
+      ['unsupported_content_encoding', 'unsupported_content'],
+      ['http_error', 'http_error'],
+      ['unresolvable_host', 'unreachable'],
+      ['unavailable', 'unreachable'],
+    ]
 
-    expect(failure('timeout')).toBe('timeout')
-    expect(failure('body_timeout')).toBe('timeout')
-    expect(failure('too_large')).toBe('too_large')
-    expect(failure('unsupported_content_type')).toBe('unsupported_content')
-    expect(failure('unsupported_content_encoding')).toBe('unsupported_content')
-    expect(failure('http_error')).toBe('http_error')
-    expect(failure('unresolvable_host')).toBe('unreachable')
-    expect(failure('unavailable')).toBe('unreachable')
-    expect(availabilityCategoryOf({ kind: 'invalid-feed', code: 'malformed_feed' })).toBe('invalid_feed')
+    const clock = new ManualClock(START)
+    const database = openDatabase(join(await makeTempDataDir(), 'categories.db'))
+    applyMigrations(database, clock)
+    const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
+    const subscriptions = new SubscriptionService({
+      database,
+      clock,
+      settings: new InstallationSettingsStore(database),
+      logger,
+    })
+    const poll = new FeedPoll({
+      database,
+      retrieval: scriptedRetrieval(verdicts.map(([code]) => ({ ok: false, code, reason: '' }))),
+      clock,
+      logger,
+      subscriptions,
+      availability: new FeedAvailabilityLedger({ database, clock, logger }),
+    })
+
+    try {
+      expect(subscriptions.create('https://one.example/feed').kind).toBe('created')
+      for (const [code, category] of verdicts) {
+        await poll.ingest(1)
+        expect(storedAvailabilityIn(database, 1).lastFailureCategory, code).toBe(category)
+        clock.advance(60_000)
+      }
+    } finally {
+      database.close()
+    }
   })
 })

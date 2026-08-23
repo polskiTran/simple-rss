@@ -7,13 +7,7 @@ import type { Logger } from '../logger.js'
 import type { SqliteDatabase } from '../persistence/database.js'
 import { feedUrlAliases, feeds, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalBytes } from '../upstream/retrieval.js'
-import {
-  availabilityCategoryOf,
-  wasNeverAsked,
-  type FailedPoll,
-  type FeedAvailabilityLedger,
-  type PolledFeed,
-} from './feed-availability.js'
+import type { FailedPoll, FeedAvailabilityLedger, PolledFeed } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import type { SubscriptionService } from './subscription-service.js'
 
@@ -68,9 +62,7 @@ export class FeedPoll {
 
     const outcome = await this.#poll(feed)
     if (outcome.kind === 'missing' || outcome.kind === 'merged') return outcome
-    if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.#availability.recordSuccess(feed)
-    else if (wasNeverAsked(outcome)) this.#availability.recordDeferral(feed, outcome.failure.code)
-    else this.#availability.recordFailure(feed, availabilityCategoryOf(outcome))
+    this.#availability.record(feed, outcome)
     return outcome
   }
 
