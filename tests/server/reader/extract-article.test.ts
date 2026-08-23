@@ -48,7 +48,6 @@ describe('extractArticle', () => {
   it('honours a declared transport charset over the UTF-8 default', async () => {
     const body =
       '<html><head><title>t</title></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
-    // windows-1252 stores é as the single byte 0xE9, which is invalid UTF-8.
     const latin1 = Uint8Array.from([...body].map((char) => char.charCodeAt(0)))
     const article = await extractArticle({ bytes: latin1, charset: 'windows-1252', url: URL })
 

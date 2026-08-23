@@ -70,6 +70,8 @@ async function freePort(): Promise<number> {
   return address.port
 }
 
+const STARTUP_HANG_LIMIT_MS = 8_000
+
 function waitForLog(child: ChildProcessWithoutNullStreams, predicate: () => boolean): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>()
   const onData = () => {
@@ -85,10 +87,7 @@ function waitForLog(child: ChildProcessWithoutNullStreams, predicate: () => bool
     error ? reject(error) : resolve()
   }
 
-  // Bounds a real child process; fake timers cannot drive OS events. Generous
-  // because it catches a hang, not races startup: module loading alone costs
-  // the child ~500ms while the suite competes for the same cores.
-  const timeout = setTimeout(() => finish(new Error('service did not start')), 8_000)
+  const timeout = setTimeout(() => finish(new Error('service did not start')), STARTUP_HANG_LIMIT_MS)
   child.stdout.on('data', onData)
   child.once('exit', onExit)
   onData()
@@ -104,8 +103,6 @@ function waitForExit(
     resolve({ code, signal })
   }
 
-  // This watchdog is the assertion that the external process did not exit;
-  // fake timers cannot advance a spawned Node process.
   const timeout = setTimeout(() => {
     child.off('exit', onExit)
     reject(new Error('service kept running after a fatal error'))

@@ -44,9 +44,7 @@ describe('health endpoints', () => {
     await chmod(unwritable, 0o700)
   })
 
-  // An installation without services registers no /api routes at all, so one
-  // refusal stands in for every one of them.
-  it('refuses the whole API when startup could not migrate the database', async () => {
+  it('refuses API requests when startup could not migrate the database', async () => {
     const parent = await makeTempDataDir()
     const unwritable = join(parent, 'readonly')
     await mkdir(unwritable)

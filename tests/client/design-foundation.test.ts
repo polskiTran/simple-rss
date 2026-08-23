@@ -3,8 +3,6 @@ import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { BAND_HEIGHT_PX } from '../../src/client/components/daily-band.js'
 
-// jsdom does not evaluate stylesheets, so these tests read styles.css directly
-// and hold its token values against the literals in `docs/DESIGN.md`.
 let css: string
 
 beforeAll(async () => {
@@ -221,9 +219,6 @@ describe('layout', () => {
 
 describe('the Feeds tab', () => {
   it('lets the search treatment scroll with the page, on the documented rhythm', () => {
-    // Nothing sticks to the viewport. `position: fixed` is not collateral here:
-    // the overlay is the one thing drawn over the paper (DESIGN.md §5), and it
-    // is the backdrop and the viewport, nothing else.
     expect(css).not.toMatch(/position:\s*sticky/)
     expect(css.match(/position:\s*fixed/g) ?? []).toHaveLength(1)
     expect(css).toMatch(/\.overlay-backdrop,\n\s*\.overlay-viewport\s*\{[^}]*position:\s*fixed/)
