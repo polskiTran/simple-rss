@@ -41,7 +41,7 @@ The User-selected preset controlling how often a Subscription becomes eligible t
 _Avoid_: Polling rate, exact schedule
 
 **Feed Availability**:
-A calm summary of a Subscription's recent retrieval outcome, without implying that a failing Feed should be removed. A Subscription that has never been retrieved is unchecked.
+A calm summary of a Subscription's recent retrieval outcome, without implying that a failing Feed should be removed. A Subscription recorded by OPML Import that has never been retrieved is unchecked.
 _Avoid_: Feed health, broken Feed, pending feed
 
 **Feed Item**:

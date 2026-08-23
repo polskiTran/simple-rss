@@ -1,7 +1,7 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { arrayOf, asRecord, declaresXmlEntities } from '../ingestion/xml.js'
 
-/** Recording is local (ADR 0007), so this bounds parse work and the scheduler's first-check backlog. */
+/** OPML Import records without contacting a Feed (ADR 0009), so this bounds parse work and the scheduler's first-check backlog. */
 export const MAX_OPML_FEEDS = 500
 
 const MAX_TITLE_LENGTH = 512

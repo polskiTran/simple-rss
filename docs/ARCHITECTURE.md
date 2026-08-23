@@ -155,9 +155,11 @@ Railway mounts the volume only at runtime, so migrations run during application 
 
 A pasted address may be a Feed or a page. A page is read, under the same limits as a Feed, for the Feeds it declares in `<link rel="alternate">` (`application/rss+xml` or `application/atom+xml`, document order, deduped); the first Declared Feed is previewed and the rest are offered in the dialog. The page itself is never recorded as a Feed URL.
 
-Subscribing and OPML Import record the Subscription without contacting the Feed (ADR 0007). The server validates the URL shape, deduplicates against known Feed URLs, and creates the Feed and Subscription transactionally; the Subscription starts unchecked and immediately due, and the request nudges the scheduler awake. The first retrieval is an ordinary poll: it confirms RSS or Atom content, corrects the Feed's title and resolved URL, and ingests the current Feed Window. A first retrieval that reveals an already-subscribed Feed behind a different URL quietly merges the later Subscription into it.
+Subscribing proves the Feed inside the request (ADR 0009). `POST /api/feeds/preview` retrieves and parses the pasted address and records nothing, so the User is asked `subscribe to <title>?` before anything is written; `POST /api/subscriptions` retrieves and parses the Feed URL the preview settled on, unconditionally, and writes the Feed, the Subscription, and the first Feed Window in one transaction. The answer is 201 with a Subscription already available, its items already in the Digest and its next poll one Polling Interval out; the scheduler is not involved. Duplicates are settled after the proof and before the write: the Feed owning the resolved URL, else the typed one, is the Feed — subscribed answers 409, a dormant Feed is revived into the same row, and otherwise a Feed is created. An address that does not prove to be a Feed answers 4xx with the reason and leaves no row; a page that reaches subscribe is `no_feed_found`, since reading declarations belongs to the preview.
 
-The entered URL is preserved while a validated resolved URL may be recorded for subsequent retrievals. One OPML import records at most 500 Feeds; a wake that finds a full due batch drains the next batch at once, so an import's first checks finish at the pace of the retrieval budgets rather than one batch per minute.
+OPML Import records each entry without contacting its Feed (ADR 0009). The server validates the URL shape, deduplicates against known Feed URLs, and creates the Feed and Subscription transactionally; the Subscription starts unchecked and immediately due, and the import nudges the scheduler awake. The first retrieval is an ordinary poll: it confirms RSS or Atom content, corrects the Feed's title and resolved URL, and ingests the current Feed Window. A first retrieval that reveals an already-subscribed Feed behind a different URL quietly merges the later Subscription into it — import is the only path that can, being the only one that records a URL before seeing where it resolves.
+
+The entered URL is preserved while a validated resolved URL may be recorded for subsequent retrievals. One OPML import records at most 500 Feeds; a wake that finds a full due batch drains the next batch at once, and a Feed deferred by a busy retrieval budget waits a wake interval rather than a full Polling Interval, so an import's rows fill in at the pace of the retrieval budgets rather than one batch per minute.
 
 ### Feed retrieval limits
 
@@ -169,6 +171,8 @@ The entered URL is preserved while a validated resolved URL may be recorded for 
 - Redirect destinations revalidated independently
 - No credentials, localhost, private/reserved destinations, or self-reference
 - No forwarding of browser credentials or cookies
+
+A pasted address is retrieved under its own profile (ADR 0005): the same ceiling, redirect count, and destination rules, accepting a page as well as a Feed, under a single fifteen-second deadline covering the answer and its body together and spent across the page and the Declared Feed it leads to. Its concurrency budget is separate from polling's, so a running OPML Import can neither refuse nor delay a preview.
 
 ### Polling
 

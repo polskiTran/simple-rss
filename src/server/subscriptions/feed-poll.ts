@@ -22,7 +22,7 @@ export type IngestFeedOutcome =
   | { readonly kind: 'updated'; readonly observedItems: number }
   | { readonly kind: 'not-modified' }
   | { readonly kind: 'missing' }
-  /** The retrieval revealed this Feed to be another subscribed Feed (ADR 0007). */
+  /** The retrieval revealed this Feed to be another subscribed Feed: the quiet merge, which only an imported Subscription reaches (ADR 0009). */
   | { readonly kind: 'merged'; readonly intoFeedId: number }
   | FailedPoll
 
@@ -35,7 +35,7 @@ interface PollableFeed extends PolledFeed, FeedValidators {
  * One poll of one Feed, end to end: the conditional retrieval and parse
  * (`proveFeed`), the Feed Window write, and the single Feed Availability write
  * the outcome earns. A retrieval that reveals a duplicate is handed back to
- * `SubscriptionService`, which owns every Subscription write (ADR 0007).
+ * `SubscriptionService`, which owns every Subscription write (ADR 0009).
  */
 export class FeedPoll {
   readonly #db: BetterSQLite3Database
