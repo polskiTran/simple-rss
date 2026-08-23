@@ -10,8 +10,7 @@ export function OlderItems({
 }: {
   nextCursor: string | null
   older: OlderState
-  /** `items` or `saves`. */
-  noun: string
+  noun: 'items' | 'saves'
   onLoadOlder: (cursor: string) => void
 }) {
   if (nextCursor === null) return null

@@ -8,9 +8,7 @@ export interface FieldProps {
   readonly autoFocus?: boolean
   /** What stands when the value is left blank, e.g. a Feed's reported title. */
   readonly placeholder?: string | undefined
-  /** The server's bound for the value; typing stops there, but a paste is cut silently. */
   readonly maxLength?: number
-  /** A paragraph-shaped control for paragraph-shaped values, e.g. a description. */
   readonly multiline?: boolean
   onChange(value: string): void
 }
@@ -35,8 +33,6 @@ export function Field({
         type={multiline ? undefined : type}
         value={value}
         autoComplete={autoComplete}
-        // Only Setup and Login pass it, and each is a whole page whose single
-        // purpose is that one field.
         autoFocus={autoFocus}
         placeholder={placeholder}
         maxLength={maxLength}

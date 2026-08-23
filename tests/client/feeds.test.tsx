@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -94,7 +94,7 @@ describe('Feeds', () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
     api.on('POST /api/subscriptions', () => {
       api.on('GET /api/feeds/1', () => firstCheck)
-      api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+      api.on('GET /api/feeds', { body: { subscriptions: [UNCHECKED_FEED] } })
       return { status: 201, body: { subscription: UNCHECKED_FEED } }
     })
     window.history.replaceState(null, '', '/feeds')
@@ -108,6 +108,7 @@ describe('Feeds', () => {
     expect(screen.getByText('subscribed — checking the feed…')).toBeDefined()
     expect(screen.getByText('waiting for first check')).toBeDefined()
 
+    api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     releaseDetail?.({ body: feedDetail(AVAILABLE, 1) })
     expect(await screen.findByText('subscribed — 1 item in the digest')).toBeDefined()
     expect(await screen.findByText('Field Notes')).toBeDefined()
@@ -232,8 +233,11 @@ describe('Feeds', () => {
     const staleList = new Promise<Reply>((resolve) => {
       release = resolve
     })
-    stubApi()
-      .on('GET /api/feeds', () => staleList)
+    const api = stubApi()
+      .on('GET /api/feeds', () => {
+        api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
+        return staleList
+      })
       .on('GET /api/feeds/1', { body: feedDetail(AVAILABLE, 1) })
       .on('POST /api/subscriptions', {
         status: 201,
@@ -248,7 +252,8 @@ describe('Feeds', () => {
     expect(await screen.findByText('Field Notes')).toBeDefined()
 
     release?.({ body: { subscriptions: [] } })
-    await waitFor(() => expect(screen.getByText('Field Notes')).toBeDefined())
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(screen.getByText('Field Notes')).toBeDefined()
   })
   it('keeps a useful duplicate outcome in place', async () => {
     stubApi()

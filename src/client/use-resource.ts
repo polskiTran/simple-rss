@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { failureKind } from './views/failure.js'
 
 /**
@@ -26,12 +26,12 @@ export function useResource<T>(
 ): readonly [Resource<T>, ResourceControls<T>] {
   const [state, setState] = useState<Resource<T>>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
+  const run = useEffectEvent(load)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is a new closure every render; `deps` is the caller's own statement of when the read goes stale.
   useEffect(() => {
     const request = new AbortController()
     setState({ kind: 'loading' })
-    void load(request.signal)
+    void run(request.signal)
       .then((value) => {
         if (!request.signal.aborted) setState({ kind: 'loaded', value })
       })

@@ -3,7 +3,6 @@ import { fetchInstallationPreferences, updateInstallationTimezone } from '../../
 import { useResource } from '../../use-resource.js'
 import { describeFailure } from '../failure.js'
 
-/** The installation's timezone: one held value, changed in place, rolled back if refused. */
 export function TimezoneChoice() {
   const [preferences, { set }] = useResource((signal) => fetchInstallationPreferences(signal), [])
   const [saving, setSaving] = useState(false)
