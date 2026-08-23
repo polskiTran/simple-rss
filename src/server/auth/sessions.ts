@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq, lte, or } from 'drizzle-orm'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { userAuth, sessions } from '../persistence/schema.js'
 
 /** A session dies this long after the device last used it. */
@@ -22,10 +21,10 @@ export interface IssuedSession {
 }
 
 export class SessionStore {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
 
-  constructor(db: SqliteDatabase) {
-    this.#db = drizzle(db)
+  constructor(db: DrizzleDatabase) {
+    this.#db = db
   }
 
   issueForPasswordHash(passwordHash: string, now: Date): IssuedSession | undefined {

@@ -1,8 +1,7 @@
 import { and, eq, inArray, isNull, lte } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { Clock } from '../clock.js'
 import type { Logger } from '../logger.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 export const RETENTION_PERIOD_DAYS = 90
@@ -16,19 +15,19 @@ export interface RetentionLimits {
 }
 
 export interface RetentionServiceOptions extends RetentionLimits {
-  readonly database: SqliteDatabase
+  readonly db: DrizzleDatabase
   readonly clock: Clock
   readonly logger: Logger
 }
 
 export class RetentionService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #logger: Logger
   readonly #batchLimit: number
 
   constructor(options: RetentionServiceOptions) {
-    this.#db = drizzle(options.database)
+    this.#db = options.db
     this.#clock = options.clock
     this.#logger = options.logger.child({ component: 'retention' })
     this.#batchLimit = options.batchLimit ?? DEFAULT_BATCH_LIMIT

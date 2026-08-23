@@ -9,7 +9,7 @@ import type { ImageService } from './images/image-service.js'
 import type { ImageUrlSignature } from './images/image-url-signature.js'
 import type { LibraryService } from './library/library-service.js'
 import type { Logger } from './logger.js'
-import { assertWritable, type SqliteDatabase } from './persistence/database.js'
+import { assertWritable, type DrizzleDatabase, type SqliteDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderService } from './reader/reader-service.js'
 import type { Readiness } from './readiness.js'
@@ -37,7 +37,9 @@ import { staticAssets } from './http/static-assets.js'
  * whether one piece of it arrived.
  */
 export interface Services {
+  /** The raw handle, for the readiness write probe and close; queries go through `db`. */
   readonly database: SqliteDatabase
+  readonly db: DrizzleDatabase
   readonly authentication: Authentication
   readonly settings: InstallationSettingsStore
   readonly subscriptions: SubscriptionService

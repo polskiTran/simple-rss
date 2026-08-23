@@ -1,3 +1,4 @@
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Authentication } from '../../../src/server/auth/authentication.js'
@@ -22,8 +23,8 @@ describe('credential rotation races', () => {
     const clock = new ManualClock('2026-08-08T09:00:00.000Z')
     applyMigrations(database, clock)
 
-    const user = new UserAuthStore(database)
-    const sessions = new SessionStore(database)
+    const user = new UserAuthStore(drizzle(database))
+    const sessions = new SessionStore(drizzle(database))
     user.claim('hash:old-password', clock.now())
 
     let verificationStarted!: () => void

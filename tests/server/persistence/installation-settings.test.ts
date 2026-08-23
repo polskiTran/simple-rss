@@ -1,3 +1,4 @@
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDatabase, type SqliteDatabase } from '../../../src/server/persistence/database.js'
@@ -17,7 +18,7 @@ describe('InstallationSettingsStore', () => {
     dataDir = await makeTempDataDir()
     db = openDatabase(join(dataDir, 'simple-rss.db'))
     applyMigrations(db)
-    store = new InstallationSettingsStore(db)
+    store = new InstallationSettingsStore(drizzle(db))
   })
 
   it('reports no settings before the installation is seeded', () => {
@@ -59,7 +60,7 @@ describe('InstallationSettingsStore', () => {
     const reopened = openDatabase(join(dataDir, 'simple-rss.db'))
     applyMigrations(reopened)
 
-    expect(new InstallationSettingsStore(reopened).read()?.timezone).toBe('Europe/Berlin')
+    expect(new InstallationSettingsStore(drizzle(reopened)).read()?.timezone).toBe('Europe/Berlin')
     reopened.close()
   })
 })

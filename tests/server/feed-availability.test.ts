@@ -1,3 +1,4 @@
+import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../src/shared/api.js'
@@ -355,16 +356,17 @@ describe('congestion at the retrieval boundary', () => {
     const clock = new ManualClock(START)
     const database = openDatabase(join(await makeTempDataDir(), 'availability.db'))
     applyMigrations(database, clock)
+    const db = drizzle(database)
     const url = 'https://one.example/feed'
     const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
     const subscriptions = new SubscriptionService({
-      database,
+      db,
       clock,
-      settings: new InstallationSettingsStore(database),
+      settings: new InstallationSettingsStore(db),
       logger,
     })
     const poll = new FeedPoll({
-      database,
+      db,
       retrieval: scriptedRetrieval([
         feedBytes(url),
         { ok: false, code: 'http_error', reason: 'upstream answered 500', status: 500 },
@@ -374,7 +376,7 @@ describe('congestion at the retrieval boundary', () => {
       clock,
       logger,
       subscriptions,
-      availability: new FeedAvailabilityLedger({ database, clock, logger }),
+      availability: new FeedAvailabilityLedger({ db, clock, logger }),
     })
 
     try {
@@ -425,20 +427,21 @@ describe('availability categories', () => {
     const clock = new ManualClock(START)
     const database = openDatabase(join(await makeTempDataDir(), 'categories.db'))
     applyMigrations(database, clock)
+    const db = drizzle(database)
     const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
     const subscriptions = new SubscriptionService({
-      database,
+      db,
       clock,
-      settings: new InstallationSettingsStore(database),
+      settings: new InstallationSettingsStore(db),
       logger,
     })
     const poll = new FeedPoll({
-      database,
+      db,
       retrieval: scriptedRetrieval(verdicts.map(([code]) => ({ ok: false, code, reason: '' }))),
       clock,
       logger,
       subscriptions,
-      availability: new FeedAvailabilityLedger({ database, clock, logger }),
+      availability: new FeedAvailabilityLedger({ db, clock, logger }),
     })
 
     try {

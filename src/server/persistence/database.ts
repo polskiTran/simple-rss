@@ -1,8 +1,12 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import Database from 'better-sqlite3'
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 
 export type SqliteDatabase = Database.Database
+
+/** The typed handle domain services query through; the raw handle stays in persistence and operational code. */
+export type DrizzleDatabase = BetterSQLite3Database
 
 const BUSY_TIMEOUT_MS = 5_000
 

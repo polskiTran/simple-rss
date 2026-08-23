@@ -1,10 +1,9 @@
 import { eq } from 'drizzle-orm'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
-import type { SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -29,7 +28,7 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
 export class ReaderService {
-  readonly #db: BetterSQLite3Database
+  readonly #db: DrizzleDatabase
   readonly #clock: Clock
   readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
@@ -39,14 +38,14 @@ export class ReaderService {
   readonly #failures = new Map<number, FailureEpisode>()
 
   constructor(options: {
-    database: SqliteDatabase
+    db: DrizzleDatabase
     clock: Clock
     settings: InstallationSettingsStore
     retrieval: Retrieval
     digest: DigestService
     signImageUrl: SignImageUrl
   }) {
-    this.#db = drizzle(options.database)
+    this.#db = options.db
     this.#clock = options.clock
     this.#settings = options.settings
     this.#retrieval = options.retrieval

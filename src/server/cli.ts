@@ -4,7 +4,8 @@ import { createAuthentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
 import { createLogger, type Logger } from './logger.js'
-import { openDatabase, type SqliteDatabase } from './persistence/database.js'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations, appliedVersions } from './persistence/migrations.js'
 import { restoreSnapshot, writeSnapshot } from './persistence/snapshot.js'
@@ -53,12 +54,13 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
   if (command === 'backup') return backup(rest[0], context)
   if (command === 'restore') return restore(rest[0], context)
 
-  const db = openDatabase(context.config.databasePath)
+  const database = openDatabase(context.config.databasePath)
+  const db = drizzle(database)
   try {
     switch (command) {
       case 'migrate': {
-        const applied = applyMigrations(db, context.clock)
-        context.out(JSON.stringify({ applied, versions: appliedVersions(db) }))
+        const applied = applyMigrations(database, context.clock)
+        context.out(JSON.stringify({ applied, versions: appliedVersions(database) }))
         return 0
       }
       case 'show': {
@@ -71,19 +73,20 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
           context.out('set-timezone needs an IANA timezone, e.g. Europe/Berlin')
           return 1
         }
-        applyMigrations(db, context.clock)
+        applyMigrations(database, context.clock)
         const store = new InstallationSettingsStore(db)
         store.setTimezone(timezone, context.clock.now())
         context.out(JSON.stringify(store.read()))
         return 0
       }
       case 'rebuild-search': {
-        applyMigrations(db, context.clock)
-        const indexedItems = rebuildSearchIndex(db)
+        applyMigrations(database, context.clock)
+        const indexedItems = rebuildSearchIndex(database)
         context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems }))
         return 0
       }
       case 'reset-password': {
+        applyMigrations(database, context.clock)
         return await resetPassword(db, rest[0], context)
       }
       default: {
@@ -92,7 +95,7 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       }
     }
   } finally {
-    db.close()
+    database.close()
   }
 }
 
@@ -136,7 +139,7 @@ function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function resetPassword(db: SqliteDatabase, argument: string | undefined, context: CliContext): Promise<number> {
+async function resetPassword(db: DrizzleDatabase, argument: string | undefined, context: CliContext): Promise<number> {
   const password = argument ?? context.env?.[NEW_PASSWORD_VARIABLE]
 
   if (!password) {
@@ -151,10 +154,8 @@ async function resetPassword(db: SqliteDatabase, argument: string | undefined, c
     return 1
   }
 
-  applyMigrations(db, context.clock)
-
   const authentication = createAuthentication({
-    database: db,
+    db,
     clock: context.clock,
     // Audit output goes to stderr: stdout is this command's result channel,
     // and a log line interleaved with the JSON report would break piping to `jq`.
