@@ -43,7 +43,6 @@ export interface RetrievalProfile {
 }
 
 const FEED_CONTENT_TYPES = ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml']
-/** A page; under `preview`, what a pasted address may turn out to be. */
 export const PAGE_CONTENT_TYPES = ['text/html', 'application/xhtml+xml']
 
 export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
@@ -68,11 +67,7 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
-  /**
-   * A pasted address proven before it is recorded: the Feed profile under one
-   * clock a User is waiting on. It accepts a page too, since the address may
-   * be one — the caller reads its Declared Feeds instead of parsing it.
-   */
+  /** A pasted address proven before it is recorded: the Feed profile under one clock a User is waiting on. */
   preview: {
     accept: [...FEED_CONTENT_TYPES, ...PAGE_CONTENT_TYPES],
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,

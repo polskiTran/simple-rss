@@ -1,9 +1,4 @@
-/**
- * Decodes a publisher page: a BOM outranks the transport charset, which
- * outranks a `<meta>` in the first kilobyte; UTF-8 is the default. An unknown
- * label falls back rather than failing, and a body cut mid-character decodes
- * as it stands.
- */
+/** Decodes a page by the HTML encoding precedence: BOM, then transport charset, then `<meta>` in the first kilobyte, then UTF-8. */
 export function decodeHtml(bytes: Uint8Array, transportCharset: string | undefined): string {
   const label = bomCharset(bytes) ?? transportCharset ?? metaCharset(bytes) ?? 'utf-8'
   try {

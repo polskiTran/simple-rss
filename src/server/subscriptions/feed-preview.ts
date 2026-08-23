@@ -55,12 +55,6 @@ export class FeedPreview {
     this.#logger = options.logger.child({ component: 'subscriptions' })
   }
 
-  /**
-   * Proven under `preview`, which accepts a Feed or a page. A page is read for
-   * its Declared Feeds and the first is proven in turn, handed what is left of
-   * the profile's one deadline. A Feed already subscribed, pasted or declared,
-   * is answered from the store without asking the publisher.
-   */
   async preview(enteredUrl: string, signal?: AbortSignal): Promise<PreviewOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
@@ -115,21 +109,20 @@ export class FeedPreview {
     }
   }
 
-  /** A redirect can land on a subscribed Feed after the fetch; then the store names it and the fetch fills the items. */
   #answerFromProof(url: string, { retrieved, parsed }: ProvenFeed, declaredFeeds: DeclaredFeed[]): PreviewOutcome {
-    const feed = this.#knownSubscription(retrieved.url)
+    const subscribed = this.#knownSubscription(retrieved.url)
     this.#logger.info('subscriptions.feed_previewed', {
       url: loggableUrl(url),
       resolvedUrl: loggableUrl(retrieved.url),
-      ...(feed && { feedId: feed.feedId }),
+      ...(subscribed && { feedId: subscribed.feedId }),
       ...(declaredFeeds.length > 0 && { declaredFeeds: declaredFeeds.length }),
     })
     return {
       kind: 'previewed',
       preview: {
         url,
-        title: feed?.title ?? parsed.title,
-        description: feed ? feed.description : parsed.description,
+        title: subscribed?.title ?? parsed.title,
+        description: subscribed ? subscribed.description : parsed.description,
         domain: new URL(parsed.homePageUrl ?? retrieved.url).hostname,
         homePageUrl: parsed.homePageUrl,
         items: this.#present(
@@ -138,7 +131,7 @@ export class FeedPreview {
           ),
         ),
         declaredFeeds,
-        subscribed: feed ? { feedId: feed.feedId } : null,
+        subscribed: subscribed ? { feedId: subscribed.feedId } : null,
       },
     }
   }

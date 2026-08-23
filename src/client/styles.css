@@ -724,7 +724,6 @@
     list-style: none;
   }
 
-  /* Each Declared Feed is one text button, no wider than its words. */
   .preview-declared {
     align-items: flex-start;
   }

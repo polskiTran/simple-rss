@@ -11,11 +11,6 @@ export interface PreviewRequest {
   readonly url: string
 }
 
-/**
- * Absent while the request's own preview is on its way; `previewing` is a
- * Declared Feed chosen in its place, carrying the page's list so the chooser
- * outlives the answer — which, being a Feed's, declares nothing.
- */
 type Phase =
   | { readonly kind: 'previewing'; readonly url: string; readonly declaredFeeds: DeclaredFeed[] }
   | { readonly kind: 'arrived'; readonly preview: FeedPreview }
@@ -40,9 +35,8 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
   // its request so the body holds still then, and the next request opens on the wait.
   const phase = answer && answer.request === request ? answer.phase : undefined
 
-  /** One preview in flight at a time: starting another abandons the last. */
   const load = useCallback(
-    (request: PreviewRequest, url: string, declaredFeeds?: DeclaredFeed[]) => {
+    (request: PreviewRequest, url: string, declaredByPage?: DeclaredFeed[]) => {
       inFlight.current?.abort()
       const controller = new AbortController()
       inFlight.current = controller
@@ -50,7 +44,10 @@ export function PreviewDialog({ request, field, onSubscribed, onFailed, onOpenFe
         .then((preview) =>
           setAnswer({
             request,
-            phase: { kind: 'arrived', preview: declaredFeeds ? { ...preview, declaredFeeds } : preview },
+            phase: {
+              kind: 'arrived',
+              preview: declaredByPage ? { ...preview, declaredFeeds: declaredByPage } : preview,
+            },
           }),
         )
         .catch((error: unknown) => {
@@ -220,7 +217,6 @@ function hostOf(url: string): string {
   }
 }
 
-/** The publisher's title verbatim; a declaration without one reads as its path. */
 function declaredFeedName(feed: DeclaredFeed): string {
   if (feed.title) return feed.title
   try {

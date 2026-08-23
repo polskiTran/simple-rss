@@ -15,10 +15,8 @@ export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface Installation {
   readonly url: string
-  /** The publisher's home page, which declares `feedUrl` — what the User pastes. */
   readonly pageUrl: string
-  /** A page of the publisher's that declares no Feed. */
-  readonly barePageUrl: string
+  readonly feedlessPageUrl: string
   readonly feedUrl: string
   readonly brokenArticleFeedUrl: string
   readonly longFeedUrl: string
@@ -94,7 +92,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
   installation: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
     const pageUrl = 'https://publisher.example/'
-    const barePageUrl = 'https://publisher.example/about'
+    const feedlessPageUrl = 'https://publisher.example/about'
     const feedUrl = 'https://publisher.example/feed.xml'
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
     const longFeedUrl = 'https://publisher.example/meadow.xml'
@@ -108,7 +106,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
           <link rel="alternate" type="application/rss+xml" title="Field Notes" href="/feed.xml">
           </head><body><p>Notes from the field.</p></body></html>`,
       })
-      .stub(barePageUrl, {
+      .stub(feedlessPageUrl, {
         headers: { 'content-type': 'text/html; charset=utf-8' },
         body: '<!doctype html><html><head><meta charset="utf-8"><title>About</title></head><body><p>About the field.</p></body></html>',
       })
@@ -183,7 +181,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
           self: new URL(config.publicOrigin),
         }),
       })
-      await use({ url: service.url, pageUrl, barePageUrl, feedUrl, brokenArticleFeedUrl, longFeedUrl })
+      await use({ url: service.url, pageUrl, feedlessPageUrl, feedUrl, brokenArticleFeedUrl, longFeedUrl })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })
@@ -226,7 +224,6 @@ export async function claim(page: Page, installation: Installation): Promise<voi
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
-/** Pastes `address` — a page or a Feed — and subscribes through the preview dialog. */
 export async function subscribe(page: Page, address: string, title: string): Promise<void> {
   await page.getByRole('link', { name: 'feeds' }).click()
   await page.getByRole('textbox', { name: 'search or add feeds' }).fill(address)

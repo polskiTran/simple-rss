@@ -127,7 +127,7 @@ test.describe('desktop Feed and Digest rendering', () => {
     await claim(page, installation)
     await page.getByRole('link', { name: 'feeds' }).click()
     const field = page.getByRole('textbox', { name: 'search or add feeds' })
-    await field.fill(installation.barePageUrl)
+    await field.fill(installation.feedlessPageUrl)
     await page.keyboard.press('Enter')
 
     await expect(page.getByText('no feed was found at that address')).toBeVisible()

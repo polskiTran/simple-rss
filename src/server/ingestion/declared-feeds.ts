@@ -6,13 +6,11 @@ import { decodeHtml } from './html-text.js'
 const DECLARED_FEED_TYPES = new Set(['application/rss+xml', 'application/atom+xml'])
 
 /**
- * The Feeds a page declares in `<link rel="alternate">`, in document order and
- * deduped by resolved URL — the first is the page's default. The whole document
- * is scanned, `<body>` included, and a document cut short yields what
- * arrived before the cut. `href` resolves against the first `<base href>` (itself
- * against `documentUrl`), else `documentUrl`, which is the post-redirect
- * address. Only web addresses are kept; `title` is the attribute verbatim, or
- * null when absent or blank.
+ * The Feeds a page declares, by the HTML autodiscovery conventions: every
+ * `<link>` in the document whose `rel` tokens include `alternate` and whose
+ * `type` is RSS or Atom, `href` resolved against the first `<base href>` in
+ * tree order (itself against `documentUrl`), else `documentUrl` — which must
+ * be the post-redirect address.
  */
 export function declaredFeeds(bytes: Uint8Array, documentUrl: string, charset?: string): DeclaredFeed[] {
   const { document } = parseHTML(decodeHtml(bytes, charset))

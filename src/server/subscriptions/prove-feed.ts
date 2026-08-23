@@ -27,7 +27,6 @@ export interface FeedNotModified {
   readonly validators: FeedValidators
 }
 
-/** The address was a page, not a Feed; only `preview` accepts one. Its body is for the Declared Feeds. */
 export interface AnsweredWithPage {
   readonly kind: 'page'
   readonly retrieved: RetrievalBytes
@@ -44,7 +43,6 @@ interface ProveFeedOptions {
   /** Other URLs this Feed is known by, so a document naming one as its site is still the Feed itself. */
   readonly priorUrls?: readonly string[]
   readonly signal?: AbortSignal
-  /** Tightens the operation's profile — what is left of a budget an earlier retrieval already spent from. */
   readonly limits?: RetrievalLimits
 }
 
@@ -57,8 +55,7 @@ interface ProveFeedOptions {
  * those validators hold, since a Feed's first poll passes two nulls and still
  * honours a 304. A caller that passes none and is answered 304 has met a
  * publisher answering without a body, which is an `http_error` like any other
- * bodiless status. Only a `preview` caller can be answered `page`, since only
- * that profile accepts one.
+ * bodiless status.
  */
 export function proveFeed(
   options: ProveFeedOptions & { readonly validators: FeedValidators },

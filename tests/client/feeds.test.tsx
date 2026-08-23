@@ -202,7 +202,6 @@ describe('Feeds', () => {
       { body: { url: COMMENTS_URL } },
     ])
 
-    // The chosen address is a Feed, so its own answer declares nothing; the chooser still stands.
     release?.({ body: { ...PREVIEW, url: COMMENTS_URL, title: 'Field Notes » Comments', declaredFeeds: [] } })
 
     expect(await screen.findByRole('dialog', { name: 'subscribe to Field Notes » Comments?' })).toBeDefined()
