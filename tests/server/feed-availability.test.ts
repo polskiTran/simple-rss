@@ -1,9 +1,8 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../src/shared/api.js'
 import { createLogger } from '../../src/server/logger.js'
-import { openDatabase, type SqliteDatabase } from '../../src/server/persistence/database.js'
+import { type DrizzleDatabase, openDatabase } from '../../src/server/persistence/database.js'
 import { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import { applyMigrations } from '../../src/server/persistence/migrations.js'
 import {
@@ -61,17 +60,15 @@ function storedAvailability(service: TestService, feedId: number): StoredAvailab
   return storedAvailabilityIn(service.database, feedId)
 }
 
-function storedAvailabilityIn(database: SqliteDatabase, feedId: number): StoredAvailability {
-  const row = database
-    .prepare(
-      `SELECT next_poll_at          AS nextPollAt,
-              last_polled_at        AS lastPolledAt,
-              last_success_at       AS lastSuccessAt,
-              last_failure_at       AS lastFailureAt,
-              consecutive_failures  AS consecutiveFailures,
-              last_failure_category AS lastFailureCategory
-         FROM subscriptions WHERE feed_id = ?`,
-    )
+function storedAvailabilityIn(database: DrizzleDatabase, feedId: number): StoredAvailability {
+  const row = database.$client
+    .prepare(`SELECT next_poll_at          AS nextPollAt,
+          last_polled_at        AS lastPolledAt,
+          last_success_at       AS lastSuccessAt,
+          last_failure_at       AS lastFailureAt,
+          consecutive_failures  AS consecutiveFailures,
+          last_failure_category AS lastFailureCategory
+     FROM subscriptions WHERE feed_id = ?`)
     .get(feedId)
   if (!row) throw new Error(`no subscription for feed ${feedId}`)
   return row as StoredAvailability
@@ -148,7 +145,7 @@ describe('Feed Availability', () => {
       groups: { items: { title: string }[] }[]
     }
     expect(digest.groups.flatMap((group) => group.items.map((item) => item.title))).toEqual(['First light'])
-    expect(service.database?.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 1 })
+    expect(service.database?.$client.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 1 })
   })
 
   it('resets the failure state the moment a later scheduled poll succeeds', async () => {
@@ -354,9 +351,8 @@ describe('congestion at the retrieval boundary', () => {
 
   it('defers the attempt without blaming the Feed when no retrieval slot was available', async () => {
     const clock = new ManualClock(START)
-    const database = openDatabase(join(await makeTempDataDir(), 'availability.db'))
-    applyMigrations(database, clock)
-    const db = drizzle(database)
+    const db = openDatabase(join(await makeTempDataDir(), 'availability.db'))
+    applyMigrations(db, clock)
     const url = 'https://one.example/feed'
     const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
     const subscriptions = new SubscriptionService({
@@ -385,14 +381,14 @@ describe('congestion at the retrieval boundary', () => {
 
       clock.advance(60_000)
       await poll.ingest(1)
-      expect(storedAvailabilityIn(database, 1)).toMatchObject({
+      expect(storedAvailabilityIn(db, 1)).toMatchObject({
         consecutiveFailures: 1,
         lastFailureCategory: 'http_error',
       })
 
       clock.advance(60_000)
       await poll.ingest(1)
-      expect(storedAvailabilityIn(database, 1)).toMatchObject({
+      expect(storedAvailabilityIn(db, 1)).toMatchObject({
         consecutiveFailures: 1,
         lastFailureCategory: 'http_error',
         lastPolledAt: clock.now().toISOString(),
@@ -401,12 +397,12 @@ describe('congestion at the retrieval boundary', () => {
 
       clock.advance(60_000)
       await poll.ingest(1)
-      expect(storedAvailabilityIn(database, 1)).toMatchObject({
+      expect(storedAvailabilityIn(db, 1)).toMatchObject({
         consecutiveFailures: 0,
         lastFailureCategory: null,
       })
     } finally {
-      database.close()
+      db.$client.close()
     }
   })
 })
@@ -425,9 +421,8 @@ describe('availability categories', () => {
     ]
 
     const clock = new ManualClock(START)
-    const database = openDatabase(join(await makeTempDataDir(), 'categories.db'))
-    applyMigrations(database, clock)
-    const db = drizzle(database)
+    const db = openDatabase(join(await makeTempDataDir(), 'categories.db'))
+    applyMigrations(db, clock)
     const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
     const subscriptions = new SubscriptionService({
       db,
@@ -448,11 +443,11 @@ describe('availability categories', () => {
       expect(subscriptions.create('https://one.example/feed').kind).toBe('created')
       for (const [code, category] of verdicts) {
         await poll.ingest(1)
-        expect(storedAvailabilityIn(database, 1).lastFailureCategory, code).toBe(category)
+        expect(storedAvailabilityIn(db, 1).lastFailureCategory, code).toBe(category)
         clock.advance(60_000)
       }
     } finally {
-      database.close()
+      db.$client.close()
     }
   })
 })

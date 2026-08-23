@@ -120,7 +120,7 @@ describe('OPML import', () => {
 
     expect((await user.post('/api/subscriptions/import', { opml: opmlListing([ATOM_URL]) })).status).toBe(200)
 
-    expect(service.database?.prepare('SELECT polling_interval_minutes FROM subscriptions').all()).toEqual([
+    expect(service.database?.$client.prepare('SELECT polling_interval_minutes FROM subscriptions').all()).toEqual([
       { polling_interval_minutes: 120 },
     ])
   })
@@ -138,8 +138,8 @@ describe('OPML import', () => {
     const second = await (await user.post('/api/subscriptions/import', { opml })).json()
     expect(second).toEqual({ added: 0, alreadySubscribed: 2, unusable: [] })
     await service.wakeScheduler()
-    expect(service.database?.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
-    expect(service.database?.prepare('SELECT count(*) AS count FROM feed_items').get()).toEqual({ count: 2 })
+    expect(service.database?.$client.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
+    expect(service.database?.$client.prepare('SELECT count(*) AS count FROM feed_items').get()).toEqual({ count: 2 })
     expect(service.upstream.requestsTo(RSS_URL)).toHaveLength(1)
     expect(service.upstream.requestsTo(ATOM_URL)).toHaveLength(1)
   })
@@ -209,6 +209,6 @@ describe('OPML export', () => {
     const reimported = await (await user.post('/api/subscriptions/import', { opml: exported })).json()
 
     expect(reimported).toEqual({ added: 0, alreadySubscribed: 2, unusable: [] })
-    expect(service.database?.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
+    expect(service.database?.$client.prepare('SELECT count(*) AS count FROM subscriptions').get()).toEqual({ count: 2 })
   })
 })

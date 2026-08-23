@@ -132,11 +132,11 @@ describe('the Reader article', () => {
 
     const database = service.database
     if (!database) throw new Error('the service has no database')
-    const tables = database.prepare("select name from sqlite_master where type = 'table'").all() as {
+    const tables = database.$client.prepare("select name from sqlite_master where type = 'table'").all() as {
       name: string
     }[]
     for (const { name } of tables) {
-      const rows = database.prepare(`select * from "${name}"`).all()
+      const rows = database.$client.prepare(`select * from "${name}"`).all()
       expect(JSON.stringify(rows)).not.toContain('carries the morning along')
     }
   })

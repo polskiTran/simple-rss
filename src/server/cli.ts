@@ -4,7 +4,6 @@ import { createAuthentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'
 import { createLogger, type Logger } from './logger.js'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations, appliedVersions } from './persistence/migrations.js'
@@ -54,13 +53,12 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
   if (command === 'backup') return backup(rest[0], context)
   if (command === 'restore') return restore(rest[0], context)
 
-  const database = openDatabase(context.config.databasePath)
-  const db = drizzle(database)
+  const db = openDatabase(context.config.databasePath)
   try {
     switch (command) {
       case 'migrate': {
-        const applied = applyMigrations(database, context.clock)
-        context.out(JSON.stringify({ applied, versions: appliedVersions(database) }))
+        const applied = applyMigrations(db, context.clock)
+        context.out(JSON.stringify({ applied, versions: appliedVersions(db) }))
         return 0
       }
       case 'show': {
@@ -73,20 +71,20 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
           context.out('set-timezone needs an IANA timezone, e.g. Europe/Berlin')
           return 1
         }
-        applyMigrations(database, context.clock)
+        applyMigrations(db, context.clock)
         const store = new InstallationSettingsStore(db)
         store.setTimezone(timezone, context.clock.now())
         context.out(JSON.stringify(store.read()))
         return 0
       }
       case 'rebuild-search': {
-        applyMigrations(database, context.clock)
-        const indexedItems = rebuildSearchIndex(database)
+        applyMigrations(db, context.clock)
+        const indexedItems = rebuildSearchIndex(db)
         context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems }))
         return 0
       }
       case 'reset-password': {
-        applyMigrations(database, context.clock)
+        applyMigrations(db, context.clock)
         return await resetPassword(db, rest[0], context)
       }
       default: {
@@ -95,7 +93,7 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       }
     }
   } finally {
-    database.close()
+    db.$client.close()
   }
 }
 

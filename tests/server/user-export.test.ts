@@ -186,10 +186,10 @@ describe('the JSON export', () => {
       'title',
     ])
 
-    const storedHash = service.database?.prepare('SELECT password_hash FROM user_auth').get() as {
+    const storedHash = service.database?.$client.prepare('SELECT password_hash FROM user_auth').get() as {
       password_hash: string
     }
-    const storedSession = service.database?.prepare('SELECT token_hash FROM sessions').get() as {
+    const storedSession = service.database?.$client.prepare('SELECT token_hash FROM sessions').get() as {
       token_hash: string
     }
     expect(text).not.toContain(storedHash.password_hash)

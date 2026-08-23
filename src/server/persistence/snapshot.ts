@@ -1,7 +1,8 @@
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { sql } from 'drizzle-orm'
 import type { Clock } from '../clock.js'
-import { assertWritable, openDatabase, type SqliteDatabase } from './database.js'
+import { assertWritable, type DrizzleDatabase, openDatabase } from './database.js'
 import { applyMigrations } from './migrations.js'
 
 function sidecarsOf(path: string): string[] {
@@ -27,9 +28,9 @@ export function writeSnapshot(source: string, destination: string): { bytes: num
 
     const db = openDatabase(source)
     try {
-      db.prepare('VACUUM INTO ?').run(partial)
+      db.run(sql`VACUUM INTO ${partial}`)
     } finally {
-      db.close()
+      db.$client.close()
     }
 
     renameSync(partial, destination)
@@ -64,7 +65,7 @@ export interface RestoreReport {
 export function restoreSnapshot(
   backupPath: string,
   databasePath: string,
-  options: { clock: Clock; rebuildIndex: (db: SqliteDatabase) => number },
+  options: { clock: Clock; rebuildIndex: (db: DrizzleDatabase) => number },
 ): RestoreReport {
   const { clock, rebuildIndex } = options
 
@@ -92,7 +93,7 @@ export function restoreSnapshot(
 
     const db = openDatabase(staging)
     try {
-      if (db.pragma('integrity_check', { simple: true }) !== 'ok') {
+      if (db.get<{ integrity_check: string }>(sql`PRAGMA integrity_check`)?.integrity_check !== 'ok') {
         throw new Error('the snapshot failed its integrity check')
       }
       const migrationsApplied = applyMigrations(db, clock).length
@@ -110,7 +111,7 @@ export function restoreSnapshot(
         claimed: countRows(db, 'user_auth') > 0,
       }
     } finally {
-      db.close()
+      db.$client.close()
     }
 
     // Closing checkpoints the WAL and removes the sidecars.
@@ -130,8 +131,8 @@ export function restoreSnapshot(
 }
 
 function countRows(
-  db: SqliteDatabase,
+  db: DrizzleDatabase,
   table: 'feeds' | 'subscriptions' | 'feed_items' | 'library_items' | 'user_auth',
 ): number {
-  return (db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as { count: number }).count
+  return db.get<{ count: number }>(sql.raw(`SELECT count(*) AS count FROM ${table}`))?.count ?? 0
 }

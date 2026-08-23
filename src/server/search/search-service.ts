@@ -3,7 +3,7 @@ import type { SearchResults } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, inDigestOrder, metaRowDate } from '../digest/chronology.js'
 import { chronologySql } from '../digest/list-page.js'
-import type { DrizzleDatabase, SqliteDatabase } from '../persistence/database.js'
+import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { feedItemSearch } from './search-schema.js'
@@ -89,21 +89,20 @@ function matchExpressionOf(query: string): string | undefined {
 }
 
 /**
- * Restates `effectiveFeedTitle` (persistence/schema.ts) in raw SQL; keep them in
- * step. Raw because its callers — the CLI and restore — hold only the raw handle.
+ * Restates `effectiveFeedTitle` (persistence/schema.ts) in SQL; keep them in
+ * step. FTS5 is outside the schema mirror, but the operation still uses the
+ * process-wide Drizzle handle.
  */
-export function rebuildSearchIndex(db: SqliteDatabase): number {
-  return db.transaction(() => {
-    db.exec('DELETE FROM feed_item_search')
-    return db
-      .prepare(
-        `INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
-         SELECT feed_items.id, feed_items.title, feed_items.summary,
-                coalesce(subscriptions.custom_title, feeds.title)
-         FROM feed_items
-         JOIN feeds ON feeds.id = feed_items.feed_id
-         LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id`,
-      )
-      .run().changes
-  })()
+export function rebuildSearchIndex(db: DrizzleDatabase): number {
+  return db.transaction((tx) => {
+    tx.run(sql`DELETE FROM feed_item_search`)
+    return tx.run(sql`
+      INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+      SELECT feed_items.id, feed_items.title, feed_items.summary,
+             coalesce(subscriptions.custom_title, feeds.title)
+      FROM feed_items
+      JOIN feeds ON feeds.id = feed_items.feed_id
+      LEFT JOIN subscriptions ON subscriptions.feed_id = feeds.id
+    `).changes
+  })
 }

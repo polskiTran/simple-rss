@@ -38,13 +38,13 @@ interface StoredItem {
 }
 
 function storedItems(service: TestService): StoredItem[] {
-  return service.database
-    ?.prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items ORDER BY id')
+  return service.database?.$client
+    .prepare('SELECT title, last_observed_at AS lastObservedAt FROM feed_items ORDER BY id')
     .all() as StoredItem[]
 }
 
 function storedFeedTitles(service: TestService): string[] {
-  const rows = service.database?.prepare('SELECT title FROM feeds ORDER BY id').all() as { title: string }[]
+  const rows = service.database?.$client.prepare('SELECT title FROM feeds ORDER BY id').all() as { title: string }[]
   return rows.map((row) => row.title)
 }
 
