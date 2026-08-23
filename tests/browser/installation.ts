@@ -15,6 +15,10 @@ export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface Installation {
   readonly url: string
+  /** The publisher's home page, which declares `feedUrl` — what the User pastes. */
+  readonly pageUrl: string
+  /** A page of the publisher's that declares no Feed. */
+  readonly barePageUrl: string
   readonly feedUrl: string
   readonly brokenArticleFeedUrl: string
   readonly longFeedUrl: string
@@ -89,6 +93,8 @@ export interface ForeignSite {
 export const test = base.extend<{ installation: Installation; foreign: ForeignSite }>({
   installation: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
+    const pageUrl = 'https://publisher.example/'
+    const barePageUrl = 'https://publisher.example/about'
     const feedUrl = 'https://publisher.example/feed.xml'
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
     const longFeedUrl = 'https://publisher.example/meadow.xml'
@@ -96,6 +102,16 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
     publishedAt.setUTCHours(7, 15, 0, 0)
     const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
     const upstream = new UpstreamFixtures()
+      .stub(pageUrl, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        body: `<!doctype html><html><head><meta charset="utf-8"><title>Field Notes</title>
+          <link rel="alternate" type="application/rss+xml" title="Field Notes" href="/feed.xml">
+          </head><body><p>Notes from the field.</p></body></html>`,
+      })
+      .stub(barePageUrl, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        body: '<!doctype html><html><head><meta charset="utf-8"><title>About</title></head><body><p>About the field.</p></body></html>',
+      })
       .stub(feedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
         body: `<?xml version="1.0"?>
@@ -167,7 +183,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
           self: new URL(config.publicOrigin),
         }),
       })
-      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, longFeedUrl })
+      await use({ url: service.url, pageUrl, barePageUrl, feedUrl, brokenArticleFeedUrl, longFeedUrl })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })
@@ -210,9 +226,10 @@ export async function claim(page: Page, installation: Installation): Promise<voi
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
-export async function subscribe(page: Page, feedUrl: string, title: string): Promise<void> {
+/** Pastes `address` — a page or a Feed — and subscribes through the preview dialog. */
+export async function subscribe(page: Page, address: string, title: string): Promise<void> {
   await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(feedUrl)
+  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(address)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('dialog', { name: `subscribe to ${title}?` })).toBeVisible()
   await page.getByRole('button', { name: 'subscribe' }).click()

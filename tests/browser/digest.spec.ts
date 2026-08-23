@@ -13,7 +13,7 @@ const DARK_PAPER = 'rgb(18, 17, 15)'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await claim(page, installation)
-  await subscribeThroughDialog(page, installation.feedUrl, 'Field Notes')
+  await subscribeThroughDialog(page, installation.pageUrl, 'Field Notes')
 }
 
 async function openDigest(page: Page, installation: Installation): Promise<void> {

@@ -13,7 +13,7 @@ const QUIET_GREY = 'rgb(163, 162, 157)'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await claim(page, installation)
-  await subscribeThroughDialog(page, installation.feedUrl, 'Field Notes')
+  await subscribeThroughDialog(page, installation.pageUrl, 'Field Notes')
 }
 
 test.describe('the Library', () => {

@@ -153,7 +153,7 @@ Railway mounts the volume only at runtime, so migrations run during application 
 
 ### Adding a Subscription
 
-V1 accepts an exact RSS or Atom URL; it does not discover Feeds from website URLs.
+A pasted address may be a Feed or a page. A page is read, to at most 1 MiB, for the Feeds it declares in `<link rel="alternate">` (`application/rss+xml` or `application/atom+xml`, document order, deduped); the first Declared Feed is previewed and the rest are offered in the dialog. The page itself is never recorded as a Feed URL.
 
 Subscribing and OPML Import record the Subscription without contacting the Feed (ADR 0007). The server validates the URL shape, deduplicates against known Feed URLs, and creates the Feed and Subscription transactionally; the Subscription starts unchecked and immediately due, and the request nudges the scheduler awake. The first retrieval is an ordinary poll: it confirms RSS or Atom content, corrects the Feed's title and resolved URL, and ingests the current Feed Window. A first retrieval that reveals an already-subscribed Feed behind a different URL quietly merges the later Subscription into it.
 

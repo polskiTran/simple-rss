@@ -8,16 +8,16 @@ import {
   type Installation,
 } from './installation.js'
 
-async function subscribe(page: Page, installation: Installation, feedUrl = installation.feedUrl): Promise<void> {
+async function subscribe(page: Page, installation: Installation, address = installation.pageUrl): Promise<void> {
   await claim(page, installation)
-  await subscribeTo(page, installation, feedUrl)
+  await subscribeTo(page, installation, address)
 }
 
-function subscribeTo(page: Page, installation: Installation, feedUrl: string): Promise<void> {
+function subscribeTo(page: Page, installation: Installation, address: string): Promise<void> {
   return subscribeThroughDialog(
     page,
-    feedUrl,
-    feedUrl === installation.brokenArticleFeedUrl ? 'The Quiet Coast' : 'Field Notes',
+    address,
+    address === installation.brokenArticleFeedUrl ? 'The Quiet Coast' : 'Field Notes',
   )
 }
 

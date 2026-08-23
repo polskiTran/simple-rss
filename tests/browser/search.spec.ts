@@ -3,7 +3,7 @@ import { claim, expect, expectNoHorizontalOverflow, subscribe, test, type Instal
 
 async function openDigest(page: Page, installation: Installation): Promise<void> {
   await claim(page, installation)
-  await subscribe(page, installation.feedUrl, 'Field Notes')
+  await subscribe(page, installation.pageUrl, 'Field Notes')
   await subscribe(page, installation.brokenArticleFeedUrl, 'The Quiet Coast')
   await page.getByRole('link', { name: 'digest' }).click()
   await expect(page.getByRole('heading', { name: 'today · 1 post' })).toBeVisible()

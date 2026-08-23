@@ -14,7 +14,7 @@ test.describe('the masthead mark', () => {
 
   test('leads back to the digest from a Feed Item', async ({ page, installation }) => {
     await claim(page, installation)
-    await subscribe(page, installation.feedUrl, 'Field Notes')
+    await subscribe(page, installation.pageUrl, 'Field Notes')
 
     await page.getByRole('link', { name: 'simple' }).click()
 
