@@ -1,5 +1,10 @@
 import { FeedDocumentError, parseFeedDocument, type ParsedFeedDocument } from '../ingestion/feed-document.js'
-import type { Retrieval, RetrievalBytes, RetrievalOperation } from '../upstream/retrieval.js'
+import {
+  PAGE_CONTENT_TYPES,
+  type Retrieval,
+  type RetrievalBytes,
+  type RetrievalOperation,
+} from '../upstream/retrieval.js'
 import type { FailedPoll } from './feed-availability.js'
 
 /** The `ETag` and `Last-Modified` a Feed last answered with; `null` where it sent none. */
@@ -83,4 +88,13 @@ export async function proveFeed(
     if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
     throw error
   }
+}
+
+/** The address answered with an HTML page rather than a Feed — what a pasted home page looks like from here. */
+export function answeredWithPage(proof: FailedPoll): boolean {
+  return (
+    proof.kind === 'retrieval-failed' &&
+    proof.failure.code === 'unsupported_content_type' &&
+    PAGE_CONTENT_TYPES.includes(proof.failure.contentType ?? '')
+  )
 }

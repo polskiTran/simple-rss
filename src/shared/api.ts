@@ -141,6 +141,42 @@ export type CreateSubscriptionRequest = z.infer<typeof createSubscriptionRequest
 
 export const MAX_FEED_SIZE_MIB = 20
 
+export const PREVIEW_ITEM_COUNT = 5
+
+/** A Feed a page names in `<link rel="alternate">`; document order, deduped by URL. */
+export const declaredFeedSchema = z.object({
+  url: z.string(),
+  title: z.string().nullable(),
+})
+export type DeclaredFeed = z.infer<typeof declaredFeedSchema>
+
+/** `displayDate` is relative, in the installation timezone: today · yesterday · N days ago · N weeks ago · N months ago · undated. */
+export const previewItemSchema = z.object({
+  title: z.string(),
+  link: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  displayDate: z.string(),
+})
+export type PreviewItem = z.infer<typeof previewItemSchema>
+
+/** What `POST /api/feeds/preview` answers; nothing was recorded. */
+export const feedPreviewSchema = z.object({
+  /** The Feed URL the preview fetched — the typed URL, or the Declared Feed it followed. What subscribe sends. */
+  url: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  /** Host of the home page when the Feed declares one, else host of the Feed URL — as the Feeds list shows it. */
+  domain: z.string(),
+  homePageUrl: z.string().nullable(),
+  /** Newest first by `publishedAt`; undated items after, in document order. */
+  items: z.array(previewItemSchema).max(PREVIEW_ITEM_COUNT),
+  /** Every Declared Feed when the typed URL was a page, the followed one included; empty when it was a Feed. */
+  declaredFeeds: z.array(declaredFeedSchema),
+  /** Set when the Feed is already subscribed — found before the fetch, or revealed by a redirect after it. */
+  subscribed: z.object({ feedId: z.number().int().positive() }).nullable(),
+})
+export type FeedPreview = z.infer<typeof feedPreviewSchema>
+
 export const MAX_OPML_UTF16_UNITS = 1_048_576
 
 export const importOpmlRequestSchema = z.object({

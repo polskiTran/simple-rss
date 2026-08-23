@@ -36,8 +36,9 @@ export class Device {
     return this.#send(path, 'GET')
   }
 
-  post(path: string, body?: unknown): Promise<Response> {
-    return this.#send(path, 'POST', body)
+  /** `signal` lets a test walk away mid-request, as a browser that closed the dialog does. */
+  post(path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
+    return this.#send(path, 'POST', body, signal)
   }
 
   put(path: string, body?: unknown): Promise<Response> {
@@ -68,7 +69,7 @@ export class Device {
     return this.post('/api/auth/password', { currentPassword, newPassword })
   }
 
-  async #send(path: string, method: string, body?: unknown): Promise<Response> {
+  async #send(path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
     const headers = new Headers({ accept: 'application/json' })
 
     const origin = this.#options.origin === undefined ? new URL(this.#service.url).origin : this.#options.origin
@@ -81,6 +82,7 @@ export class Device {
       method,
       headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(signal && { signal }),
     })
 
     this.#absorb(response)

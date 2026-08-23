@@ -18,6 +18,7 @@ import { RetentionService, type RetentionLimits } from './retention/retention-se
 import { SearchService } from './search/search-service.js'
 import { FeedAvailability } from './subscriptions/feed-availability.js'
 import { FeedPoll } from './subscriptions/feed-poll.js'
+import { FeedPreview } from './subscriptions/feed-preview.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
@@ -83,6 +84,7 @@ export function createService(options: ServiceOptions): Service {
     })
     const availability = new FeedAvailability({ database, clock, logger })
     const subscriptions = new SubscriptionService({ database, retrieval, clock, settings, logger })
+    const preview = new FeedPreview({ database, retrieval, clock, settings, logger })
     const poll = new FeedPoll({ database, retrieval, clock, logger, subscriptions, availability })
     const refresh = new FeedRefresh({ clock, poll })
 
@@ -107,6 +109,7 @@ export function createService(options: ServiceOptions): Service {
       authentication,
       settings,
       subscriptions,
+      preview,
       refresh,
       digest,
       library,

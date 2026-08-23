@@ -26,7 +26,7 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
-import { PAGE_CONTENT_TYPES, type Retrieval } from '../upstream/retrieval.js'
+import type { Retrieval } from '../upstream/retrieval.js'
 import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import {
   availabilityAfterSuccess,
@@ -35,10 +35,11 @@ import {
   type PolledFeed,
   type RecordedAvailability,
 } from './feed-availability.js'
+import { aliasOwnerOf, canonicalFeedUrl } from './feed-aliases.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
 import { nextPollTime } from './polling-schedule.js'
-import { proveFeed } from './prove-feed.js'
+import { answeredWithPage, proveFeed } from './prove-feed.js'
 
 export type SubscribeOutcome =
   | { readonly kind: 'subscribed'; readonly subscription: SubscriptionSummary; readonly observedItems: number }
@@ -126,7 +127,7 @@ export class SubscriptionService {
     if (proof.kind !== 'proven') return answeredWithPage(proof) ? { kind: 'no-feed-found' } : proof
     const { retrieved, parsed } = proof
 
-    const owner = this.#aliasOwner(retrieved.url, requestedUrl)
+    const owner = aliasOwnerOf(this.#db, retrieved.url, requestedUrl)
     if (owner?.subscribed) return { kind: 'duplicate', subscription: this.#subscribed(owner.feedId) }
 
     const now = this.#clock.now()
@@ -161,7 +162,7 @@ export class SubscriptionService {
         return feedId
       })
     } catch (error) {
-      const raced = this.#aliasOwner(retrieved.url, requestedUrl)
+      const raced = aliasOwnerOf(this.#db, retrieved.url, requestedUrl)
       if (raced?.subscribed) return { kind: 'duplicate', subscription: this.#subscribed(raced.feedId) }
       throw error
     }
@@ -182,7 +183,7 @@ export class SubscriptionService {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
 
-    const owner = this.#aliasOwner(requestedUrl)
+    const owner = aliasOwnerOf(this.#db, requestedUrl)
     if (owner?.subscribed) return { kind: 'duplicate' }
 
     const now = this.#clock.now().toISOString()
@@ -210,7 +211,7 @@ export class SubscriptionService {
         return feedId
       })
     } catch (error) {
-      if (this.#aliasOwner(requestedUrl)?.subscribed) return { kind: 'duplicate' }
+      if (aliasOwnerOf(this.#db, requestedUrl)?.subscribed) return { kind: 'duplicate' }
       throw error
     }
 
@@ -482,20 +483,6 @@ export class SubscriptionService {
     return summaryOf(record, this.#cadenceByFeed())
   }
 
-  #aliasOwner(...urls: readonly string[]): { readonly feedId: number; readonly subscribed: boolean } | undefined {
-    for (const url of urls) {
-      const row = this.#db
-        .select({ feedId: feedUrlAliases.feedId, subscribedFeedId: subscriptions.feedId })
-        .from(feedUrlAliases)
-        .leftJoin(subscriptions, eq(subscriptions.feedId, feedUrlAliases.feedId))
-        .where(eq(feedUrlAliases.url, url))
-        .limit(1)
-        .all()[0]
-      if (row) return { feedId: row.feedId, subscribed: row.subscribedFeedId !== null }
-    }
-    return undefined
-  }
-
   #cadenceByFeed(): Map<number, number[]> {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
@@ -542,25 +529,6 @@ function summaryOf(record: SubscribedFeedRecord, cadence: Map<number, number[]>)
     resolvedUrl: record.resolvedUrl,
     cadence: cadence.get(record.feedId) ?? emptyCadence(),
     availability: availabilityOf(record),
-  }
-}
-
-function answeredWithPage(proof: FailedPoll): boolean {
-  return (
-    proof.kind === 'retrieval-failed' &&
-    proof.failure.code === 'unsupported_content_type' &&
-    PAGE_CONTENT_TYPES.includes(proof.failure.contentType ?? '')
-  )
-}
-
-function canonicalFeedUrl(value: string): string | undefined {
-  try {
-    const url = new URL(value)
-    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) return undefined
-    url.hash = ''
-    return url.href
-  } catch {
-    return undefined
   }
 }
 

@@ -14,6 +14,7 @@ import type { InstallationSettingsStore } from './persistence/installation-setti
 import type { ReaderService } from './reader/reader-service.js'
 import type { Readiness } from './readiness.js'
 import type { SearchService } from './search/search-service.js'
+import type { FeedPreview } from './subscriptions/feed-preview.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
 import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
@@ -41,6 +42,7 @@ export interface Services {
   readonly authentication: Authentication
   readonly settings: InstallationSettingsStore
   readonly subscriptions: SubscriptionService
+  readonly preview: FeedPreview
   readonly refresh: FeedRefresh
   readonly digest: DigestService
   readonly library: LibraryService
@@ -113,6 +115,7 @@ export function createApp(deps: AppDependencies): Hono {
       '/api',
       feedRoutes({
         subscriptions: services.subscriptions,
+        preview: services.preview,
         refresh: services.refresh,
         digest: services.digest,
         nudgeScheduler: services.nudgeScheduler,

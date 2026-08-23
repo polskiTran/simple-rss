@@ -9,15 +9,17 @@ import {
   type Digest,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedPreview,
   type OpmlImportReport,
   type PollingSchedule,
   type RefreshFeedResponse,
   type SubscriptionList,
 } from '../../shared/api.js'
 import type { DigestService } from '../digest/digest-service.js'
+import type { FeedPreview as FeedPreviewService, PreviewOutcome } from '../subscriptions/feed-preview.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
-import type { SubscribeOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
+import type { SubscriptionService } from '../subscriptions/subscription-service.js'
 import { readIdParam } from './id-param.js'
 import { readJsonBody } from './json-body.js'
 import { readListCursor } from './list-cursor.js'
@@ -26,6 +28,7 @@ import { answer, FEED_ANSWERS, INVALID_FEED_ANSWERS, PREVIEW_ANSWERS } from './r
 
 export interface FeedRouteDependencies {
   readonly subscriptions: SubscriptionService
+  readonly preview: FeedPreviewService
   readonly refresh: FeedRefresh
   readonly digest: DigestService
   /** Asks the scheduler to look at the due frontier now rather than next wake. */
@@ -44,7 +47,27 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
       const { subscription, observedItems } = outcome
       return c.json<CreateSubscriptionResponse>({ subscription, observedItems }, 201, NO_STORE)
     }
-    return subscribeFailure(c, outcome)
+    if (outcome.kind === 'duplicate') {
+      return c.json(
+        {
+          error: { code: 'duplicate_subscription', message: `Already subscribed to ${outcome.subscription.title}` },
+          subscription: outcome.subscription,
+        },
+        409,
+        NO_STORE,
+      )
+    }
+    return proofFailure(c, outcome)
+  })
+
+  /** A client that gives up takes its abort with it: the signal reaches the retrieval. */
+  app.post('/feeds/preview', async (c) => {
+    const body = await readJsonBody(c, createSubscriptionRequestSchema)
+    if (!body.ok) return body.response
+
+    const outcome = await deps.preview.preview(body.value.url, c.req.raw.signal)
+    if (outcome.kind === 'previewed') return c.json<FeedPreview>(outcome.preview, 200, NO_STORE)
+    return proofFailure(c, outcome)
   })
 
   app.post('/subscriptions/import', async (c) => {
@@ -136,21 +159,13 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   return app
 }
 
-function subscribeFailure(c: Context, outcome: Exclude<SubscribeOutcome, { kind: 'subscribed' }>) {
+/** Why the address did not prove to be a Feed — the one vocabulary preview and subscribe share. */
+function proofFailure(c: Context, outcome: Exclude<PreviewOutcome, { kind: 'previewed' }>) {
   switch (outcome.kind) {
     case 'invalid-url':
       return c.json(
         { error: { code: 'invalid_feed_url', message: 'Enter an exact HTTP or HTTPS Feed URL' } },
         400,
-        NO_STORE,
-      )
-    case 'duplicate':
-      return c.json(
-        {
-          error: { code: 'duplicate_subscription', message: `Already subscribed to ${outcome.subscription.title}` },
-          subscription: outcome.subscription,
-        },
-        409,
         NO_STORE,
       )
     case 'no-feed-found':
