@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { READER_CACHE_SECONDS, readerArticleSchema, readerItemSchema } from '../../../src/shared/api.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 
 const FEED_URL = 'https://journal.example/feed'
 const ARTICLE_URL = 'https://journal.example/first-light'
+const ASYNC_EXTRACTOR_TARGET = 'https://www.youtube.com/watch?v=reader-boundary'
 
 const rss = (...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>Field Notes</title>${items.join('')}</channel></rss>`
@@ -34,17 +35,21 @@ const ARTICLE_HTML = `<!doctype html>
 
 async function readingSetup(
   service: TestService,
-  options: { article?: Parameters<TestService['upstream']['stub']>[1] } = {},
+  options: {
+    article?: Parameters<TestService['upstream']['stub']>[1]
+    articleUrl?: string
+  } = {},
 ): Promise<{ user: Device; feedItemId: number }> {
+  const articleUrl = options.articleUrl ?? ARTICLE_URL
   service.upstream.stub(FEED_URL, {
     headers: { 'content-type': 'application/rss+xml' },
     body: rss(
-      item('first-light', 'First light', '2026-08-08T07:15:00.000Z'),
+      item('first-light', 'First light', '2026-08-08T07:15:00.000Z', `<link>${articleUrl}</link>`),
       item('evening', 'Evening notes', '2026-08-07T09:31:00.000Z'),
     ),
   })
   service.upstream.stub(
-    ARTICLE_URL,
+    articleUrl,
     options.article ?? {
       headers: { 'content-type': 'text/html; charset=utf-8' },
       body: ARTICLE_HTML,
@@ -155,6 +160,32 @@ describe('the Reader article', () => {
     expect(first?.status).toBe(200)
     expect(second?.status).toBe(200)
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1)
+  })
+
+  it('keeps asynchronous extractor targets inside Retrieval', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      articleUrl: ASYNC_EXTRACTOR_TARGET,
+      article: {
+        headers: { 'content-type': 'text/html' },
+        body: '<!doctype html><html><body></body></html>',
+      },
+    })
+
+    const originalFetch = globalThis.fetch
+    const escapedRequests: string[] = []
+    const fetchSentinel = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith(service.url)) return originalFetch(input, init)
+      escapedRequests.push(url)
+      throw new Error(`process-global network request: ${url}`)
+    })
+
+    const response = await user.get(`/api/items/${feedItemId}/reader`).finally(() => fetchSentinel.mockRestore())
+
+    expect(response.status).toBe(422)
+    expect(service.upstream.requestsTo(ASYNC_EXTRACTOR_TARGET)).toHaveLength(1)
+    expect(escapedRequests).toEqual([])
   })
 
   it('falls back calmly when the page is not supported HTML', async () => {
