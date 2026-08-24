@@ -57,11 +57,8 @@ async function library(user: Device) {
   return librarySchema.parse(await (await user.get('/api/library')).json())
 }
 
-function heldBody(xml: string): { body: ReadableStream<Uint8Array>; release: () => void } {
-  let release!: () => void
-  const gate = new Promise<void>((resolve) => {
-    release = resolve
-  })
+function heldBody(xml: string) {
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>()
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       await gate

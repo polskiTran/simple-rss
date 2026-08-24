@@ -25,7 +25,7 @@ function discardingLogger(): Logger {
   return createLogger({ level: 'error', sink: () => {} })
 }
 
-function cliOn(dataDir: string): { context: CliContext; output: string[] } {
+function cliOn(dataDir: string) {
   const output: string[] = []
   const context: CliContext = {
     config: loadConfig({ DATA_DIR: dataDir, PUBLIC_ORIGIN: 'https://reader.test' }),

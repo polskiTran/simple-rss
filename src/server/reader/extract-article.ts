@@ -57,17 +57,18 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
  */
 function articleDocument(html: string, url: string): Document {
   const { document } = parseHTML(html)
-  const doc = document as unknown as {
-    styleSheets?: unknown
-    defaultView?: { getComputedStyle?: unknown } | null
-    URL: string
+  Object.defineProperty(document, 'styleSheets', {
+    configurable: true,
+    value: document.styleSheets ?? [],
+  })
+  if (document.defaultView && !document.defaultView.getComputedStyle) {
+    Object.defineProperty(document.defaultView, 'getComputedStyle', {
+      configurable: true,
+      value: () => ({ display: '' }),
+    })
   }
-  doc.styleSheets ??= []
-  if (doc.defaultView && !doc.defaultView.getComputedStyle) {
-    doc.defaultView.getComputedStyle = () => ({ display: '' })
-  }
-  doc.URL = url
-  return doc as unknown as Document
+  Object.defineProperty(document, 'URL', { configurable: true, value: url })
+  return document
 }
 
 /**

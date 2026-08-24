@@ -3,8 +3,9 @@ import { stat } from 'node:fs/promises'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { MiddlewareHandler } from 'hono'
+import { hasOwn } from '../../shared/record.js'
 
-const CONTENT_TYPES: Record<string, string> = {
+const CONTENT_TYPES = {
   '.avif': 'image/avif',
   '.css': 'text/css; charset=utf-8',
   '.gif': 'image/gif',
@@ -20,7 +21,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
-}
+} as const satisfies Readonly<Record<string, string>>
 
 /** Vite writes content-hashed file names here, so they can never go stale. */
 const IMMUTABLE_PREFIX = '/assets/'
@@ -79,12 +80,19 @@ async function isFile(path: string): Promise<boolean> {
 }
 
 function send(path: string, cacheControl: string): Response {
+  // SAFETY: Node's `Readable.toWeb` and global `Response` use the same runtime
+  // WHATWG stream; `@types/node` and `lib.dom` declare separate TypeScript types.
   const body = Readable.toWeb(createReadStream(path)) as ReadableStream
   return new Response(body, {
     status: 200,
     headers: {
-      'Content-Type': CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream',
+      'Content-Type': contentTypeFor(path),
       'Cache-Control': cacheControl,
     },
   })
+}
+
+function contentTypeFor(path: string): string {
+  const extension = extname(path).toLowerCase()
+  return hasOwn(CONTENT_TYPES, extension) ? CONTENT_TYPES[extension] : 'application/octet-stream'
 }

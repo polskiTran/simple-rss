@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { hasOwn } from '../../shared/record.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
 import { RetrievalError, type Retrieval, type RetrievalFailure } from '../upstream/retrieval.js'
@@ -57,7 +58,7 @@ type SniffResult =
   | { readonly ok: false; readonly failure?: RetrievalFailure }
 
 async function sniffImage(contentType: string, body: ReadableStream<Uint8Array>): Promise<SniffResult> {
-  const matches = IMAGE_SIGNATURES[contentType]
+  const matches = hasOwn(IMAGE_SIGNATURES, contentType) ? IMAGE_SIGNATURES[contentType] : undefined
   const reader = body.getReader()
 
   let head = new Uint8Array(0)
@@ -121,16 +122,16 @@ function replay(
 const ascii = (head: Uint8Array, at: number, expected: string): boolean =>
   [...expected].every((char, index) => head[at + index] === char.charCodeAt(0))
 
-const IMAGE_SIGNATURES: Readonly<Record<string, (head: Uint8Array) => boolean>> = {
-  'image/jpeg': (head) => head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff,
-  'image/png': (head) =>
+const IMAGE_SIGNATURES = {
+  'image/jpeg': (head: Uint8Array) => head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff,
+  'image/png': (head: Uint8Array) =>
     head[0] === 0x89 &&
     ascii(head, 1, 'PNG') &&
     head[4] === 0x0d &&
     head[5] === 0x0a &&
     head[6] === 0x1a &&
     head[7] === 0x0a,
-  'image/gif': (head) => ascii(head, 0, 'GIF87a') || ascii(head, 0, 'GIF89a'),
-  'image/webp': (head) => ascii(head, 0, 'RIFF') && ascii(head, 8, 'WEBP'),
-  'image/avif': (head) => ascii(head, 4, 'ftyp') && (ascii(head, 8, 'avif') || ascii(head, 8, 'avis')),
-}
+  'image/gif': (head: Uint8Array) => ascii(head, 0, 'GIF87a') || ascii(head, 0, 'GIF89a'),
+  'image/webp': (head: Uint8Array) => ascii(head, 0, 'RIFF') && ascii(head, 8, 'WEBP'),
+  'image/avif': (head: Uint8Array) => ascii(head, 4, 'ftyp') && (ascii(head, 8, 'avif') || ascii(head, 8, 'avis')),
+} satisfies Readonly<Record<string, (head: Uint8Array) => boolean>>

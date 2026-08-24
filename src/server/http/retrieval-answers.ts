@@ -28,7 +28,7 @@ interface RetrievalSubject {
  * Sixteen transport outcomes collapse into the six a User can act on. Adding a
  * `RetrievalFailureCode` fails to compile here and nowhere else.
  */
-function retrievalAnswers(subject: RetrievalSubject): Readonly<Record<RetrievalFailureCode, FailureAnswer>> {
+function retrievalAnswers(subject: RetrievalSubject) {
   const { noun, profile, unsafeDestination, unsupportedContent, unreachable } = subject
   return {
     invalid_request: unsafeDestination,
@@ -59,7 +59,7 @@ function retrievalAnswers(subject: RetrievalSubject): Readonly<Record<RetrievalF
     cancelled: unreachable,
     busy: unreachable,
     unavailable: unreachable,
-  }
+  } satisfies Readonly<Record<RetrievalFailureCode, FailureAnswer>>
 }
 
 export const FEED_ANSWERS = retrievalAnswers({

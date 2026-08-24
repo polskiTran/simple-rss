@@ -97,9 +97,9 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
 
 const DEFAULT_WAIT_SECONDS = 30
 
-function waitSecondsOf(error: unknown): number | undefined {
-  return error instanceof ApiError && error.status === 429
-    ? (error.retryAfterSeconds ?? DEFAULT_WAIT_SECONDS)
+function waitSecondsOf(cause: unknown): number | undefined {
+  return cause instanceof ApiError && cause.status === 429
+    ? (cause.retryAfterSeconds ?? DEFAULT_WAIT_SECONDS)
     : undefined
 }
 

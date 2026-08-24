@@ -35,8 +35,8 @@ export function useResource<T>(
       .then((value) => {
         if (!request.signal.aborted) setState({ kind: 'loaded', value })
       })
-      .catch((error: unknown) => {
-        if (!request.signal.aborted) setState({ kind: failureKind(error), error })
+      .catch((cause: unknown) => {
+        if (!request.signal.aborted) setState({ kind: failureKind(cause), error: cause })
       })
     return () => request.abort()
   }, [attempt, ...deps])

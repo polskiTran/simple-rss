@@ -3,6 +3,7 @@ import { Agent as HttpAgent, request as httpRequest, type IncomingMessage, type 
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { isPublicAddress, unbracket } from './addresses.js'
 import { HttpClientError, type HttpClient } from './http-client.js'
@@ -68,13 +69,18 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
     signal.addEventListener('abort', abandon, { once: true })
     outbound.on('close', () => signal.removeEventListener('abort', abandon))
 
-    const response = await new Promise<IncomingMessage>((resolve, reject) => {
-      outbound.on('response', resolve)
-      outbound.on('error', reject)
+    const { promise, resolve, reject } = Promise.withResolvers<IncomingMessage>()
+    outbound.on('response', resolve)
+    outbound.on('error', reject)
 
-      if (request.body) Readable.fromWeb(request.body as never).pipe(outbound)
-      else outbound.end()
-    })
+    if (request.body) {
+      // SAFETY: Node's global `Request` body and `Readable.fromWeb` use the same
+      // WHATWG stream; `@types/node` and `lib.dom` declare separate types.
+      Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>).pipe(outbound)
+    } else {
+      outbound.end()
+    }
+    const response = await promise
 
     return toResponse(request, response)
   }
@@ -110,7 +116,7 @@ export function guardedLookup(
         return
       }
 
-      if (options.all) callback(null, answers as never, 0)
+      if (options.all) callback(null, answers, 0)
       else callback(null, first.address, first.family)
     })
   }
@@ -167,6 +173,8 @@ function toResponse(request: Request, response: IncomingMessage): Response {
 
   if (bodiless) response.resume()
 
+  // SAFETY: Node's `Readable.toWeb` and global `Response` use the same runtime
+  // WHATWG stream; `@types/node` and `lib.dom` declare separate TypeScript types.
   return new Response(bodiless ? null : (Readable.toWeb(stream) as ReadableStream<Uint8Array>), { status, headers })
 }
 

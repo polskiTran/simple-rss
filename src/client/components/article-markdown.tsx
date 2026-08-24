@@ -42,6 +42,8 @@ function visitElements(node: Root | RootContent, visit: (element: Element) => vo
   if ('children' in node) for (const child of node.children) visitElements(child, visit)
 }
 
+// SAFETY: Streamdown calls these overrides with the intrinsic element props
+// named by each key; its public `Components` type erases that key-to-props link.
 const COMPONENTS = {
   strong: 'strong',
   a: ArticleLink,

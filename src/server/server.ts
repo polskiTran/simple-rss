@@ -1,5 +1,4 @@
-import type { Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
+import { Server } from 'node:http'
 import { serve } from '@hono/node-server'
 import { createService, type Service, type ServiceOptions } from './service.js'
 
@@ -22,8 +21,7 @@ const IDLE_SWEEP_MS = 20
 
 export async function startService(options: StartOptions): Promise<RunningService> {
   const service = createService(options)
-  const server = await listen(service.app, options.port ?? options.config.port)
-  const port = (server.address() as AddressInfo).port
+  const { server, port } = await listen(service.app, options.port ?? options.config.port)
 
   service.logger.info('server.started', { port, dataDir: options.config.dataDir })
 
@@ -54,15 +52,24 @@ export async function startService(options: StartOptions): Promise<RunningServic
   }
 }
 
-/**
- * `serve` can also create an HTTP/2 server; the result is narrowed to
- * `http.Server` because the connection-draining methods exist only there.
- */
-function listen(app: Service['app'], port: number): Promise<Server> {
-  return new Promise<Server>((resolve, reject) => {
-    const server = serve({ fetch: app.fetch, port }, () => resolve(server as Server)) as Server
-    server.once('error', reject)
+interface ListeningServer {
+  readonly server: Server
+  readonly port: number
+}
+
+/** `serve` defaults to Node's HTTP/1 server when no custom server factory is supplied. */
+function listen(app: Service['app'], port: number): Promise<ListeningServer> {
+  const { promise, resolve, reject } = Promise.withResolvers<ListeningServer>()
+  const candidate = serve({ fetch: app.fetch, port }, (address) => {
+    if (candidate instanceof Server) {
+      resolve({ server: candidate, port: address.port })
+    } else {
+      candidate.close()
+      reject(new Error('Hono created an unexpected HTTP/2 server'))
+    }
   })
+  candidate.once('error', reject)
+  return promise
 }
 
 /**

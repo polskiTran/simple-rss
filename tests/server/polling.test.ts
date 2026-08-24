@@ -62,11 +62,8 @@ function scheduleOf(service: TestService, feedId: number): StoredSchedule {
   return row as StoredSchedule
 }
 
-function heldBody(xml: string): { body: ReadableStream<Uint8Array>; release: () => void } {
-  let release!: () => void
-  const gate = new Promise<void>((resolve) => {
-    release = resolve
-  })
+function heldBody(xml: string) {
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>()
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       await gate

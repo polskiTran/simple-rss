@@ -16,13 +16,17 @@ export function MarkTile() {
         row.map((level, x) => {
           const antiDiagonal = y + x
 
+          // SAFETY: React forwards CSS custom properties even though `CSSProperties`
+          // only declares standard CSS names.
+          const style = { '--glint-step': antiDiagonal } as CSSProperties
+
           return (
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: TILE is a fixed decorative grid — the cell's position is its identity.
               key={`${y}-${x}`}
               className="wordmark-cell"
               data-level={level}
-              style={{ '--glint-step': antiDiagonal } as CSSProperties}
+              style={style}
             />
           )
         }),

@@ -8,7 +8,7 @@ import type { DigestService } from './digest/digest-service.js'
 import type { ImageService } from './images/image-service.js'
 import type { ImageUrlSignature } from './images/image-url-signature.js'
 import type { LibraryService } from './library/library-service.js'
-import type { Logger } from './logger.js'
+import { errorForLog, type Logger } from './logger.js'
 import { assertWritable, type DrizzleDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderService } from './reader/reader-service.js'
@@ -171,7 +171,7 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   try {
     assertWritable(db, deps.clock.now())
   } catch (error) {
-    deps.logger.error('readiness.write_probe_failed', { error })
+    deps.logger.error('readiness.write_probe_failed', { error: errorForLog(error) })
     return 'database is not writable'
   }
 

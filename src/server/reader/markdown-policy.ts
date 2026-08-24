@@ -110,7 +110,7 @@ function policyList(node: List, context: PolicyContext): BlockContent[] {
     ordered: node.ordered ?? false,
     spread: node.spread ?? false,
     children,
-    ...(typeof node.start === 'number' ? { start: node.start } : {}),
+    ...(node.start !== null && node.start !== undefined ? { start: node.start } : {}),
   }
   return [list]
 }

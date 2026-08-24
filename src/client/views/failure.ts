@@ -1,19 +1,19 @@
 import { MIN_PASSWORD_LENGTH, newPasswordSchema } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
-export function describeFailure(error: unknown, overrides: Record<number, string> = {}): string {
-  if (!(error instanceof ApiError)) return 'the reader is unavailable'
+export function describeFailure(cause: unknown, overrides: Record<number, string> = {}): string {
+  if (!(cause instanceof ApiError)) return 'the reader is unavailable'
 
-  const override = overrides[error.status]
+  const override = overrides[cause.status]
   if (override) return override
 
-  switch (error.status) {
+  switch (cause.status) {
     case 400:
       return tooShort()
     case 401:
       return 'that password is not right'
     case 429:
-      return `too many attempts — try again in ${describeWait(error.retryAfterSeconds)}`
+      return `too many attempts — try again in ${describeWait(cause.retryAfterSeconds)}`
     default:
       return 'that did not work'
   }
@@ -30,8 +30,8 @@ export function reasonToHold(password: string, confirmation: string): string | u
   return undefined
 }
 
-export function failureKind(error: unknown): 'unreachable' | 'unavailable' {
-  return error instanceof TypeError ? 'unreachable' : 'unavailable'
+export function failureKind(cause: unknown): 'unreachable' | 'unavailable' {
+  return cause instanceof TypeError ? 'unreachable' : 'unavailable'
 }
 
 function describeWait(seconds: number | undefined): string {

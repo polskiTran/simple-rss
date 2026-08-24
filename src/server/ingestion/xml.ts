@@ -11,5 +11,7 @@ export function arrayOf(value: unknown): readonly unknown[] {
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {
+  // SAFETY: after excluding null, arrays, and primitives, callers only read the
+  // object's enumerable string properties through the record index signature.
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }

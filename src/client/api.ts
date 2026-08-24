@@ -35,6 +35,7 @@ import {
   type ServiceMeta,
   type UpdateFeedDetailsRequest,
 } from '../shared/api.js'
+import type { JsonValue } from '../shared/json.js'
 
 export class ApiError extends Error {
   readonly status: number
@@ -89,7 +90,7 @@ function read(path: string, signal: AbortSignal | undefined): Promise<Response> 
   return request(path, signal ? { signal } : {})
 }
 
-function post(path: string, body: unknown): Promise<Response> {
+function post(path: string, body: JsonValue | undefined): Promise<Response> {
   return request(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -106,7 +107,10 @@ export async function fetchAuthStatus(): Promise<AuthStatus> {
 }
 
 export async function claimInstallation(setupSecret: string, password: string): Promise<AuthStatus> {
-  return status(await post('/api/auth/setup', { setupSecret, password, timezone: detectedTimezone() }))
+  const timezone = detectedTimezone()
+  return status(
+    await post('/api/auth/setup', { setupSecret, password, ...(timezone === undefined ? {} : { timezone }) }),
+  )
 }
 
 function detectedTimezone(): string | undefined {

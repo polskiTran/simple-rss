@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { useCallback, useEffect, useState } from 'react'
 
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
@@ -61,12 +62,23 @@ export function readerOrigin(feedItemId: number, from: Origin | undefined): Orig
 
 const MAX_TRAIL = 6
 
+const historyOriginSchema = z.object({
+  path: z.string().regex(/^\/[a-z]+(\/[1-9]\d*)?$/),
+  label: z.string().min(1),
+  from: z.unknown().optional(),
+})
+
+const historyStateSchema = z.object({ origin: z.unknown().optional() })
+
 function trailOf(value: unknown, depth = 0): Origin | undefined {
-  if (depth >= MAX_TRAIL || typeof value !== 'object' || value === null) return undefined
-  const { path, label, from } = value as Record<string, unknown>
-  if (typeof path !== 'string' || !/^\/[a-z]+(\/[1-9]\d*)?$/.test(path)) return undefined
-  if (typeof label !== 'string' || label === '') return undefined
-  return { path, label, from: trailOf(from, depth + 1) }
+  if (depth >= MAX_TRAIL) return undefined
+  const parsed = historyOriginSchema.safeParse(value)
+  if (!parsed.success) return undefined
+  return {
+    path: parsed.data.path,
+    label: parsed.data.label,
+    from: trailOf(parsed.data.from, depth + 1),
+  }
 }
 
 export interface Navigation {
@@ -117,8 +129,8 @@ export function useNavigation(): Navigation {
 }
 
 function currentLocation(): Location {
-  const state = window.history.state as { origin?: unknown } | null
-  return locationOf(window.location.pathname, trailOf(state?.origin))
+  const state = historyStateSchema.safeParse(window.history.state)
+  return locationOf(window.location.pathname, trailOf(state.success ? state.data.origin : undefined))
 }
 
 function locationOf(pathname: string, origin: Origin | undefined): Location {

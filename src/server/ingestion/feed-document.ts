@@ -1,3 +1,4 @@
+import { hasOwn } from '../../shared/record.js'
 import { createHash } from 'node:crypto'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { convert } from 'html-to-text'
@@ -290,17 +291,17 @@ function boundedPlainText(value: unknown, limit: number): string | null {
   return text.slice(0, limit)
 }
 
-const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+const NAMED_ENTITIES = {
   lt: '<',
   gt: '>',
   quot: '"',
   apos: "'",
   amp: '&',
-}
+} as const satisfies Readonly<Record<string, string>>
 
 function decodeXmlEntities(text: string): string {
   return text.replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g, (entity, hex, decimal, named) => {
-    if (typeof named === 'string') return NAMED_ENTITIES[named] ?? entity
+    if (typeof named === 'string' && hasOwn(NAMED_ENTITIES, named)) return NAMED_ENTITIES[named]
     const codePoint = Number.parseInt(hex ?? decimal, hex ? 16 : 10)
     try {
       return String.fromCodePoint(codePoint)

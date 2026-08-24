@@ -1,3 +1,4 @@
+import { hasOwn } from '../../shared/record.js'
 import { useState, type ChangeEvent } from 'react'
 import type { OpmlImportReport } from '../../shared/api.js'
 import { ApiError, importOpml } from '../api.js'
@@ -69,22 +70,23 @@ export function ImportReport({ report }: { report: OpmlImportReport | undefined 
 }
 
 function readFileText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read'))
-    reader.readAsText(file)
-  })
+  const { promise, resolve, reject } = Promise.withResolvers<string>()
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result))
+  reader.onerror = () => reject(reader.error ?? new Error('The file could not be read'))
+  reader.readAsText(file)
+  return promise
 }
 
-const IMPORT_FAILURE_COPY: Readonly<Record<string, string>> = {
+const IMPORT_FAILURE_COPY = {
   malformed_opml: 'that file is malformed XML',
   unsupported_opml: 'that file is not an OPML subscription list',
   too_many_feeds: 'that file lists more feeds than one import can process',
   invalid_request: 'that file is too large to import',
-}
+} as const satisfies Readonly<Record<string, string>>
 
-function importFailure(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'the reader is unavailable'
-  return IMPORT_FAILURE_COPY[error.code] ?? 'that file could not be imported'
+function importFailure(cause: unknown): string {
+  if (!(cause instanceof ApiError)) return 'the reader is unavailable'
+  const code = cause.code
+  return hasOwn(IMPORT_FAILURE_COPY, code) ? IMPORT_FAILURE_COPY[code] : 'that file could not be imported'
 }
