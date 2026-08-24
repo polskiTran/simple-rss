@@ -30,7 +30,7 @@
     "@node-rs/argon2": "^2.0.2",
     "@streamdown/math": "^1.0.2",
     "better-sqlite3": "^11.8.1",
-    "defuddle": "^0.19.2",
+    "defuddle": "^0.19.3",
     "drizzle-orm": "^0.39.3",
     "fast-xml-parser": "^5.10.1",
     "hono": "^4.7.2",

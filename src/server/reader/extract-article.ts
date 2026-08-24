@@ -29,7 +29,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     // and a selector error would silently keep the whole page. Built eagerly because
     // Defuddle's lazy linkedom loading does not survive every module loader.
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
-    const result = await Defuddle(document, input.url)
+    const result = await Defuddle(document, input.url, { useAsync: false })
     const markdown = articleMarkdown(
       result.content ?? '',
       input.url,
