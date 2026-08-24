@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { FeedAvailability } from '../../src/shared/api.js'
 import { App } from '../../src/client/app.js'
 import { dailyShadows } from '../../src/client/components/daily-band.js'
 import { stubApi, type Reply } from './stub-api.js'
@@ -11,7 +12,7 @@ const AVAILABLE = {
   lastSuccessAt: '2026-08-08T09:00:00.000Z',
   consecutiveFailures: 0,
   category: null,
-}
+} satisfies FeedAvailability
 
 const UNCHECKED = {
   state: 'unchecked',
@@ -19,7 +20,7 @@ const UNCHECKED = {
   lastSuccessAt: null,
   consecutiveFailures: 0,
   category: null,
-}
+} satisfies FeedAvailability
 
 const FEED = {
   feedId: 1,
@@ -49,10 +50,10 @@ const UNAVAILABLE_FEED = {
     lastSuccessAt: '2026-08-05T09:00:00.000Z',
     consecutiveFailures: 3,
     category: 'http_error',
-  },
+  } satisfies FeedAvailability,
 }
 
-function feedDetail(availability: object, itemCount: number) {
+function feedDetail(availability: FeedAvailability, itemCount: number) {
   return {
     feedId: FEED.feedId,
     title: FEED.title,

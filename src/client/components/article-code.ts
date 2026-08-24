@@ -1,4 +1,4 @@
-import type { BundledLanguage } from 'shiki'
+import { hasOwn } from '../../shared/record.js'
 import type { HighlighterCore } from 'shiki/core'
 import type { CodeHighlighterPlugin, ThemeInput } from 'streamdown'
 
@@ -22,7 +22,13 @@ const GRAMMARS = {
 
 type Grammar = keyof typeof GRAMMARS
 
-const ALIASES: Readonly<Record<string, Grammar>> = {
+function isGrammar(name: string): name is Grammar {
+  return Object.hasOwn(GRAMMARS, name)
+}
+
+const SUPPORTED_LANGUAGES = Object.keys(GRAMMARS).filter(isGrammar)
+
+const ALIASES = {
   console: 'bash',
   golang: 'go',
   js: 'javascript',
@@ -37,14 +43,14 @@ const ALIASES: Readonly<Record<string, Grammar>> = {
   ts: 'typescript',
   yml: 'yaml',
   zsh: 'bash',
-}
+} as const satisfies Readonly<Record<string, Grammar>>
 
 const THEMES: [light: ThemeInput, dark: ThemeInput] = ['vitesse-light', 'vitesse-dark']
 
 function grammarFor(language: string): Grammar | undefined {
   const name = language.trim().toLowerCase()
-  if (name in GRAMMARS) return name as Grammar
-  return ALIASES[name]
+  if (isGrammar(name)) return name
+  return hasOwn(ALIASES, name) ? ALIASES[name] : undefined
 }
 
 let core: Promise<HighlighterCore> | undefined
@@ -81,7 +87,7 @@ export const articleCode: CodeHighlighterPlugin = {
   name: 'shiki',
   type: 'code-highlighter',
   getThemes: () => THEMES,
-  getSupportedLanguages: () => Object.keys(GRAMMARS) as BundledLanguage[],
+  getSupportedLanguages: () => SUPPORTED_LANGUAGES,
   supportsLanguage: (language) => grammarFor(language) !== undefined,
 
   highlight({ code, language }, callback) {

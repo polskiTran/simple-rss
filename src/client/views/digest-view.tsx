@@ -68,8 +68,8 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
         .then((found) => {
           if (!request.signal.aborted) setSearch({ kind: 'found', results: found.results })
         })
-        .catch((error: unknown) => {
-          if (!request.signal.aborted) setSearch({ kind: failureKind(error) })
+        .catch((cause: unknown) => {
+          if (!request.signal.aborted) setSearch({ kind: failureKind(cause) })
         })
     }, SEARCH_SETTLE_MS)
     return () => {

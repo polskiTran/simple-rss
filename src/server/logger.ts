@@ -1,11 +1,20 @@
+import type { JsonValue } from '../shared/json.js'
 import type { LogLevel } from './config.js'
 
-export type LogFields = Record<string, unknown>
+export type LogValue = JsonValue
 
-export interface LogRecord extends LogFields {
-  level: LogLevel
-  message: string
-  time: string
+export type LogField = LogValue | Error
+export type LogFields = Readonly<Record<string, LogField>>
+
+export interface LogRecord extends Readonly<Record<string, LogValue>> {
+  readonly level: LogLevel
+  readonly message: string
+  readonly time: string
+}
+
+/** Converts JavaScript's unconstrained thrown values into the logger's concrete error contract. */
+export function errorForLog(cause: unknown): Error {
+  return cause instanceof Error ? cause : new Error(String(cause))
 }
 
 export interface Logger {
@@ -22,10 +31,10 @@ export interface LoggerOptions {
   now?: () => Date
   sink?: (record: LogRecord) => void
   /** Where JSON lines go when no `sink` is given. Defaults to stdout. */
-  stream?: { write(chunk: string): unknown }
+  stream?: { write(chunk: string): void }
 }
 
-const RANK: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 }
+const RANK = { debug: 0, info: 1, warn: 2, error: 3 } satisfies Record<LogLevel, number>
 
 /**
  * Flat JSON records to stdout. Callers pass event names (`server.started`),
@@ -51,17 +60,37 @@ export function createLogger(options: LoggerOptions): Logger {
       child: (fields) => build({ ...bound, ...serialiseFields(fields) }),
     }
   }
-
   return build({})
 }
 
-/** `JSON.stringify` drops Error properties, so errors are unpacked by hand. */
-function serialiseFields(fields: LogFields | undefined): LogFields {
+interface SerialisedFields {
+  [key: string]: LogValue
+}
+
+/** Converts every field to a value `JSON.stringify` can emit without throwing. */
+function serialiseFields(fields: LogFields | undefined): SerialisedFields {
   if (!fields) return {}
 
-  const out: LogFields = {}
-  for (const [key, value] of Object.entries(fields)) {
-    out[key] = value instanceof Error ? { name: value.name, message: value.message, stack: value.stack ?? '' } : value
+  const seen = new WeakSet<object>()
+  const out: Record<string, LogValue> = {}
+  for (const [key, value] of Object.entries(fields)) out[key] = serialiseValue(value, seen)
+  return out
+}
+
+function serialiseValue(value: unknown, seen: WeakSet<object>): LogValue {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'bigint') return value.toString()
+  if (value instanceof Error) {
+    return { name: value.name, message: value.message, stack: value.stack ?? '' }
   }
+  if (Array.isArray(value)) return value.map((entry) => serialiseValue(entry, seen))
+  if (typeof value !== 'object') return `[${typeof value}]`
+  if (seen.has(value)) return '[Circular]'
+
+  seen.add(value)
+  const out: Record<string, LogValue> = {}
+  for (const [key, child] of Object.entries(value)) out[key] = serialiseValue(child, seen)
+  seen.delete(value)
   return out
 }

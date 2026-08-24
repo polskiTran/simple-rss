@@ -19,11 +19,11 @@ describe('poll scheduler wakes', () => {
         wakes += 1
         return []
       },
-    } as unknown as SubscriptionService
+    } satisfies Pick<SubscriptionService, 'dueFeedIds'>
 
     const scheduler = new PollScheduler({
       subscriptions,
-      refresh: {} as FeedRefresh,
+      refresh: { refresh: () => Promise.reject(new Error('unexpected refresh')) },
       retention: { sweep: () => {} },
       logger: quietLogger(),
     })
@@ -44,19 +44,16 @@ describe('poll scheduler wakes', () => {
 
   it('joins a wake that lands mid-drain: one more look at the frontier, never a second drain', async () => {
     let frontierQueries = 0
-    let finishPoll!: () => void
     const subscriptions = {
       dueFeedIds: () => {
         frontierQueries += 1
         return frontierQueries === 1 ? [1] : []
       },
-    } as unknown as SubscriptionService
+    } satisfies Pick<SubscriptionService, 'dueFeedIds'>
+    const refreshCompletion = Promise.withResolvers<{ readonly kind: 'updated'; readonly observedItems: number }>()
     const refresh = {
-      refresh: () =>
-        new Promise((resolve) => {
-          finishPoll = () => resolve({ kind: 'updated', observedItems: 0 })
-        }),
-    } as unknown as FeedRefresh
+      refresh: () => refreshCompletion.promise,
+    } satisfies Pick<FeedRefresh, 'refresh'>
 
     const scheduler = new PollScheduler({
       subscriptions,
@@ -68,7 +65,7 @@ describe('poll scheduler wakes', () => {
     const second = scheduler.tick()
     expect(frontierQueries).toBe(1)
 
-    finishPoll()
+    refreshCompletion.resolve({ kind: 'updated', observedItems: 0 })
     await Promise.all([first, second])
     expect(frontierQueries).toBe(2)
   })

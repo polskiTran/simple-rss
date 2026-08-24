@@ -13,6 +13,8 @@ export const BAND_HEIGHT_PX = 114
 const PITCH_PX = 5
 
 export function DailyBand({ date, volume }: { date: string; volume: number }) {
+  // SAFETY: React forwards CSS custom properties even though `CSSProperties`
+  // only declares standard CSS names.
   const geometry = {
     '--daily-band-height': `${BAND_HEIGHT_PX}px`,
     '--daily-band-pitch': `${PITCH_PX}px`,

@@ -1,9 +1,9 @@
 import { MAX_PASSWORD_BYTES } from '../../shared/api.js'
 import { hash, verify, type Algorithm } from '@node-rs/argon2'
 
-// `Algorithm.Argon2id` as its value: the binding's ambient `const enum` cannot be imported
-// under `verbatimModuleSyntax`.
-const ARGON2ID = 2 as Algorithm
+// `2` is `Algorithm.Argon2id`: the binding's ambient `const enum` cannot be
+// imported under `verbatimModuleSyntax`.
+const ARGON2ID: Algorithm = 2
 
 export interface PasswordHasher {
   /** The encoded verifier to store. Never the password. */

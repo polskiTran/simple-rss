@@ -1,5 +1,5 @@
 import { loadConfig } from './config.js'
-import { createLogger } from './logger.js'
+import { createLogger, errorForLog } from './logger.js'
 import { startService, type RunningService } from './server.js'
 
 async function main(): Promise<void> {
@@ -32,8 +32,8 @@ function installSignalHandlers(service: RunningService): void {
 
       service.stop().then(
         () => process.exit(0),
-        (error: unknown) => {
-          service.logger.error('process.stop_failed', { error })
+        (cause: unknown) => {
+          service.logger.error('process.stop_failed', { error: errorForLog(cause) })
           process.exit(1)
         },
       )
@@ -41,7 +41,7 @@ function installSignalHandlers(service: RunningService): void {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error('simple-rss failed to start:', error)
+main().catch((cause: unknown) => {
+  console.error('simple-rss failed to start:', cause)
   process.exitCode = 1
 })

@@ -9,7 +9,7 @@ import { DigestService } from './digest/digest-service.js'
 import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
-import { createLogger, type Logger } from './logger.js'
+import { createLogger, errorForLog, type Logger } from './logger.js'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
@@ -125,7 +125,7 @@ export function createService(options: ServiceOptions): Service {
     })
   } catch (error) {
     readiness.markFailed('migrations failed')
-    logger.error('startup.migrations_failed', { databasePath: config.databasePath, error })
+    logger.error('startup.migrations_failed', { databasePath: config.databasePath, error: errorForLog(error) })
   }
 
   const app = createApp({ config, clock, logger, readiness, services })

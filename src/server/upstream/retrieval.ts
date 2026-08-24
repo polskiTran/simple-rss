@@ -1,6 +1,7 @@
 import { MAX_FEED_SIZE_MIB } from '../../shared/api.js'
 import { VERSION } from '../../shared/version.js'
-import type { Logger } from '../logger.js'
+import { hasOwn } from '../../shared/record.js'
+import type { LogFields, Logger } from '../logger.js'
 import {
   ResolutionCapacityError,
   systemResolver,
@@ -33,7 +34,7 @@ export interface RetrievalProfile {
   readonly capacity: RetrievalCapacity
 }
 
-export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalProfile>> = {
+export const RETRIEVAL_PROFILES = {
   feed: {
     accept: ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml'],
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
@@ -58,7 +59,7 @@ export const RETRIEVAL_PROFILES: Readonly<Record<RetrievalOperation, RetrievalPr
     maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
-}
+} satisfies Readonly<Record<RetrievalOperation, RetrievalProfile>>
 
 /** Can only tighten the operation profile; non-finite values are rejected. */
 export interface RetrievalLimits {
@@ -68,11 +69,11 @@ export interface RetrievalLimits {
   readonly maxRedirects?: number
 }
 
-const FORWARDABLE_HEADERS: Readonly<Record<string, true>> = {
+const FORWARDABLE_HEADERS = {
   'accept-language': true,
   'if-modified-since': true,
   'if-none-match': true,
-}
+} as const satisfies Readonly<Record<string, true>>
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
@@ -177,11 +178,11 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
   const resolver = new BoundedResolver(options.resolve ?? systemResolver, sharedCapacity)
   const policy: DestinationPolicy = { resolve: resolver.resolve, self: options.self }
   const shared = new ConcurrencyGate(sharedCapacity.maxConcurrent, sharedCapacity.maxQueued)
-  const operationGates: Record<RetrievalOperation, ConcurrencyGate> = {
+  const operationGates = {
     feed: gateFor(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
     reader: gateFor(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
     image: gateFor(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
-  }
+  } satisfies Record<RetrievalOperation, ConcurrencyGate>
 
   const retrieve = (request: RetrievalRequest): Promise<RetrievalResult> =>
     run(request, {
@@ -258,7 +259,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     for (let index = entered - 1; index >= 0; index -= 1) context.gates[index]?.leave()
   }
 
-  const log = (event: string, fields: Record<string, unknown>): void => {
+  const log = (event: string, fields: LogFields): void => {
     const level = event === 'upstream.retrieval_completed' ? 'debug' : 'warn'
     context.logger[level](event, {
       operation: request.operation,
@@ -270,7 +271,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const fail = (
     code: RetrievalFailureCode,
     reason: string,
-    fields: Record<string, unknown> = {},
+    fields: LogFields = {},
     status?: number,
   ): RetrievalFailure => {
     settle()
@@ -520,7 +521,8 @@ function forwardableHeaders(
   const headers = new Headers()
 
   for (const [name, value] of Object.entries(supplied ?? {})) {
-    if (FORWARDABLE_HEADERS[name.toLowerCase()]) headers.set(name, value)
+    const normalizedName = name.toLowerCase()
+    if (hasOwn(FORWARDABLE_HEADERS, normalizedName)) headers.set(name, value)
   }
   headers.set('accept', acceptedTypes.join(', '))
   headers.set('user-agent', USER_AGENT)
@@ -556,8 +558,8 @@ function emptyStream(): ReadableStream<Uint8Array> {
   })
 }
 
-function describe(error: unknown): string {
-  if (error instanceof Error) return error.message
+function describe(cause: unknown): string {
+  if (cause instanceof Error) return cause.message
   return 'upstream request failed'
 }
 

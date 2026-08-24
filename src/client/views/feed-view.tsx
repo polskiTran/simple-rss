@@ -396,17 +396,17 @@ function Grid({ grid, title, onShowDay }: { grid: CadenceGrid; title: string; on
         )}
       </div>
       <div className="cadence-months" aria-hidden="true">
-        {grid.columns.map((column, index) =>
-          column.monthLabel ? (
-            <span
-              key={column.cells[0]?.date ?? index}
-              className="cadence-month"
-              style={{ '--column': index } as CSSProperties}
-            >
+        {grid.columns.map((column, index) => {
+          if (!column.monthLabel) return null
+          // SAFETY: React forwards CSS custom properties even though `CSSProperties`
+          // only declares standard CSS names.
+          const style = { '--column': index } as CSSProperties
+          return (
+            <span key={column.cells[0]?.date ?? index} className="cadence-month" style={style}>
               {column.monthLabel}
             </span>
-          ) : null,
-        )}
+          )
+        })}
       </div>
     </div>
   )
@@ -483,11 +483,11 @@ function intervalPhrase(minutes: PollingIntervalMinutes): string {
   return minutes === 1440 ? 'daily' : `every ${INTERVAL_WORDS[minutes]}`
 }
 
-const INTERVAL_WORDS: Readonly<Record<PollingIntervalMinutes, string>> = {
+const INTERVAL_WORDS = {
   30: '30 min',
   60: 'hour',
   120: '2 hours',
   360: '6 hours',
   720: '12 hours',
   1440: 'daily',
-}
+} satisfies Readonly<Record<PollingIntervalMinutes, string>>

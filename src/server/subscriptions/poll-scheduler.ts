@@ -1,4 +1,4 @@
-import type { Logger } from '../logger.js'
+import { errorForLog, type Logger } from '../logger.js'
 import type { FeedRefresh } from './feed-refresh.js'
 import type { SubscriptionService } from './subscription-service.js'
 
@@ -23,7 +23,7 @@ export interface PollSchedulerLimits {
 
 export interface PollSchedulerOptions extends PollSchedulerLimits {
   readonly subscriptions: Pick<SubscriptionService, 'dueFeedIds'>
-  readonly refresh: FeedRefresh
+  readonly refresh: Pick<FeedRefresh, 'refresh'>
   readonly retention: RetentionSweeper
   readonly logger: Logger
 }
@@ -37,7 +37,7 @@ export interface PollSchedulerOptions extends PollSchedulerLimits {
  */
 export class PollScheduler {
   readonly #subscriptions: Pick<SubscriptionService, 'dueFeedIds'>
-  readonly #refresh: FeedRefresh
+  readonly #refresh: Pick<FeedRefresh, 'refresh'>
   readonly #retention: RetentionSweeper
   readonly #logger: Logger
   readonly #batchLimit: number
@@ -116,7 +116,7 @@ export class PollScheduler {
 
       this.#retention.sweep()
     } catch (error) {
-      this.#logger.error('scheduler.tick_failed', { error })
+      this.#logger.error('scheduler.tick_failed', { error: errorForLog(error) })
     }
   }
 
@@ -125,7 +125,7 @@ export class PollScheduler {
       const outcome = await this.#refresh.refresh(feedId)
       this.#logger.debug('scheduler.feed_polled', { feedId, outcome: outcome.kind })
     } catch (error) {
-      this.#logger.error('scheduler.feed_poll_failed', { feedId, error })
+      this.#logger.error('scheduler.feed_poll_failed', { feedId, error: errorForLog(error) })
     }
   }
 }

@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { sql, type SQL } from 'drizzle-orm'
+import { z } from 'zod'
 import { feedItems } from '../persistence/schema.js'
 import { plausibleHorizon } from './chronology.js'
 
@@ -17,25 +18,24 @@ export function encodeListCursor(cursor: ListCursor): string {
 
 const STORED_ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
+const listCursorSchema = z.tuple([
+  z
+    .string()
+    .regex(STORED_ISO_INSTANT)
+    .refine((value) => Number.isFinite(Date.parse(value))),
+  z.number().int().positive(),
+])
+
 /** `undefined` for anything this module never issued. */
 export function decodeListCursor(value: string): ListCursor | undefined {
-  let parsed: unknown
   try {
-    parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
+    const parsed = listCursorSchema.safeParse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')))
+    if (!parsed.success) return undefined
+    const [chronology, feedItemId] = parsed.data
+    return { chronology, feedItemId }
   } catch {
     return undefined
   }
-  if (!Array.isArray(parsed) || parsed.length !== 2) return undefined
-
-  const [chronology, feedItemId] = parsed as [unknown, unknown]
-  if (
-    typeof chronology !== 'string' ||
-    !STORED_ISO_INSTANT.test(chronology) ||
-    !Number.isFinite(Date.parse(chronology))
-  )
-    return undefined
-  if (typeof feedItemId !== 'number' || !Number.isSafeInteger(feedItemId) || feedItemId <= 0) return undefined
-  return { chronology, feedItemId }
 }
 
 export function nextListCursor(

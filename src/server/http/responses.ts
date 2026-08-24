@@ -25,6 +25,6 @@ export function notFound(c: Context) {
 }
 
 /** Headers for a refusal that names a wait: the wait, and never a cache. */
-export function retryAfter(seconds: number): Record<string, string> {
+export function retryAfter(seconds: number) {
   return { ...NO_STORE, 'Retry-After': String(seconds) }
 }
