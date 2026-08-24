@@ -140,7 +140,7 @@ async function signedImagePath(user: Device, feedItemId: number): Promise<string
   const { markdown } = (await response.json()) as { markdown: string }
   const match = /!\[[^\]]*\]\(([^)]+)\)/.exec(markdown)
   if (!match?.[1]) throw new Error(`no image reference in the markdown:\n${markdown}`)
-  return match[1].replaceAll('%28', '(').replaceAll('%29', ')')
+  return match[1].replaceAll('\\&', '&').replaceAll('%28', '(').replaceAll('%29', ')')
 }
 
 describe('the signed Reader image route', () => {

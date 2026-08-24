@@ -6,6 +6,9 @@ import { startTestService, type TestService } from '../../support/service-harnes
 const FEED_URL = 'https://journal.example/feed'
 const ARTICLE_URL = 'https://journal.example/first-light'
 const ASYNC_EXTRACTOR_TARGET = 'https://www.youtube.com/watch?v=reader-boundary'
+const FINAL_ARTICLE_URL = 'https://journal.example/archive/first-light'
+const FINAL_ARTICLE_IMAGE_URL = 'https://journal.example/archive/media/dawn-large.jpg'
+const FINAL_DECORATIVE_IMAGE_URL = 'https://journal.example/archive/media/divider.png'
 
 const rss = (...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>Field Notes</title>${items.join('')}</channel></rss>`
@@ -28,7 +31,35 @@ const ARTICLE_HTML = `<!doctype html>
         <h1>First light</h1>
         ${Array.from({ length: 30 }, (_, index) => `<p>Paragraph ${index} carries the morning along with a steady sentence about the valley, written long enough to count as honest reading time.</p>`).join('\n')}
         <h2>Field methods</h2>
+        <p>Observe <em>carefully</em>, keep a <strong>steady hand</strong>, and run <code>measure()</code>.</p>
+        <ul>
+          <li>Arrive early enough to watch the valley before the wind changes the light.
+            <ul><li>Record the first measurement before moving the camera or changing the lens.</li></ul>
+          </li>
+          <li>Write every observation in the field notebook while the details remain clear.</li>
+        </ul>
+        <ol>
+          <li>Frame the ridge against the clear morning sky before the clouds arrive.</li>
+          <li>Expose the plate using the measured light rather than an automatic estimate.</li>
+        </ol>
+        <blockquote><p>The valley changes by the minute.</p></blockquote>
+        <hr>
         <pre><code class="language-python">def observe():\n    return light</code></pre>
+        <table>
+          <thead><tr><th>Hour</th><th>Reading</th></tr></thead>
+          <tbody><tr><td>06:10</td><td>steady | measured</td></tr></tbody>
+        </table>
+        <p>Euler wrote <math><semantics><mrow><msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>=</mo><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">e^{i\\pi} = -1</annotation></semantics></math>.</p>
+        <p>Read <a href="notes" title="Field notebook">the field notebook</a>.</p>
+        <p><a href="javascript:alert(1)">unsafe destination remains readable</a></p>
+        <p><a href="https://bad host/notes">malformed destination remains readable</a></p>
+        <img src="media/dawn-small.jpg" srcset="media/dawn-small.jpg 320w, media/dawn-large.jpg 1200w" alt="dawn over the valley">
+        <img src="media/divider.png" alt="" width="600" height="100">
+        <img src="data:image/png;base64,eA==" alt="tracking pixel">
+        <img src="https://exa mple/image.png" alt="malformed image">
+        <script>document.body.innerHTML = 'hostile'</script>
+        <iframe src="https://tracker.example/pixel"></iframe>
+        <form action="/subscribe"><button>Subscribe now</button></form>
       </article></main>
     </body>
   </html>`
@@ -113,9 +144,15 @@ describe('the Reader item', () => {
 })
 
 describe('the Reader article', () => {
-  it('extracts the original page into cacheable, sanitized markdown', async () => {
+  it('returns the supported Reader dialect with policy-safe destinations', async () => {
     const service = await startTestService()
-    const { user, feedItemId } = await readingSetup(service)
+    service.upstream.stub(FINAL_ARTICLE_URL, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: ARTICLE_HTML,
+    })
+    const { user, feedItemId } = await readingSetup(service, {
+      article: { status: 302, headers: { location: FINAL_ARTICLE_URL } },
+    })
 
     const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(200)
@@ -124,9 +161,44 @@ describe('the Reader article', () => {
     const article = readerArticleSchema.parse(await response.json())
     expect(article.feedItemId).toBe(feedItemId)
     expect(article.markdown).toContain('Paragraph 7 carries the morning along')
-    expect(article.markdown).toContain('## Field methods')
-    expect(article.markdown).toContain('```python')
     expect(article.markdown).not.toContain('Archive')
+    expect(article.markdown).toContain('## Field methods')
+    expect(article.markdown).toContain('*carefully*')
+    expect(article.markdown).toContain('**steady hand**')
+    expect(article.markdown).toContain('`measure()`')
+    expect(article.markdown).toContain('- Arrive early enough to watch the valley')
+    expect(article.markdown).toContain('1. Frame the ridge against the clear morning sky')
+    expect(article.markdown).toContain('> The valley changes by the minute.')
+    expect(article.markdown).toContain('\n\n---\n\n')
+    expect(article.markdown).toContain('```python')
+    expect(article.markdown).toMatch(/\|\s*Hour\s*\|\s*Reading\s*\|/)
+    expect(article.markdown).toContain('steady \\| measured')
+    expect(article.markdown).toContain('$e^{i\\pi} = -1$')
+    expect(article.markdown).toContain('[the field notebook](https://journal.example/archive/notes "Field notebook")')
+    expect(article.markdown).toContain('unsafe destination remains readable')
+    expect(article.markdown).toContain('malformed destination remains readable')
+    expect(article.markdown).not.toContain('https://bad host')
+    expect(article.markdown).toContain('!\\[malformed image]')
+    expect(article.markdown).not.toContain('![malformed image](')
+    expect(article.markdown).not.toContain('javascript:')
+    expect(article.markdown).not.toContain('data:image')
+    expect(article.markdown).not.toContain('tracking pixel')
+    expect(article.markdown).not.toMatch(/<(?:script|iframe|form|button)\b/i)
+    expect(article.markdown).not.toContain('Subscribe now')
+
+    const imageUrls = [...article.markdown.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(
+      (match) => new URL((match[1] ?? '').replaceAll('\\&', '&'), 'https://reader.test'),
+    )
+    expect(imageUrls).toHaveLength(2)
+    expect(imageUrls.map((url) => url.pathname)).toEqual(['/api/reader/image', '/api/reader/image'])
+    expect(imageUrls.map((url) => url.searchParams.get('url'))).toEqual([
+      FINAL_ARTICLE_IMAGE_URL,
+      FINAL_DECORATIVE_IMAGE_URL,
+    ])
+    for (const url of imageUrls) {
+      expect(url.searchParams.get('exp')).not.toBeNull()
+      expect(url.searchParams.get('sig')).not.toBeNull()
+    }
     expect(article.readingTimeMinutes).toBeGreaterThanOrEqual(2)
   })
 

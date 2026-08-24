@@ -226,13 +226,13 @@ Reader View is generated only when requested:
 2. The server retrieves the stored original link through the hardened retrieval boundary.
 3. The response must be HTML and no larger than five MiB decoded.
 4. Defuddle produces temporary Markdown.
-5. Output is sanitized through an explicit allowlist.
-6. Reader image URLs are replaced with signed proxy URLs.
+5. A directly declared Markdown parser builds an AST; the Reader policy reconstructs only its accepted dialect.
+6. Links and images resolve against Retrieval's final page URL; links keep only HTTP(S) destinations, while images keep only HTTP(S) targets rewritten as short-lived signed proxy paths.
 7. Markdown is returned with `Cache-Control: private, max-age=86400`.
 
-Allowed output includes headings, paragraphs, lists, links, images, block quotes, tables, code, and supported math. Scripts, styles, forms, iframes, embedded media, event handlers, and arbitrary raw HTML are removed. External links use `noopener noreferrer`.
+Allowed output includes headings, paragraphs, emphasis, lists, block quotes, thematic breaks, HTTP(S) links, signed Reader images, inline and fenced code, tables, and supported math. Rejected links keep their readable child content. Scripts, styles, forms, iframes, embedded media, event handlers, unsupported Markdown nodes, and raw HTML are omitted.
 
-The client renders that Markdown with Streamdown, KaTeX, and Shiki, and takes the renderer's own styling for the article's blocks. Raw HTML has no path through it — rehype-raw is left out of the plugin list and stubbed out at the bundler — and links and images pass through the reading surface's own components, so rendering can admit nothing the server's allowlist excluded.
+The client renders that Markdown with Streamdown in static mode, with KaTeX and Shiki support. Streamdown's sanitize and link-hardening stages remain in place; its raw-HTML stage is explicitly excluded and stubbed out at the bundler. Reader-specific link and image components repeat destination validation, safe opener behavior, signed-image-route enforcement, lazy loading, and alternative-text fallback at the final DOM boundary.
 
 Article HTML and Markdown are never written to SQLite. Extraction failures preserve the Feed Item, show its stored summary and an **Open original** action, and expose a rate-limited **Retry parsing** action. Failed extraction responses are not cached.
 
