@@ -38,15 +38,30 @@ importers:
       html-to-text:
         specifier: ^10.0.0
         version: 10.0.0
-      jsdom:
-        specifier: ^26.1.0
-        version: 26.1.0(supports-color@8.1.1)
       katex:
         specifier: ^0.16.47
         version: 0.16.47
       linkedom:
         specifier: ^0.18.13
         version: 0.18.13
+      mdast-util-from-markdown:
+        specifier: ^2.0.3
+        version: 2.0.3(supports-color@8.1.1)
+      mdast-util-gfm-table:
+        specifier: ^2.0.0
+        version: 2.0.0(supports-color@8.1.1)
+      mdast-util-math:
+        specifier: ^3.0.0
+        version: 3.0.0(supports-color@8.1.1)
+      mdast-util-to-markdown:
+        specifier: ^2.1.2
+        version: 2.1.2
+      micromark-extension-gfm-table:
+        specifier: ^2.1.1
+        version: 2.1.1
+      micromark-extension-math:
+        specifier: ^3.1.0
+        version: 3.1.0
       react:
         specifier: ^19.0.0
         version: 19.2.8
@@ -93,9 +108,9 @@ importers:
       '@types/html-to-text':
         specifier: ^9.0.4
         version: 9.0.4
-      '@types/jsdom':
-        specifier: ^30.0.0
-        version: 30.0.0
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: ^22.13.5
         version: 22.20.1
@@ -111,6 +126,9 @@ importers:
       concurrently:
         specifier: ^9.1.2
         version: 9.2.4
+      jsdom:
+        specifier: ^26.1.0
+        version: 26.1.0(supports-color@8.1.1)
       tailwindcss:
         specifier: ^4.0.9
         version: 4.3.3
@@ -1261,9 +1279,6 @@ packages:
   '@types/html-to-text@9.0.4':
     resolution: {integrity: sha512-pUY3cKH/Nm2yYrEmDlPR1mR7yszjGx4DrwPjQ702C4/D5CwHuZTgZdIdwPkRbcuhs7BAh2L5rg3CL5cbRiGTCQ==}
 
-  '@types/jsdom@30.0.0':
-    resolution: {integrity: sha512-uAHGxujGE0cDaKGdK28zgDotFtNA7MKq5DXl8LrfdxdCI8VHcg15oJz+amHTChPNI5JpgEPQWc2xFdrw3em/nQ==}
-
   '@types/katex@0.16.8':
     resolution: {integrity: sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg==}
 
@@ -1283,9 +1298,6 @@ packages:
 
   '@types/react@19.2.18':
     resolution: {integrity: sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w==}
-
-  '@types/tough-cookie@4.0.5':
-    resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -2439,9 +2451,6 @@ packages:
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
 
-  parse5@8.0.1:
-    resolution: {integrity: sha512-z1e/HMG90obSGeidlli3hj7cbocou0/wa5HacvI3ASx34PecNjNQeaHNo5WIZpWofN9kgkqV1q5YvXe3F0FoPw==}
-
   parseley@0.13.1:
     resolution: {integrity: sha512-uNBJZzmb60l6p6VWLTmevizNAGnE0xoSf1n0B4q3ntegDNzcS68NRCcBDZTcyXHxt2XhBChsCuqj4M+nChvE/A==}
 
@@ -2805,9 +2814,6 @@ packages:
 
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
-
-  undici-types@8.10.0:
-    resolution: {integrity: sha512-ibvdovq3nCFs8Msrd95BW+zUOq+aOVbT+wpHUoPWhztbHEoPc6oof51iFDB6Es8lTKvNvVW9jNSAB8dwrKTMGg==}
 
   unified@11.0.5:
     resolution: {integrity: sha512-xKvGhPWw3k84Qjh8bI3ZeJjqnyadK+GEFtazSfZv/rKeTkTjOJho6mFqh2SM96iIcZokxiOpg78GazTSg8+KHA==}
@@ -3929,13 +3935,6 @@ snapshots:
 
   '@types/html-to-text@9.0.4': {}
 
-  '@types/jsdom@30.0.0':
-    dependencies:
-      '@types/node': 22.20.1
-      '@types/tough-cookie': 4.0.5
-      parse5: 8.0.1
-      undici-types: 8.10.0
-
   '@types/katex@0.16.8': {}
 
   '@types/mdast@4.0.4':
@@ -3955,8 +3954,6 @@ snapshots:
   '@types/react@19.2.18':
     dependencies:
       csstype: 3.2.3
-
-  '@types/tough-cookie@4.0.5': {}
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -5377,10 +5374,6 @@ snapshots:
     dependencies:
       entities: 6.0.1
 
-  parse5@8.0.1:
-    dependencies:
-      entities: 8.0.0
-
   parseley@0.13.1:
     dependencies:
       leac: 0.7.0
@@ -5814,8 +5807,6 @@ snapshots:
   uhyphen@0.2.0: {}
 
   undici-types@6.21.0: {}
-
-  undici-types@8.10.0: {}
 
   unified@11.0.5:
     dependencies:

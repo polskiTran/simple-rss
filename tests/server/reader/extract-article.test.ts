@@ -33,7 +33,7 @@ describe('extractArticle', () => {
     expect(article?.markdown).toContain('Paragraph 7 keeps the argument moving')
     expect(article?.markdown).toContain('## What holds up')
     expect(article?.markdown).toContain('```python')
-    expect(article?.markdown).toContain('| Mitigation | Holds |')
+    expect(article?.markdown).toMatch(/\|\s*Mitigation\s*\|\s*Holds\s*\|/)
     expect(article?.markdown).not.toContain('Archive')
     expect(article?.markdown).not.toContain('newsletter')
   })

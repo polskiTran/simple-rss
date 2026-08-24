@@ -1,9 +1,10 @@
 import { Defuddle } from 'defuddle/node'
 import { parseHTML } from 'linkedom'
 import type { SignImageUrl } from '../images/image-url-signature.js'
-import { articleMarkdown } from './article-markdown.js'
+import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 
 const WORDS_PER_MINUTE = 225
+const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
 export interface ExtractedArticle {
   readonly markdown: string
@@ -29,12 +30,14 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     // and a selector error would silently keep the whole page. Built eagerly because
     // Defuddle's lazy linkedom loading does not survive every module loader.
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
-    const result = await Defuddle(document, input.url, { useAsync: false })
-    const markdown = articleMarkdown(
-      result.content ?? '',
-      input.url,
-      input.signImageUrl ? { signImageUrl: input.signImageUrl } : {},
-    )
+    const result = await Defuddle(document, input.url, { separateMarkdown: true, useAsync: false })
+    // A synchronous extractor can represent an otherwise empty page as an
+    // embed. It remains unreadable; Markdown must not turn it into an image.
+    if (result.wordCount === 0 && UNSUPPORTED_ACTIVE_CONTENT.test(result.content)) return undefined
+    const markdown = applyReaderMarkdownPolicy(result.contentMarkdown ?? '', {
+      baseUrl: input.url,
+      ...(input.signImageUrl ? { signImageUrl: input.signImageUrl } : {}),
+    })
     if (!markdown) return undefined
 
     const wordCount = countWords(markdown)
