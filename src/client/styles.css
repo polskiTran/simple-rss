@@ -138,7 +138,7 @@
     text-decoration: none;
   }
 
-  :root::selection {
+  *::selection {
     background: var(--color-selection);
   }
 }
