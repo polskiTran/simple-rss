@@ -138,7 +138,7 @@
     text-decoration: none;
   }
 
-  ::selection {
+  :root::selection {
     background: var(--color-selection);
   }
 }
@@ -886,6 +886,10 @@
     gap: 24px;
     font-size: 12.5px;
     line-height: 1;
+  }
+
+  .reader-topline .save-toggle {
+    text-align: right;
   }
 
   .reader-back {
