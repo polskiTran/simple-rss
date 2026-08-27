@@ -50,6 +50,7 @@ const ARTICLE_HTML = `<!doctype html>
           <tbody><tr><td>06:10</td><td>steady | measured</td></tr></tbody>
         </table>
         <p>Euler wrote <math><semantics><mrow><msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>=</mo><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">e^{i\\pi} = -1</annotation></semantics></math>.</p>
+        <p>The field notebook costs $5 at dawn and $10 after sunrise.</p>
         <p>Read <a href="notes" title="Field notebook">the field notebook</a>.</p>
         <p><a href="javascript:alert(1)">unsafe destination remains readable</a></p>
         <p><a href="https://bad host/notes">malformed destination remains readable</a></p>
@@ -173,7 +174,8 @@ describe('the Reader article', () => {
     expect(article.markdown).toContain('```python')
     expect(article.markdown).toMatch(/\|\s*Hour\s*\|\s*Reading\s*\|/)
     expect(article.markdown).toContain('steady \\| measured')
-    expect(article.markdown).toContain('$e^{i\\pi} = -1$')
+    expect(article.markdown).toContain('$$e^{i\\pi} = -1$$')
+    expect(article.markdown).toContain('The field notebook costs $5 at dawn and $10 after sunrise.')
     expect(article.markdown).toContain('[the field notebook](https://journal.example/archive/notes "Field notebook")')
     expect(article.markdown).toContain('unsafe destination remains readable')
     expect(article.markdown).toContain('malformed destination remains readable')

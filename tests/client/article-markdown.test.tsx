@@ -99,13 +99,20 @@ describe('article markdown rendering', () => {
     expect(cells[1]?.textContent).toBe('polling')
   })
 
-  it('sets math with KaTeX, inline and as a display block', () => {
-    const body = bodyOf('Euler wrote $e^{i\\pi} = -1$.\n\n$$\n\\int_0^1 x\\,dx\n$$')
+  it('sets double-dollar math with KaTeX, inline and as a display block', () => {
+    const body = bodyOf('Euler wrote $$e^{i\\pi} = -1$$.\n\n$$\n\\int_0^1 x\\,dx\n$$')
 
     expect(body.querySelector('p .katex')).not.toBeNull()
     expect(body.querySelector('.katex-display')).not.toBeNull()
     const sources = [...body.querySelectorAll('annotation')].map((source) => source.textContent)
     expect(sources).toEqual(['e^{i\\pi} = -1', '\\int_0^1 x\\,dx'])
+  })
+
+  it('keeps paired currency dollars across a soft line break as text', () => {
+    const body = bodyOf('The field notebook costs $5 at dawn\nand $10 after sunrise.')
+
+    expect(body.querySelector('.katex')).toBeNull()
+    expect(body.textContent).toBe('The field notebook costs $5 at dawn\nand $10 after sunrise.')
   })
 
   it('reads an escaped dollar as a dollar, not as an opening delimiter', () => {

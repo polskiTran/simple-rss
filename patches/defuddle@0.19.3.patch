@@ -1,0 +1,40 @@
+diff --git a/dist/markdown.js b/dist/markdown.js
+index 239a3b38f6dd859230b45052381b55da17414ee5..a9ca0a72c852411921d31781311139091fc8a72d 100644
+--- a/dist/markdown.js
++++ b/dist/markdown.js
+@@ -311,7 +311,7 @@ function createMarkdownContent(content, url) {
+                     const isEndOfLine = offset + match.length === string.length || /\s/.test(nextChar);
+                     const leftSpace = (!isStartOfLine && !/[\s$]/.test(prevChar)) ? ' ' : '';
+                     const rightSpace = (!isEndOfLine && !/[\s$]/.test(nextChar)) ? ' ' : '';
+-                    return `${leftSpace}$${latex}$${rightSpace}`;
++                    return `${leftSpace}$$${latex}$$${rightSpace}`;
+                 });
+                 // Convert the processed caption content to markdown
+                 const captionMarkdown = turndownService.turndown(captionContent);
+@@ -591,7 +591,7 @@ function createMarkdownContent(content, url) {
+                 const isEndOfLine = !nextNode || ((0, utils_1.isTextNode)(nextNode) && nextNode.textContent?.trim() === '');
+                 const leftSpace = (!isStartOfLine && prevChar && !/[\s$]/.test(prevChar)) ? ' ' : '';
+                 const rightSpace = (!isEndOfLine && nextChar && !/[\s$]/.test(nextChar)) ? ' ' : '';
+-                return `${leftSpace}$${latex}$${rightSpace}`;
++                return `${leftSpace}$$${latex}$$${rightSpace}`;
+             }
+         }
+     });
+@@ -620,7 +620,7 @@ function createMarkdownContent(content, url) {
+             const isInline = node.classList?.contains('math-inline') ||
+                 (mathElement && isGenericElement(mathElement) && mathElement.getAttribute('display') !== 'block');
+             if (isInline) {
+-                return `$${latex}$`;
++                return `$$${latex}$$`;
+             }
+             else {
+                 return `\n$$\n${latex}\n$$\n`;
+@@ -670,7 +670,7 @@ function createMarkdownContent(content, url) {
+             const latex = annotation?.textContent?.trim() || mathElement.getAttribute('alttext')?.trim();
+             if (latex) {
+                 const isInline = mathElement.closest('.ltx_eqn_inline, .mwe-math-element-inline') !== null;
+-                return isInline ? `$${latex}$` : `\n$$\n${latex}\n$$`;
++                return isInline ? `$$${latex}$$` : `\n$$\n${latex}\n$$`;
+             }
+             return '';
+         }).join('\n\n');
