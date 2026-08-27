@@ -24,14 +24,14 @@ import { math } from 'micromark-extension-math'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 
 const PARSER_OPTIONS = {
-  extensions: [gfmTable(), math({ singleDollarTextMath: true })],
+  extensions: [gfmTable(), math({ singleDollarTextMath: false })],
   mdastExtensions: [gfmTableFromMarkdown(), mathFromMarkdown()],
 }
 
 const SERIALIZER_OPTIONS = {
   bullet: '-' as const,
   emphasis: '*' as const,
-  extensions: [gfmTableToMarkdown(), mathToMarkdown()],
+  extensions: [gfmTableToMarkdown(), mathToMarkdown({ singleDollarTextMath: false })],
   fence: '`' as const,
   fences: true,
   listItemIndent: 'one' as const,

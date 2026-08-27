@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  defuddle@0.19.3: bf73e383e8e1cbe7a59e615ea372da12ce09c89dc411af0947b2574c4f0f7e37
+
 importers:
 
   .:
@@ -25,7 +28,7 @@ importers:
         version: 11.10.0
       defuddle:
         specifier: ^0.19.3
-        version: 0.19.3
+        version: 0.19.3(patch_hash=bf73e383e8e1cbe7a59e615ea372da12ce09c89dc411af0947b2574c4f0f7e37)
       drizzle-orm:
         specifier: ^0.39.3
         version: 0.39.3(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
@@ -4645,7 +4648,7 @@ snapshots:
 
   deepmerge-ts@7.1.5: {}
 
-  defuddle@0.19.3:
+  defuddle@0.19.3(patch_hash=bf73e383e8e1cbe7a59e615ea372da12ce09c89dc411af0947b2574c4f0f7e37):
     dependencies:
       commander: 12.1.0
     optionalDependencies:

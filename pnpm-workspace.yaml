@@ -3,3 +3,5 @@
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+patchedDependencies:
+  defuddle@0.19.3: patches/defuddle@0.19.3.patch

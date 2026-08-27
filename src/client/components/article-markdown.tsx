@@ -22,7 +22,7 @@ export function ArticleMarkdown({ markdown }: { readonly markdown: string }) {
 
 const PLUGINS: PluginConfig = {
   code: articleCode,
-  math: createMathPlugin({ singleDollarTextMath: true }),
+  math: createMathPlugin({ singleDollarTextMath: false }),
 }
 
 const { raw, ...keptRehypePlugins } = defaultRehypePlugins
