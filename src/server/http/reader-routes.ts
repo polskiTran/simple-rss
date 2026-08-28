@@ -35,7 +35,7 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
     const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
     if (!feedItemId.ok) return feedItemId.response
 
-    const outcome = await deps.reader.article(feedItemId.value)
+    const outcome = await deps.reader.article(feedItemId.value, c.req.raw.signal)
     switch (outcome.kind) {
       case 'extracted':
         return c.json<ReaderArticle>(outcome.article, 200, {

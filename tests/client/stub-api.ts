@@ -54,11 +54,26 @@ export class StubbedApi {
         const route = this.#routes.get(`${method} ${path}`)
         if (!route) return new Response(null, { status: 404 })
 
-        const reply = typeof route === 'function' ? await route(request) : route
+        const reply = await answer(route, request, init.signal)
         const { status = 200, body: replyBody, headers = {} } = reply
         return new Response(replyBody === undefined ? null : JSON.stringify(replyBody), { status, headers })
       }),
     )
+  }
+}
+
+async function answer(route: Route, request: StubbedRequest, signal: AbortSignal | null | undefined): Promise<Reply> {
+  const work = Promise.resolve(typeof route === 'function' ? route(request) : route)
+  if (!signal) return work
+  if (signal.aborted) throw signal.reason
+
+  const aborted = Promise.withResolvers<never>()
+  const onAbort = () => aborted.reject(signal.reason)
+  signal.addEventListener('abort', onAbort, { once: true })
+  try {
+    return await Promise.race([work, aborted.promise])
+  } finally {
+    signal.removeEventListener('abort', onAbort)
   }
 }
 

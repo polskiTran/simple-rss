@@ -35,6 +35,8 @@ test.describe('Reader View', () => {
     await expect(page).toHaveURL(/\/reader\/\d+$/)
 
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
+    await expect(page.getByText('A clear morning.')).toBeVisible()
+    await expect(page.getByText('parsing the original page')).toBeVisible()
     const meta = page.locator('.reader-meta')
     await expect(meta).toContainText('Field Notes')
     await expect(meta).toContainText(/\d+ min/)
@@ -120,7 +122,7 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
   })
 
-  test('falls back to the summary with a rate-limited retry when parsing fails', async ({ page, installation }) => {
+  test('falls back to the summary and rate-limits repeated parsing failures', async ({ page, installation }) => {
     await subscribe(page, installation, installation.brokenArticleFeedUrl)
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'Slow water' }).click()
@@ -131,11 +133,17 @@ test.describe('Reader View', () => {
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    await page.getByRole('button', { name: 'retry parsing' }).click()
-    await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
-    await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
+    const retry = page.getByRole('button', { name: 'retry parsing' })
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      const failed = page.waitForResponse((response) => response.url().endsWith('/reader'))
+      await retry.click()
+      expect((await failed).status()).toBe(502)
+      await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
+    }
 
-    await page.getByRole('button', { name: 'retry parsing' }).click()
+    const limited = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    await retry.click()
+    expect((await limited).status()).toBe(429)
     await expect(page.getByText(/wait \d+s, then retry/)).toBeVisible()
 
     await page.getByRole('link', { name: '← digest' }).click()

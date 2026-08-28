@@ -12,7 +12,7 @@ import { extractArticle } from './extract-article.js'
 
 const RETRY_COOLDOWN_MS = 30_000
 
-const ATTEMPTS_BEFORE_COOLDOWN = 2
+const ATTEMPTS_BEFORE_COOLDOWN = 5
 
 interface FailureEpisode {
   readonly attempts: number
@@ -27,6 +27,17 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'unreadable' }
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
+interface InFlightExtraction {
+  readonly controller: AbortController
+  readonly work: Promise<ReaderArticleOutcome>
+  waiters: number
+}
+
+const ABANDONED_READER_OUTCOME = {
+  kind: 'retrieval-failed',
+  failure: { ok: false, code: 'cancelled', reason: 'the browser left the Reader' },
+} satisfies ReaderArticleOutcome
+
 export class ReaderService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -34,7 +45,7 @@ export class ReaderService {
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
   readonly #signImageUrl: SignImageUrl
-  readonly #inFlight = new Map<number, Promise<ReaderArticleOutcome>>()
+  readonly #inFlight = new Map<number, InFlightExtraction>()
   readonly #failures = new Map<number, FailureEpisode>()
 
   constructor(options: {
@@ -94,7 +105,7 @@ export class ReaderService {
     }
   }
 
-  async article(feedItemId: number): Promise<ReaderArticleOutcome> {
+  async article(feedItemId: number, signal?: AbortSignal): Promise<ReaderArticleOutcome> {
     const row = this.#db
       .select({ link: feedItems.link })
       .from(feedItems)
@@ -106,7 +117,7 @@ export class ReaderService {
     if (!link) return { kind: 'no-link' }
 
     const inFlight = this.#inFlight.get(feedItemId)
-    if (inFlight) return inFlight
+    if (inFlight) return this.#waitForExtraction(feedItemId, inFlight, signal)
 
     const now = this.#clock.now().getTime()
     for (const [id, episode] of this.#failures) {
@@ -120,15 +131,21 @@ export class ReaderService {
       }
     }
 
-    const work = this.#extract(feedItemId, link).finally(() => this.#inFlight.delete(feedItemId))
-    this.#inFlight.set(feedItemId, work)
-    return work
+    const controller = new AbortController()
+    const work = this.#extract(feedItemId, link, controller.signal)
+    const extraction: InFlightExtraction = { controller, work, waiters: 0 }
+    this.#inFlight.set(feedItemId, extraction)
+    const finish = () => {
+      if (this.#inFlight.get(feedItemId) === extraction) this.#inFlight.delete(feedItemId)
+    }
+    void work.then(finish, finish)
+    return this.#waitForExtraction(feedItemId, extraction, signal)
   }
 
-  async #extract(feedItemId: number, link: string): Promise<ReaderArticleOutcome> {
-    const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader' })
+  async #extract(feedItemId: number, link: string, signal: AbortSignal): Promise<ReaderArticleOutcome> {
+    const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal })
     if (!result.ok) {
-      this.#recordFailure(feedItemId)
+      if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
       return { kind: 'retrieval-failed', failure: result }
     }
 
@@ -151,6 +168,43 @@ export class ReaderService {
         markdown: extracted.markdown,
         readingTimeMinutes: extracted.readingTimeMinutes,
       },
+    }
+  }
+
+  async #waitForExtraction(
+    feedItemId: number,
+    extraction: InFlightExtraction,
+    signal: AbortSignal | undefined,
+  ): Promise<ReaderArticleOutcome> {
+    extraction.waiters += 1
+    const release = () => {
+      extraction.waiters -= 1
+      if (extraction.waiters === 0 && this.#inFlight.get(feedItemId) === extraction) {
+        this.#inFlight.delete(feedItemId)
+        extraction.controller.abort()
+      }
+    }
+
+    if (signal?.aborted) {
+      release()
+      return ABANDONED_READER_OUTCOME
+    }
+    if (!signal) {
+      try {
+        return await extraction.work
+      } finally {
+        release()
+      }
+    }
+
+    const abandoned = Promise.withResolvers<ReaderArticleOutcome>()
+    const onAbort = () => abandoned.resolve(ABANDONED_READER_OUTCOME)
+    signal.addEventListener('abort', onAbort, { once: true })
+    try {
+      return await Promise.race([extraction.work, abandoned.promise])
+    } finally {
+      signal.removeEventListener('abort', onAbort)
+      release()
     }
   }
 
