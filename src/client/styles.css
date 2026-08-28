@@ -919,18 +919,21 @@
   }
 
   .reader-extracting,
+  .reader-waiting,
   .reader-fallback,
   .article-body {
     margin-top: 48px;
   }
 
   .article-body,
+  .reader-waiting,
   .reader-fallback {
     transition: opacity 200ms ease-out;
   }
 
   @starting-style {
     .article-body,
+    .reader-waiting,
     .reader-fallback {
       opacity: 0;
     }

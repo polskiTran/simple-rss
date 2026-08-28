@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -99,6 +99,36 @@ describe('Reader View', () => {
     healed = true
     await user.click(screen.getByRole('button', { name: 'retry parsing' }))
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+  })
+
+  it('shows the stored summary while the Reader server remains within its response deadline', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(new DOMException('The operation timed out', 'TimeoutError')), milliseconds)
+      return controller.signal
+    })
+
+    try {
+      const api = reading().on('GET /api/items/3/reader', async () => {
+        const { promise, resolve } = Promise.withResolvers<void>()
+        setTimeout(resolve, 35_000)
+        await promise
+        return { body: ARTICLE }
+      })
+      render(<App />)
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
+      expect(screen.getByText('A clear morning over the valley.')).toBeDefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(30_001))
+      expect(screen.getByText('parsing the original page')).toBeDefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(5_000))
+      expect(screen.getByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('says how long to wait when retrying is rate-limited', async () => {

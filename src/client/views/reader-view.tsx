@@ -47,6 +47,14 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   const item = itemState.value
   const next = item.nextInDigest
   const setSaved = (saved: boolean) => setItem((current) => ({ ...current, saved }))
+  const waitingContent = item.summary ? (
+    <div className="reader-waiting">
+      <p className="reader-summary">{item.summary}</p>
+      <LoadingNote className="empty-note">parsing the original page</LoadingNote>
+    </div>
+  ) : (
+    parsingNote
+  )
 
   return (
     <article className="view measure reader-view">
@@ -69,9 +77,9 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </p>
       </header>
 
-      {articleState.kind === 'loading' ? parsingNote : null}
+      {articleState.kind === 'loading' ? waitingContent : null}
       {articleState.kind === 'loaded' ? (
-        <Suspense fallback={parsingNote}>
+        <Suspense fallback={waitingContent}>
           <ArticleMarkdown markdown={articleState.value.markdown} />
         </Suspense>
       ) : null}

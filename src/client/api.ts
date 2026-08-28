@@ -67,9 +67,16 @@ const STATUS_PATH = '/api/auth/status'
 const UNAUTHENTICATED = 'unauthenticated'
 
 const REQUEST_TIMEOUT_MS = 30_000
+/** Reader retrieval may spend 10s reaching headers and another 30s receiving the body before extraction starts. */
+const READER_REQUEST_TIMEOUT_MS = 60_000
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+interface ApiRequestOptions extends RequestInit {
+  readonly timeoutMs?: number
+}
+
+async function request(path: string, options: ApiRequestOptions = {}): Promise<Response> {
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...init } = options
+  const deadline = AbortSignal.timeout(timeoutMs)
   const response = await fetch(path, {
     ...init,
     headers: { accept: 'application/json', ...init.headers },
@@ -216,7 +223,10 @@ export async function fetchReaderItem(feedItemId: number, signal?: AbortSignal):
 }
 
 export async function fetchReaderArticle(feedItemId: number, signal?: AbortSignal): Promise<ReaderArticle> {
-  const response = await read(`/api/items/${feedItemId}/reader`, signal)
+  const response = await request(`/api/items/${feedItemId}/reader`, {
+    timeoutMs: READER_REQUEST_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
+  })
   return readerArticleSchema.parse(await response.json())
 }
 

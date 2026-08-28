@@ -49,7 +49,7 @@ export const RETRIEVAL_PROFILES = {
     timeoutMs: 10_000,
     bodyTimeoutMs: 30_000,
     maxRedirects: MAX_REDIRECTS,
-    capacity: { maxConcurrent: 2, maxQueued: 8 },
+    capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
   image: {
     accept: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'],

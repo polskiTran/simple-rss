@@ -111,6 +111,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
       .stub('https://publisher.example/first-light', {
         headers: { 'content-type': 'text/html; charset=utf-8' },
         body: ARTICLE_HTML,
+        delayMs: 500,
       })
       .stub(FIGURE_IMAGE_URL, {
         headers: { 'content-type': 'image/png' },

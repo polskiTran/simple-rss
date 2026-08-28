@@ -236,6 +236,30 @@ describe('the Reader article', () => {
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1)
   })
 
+  it('cancels orphaned retrieval when the browser leaves the Reader', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service)
+    let attempts = 0
+    service.upstream.stubDynamic(ARTICLE_URL, () => {
+      attempts += 1
+      return attempts === 1
+        ? { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML, delayMs: 5_000 }
+        : { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML }
+    })
+
+    const controller = new AbortController()
+    const abandoned = user.get(`/api/items/${feedItemId}/reader`, controller.signal)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1))
+
+    controller.abort()
+    await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(service.upstream.aborted).toContain(ARTICLE_URL))
+
+    const retried = await user.get(`/api/items/${feedItemId}/reader`)
+    expect(retried.status).toBe(200)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+  })
+
   it('keeps asynchronous extractor targets inside Retrieval', async () => {
     const service = await startTestService()
     const { user, feedItemId } = await readingSetup(service, {
@@ -315,7 +339,7 @@ describe('the Reader article', () => {
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_unreadable')
   })
 
-  it('lets the offered retry through once, then rate-limits until the cooldown', async () => {
+  it('allows five failed attempts before rate-limiting until the cooldown', async () => {
     const service = await startTestService()
     let healed = false
     const { user, feedItemId } = await readingSetup(service)
@@ -325,15 +349,15 @@ describe('the Reader article', () => {
         : { status: 503, headers: { 'content-type': 'text/html' }, body: 'down' },
     )
 
-    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
-
-    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
-    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+    }
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(5)
 
     const tooSoon = await user.get(`/api/items/${feedItemId}/reader`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
-    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(5)
 
     healed = true
     service.clock.advance(30_000)
