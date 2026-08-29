@@ -7,6 +7,32 @@ import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 const WORDS_PER_MINUTE = 225
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
+/**
+ * Reader policy bounds for full Defuddle cleanup — not caller-configurable.
+ * A document above either bound takes the fast profile: Defuddle content-pattern
+ * removal is skipped, so harmless boilerplate may survive, but the article and
+ * the Reader Markdown policy are unchanged.
+ */
+const FULL_CLEANUP_MAX_BYTES = 512 * 1024
+const FULL_CLEANUP_MAX_ELEMENTS = 5_000
+
+/**
+ * Removed after parsing, before Defuddle spends cleanup time on them. JSON-LD
+ * stays because Defuddle reads it for metadata; math scripts stay because
+ * standardization turns them into math content.
+ */
+const IRRELEVANT_DOM_SELECTOR = [
+  'script:not([type="application/ld+json"]):not([type^="math/"])',
+  'style',
+  'template',
+  'noscript',
+  'iframe',
+  'video',
+  'audio',
+  'object',
+  'embed',
+].join(', ')
+
 export interface ExtractedArticle {
   readonly markdown: string
   readonly wordCount: number
@@ -46,10 +72,18 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     // Defuddle's lazy linkedom loading does not survive every module loader.
     const domStartedAt = performance.now()
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
+    for (const element of document.querySelectorAll(IRRELEVANT_DOM_SELECTOR)) element.remove()
+    const fastProfile =
+      input.bytes.byteLength > FULL_CLEANUP_MAX_BYTES ||
+      document.querySelectorAll('*').length > FULL_CLEANUP_MAX_ELEMENTS
     timings.domMs = elapsedMs(domStartedAt)
 
     const defuddleStartedAt = performance.now()
-    const result = await Defuddle(document, input.url, { separateMarkdown: true, useAsync: false })
+    const result = await Defuddle(document, input.url, {
+      separateMarkdown: true,
+      useAsync: false,
+      ...(fastProfile ? { removeContentPatterns: false } : {}),
+    })
     timings.defuddleMs = elapsedMs(defuddleStartedAt)
     // A synchronous extractor can represent an otherwise empty page as an
     // embed. It remains unreadable; Markdown must not turn it into an image.
