@@ -448,6 +448,12 @@ describe('the Reader article', () => {
     const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(422)
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_unreadable')
+
+    const trace = service.logs.find((record) => record.message === 'reader.trace')
+    expect(trace).toMatchObject({ outcome: 'unreadable', host: 'journal.example' })
+    expect(trace?.domMs).toBeGreaterThanOrEqual(0)
+    expect(trace?.defuddleMs).toBeGreaterThanOrEqual(0)
+    expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
   })
 
   it('allows five failed attempts before rate-limiting until the cooldown', async () => {
@@ -479,6 +485,108 @@ describe('the Reader article', () => {
     healed = false
     const failed = await user.get(`/api/items/${feedItemId}/reader`)
     expect(failed.status).toBe(502)
+  })
+
+  it('records one trace correlating retrieval and worker extraction for a Reader operation', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service)
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
+
+    const traces = service.logs.filter((record) => record.message === 'reader.trace')
+    expect(traces).toHaveLength(1)
+    const trace = traces[0]
+    expect(trace).toMatchObject({ outcome: 'extracted', feedItemId, host: 'journal.example', redirects: 0 })
+    expect(typeof trace?.trace).toBe('string')
+    const phases = [
+      'queueMs',
+      'dnsMs',
+      'ttfbMs',
+      'bodyMs',
+      'workerQueueMs',
+      'domMs',
+      'defuddleMs',
+      'markdownPolicyMs',
+      'totalMs',
+    ] as const
+    for (const phase of phases) {
+      expect(trace?.[phase], phase).toBeGreaterThanOrEqual(0)
+    }
+    expect(trace?.bytes).toBeGreaterThan(0)
+    // The stubbed transport answers over a warm connection, so the skipped
+    // phases are absent rather than reported as zero elapsed time.
+    expect(trace).toMatchObject({ connectionReused: true })
+    expect(trace).not.toHaveProperty('connectMs')
+
+    const retrieved = service.logs.find(
+      (record) => record.message === 'upstream.retrieval_completed' && record.operation === 'reader',
+    )
+    expect(retrieved?.trace).toBe(trace?.trace)
+  })
+
+  it('keeps article content, summaries, and query strings out of captured logs', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      articleUrl: 'https://journal.example/first-light?token=secret-query-value',
+    })
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
+
+    const everything = JSON.stringify(service.logs)
+    expect(everything).toContain('reader.trace')
+    expect(everything).not.toContain('secret-query-value')
+    expect(everything).not.toContain('carries the morning along')
+    expect(everything).not.toContain('A clear morning over the valley')
+    expect(everything).not.toContain('<article')
+  })
+
+  it('closes a publisher failure with a coherent terminal trace', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      article: { status: 503, headers: { 'content-type': 'text/html' }, body: 'down' },
+    })
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+
+    const trace = service.logs.find((record) => record.message === 'reader.trace')
+    expect(trace).toMatchObject({ outcome: 'http_error', status: 503, host: 'journal.example' })
+    expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
+    expect(trace).not.toHaveProperty('domMs')
+  })
+
+  it('closes an abandoned Reader operation with a cancelled trace', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      article: { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML, delayMs: 5_000 },
+    })
+    const controller = new AbortController()
+
+    const abandoned = user.get(`/api/items/${feedItemId}/reader`, controller.signal)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1))
+    controller.abort()
+    await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+
+    await vi.waitFor(() => {
+      const trace = service.logs.find((record) => record.message === 'reader.trace')
+      expect(trace).toMatchObject({ outcome: 'cancelled', feedItemId })
+      expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  it('closes a worker crash with its own terminal trace', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorker })
+    const { user, feedItemId } = await readingSetup(service)
+    readerWorker.crashNext()
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(422)
+
+    await vi.waitFor(() => {
+      const trace = service.logs.find((record) => record.message === 'reader.trace')
+      expect(trace).toMatchObject({ outcome: 'worker_failed', host: 'journal.example' })
+      expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
+      expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
+    })
   })
 
   it('answers 422 when the Feed Item never had an original link', async () => {

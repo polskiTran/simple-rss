@@ -1,13 +1,18 @@
+import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
-import type { Clock } from '../clock.js'
+import { elapsedMs, type Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
+import type { LogField, LogFields, Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
-import type { ReaderExtractor } from './reader-extractor.js'
+import type { Retrieval, RetrievalFailure, RetrievalFailureCode, RetrievalTimings } from '../upstream/retrieval.js'
+import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
+
+/** Every way one Reader operation can end, as named by its `reader.trace` record. */
+type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed'
 
 const RETRY_COOLDOWN_MS = 30_000
 
@@ -44,6 +49,7 @@ export class ReaderService {
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
   readonly #extractor: ReaderExtractor
+  readonly #logger: Logger
   readonly #inFlight = new Map<number, InFlightExtraction>()
   readonly #failures = new Map<number, FailureEpisode>()
 
@@ -54,6 +60,7 @@ export class ReaderService {
     retrieval: Retrieval
     digest: DigestService
     extractor: ReaderExtractor
+    logger: Logger
   }) {
     this.#db = options.db
     this.#clock = options.clock
@@ -61,6 +68,7 @@ export class ReaderService {
     this.#retrieval = options.retrieval
     this.#digest = options.digest
     this.#extractor = options.extractor
+    this.#logger = options.logger
   }
 
   item(feedItemId: number): ReaderItem | undefined {
@@ -148,34 +156,69 @@ export class ReaderService {
   }
 
   async #extract(feedItemId: number, link: string, signal: AbortSignal): Promise<ReaderArticleOutcome> {
-    const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal })
-    if (!result.ok) {
-      if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
-      return { kind: 'retrieval-failed', failure: result }
+    const trace = randomUUID()
+    const startedAt = performance.now()
+    const finish = <Outcome extends ReaderArticleOutcome>(
+      outcome: ReaderTraceOutcome,
+      fields: Readonly<Record<string, LogField>>,
+      value: Outcome,
+    ): Outcome => {
+      const level = outcome === 'extracted' || outcome === 'cancelled' ? 'debug' : 'warn'
+      this.#logger[level]('reader.trace', {
+        trace,
+        feedItemId,
+        outcome,
+        ...fields,
+        totalMs: elapsedMs(startedAt),
+      })
+      return value
     }
 
+    const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal, trace })
+    if (!result.ok) {
+      if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
+      return finish(
+        result.code,
+        {
+          ...hostField(link),
+          ...(result.status === undefined ? {} : { status: result.status }),
+          ...definedFields(result.timings),
+        },
+        { kind: 'retrieval-failed', failure: result },
+      )
+    }
+
+    const answered = { ...hostField(result.url), ...definedFields(result.timings) }
     const bytes = ownedArrayBuffer(result.bytes)
     if (!bytes) {
       this.#recordFailure(feedItemId)
-      return { kind: 'unreadable' }
+      return finish('unreadable', answered, { kind: 'unreadable' })
     }
     const extraction = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
-    if (extraction.kind === 'cancelled') return ABANDONED_READER_OUTCOME
+    if (extraction.kind === 'cancelled') return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
+    if (extraction.kind === 'failed') {
+      this.#recordFailure(feedItemId)
+      return finish('worker_failed', answered, { kind: 'unreadable' })
+    }
     if (extraction.kind !== 'extracted') {
       this.#recordFailure(feedItemId)
-      return { kind: 'unreadable' }
+      return finish('unreadable', { ...answered, ...definedFields(extraction.timings) }, { kind: 'unreadable' })
     }
     const extracted = extraction.article
 
     this.#failures.delete(feedItemId)
-    return {
-      kind: 'extracted',
-      article: {
-        feedItemId,
-        markdown: extracted.markdown,
-        readingTimeMinutes: extracted.readingTimeMinutes,
+    return finish(
+      'extracted',
+      { ...answered, ...definedFields(extraction.timings) },
+      {
+        kind: 'extracted',
+        article: {
+          feedItemId,
+          markdown: extracted.markdown,
+          readingTimeMinutes: extracted.readingTimeMinutes,
+        },
       },
-    }
+    )
   }
 
   async #waitForExtraction(
@@ -232,6 +275,27 @@ export class ReaderService {
       displayTime: next.displayTime,
     }
   }
+}
+
+/**
+ * `reader.trace` fields stay at the publisher-host level: never the URL path or
+ * query, and never retrieved HTML, extracted Markdown, or Feed Item summaries.
+ */
+function hostField(url: string): LogFields {
+  try {
+    return { host: new URL(url).host }
+  } catch {
+    return {}
+  }
+}
+
+function definedFields(timings: RetrievalTimings | ReaderExtractionTimings | undefined): LogFields {
+  if (!timings) return {}
+  const fields: Record<string, LogField> = {}
+  for (const [phase, value] of Object.entries(timings)) {
+    if (value !== undefined) fields[phase] = value
+  }
+  return fields
 }
 
 function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer | undefined {

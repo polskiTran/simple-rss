@@ -1,5 +1,6 @@
 import { Defuddle } from 'defuddle/node'
 import { parseHTML } from 'linkedom'
+import { elapsedMs } from '../clock.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 
@@ -20,34 +21,61 @@ export interface ExtractArticleInput {
   readonly signImageUrl?: SignImageUrl
 }
 
+/** Millisecond phase durations; a phase the extraction never reached is absent. */
+export interface ExtractionTimings {
+  readonly domMs?: number | undefined
+  readonly defuddleMs?: number | undefined
+  readonly markdownPolicyMs?: number | undefined
+}
+
+export interface ExtractArticleOutcome {
+  /** `undefined` means no readable article; the caller falls back to the stored summary. */
+  readonly article: ExtractedArticle | undefined
+  readonly timings: ExtractionTimings
+}
+
 /**
- * Everything here lives and dies with the request — nothing is ever written anywhere.
- * `undefined` means no readable article; the caller falls back to the stored summary.
+ * Everything here lives and dies with the request — nothing is ever written
+ * anywhere. Timings carry the phases that ran, whatever the outcome.
  */
-export async function extractArticle(input: ExtractArticleInput): Promise<ExtractedArticle | undefined> {
+export async function extractArticle(input: ExtractArticleInput): Promise<ExtractArticleOutcome> {
+  const timings: { -readonly [Phase in keyof ExtractionTimings]: ExtractionTimings[Phase] } = {}
   try {
     // linkedom, not jsdom: Defuddle's clutter selectors use CSS jsdom cannot parse,
     // and a selector error would silently keep the whole page. Built eagerly because
     // Defuddle's lazy linkedom loading does not survive every module loader.
+    const domStartedAt = performance.now()
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
+    timings.domMs = elapsedMs(domStartedAt)
+
+    const defuddleStartedAt = performance.now()
     const result = await Defuddle(document, input.url, { separateMarkdown: true, useAsync: false })
+    timings.defuddleMs = elapsedMs(defuddleStartedAt)
     // A synchronous extractor can represent an otherwise empty page as an
     // embed. It remains unreadable; Markdown must not turn it into an image.
-    if (result.wordCount === 0 && UNSUPPORTED_ACTIVE_CONTENT.test(result.content)) return undefined
+    if (result.wordCount === 0 && UNSUPPORTED_ACTIVE_CONTENT.test(result.content)) {
+      return { article: undefined, timings }
+    }
+
+    const policyStartedAt = performance.now()
     const markdown = applyReaderMarkdownPolicy(result.contentMarkdown ?? '', {
       baseUrl: input.url,
       ...(input.signImageUrl ? { signImageUrl: input.signImageUrl } : {}),
     })
-    if (!markdown) return undefined
+    timings.markdownPolicyMs = elapsedMs(policyStartedAt)
+    if (!markdown) return { article: undefined, timings }
 
     const wordCount = countWords(markdown)
     return {
-      markdown,
-      wordCount,
-      readingTimeMinutes: Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE)),
+      article: {
+        markdown,
+        wordCount,
+        readingTimeMinutes: Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE)),
+      },
+      timings,
     }
   } catch {
-    return undefined
+    return { article: undefined, timings }
   }
 }
 

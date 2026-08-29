@@ -1,12 +1,19 @@
 import { lookup as systemLookup, type LookupAddress } from 'node:dns'
-import { Agent as HttpAgent, request as httpRequest, type IncomingMessage, type OutgoingHttpHeaders } from 'node:http'
+import {
+  Agent as HttpAgent,
+  request as httpRequest,
+  type ClientRequest,
+  type IncomingMessage,
+  type OutgoingHttpHeaders,
+} from 'node:http'
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
+import { elapsedMs } from '../clock.js'
 import { isPublicAddress, unbracket } from './addresses.js'
-import { HttpClientError, type HttpClient } from './http-client.js'
+import { HttpClientError, type HttpClient, type HttpTimings } from './http-client.js'
 
 const ACCEPT_ENCODING = 'gzip, deflate, br'
 
@@ -33,7 +40,7 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
   const httpAgent = new HttpAgent(agentOptions)
   const httpsAgent = new HttpsAgent(agentOptions)
 
-  return async (request) => {
+  return async (request, onTimings) => {
     const url = new URL(request.url)
     const secure = url.protocol === 'https:'
     if (!secure && url.protocol !== 'http:') {
@@ -59,6 +66,7 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
       lookup,
       agent: secure ? httpsAgent : httpAgent,
     })
+    const connectionTimings = observeConnection(outbound)
 
     const { signal } = request
     if (signal.aborted) {
@@ -70,7 +78,10 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
     outbound.on('close', () => signal.removeEventListener('abort', abandon))
 
     const { promise, resolve, reject } = Promise.withResolvers<IncomingMessage>()
-    outbound.on('response', resolve)
+    outbound.on('response', (response) => {
+      onTimings?.(connectionTimings())
+      resolve(response)
+    })
     outbound.on('error', reject)
 
     if (request.body) {
@@ -203,4 +214,43 @@ function decoderFor(encoding: string): Duplex | undefined {
 
 function reasonFor(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('the retrieval was abandoned')
+}
+
+/**
+ * Watches the socket events behind one request. The returned snapshot, taken
+ * when the response headers arrive, carries only the phases that actually ran:
+ * a reused keep-alive socket fires none of them, so it reports no durations.
+ */
+function observeConnection(outbound: ClientRequest): () => HttpTimings {
+  const startedAt = performance.now()
+  let reused = false
+  let socketAt: number | undefined
+  let lookupAt: number | undefined
+  let connectAt: number | undefined
+  let secureAt: number | undefined
+
+  outbound.on('socket', (socket) => {
+    socketAt = performance.now()
+    reused = outbound.reusedSocket
+    socket.once('lookup', () => {
+      lookupAt = performance.now()
+    })
+    socket.once('connect', () => {
+      connectAt = performance.now()
+    })
+    socket.once('secureConnect', () => {
+      secureAt = performance.now()
+    })
+  })
+
+  return () => {
+    const readyAt = secureAt ?? connectAt ?? socketAt ?? startedAt
+    return {
+      connectionReused: reused,
+      ...(lookupAt !== undefined ? { socketDnsMs: elapsedMs(socketAt ?? startedAt, lookupAt) } : {}),
+      ...(connectAt !== undefined ? { connectMs: elapsedMs(lookupAt ?? socketAt ?? startedAt, connectAt) } : {}),
+      ...(secureAt !== undefined && connectAt !== undefined ? { tlsMs: elapsedMs(connectAt, secureAt) } : {}),
+      ttfbMs: elapsedMs(readyAt),
+    }
+  }
 }

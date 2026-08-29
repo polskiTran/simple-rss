@@ -1,8 +1,9 @@
 import { Worker } from 'node:worker_threads'
 import { z } from 'zod'
 import type { Clock } from '../clock.js'
+import { elapsedMs } from '../clock.js'
 import { errorForLog, type Logger } from '../logger.js'
-import type { ExtractedArticle } from './extract-article.js'
+import type { ExtractedArticle, ExtractionTimings } from './extract-article.js'
 
 const readerWorkerDirectiveSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('hold'), state: z.instanceof(SharedArrayBuffer) }),
@@ -22,9 +23,18 @@ export interface ReaderExtractionInput {
   readonly url: string
 }
 
+/** The worker's extraction phases plus how long the task waited for the worker. */
+export interface ReaderExtractionTimings extends ExtractionTimings {
+  readonly workerQueueMs?: number | undefined
+}
+
 export type ReaderExtractionResult =
-  | { readonly kind: 'extracted'; readonly article: ExtractedArticle }
-  | { readonly kind: 'unreadable' }
+  | {
+      readonly kind: 'extracted'
+      readonly article: ExtractedArticle
+      readonly timings: ReaderExtractionTimings
+    }
+  | { readonly kind: 'unreadable'; readonly timings: ReaderExtractionTimings }
   | { readonly kind: 'cancelled' }
   | { readonly kind: 'failed' }
 
@@ -45,9 +55,20 @@ const extractedArticleSchema = z.object({
   readingTimeMinutes: z.number().int().positive(),
 })
 
+const extractionTimingsSchema = z.object({
+  domMs: z.number().nonnegative().optional(),
+  defuddleMs: z.number().nonnegative().optional(),
+  markdownPolicyMs: z.number().nonnegative().optional(),
+})
+
 export const readerWorkerReplySchema = z.discriminatedUnion('kind', [
-  z.object({ id: z.number().int().positive(), kind: z.literal('extracted'), article: extractedArticleSchema }),
-  z.object({ id: z.number().int().positive(), kind: z.literal('unreadable') }),
+  z.object({
+    id: z.number().int().positive(),
+    kind: z.literal('extracted'),
+    article: extractedArticleSchema,
+    timings: extractionTimingsSchema,
+  }),
+  z.object({ id: z.number().int().positive(), kind: z.literal('unreadable'), timings: extractionTimingsSchema }),
 ])
 
 export type ReaderWorkerReply = z.infer<typeof readerWorkerReplySchema>
@@ -63,6 +84,9 @@ interface ExtractionTask {
   readonly signal: AbortSignal
   readonly onAbort: () => void
   readonly resolve: (result: ReaderExtractionResult) => void
+  readonly enqueuedAt: number
+  /** Set when the task reaches the worker; a task cancelled while queued never waits it out. */
+  workerQueueMs?: number
 }
 
 export class ReaderExtractor {
@@ -103,6 +127,7 @@ export class ReaderExtractor {
       signal,
       onAbort: () => this.#cancel(id),
       resolve,
+      enqueuedAt: performance.now(),
     }
     signal.addEventListener('abort', task.onAbort, { once: true })
     this.#queue.push(task)
@@ -145,6 +170,7 @@ export class ReaderExtractor {
     }
 
     this.#active = task
+    task.workerQueueMs = elapsedMs(task.enqueuedAt)
     const request: ReaderWorkerRequest = {
       id: task.id,
       bytes: task.input.bytes,
@@ -200,7 +226,14 @@ export class ReaderExtractor {
     }
 
     this.#active = undefined
-    this.#settle(active, value.kind === 'extracted' ? { kind: 'extracted', article: value.article } : value)
+    const timings: ReaderExtractionTimings =
+      active.workerQueueMs === undefined ? value.timings : { ...value.timings, workerQueueMs: active.workerQueueMs }
+    this.#settle(
+      active,
+      value.kind === 'extracted'
+        ? { kind: 'extracted', article: value.article, timings }
+        : { kind: 'unreadable', timings },
+    )
     this.#pump()
   }
 
