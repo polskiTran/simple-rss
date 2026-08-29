@@ -11,7 +11,7 @@ import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
-import { elapsedMs } from '../clock.js'
+import { elapsedMs } from '../monotonic.js'
 import { isPublicAddress, unbracket } from './addresses.js'
 import { HttpClientError, type HttpClient, type HttpTimings } from './http-client.js'
 

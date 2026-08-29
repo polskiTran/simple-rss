@@ -1,7 +1,7 @@
 import { Worker } from 'node:worker_threads'
 import { z } from 'zod'
 import type { Clock } from '../clock.js'
-import { elapsedMs } from '../clock.js'
+import { elapsedMs } from '../monotonic.js'
 import { errorForLog, type Logger } from '../logger.js'
 import type { ExtractedArticle, ExtractionTimings } from './extract-article.js'
 

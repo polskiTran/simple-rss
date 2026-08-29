@@ -1,6 +1,6 @@
 import { Defuddle } from 'defuddle/node'
 import { parseHTML } from 'linkedom'
-import { elapsedMs } from '../clock.js'
+import { elapsedMs } from '../monotonic.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 
