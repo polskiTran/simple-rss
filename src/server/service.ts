@@ -13,6 +13,7 @@ import { createLogger, errorForLog, type Logger } from './logger.js'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
+import { ReaderExtractor, type ReaderWorkerControl } from './reader/reader-extractor.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
@@ -32,6 +33,7 @@ export interface ServiceOptions {
   readonly sleep?: Sleeper
   readonly scheduling?: PollSchedulerLimits
   readonly retention?: RetentionLimits
+  readonly readerWorkerControl?: ReaderWorkerControl
 }
 
 export interface Service {
@@ -47,6 +49,7 @@ export interface Service {
   readonly settings: InstallationSettingsStore | undefined
   /** The in-process background poller; absent only when startup failed. */
   readonly scheduler: PollScheduler | undefined
+  beginShutdown(): Promise<void>
   close(): void
 }
 
@@ -68,6 +71,7 @@ export function createService(options: ServiceOptions): Service {
   const readiness = new Readiness()
 
   let scheduler: PollScheduler | undefined
+  let reader: ReaderService | undefined
   let services: Services | undefined
 
   try {
@@ -88,15 +92,22 @@ export function createService(options: ServiceOptions): Service {
 
     const digest = new DigestService({ db, clock, settings })
     const library = new LibraryService({ db, clock, settings })
-    const imageSignature = createImageUrlSignature({ key: randomBytes(32), clock })
+    const imageSigningKey = randomBytes(32)
+    const imageSignature = createImageUrlSignature({ key: imageSigningKey, clock })
     const images = new ImageService({ db, retrieval })
-    const reader = new ReaderService({
+    const extractor = new ReaderExtractor({
+      clock,
+      imageSigningKey,
+      logger,
+      control: options.readerWorkerControl,
+    })
+    reader = new ReaderService({
       db,
       clock,
       settings,
       retrieval,
       digest,
-      signImageUrl: imageSignature.sign,
+      extractor,
     })
     const search = new SearchService({ db, clock, settings })
     const retention = new RetentionService({ db, clock, logger, ...options.retention })
@@ -124,6 +135,7 @@ export function createService(options: ServiceOptions): Service {
       applied,
     })
   } catch (error) {
+    void reader?.close()
     readiness.markFailed('migrations failed')
     logger.error('startup.migrations_failed', { databasePath: config.databasePath, error: errorForLog(error) })
   }
@@ -146,9 +158,12 @@ export function createService(options: ServiceOptions): Service {
     get scheduler() {
       return scheduler
     },
-    close() {
+    async beginShutdown() {
       scheduler?.stop()
       scheduler = undefined
+      await services?.reader.close()
+    },
+    close() {
       services?.db.$client.close()
       services = undefined
     },

@@ -16,6 +16,16 @@ export interface ImageUrlSignature {
   verify(query: URLSearchParams): VerifiedImageUrl
 }
 
+export function signReaderImageUrl(options: {
+  readonly key: Uint8Array
+  readonly nowMilliseconds: number
+  readonly url: string
+}): string {
+  const expiry = String(Math.floor(options.nowMilliseconds / 1_000) + READER_IMAGE_URL_LIFETIME_SECONDS)
+  const sig = imageUrlMac(options.key, expiry, options.url).toString('base64url')
+  return `${READER_IMAGE_PATH}?url=${encodeURIComponent(options.url)}&exp=${expiry}&sig=${sig}`
+}
+
 export function createImageUrlSignature(options: {
   readonly key: Uint8Array
   readonly clock: Clock
@@ -25,13 +35,11 @@ export function createImageUrlSignature(options: {
   }
   const { key, clock } = options
 
-  const mac = (expiry: string, url: string): Buffer => createHmac('sha256', key).update(`${expiry}\n${url}`).digest()
+  const mac = (expiry: string, url: string): Buffer => imageUrlMac(key, expiry, url)
 
   return {
     sign(url) {
-      const expiry = String(Math.floor(clock.now().getTime() / 1000) + READER_IMAGE_URL_LIFETIME_SECONDS)
-      const sig = mac(expiry, url).toString('base64url')
-      return `${READER_IMAGE_PATH}?url=${encodeURIComponent(url)}&exp=${expiry}&sig=${sig}`
+      return signReaderImageUrl({ key, nowMilliseconds: clock.now().getTime(), url })
     },
 
     verify(query) {
@@ -55,4 +63,8 @@ export function createImageUrlSignature(options: {
       return { ok: true, url }
     },
   }
+}
+
+function imageUrlMac(key: Uint8Array, expiry: string, url: string): Buffer {
+  return createHmac('sha256', key).update(`${expiry}\n${url}`).digest()
 }

@@ -8,7 +8,7 @@ export interface StartOptions extends ServiceOptions {
 }
 
 /** A listening service. `stop()` is the only way down: it drains before closing the database. */
-export interface RunningService extends Omit<Service, 'close'> {
+export interface RunningService extends Omit<Service, 'beginShutdown' | 'close'> {
   /** The port actually bound, which differs from the request when it was 0. */
   readonly port: number
   /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
@@ -80,7 +80,7 @@ function listen(app: Service['app'], port: number): Promise<ListeningServer> {
 async function shutdown(server: Server, service: Service, graceMs: number): Promise<void> {
   service.logger.info('server.stopping', { graceMs })
 
-  await new Promise<void>((resolve) => {
+  const drained = new Promise<void>((resolve) => {
     const forceTimer = setTimeout(() => {
       service.logger.warn('server.stop_forced', { graceMs })
       server.closeAllConnections()
@@ -99,6 +99,8 @@ async function shutdown(server: Server, service: Service, graceMs: number): Prom
     })
     server.closeIdleConnections()
   })
+  await service.beginShutdown()
+  await drained
 
   service.close()
   service.logger.info('server.stopped')
