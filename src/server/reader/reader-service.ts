@@ -23,13 +23,6 @@ const RETRY_COOLDOWN_MS = 30_000
 
 const ATTEMPTS_BEFORE_COOLDOWN = 5
 
-class ReaderBudgetExceeded extends Error {
-  constructor() {
-    super('the Reader budget expired')
-    this.name = 'ReaderBudgetExceeded'
-  }
-}
-
 interface FailureEpisode {
   readonly attempts: number
   readonly lastAttemptAt: number
@@ -157,8 +150,12 @@ export class ReaderService {
     }
 
     const controller = new AbortController()
-    const budget = setTimeout(() => controller.abort(new ReaderBudgetExceeded()), this.#budgetMs)
-    const work = this.#extract(feedItemId, link, controller.signal)
+    let deadlineExceeded = false
+    const budget = setTimeout(() => {
+      deadlineExceeded = true
+      controller.abort()
+    }, this.#budgetMs)
+    const work = this.#extract(feedItemId, link, controller.signal, () => deadlineExceeded)
     const extraction: InFlightExtraction = { controller, work, waiters: 0 }
     this.#inFlight.set(feedItemId, extraction)
     const finish = () => {
@@ -175,7 +172,12 @@ export class ReaderService {
     await this.#extractor.close()
   }
 
-  async #extract(feedItemId: number, link: string, signal: AbortSignal): Promise<ReaderArticleOutcome> {
+  async #extract(
+    feedItemId: number,
+    link: string,
+    signal: AbortSignal,
+    deadlineExceeded: () => boolean,
+  ): Promise<ReaderArticleOutcome> {
     const trace = randomUUID()
     const startedAt = performance.now()
     const finish = <Outcome extends ReaderArticleOutcome>(
@@ -194,8 +196,6 @@ export class ReaderService {
       return value
     }
 
-    const budgetExpired = () => signal.reason instanceof ReaderBudgetExceeded
-
     const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal, trace })
     if (!result.ok) {
       const fields = {
@@ -203,7 +203,7 @@ export class ReaderService {
         ...(result.status === undefined ? {} : { status: result.status }),
         ...definedFields(result.timings),
       }
-      if (result.code === 'cancelled' && budgetExpired()) {
+      if (result.code === 'cancelled' && deadlineExceeded()) {
         return finish('deadline_exceeded', fields, DEADLINE_READER_OUTCOME)
       }
       if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
@@ -214,7 +214,7 @@ export class ReaderService {
     const bytes = ownedArrayBuffer(result.bytes)
     const extraction = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
     if (extraction.kind === 'cancelled') {
-      if (budgetExpired()) return finish('deadline_exceeded', answered, DEADLINE_READER_OUTCOME)
+      if (deadlineExceeded()) return finish('deadline_exceeded', answered, DEADLINE_READER_OUTCOME)
       return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
     }
     if (extraction.kind === 'failed') {
