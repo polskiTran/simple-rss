@@ -322,7 +322,7 @@ describe('the Reader article', () => {
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
   })
 
-  it('cancels worker and publisher work before service shutdown completes', async () => {
+  it('cancels Reader work that outlives the shutdown grace period', async () => {
     const readerWorker = new ReaderWorkerFixtures()
     const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
@@ -340,9 +340,13 @@ describe('the Reader article', () => {
     const retrieving = user.get(`/api/items/${secondFeedItemId}/reader`)
     await vi.waitFor(() => expect(service.upstream.requestsTo(SECOND_ARTICLE_URL)).toHaveLength(1))
 
+    // Settle handlers attach before the stop, which now drains first and so
+    // leaves these two requests pending long enough to reject unobserved.
+    const settled = Promise.allSettled([extracting, retrieving])
     await service.stop()
-    await Promise.allSettled([extracting, retrieving])
+    await settled
 
+    expect(service.logs.map((record) => record.message)).toContain('server.stop_forced')
     expect(cancelledExtractions(service.logs)).toBe(1)
     expect(service.upstream.aborted).toContain(SECOND_ARTICLE_URL)
   })

@@ -52,7 +52,14 @@ export interface Service {
   readonly settings: InstallationSettingsStore | undefined
   /** The in-process background poller; absent only when startup failed. */
   readonly scheduler: PollScheduler | undefined
-  beginShutdown(): Promise<void>
+  /**
+   * Shutdown runs in three ordered steps, because they sit on opposite sides of
+   * the HTTP drain: stop background work, drain, then release. The caller owns
+   * the drain, so it owns the order.
+   */
+  stopBackgroundWork(): void
+  /** Aborts in-flight Reader operations and retires the extraction worker. */
+  releaseRequestResources(): Promise<void>
   close(): void
 }
 
@@ -149,6 +156,14 @@ export function createService(options: ServiceOptions): Service {
 
   const app = createApp({ config, clock, logger, readiness, services })
 
+  const stopBackgroundWork = (): void => {
+    scheduler?.stop()
+    scheduler = undefined
+  }
+  const releaseRequestResources = async (): Promise<void> => {
+    await services?.reader.close()
+  }
+
   return {
     app,
     config,
@@ -165,11 +180,8 @@ export function createService(options: ServiceOptions): Service {
     get scheduler() {
       return scheduler
     },
-    async beginShutdown() {
-      scheduler?.stop()
-      scheduler = undefined
-      await services?.reader.close()
-    },
+    stopBackgroundWork,
+    releaseRequestResources,
     close() {
       services?.db.$client.close()
       services = undefined
