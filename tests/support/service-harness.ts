@@ -31,7 +31,7 @@ export interface HarnessOptions {
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
   readonly readerWorker?: ReaderWorkerControl
-  /** Shortens the total Reader budget so deadline tests never wait 4.5 real seconds. */
+  /** Shortens the total Reader budget so deadline tests never wait out the production value. */
   readonly readerBudgetMs?: number
 }
 

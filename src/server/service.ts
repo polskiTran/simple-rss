@@ -34,7 +34,7 @@ export interface ServiceOptions {
   readonly scheduling?: PollSchedulerLimits
   readonly retention?: RetentionLimits
   readonly readerWorkerControl?: ReaderWorkerControl
-  /** Test seam shortening the total Reader budget below its 4.5-second default. */
+  /** Test seam shortening the total Reader budget below its production default. */
   readonly readerBudgetMs?: number
 }
 

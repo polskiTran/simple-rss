@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { apiErrorSchema, readerItemSchema } from '../../../src/shared/api.js'
+import { RETRIEVAL_PROFILES } from '../../../src/server/upstream/retrieval.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
@@ -88,15 +89,16 @@ describe('the Reader budget', () => {
   })
 
   it('expires an operation still queued for a retrieval slot with the same contract', async () => {
-    const guids = ['item-one', 'item-two', 'item-three', 'item-four', 'item-five']
+    // One operation more than the active Reader slots, so the last spends its
+    // whole budget queued and must still speak the same public contract.
+    const slots = RETRIEVAL_PROFILES.reader.capacity.maxConcurrent
+    const guids = Array.from({ length: slots + 1 }, (_, index) => `item-${index}`)
     const service = await startTestService({ readerBudgetMs: 400 })
-    const { user, ids } = await readingSetup(service, guids)
-    for (const guid of guids) {
+    const { user, ids } = await readingSetup(service, [...guids, 'item-after'])
+    for (const guid of [...guids, 'item-after']) {
       service.upstream.stub(articleUrl(guid), { headers: HTML_HEADERS, body: ARTICLE_HTML, delayMs: 60_000 })
     }
 
-    // Reader capacity holds four active retrievals, so one of five spends its
-    // whole budget queued and must still speak the same public contract.
     const responses = await Promise.all(guids.map((guid) => user.get(`/api/items/${ids.get(guid)}/reader`)))
     for (const response of responses) await expectDeadline(response)
 
@@ -106,6 +108,12 @@ describe('the Reader budget', () => {
     const queued = traces.filter((trace) => Number(trace.queueMs) >= 300)
     expect(queued).toHaveLength(1)
     expect(queued[0]).not.toHaveProperty('ttfbMs')
+
+    // Expiry released every slot: a fresh operation reaches its publisher
+    // immediately instead of queueing behind abandoned work.
+    const after = user.get(`/api/items/${ids.get('item-after')}/reader`)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(articleUrl('item-after'))).toHaveLength(1))
+    await expectDeadline(await after)
   })
 
   it('expires during body receipt with the same contract', async () => {
@@ -129,35 +137,33 @@ describe('the Reader budget', () => {
     expect(trace).not.toHaveProperty('domMs')
   })
 
-  it(
-    'expires held and worker-queued extraction, replaces the worker, and answers the next request',
-    { timeout: 20_000 },
-    async () => {
-      const readerWorker = new ReaderWorkerFixtures()
-      const service = await startTestService({ readerWorker, readerBudgetMs: 2_000 })
-      const { user, ids } = await readingSetup(service, ['item-one', 'item-two'])
-      service.upstream.stub(articleUrl('item-one'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
-      service.upstream.stub(articleUrl('item-two'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
-      const held = readerWorker.holdNext()
+  it('expires held and worker-queued extraction, replaces the worker, and answers the next request', {
+    timeout: 20_000,
+  }, async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorker, readerBudgetMs: 2_000 })
+    const { user, ids } = await readingSetup(service, ['item-one', 'item-two'])
+    service.upstream.stub(articleUrl('item-one'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
+    service.upstream.stub(articleUrl('item-two'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
+    const held = readerWorker.holdNext()
 
-      const active = user.get(`/api/items/${ids.get('item-one')}/reader`)
-      await held.entered
-      const queued = user.get(`/api/items/${ids.get('item-two')}/reader`)
-      await readerWorker.waitForSubmittedTasks(2)
+    const active = user.get(`/api/items/${ids.get('item-one')}/reader`)
+    await held.entered
+    const queued = user.get(`/api/items/${ids.get('item-two')}/reader`)
+    await readerWorker.waitForSubmittedTasks(2)
 
-      await expectDeadline(await active)
-      await expectDeadline(await queued)
-      await readerWorker.waitForCancelledTasks(2)
+    await expectDeadline(await active)
+    await expectDeadline(await queued)
+    await readerWorker.waitForCancelledTasks(2)
 
-      const trace = service.logs.find((record) => record.message === 'reader.trace')
-      expect(trace).toMatchObject({ outcome: 'deadline_exceeded', host: 'journal.example' })
-      expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
+    const trace = service.logs.find((record) => record.message === 'reader.trace')
+    expect(trace).toMatchObject({ outcome: 'deadline_exceeded', host: 'journal.example' })
+    expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
 
-      const retried = await user.get(`/api/items/${ids.get('item-one')}/reader`)
-      expect(retried.status).toBe(200)
-      expect(service.upstream.requestsTo(articleUrl('item-one'))).toHaveLength(2)
-    },
-  )
+    const retried = await user.get(`/api/items/${ids.get('item-one')}/reader`)
+    expect(retried.status).toBe(200)
+    expect(service.upstream.requestsTo(articleUrl('item-one'))).toHaveLength(2)
+  })
 
   it('keeps deadlines out of the five-attempt failure allowance', { timeout: 15_000 }, async () => {
     const service = await startTestService({ readerBudgetMs: 300 })

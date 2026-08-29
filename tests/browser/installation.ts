@@ -89,7 +89,7 @@ export interface ForeignSite {
 }
 
 export interface InstallationOptions {
-  /** Shortens the server's Reader budget so a deadline test never waits 4.5 production seconds. */
+  /** Shortens the server's Reader budget so a deadline test never waits out the production value. */
   readonly readerBudgetMs: number | undefined
 }
 

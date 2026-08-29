@@ -68,8 +68,8 @@ const UNAUTHENTICATED = 'unauthenticated'
 
 const REQUEST_TIMEOUT_MS = 30_000
 /**
- * A defensive ceiling only: the server enforces its own 4.5-second Reader
- * budget and answers `article_deadline_exceeded` long before this fires.
+ * A defensive ceiling only: the server enforces its own shorter Reader budget
+ * and answers `article_deadline_exceeded` long before this fires.
  */
 const READER_REQUEST_TIMEOUT_MS = 60_000
 
