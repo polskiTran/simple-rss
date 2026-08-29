@@ -70,7 +70,8 @@ export class UpstreamFixtures {
   }
 
   get client(): HttpClient {
-    return async (request) => {
+    return async (request, onTimings) => {
+      const askedAt = performance.now()
       this.#requests.push({
         method: request.method,
         url: request.url,
@@ -95,6 +96,7 @@ export class UpstreamFixtures {
       // `304` and friends carry no body at all, and `Response` refuses to
       // pretend otherwise.
       const carriesBody = status !== 204 && status !== 205 && status !== 304
+      onTimings?.({ connectionReused: true, ttfbMs: performance.now() - askedAt })
       return new Response(carriesBody ? (body as BodyInit) : null, { status, headers })
     }
   }

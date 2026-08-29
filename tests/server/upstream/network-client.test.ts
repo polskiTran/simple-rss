@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { brotliCompress, createGzip, gzip } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createLogger } from '../../../src/server/logger.js'
-import type { HttpClient } from '../../../src/server/upstream/http-client.js'
+import type { HttpClient, HttpTimings } from '../../../src/server/upstream/http-client.js'
 import { createNetworkHttpClient, guardedLookup } from '../../../src/server/upstream/network-client.js'
 import { createRetrieval } from '../../../src/server/upstream/retrieval.js'
 
@@ -44,10 +44,14 @@ function clientReachingTheTestServer(): HttpClient {
   return createNetworkHttpClient({ isAllowedAddress: () => true })
 }
 
+// Answers on a later tick the way real DNS does; a synchronous callback would
+// emit the socket's `lookup` event before any request-level listener attaches.
 const testServerLookup: LookupFunction = (_hostname, options, callback) => {
   const answer = { address: '127.0.0.1', family: 4 as const }
-  if (options.all) callback(null, [answer] as never, 0)
-  else callback(null, answer.address, answer.family)
+  setImmediate(() => {
+    if (options.all) callback(null, [answer] as never, 0)
+    else callback(null, answer.address, answer.family)
+  })
 }
 
 describe('createNetworkHttpClient', () => {
@@ -268,6 +272,35 @@ describe('createNetworkHttpClient', () => {
     await response.body?.cancel()
 
     await expect(connectionClosed).resolves.toBeUndefined()
+  })
+
+  it('times connection phases on a fresh connection and reports them skipped on reuse', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml' })
+      response.end('<rss></rss>')
+    })
+    const port = new URL(running.url).port
+    const url = `http://publisher.example:${port}/feed.xml`
+    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup })
+    const observed: HttpTimings[] = []
+
+    const first = await client(new Request(url), (timings) => observed.push(timings))
+    await first.text()
+    const second = await client(new Request(url), (timings) => observed.push(timings))
+    await second.text()
+
+    const fresh = observed[0]
+    expect(fresh?.connectionReused).toBe(false)
+    expect(fresh?.socketDnsMs).toBeGreaterThanOrEqual(0)
+    expect(fresh?.connectMs).toBeGreaterThanOrEqual(0)
+    expect(fresh?.ttfbMs).toBeGreaterThanOrEqual(0)
+    expect(fresh?.tlsMs).toBeUndefined()
+
+    const reused = observed[1]
+    expect(reused?.connectionReused).toBe(true)
+    expect(reused?.socketDnsMs).toBeUndefined()
+    expect(reused?.connectMs).toBeUndefined()
+    expect(reused?.ttfbMs).toBeGreaterThanOrEqual(0)
   })
 
   it('refuses a private address by default, before anything is connected to', async () => {

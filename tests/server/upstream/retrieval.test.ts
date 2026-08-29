@@ -766,4 +766,119 @@ describe('logging', () => {
       bytes: 11,
     })
   })
+
+  it('stamps a caller trace id on its records', async () => {
+    const { retrieval, upstream, logs } = harness()
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+    })
+
+    await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { trace: 'one-reader-operation' }))
+
+    expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject({
+      trace: 'one-reader-operation',
+    })
+  })
+})
+
+describe('phase timings', () => {
+  it('reports non-negative phases where they occurred, on the result and the record', async () => {
+    const { retrieval, upstream, logs } = harness()
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+    })
+
+    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    for (const phase of ['queueMs', 'dnsMs', 'ttfbMs', 'bodyMs', 'totalMs'] as const) {
+      expect(result.timings[phase], phase).toBeGreaterThanOrEqual(0)
+    }
+    expect(result.timings.bytes).toBe(11)
+    expect(result.timings.redirects).toBe(0)
+    expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject({
+      queueMs: result.timings.queueMs ?? Number.NaN,
+      dnsMs: result.timings.dnsMs ?? Number.NaN,
+    })
+  })
+
+  it('represents a reused connection as skipped phases, not zero elapsed time', async () => {
+    const { retrieval, upstream, logs } = harness()
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+    })
+
+    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.timings.connectionReused).toBe(true)
+    expect(result.timings.socketDnsMs).toBeUndefined()
+    expect(result.timings.connectMs).toBeUndefined()
+    expect(result.timings.tlsMs).toBeUndefined()
+    const record = logs.find((entry) => entry.message === 'upstream.retrieval_completed')
+    expect(record).toMatchObject({ connectionReused: true })
+    expect(record).not.toHaveProperty('connectMs')
+  })
+
+  it('carries fresh-connection phases from the transport through to the result', async () => {
+    const logs: LogRecord[] = []
+    const retrieval = createRetrieval({
+      httpClient: async (_request, onTimings) => {
+        onTimings?.({ connectionReused: false, socketDnsMs: 2.5, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 })
+        return new Response('<rss></rss>', { headers: { 'content-type': 'application/xml' } })
+      },
+      logger: createLogger({ level: 'debug', sink: (record) => logs.push(record) }),
+      resolve: async () => ['93.184.216.34'],
+      self: new URL('https://reader.test'),
+    })
+
+    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const phases = { connectionReused: false, socketDnsMs: 2.5, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 }
+    expect(result.timings).toMatchObject(phases)
+    expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject(phases)
+  })
+
+  it('closes a timeout with a terminal record and no invented body phase', async () => {
+    const { retrieval, upstream } = harness()
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+      delayMs: 1_000,
+    })
+
+    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 }))
+
+    expect(result).toMatchObject({ ok: false, code: 'timeout' })
+    if (result.ok) return
+    expect(result.timings?.queueMs).toBeGreaterThanOrEqual(0)
+    expect(result.timings?.totalMs).toBeGreaterThanOrEqual(0)
+    expect(result.timings?.bodyMs).toBeUndefined()
+    expect(result.timings?.bytes).toBeUndefined()
+  })
+
+  it('closes a capacity refusal with a terminal record', async () => {
+    const { retrieval, upstream } = harness({ operationCapacity: { feed: { maxConcurrent: 1, maxQueued: 0 } } })
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+      delayMs: 50,
+    })
+
+    const holding = retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+    const refused = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+    await holding
+
+    expect(refused).toMatchObject({ ok: false, code: 'busy' })
+    if (refused.ok) return
+    expect(refused.timings?.queueMs).toBeGreaterThanOrEqual(0)
+    expect(refused.timings?.totalMs).toBeGreaterThanOrEqual(0)
+  })
 })

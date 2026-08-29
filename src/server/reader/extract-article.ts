@@ -1,10 +1,32 @@
 import { Defuddle } from 'defuddle/node'
 import { parseHTML } from 'linkedom'
+import { elapsedMs } from '../monotonic.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 
 const WORDS_PER_MINUTE = 225
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
+
+export const FULL_CLEANUP_MAX_BYTES = 512 * 1024
+export const FULL_CLEANUP_MAX_ELEMENTS = 5_000
+
+/**
+ * JSON-LD stays because Defuddle reads it for metadata; math scripts stay because
+ * standardization turns them into math content.
+ */
+const IRRELEVANT_DOM_SELECTOR = [
+  'script:not([type="application/ld+json"]):not([type^="math/"])',
+  'style',
+  'template',
+  'noscript',
+  'iframe',
+  'video',
+  'audio',
+  'object',
+  'embed',
+].join(', ')
+
+type ArticleDocument = ReturnType<typeof parseHTML>['document']
 
 export interface ExtractedArticle {
   readonly markdown: string
@@ -20,34 +42,64 @@ export interface ExtractArticleInput {
   readonly signImageUrl?: SignImageUrl
 }
 
-/**
- * Everything here lives and dies with the request — nothing is ever written anywhere.
- * `undefined` means no readable article; the caller falls back to the stored summary.
- */
-export async function extractArticle(input: ExtractArticleInput): Promise<ExtractedArticle | undefined> {
+export interface ExtractionTimings {
+  readonly domMs?: number | undefined
+  readonly defuddleMs?: number | undefined
+  readonly markdownPolicyMs?: number | undefined
+}
+
+export interface ExtractArticleOutcome {
+  readonly article: ExtractedArticle | undefined
+  readonly timings: ExtractionTimings
+}
+
+export async function extractArticle(input: ExtractArticleInput): Promise<ExtractArticleOutcome> {
+  const timings: { -readonly [Phase in keyof ExtractionTimings]: ExtractionTimings[Phase] } = {}
   try {
     // linkedom, not jsdom: Defuddle's clutter selectors use CSS jsdom cannot parse,
     // and a selector error would silently keep the whole page. Built eagerly because
     // Defuddle's lazy linkedom loading does not survive every module loader.
+    const domStartedAt = performance.now()
     const document = articleDocument(decode(input.bytes, input.charset), input.url)
-    const result = await Defuddle(document, input.url, { separateMarkdown: true, useAsync: false })
-    // A synchronous extractor can represent an otherwise empty page as an
-    // embed. It remains unreadable; Markdown must not turn it into an image.
-    if (result.wordCount === 0 && UNSUPPORTED_ACTIVE_CONTENT.test(result.content)) return undefined
+    for (const element of document.querySelectorAll(IRRELEVANT_DOM_SELECTOR)) element.remove()
+    const fastProfile =
+      input.bytes.byteLength > FULL_CLEANUP_MAX_BYTES ||
+      document.querySelectorAll('*').length > FULL_CLEANUP_MAX_ELEMENTS
+    timings.domMs = elapsedMs(domStartedAt)
+
+    const defuddleStartedAt = performance.now()
+    const result = await Defuddle(document, input.url, {
+      separateMarkdown: true,
+      useAsync: false,
+      ...(fastProfile ? { removeContentPatterns: false } : {}),
+    })
+    timings.defuddleMs = elapsedMs(defuddleStartedAt)
+    // Page embeds are pruned before Defuddle, but a synchronous site extractor
+    // builds its own embed markup and can represent an otherwise empty page as
+    // one. It remains unreadable; Markdown must not turn it into an image.
+    if (result.wordCount === 0 && UNSUPPORTED_ACTIVE_CONTENT.test(result.content)) {
+      return { article: undefined, timings }
+    }
+
+    const policyStartedAt = performance.now()
     const markdown = applyReaderMarkdownPolicy(result.contentMarkdown ?? '', {
       baseUrl: input.url,
       ...(input.signImageUrl ? { signImageUrl: input.signImageUrl } : {}),
     })
-    if (!markdown) return undefined
+    timings.markdownPolicyMs = elapsedMs(policyStartedAt)
+    if (!markdown) return { article: undefined, timings }
 
     const wordCount = countWords(markdown)
     return {
-      markdown,
-      wordCount,
-      readingTimeMinutes: Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE)),
+      article: {
+        markdown,
+        wordCount,
+        readingTimeMinutes: Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE)),
+      },
+      timings,
     }
   } catch {
-    return undefined
+    return { article: undefined, timings }
   }
 }
 
@@ -55,7 +107,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
  * Shims the styleSheets and getComputedStyle Defuddle consults; `document.URL`
  * carries the final address so relative links and extractor matching resolve.
  */
-function articleDocument(html: string, url: string): Document {
+function articleDocument(html: string, url: string): ArticleDocument {
   const { document } = parseHTML(html)
   Object.defineProperty(document, 'styleSheets', {
     configurable: true,

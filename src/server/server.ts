@@ -8,7 +8,7 @@ export interface StartOptions extends ServiceOptions {
 }
 
 /** A listening service. `stop()` is the only way down: it drains before closing the database. */
-export interface RunningService extends Omit<Service, 'close'> {
+export interface RunningService extends Omit<Service, 'shutdown'> {
   /** The port actually bound, which differs from the request when it was 0. */
   readonly port: number
   /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
@@ -73,14 +73,13 @@ function listen(app: Service['app'], port: number): Promise<ListeningServer> {
 }
 
 /**
- * Refuse new connections, let in-flight requests finish, then close the
- * database so no request observes a closed handle. Whatever outlives the
- * grace period is cut off — a platform that sent SIGTERM sends SIGKILL next.
+ * Whatever outlives the grace period is cut off, because a platform that sent
+ * SIGTERM sends SIGKILL next.
  */
 async function shutdown(server: Server, service: Service, graceMs: number): Promise<void> {
   service.logger.info('server.stopping', { graceMs })
 
-  await new Promise<void>((resolve) => {
+  const drained = new Promise<void>((resolve) => {
     const forceTimer = setTimeout(() => {
       service.logger.warn('server.stop_forced', { graceMs })
       server.closeAllConnections()
@@ -99,7 +98,6 @@ async function shutdown(server: Server, service: Service, graceMs: number): Prom
     })
     server.closeIdleConnections()
   })
-
-  service.close()
+  await service.shutdown(() => drained)
   service.logger.info('server.stopped')
 }

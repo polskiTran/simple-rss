@@ -35,7 +35,7 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
     const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
     if (!feedItemId.ok) return feedItemId.response
 
-    const outcome = await deps.reader.article(feedItemId.value)
+    const outcome = await deps.reader.article(feedItemId.value, c.req.raw.signal)
     switch (outcome.kind) {
       case 'extracted':
         return c.json<ReaderArticle>(outcome.article, 200, {
@@ -53,6 +53,12 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
         return c.json(
           { error: { code: 'article_unreadable', message: 'The original page did not yield a readable article' } },
           422,
+          NO_STORE,
+        )
+      case 'deadline':
+        return c.json(
+          { error: { code: 'article_deadline_exceeded', message: 'The original page could not be prepared in time' } },
+          504,
           NO_STORE,
         )
       case 'rate-limited':

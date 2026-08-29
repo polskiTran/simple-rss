@@ -3,6 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2024"],
     "types": ["node"],
+    "jsx": "preserve",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "rootDir": "./src",

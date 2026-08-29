@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import type { ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackLink } from '../components/back-link.js'
@@ -10,9 +10,24 @@ import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
 
+const preloadArticleMarkdown = () => import('../components/article-markdown.js')
 const ArticleMarkdown = lazy(async () => ({
-  default: (await import('../components/article-markdown.js')).ArticleMarkdown,
+  default: (await preloadArticleMarkdown()).ArticleMarkdown,
 }))
+
+const READER_MARKS = {
+  entry: 'reader:entry',
+  articleResponse: 'reader:article-response',
+  rendererReady: 'reader:renderer-ready',
+  markdownCommitted: 'reader:markdown-committed',
+} as const
+
+function MarkdownCommitted() {
+  useEffect(() => {
+    performance.mark(READER_MARKS.markdownCommitted)
+  }, [])
+  return null
+}
 
 const parsingNote = <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
 
@@ -27,9 +42,20 @@ export interface ReaderViewProps {
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
   const [itemState, { set: setItem }] = useResource((signal) => fetchReaderItem(feedItemId, signal), [feedItemId])
   const [articleState, { retry: retryParsing }] = useResource(
-    (signal) => fetchReaderArticle(feedItemId, signal),
+    (signal) =>
+      fetchReaderArticle(feedItemId, signal).finally(() => {
+        if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
+      }),
     [feedItemId],
   )
+
+  useEffect(() => {
+    performance.mark(READER_MARKS.entry)
+  }, [feedItemId])
+
+  useEffect(() => {
+    void preloadArticleMarkdown().then(() => performance.mark(READER_MARKS.rendererReady))
+  }, [])
 
   if (itemState.kind === 'loading') {
     return <LoadingNote className="view measure empty-note">opening the article</LoadingNote>
@@ -47,6 +73,14 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   const item = itemState.value
   const next = item.nextInDigest
   const setSaved = (saved: boolean) => setItem((current) => ({ ...current, saved }))
+  const waitingContent = item.summary ? (
+    <div className="reader-waiting">
+      <p className="reader-summary">{item.summary}</p>
+      <LoadingNote className="empty-note">parsing the original page</LoadingNote>
+    </div>
+  ) : (
+    parsingNote
+  )
 
   return (
     <article className="view measure reader-view">
@@ -69,14 +103,20 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </p>
       </header>
 
-      {articleState.kind === 'loading' ? parsingNote : null}
+      {articleState.kind === 'loading' ? waitingContent : null}
       {articleState.kind === 'loaded' ? (
-        <Suspense fallback={parsingNote}>
+        <Suspense fallback={waitingContent}>
           <ArticleMarkdown markdown={articleState.value.markdown} />
+          <MarkdownCommitted />
         </Suspense>
       ) : null}
       {articleState.kind === 'unavailable' || articleState.kind === 'unreachable' ? (
-        <Fallback item={item} waitSeconds={waitSecondsOf(articleState.error)} onRetry={retryParsing} />
+        <Fallback
+          item={item}
+          waitSeconds={waitSecondsOf(articleState.error)}
+          deadline={deadlineExceeded(articleState.error)}
+          onRetry={retryParsing}
+        />
       ) : null}
 
       {next ? (
@@ -103,19 +143,28 @@ function waitSecondsOf(cause: unknown): number | undefined {
     : undefined
 }
 
+function deadlineExceeded(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.code === 'article_deadline_exceeded'
+}
+
 interface FallbackProps {
   readonly item: ReaderItem
   readonly waitSeconds: number | undefined
+  readonly deadline: boolean
   onRetry(): void
 }
 
-function Fallback({ item, waitSeconds, onRetry }: FallbackProps) {
+function Fallback({ item, waitSeconds, deadline, onRetry }: FallbackProps) {
   return (
     <div className="reader-fallback" role="status">
       {item.summary ? (
         <p className="reader-summary">{item.summary}</p>
       ) : (
-        <p className="empty-note">the original page could not be parsed into an article</p>
+        <p className="empty-note">
+          {deadline
+            ? 'the original page took too long to prepare'
+            : 'the original page could not be parsed into an article'}
+        </p>
       )}
       <p className="reader-fallback-actions">
         {item.link ? (

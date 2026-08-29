@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { READER_CACHE_SECONDS, readerArticleSchema, readerItemSchema } from '../../../src/shared/api.js'
+import { apiErrorSchema, READER_CACHE_SECONDS, readerArticleSchema, readerItemSchema } from '../../../src/shared/api.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
+import { cancelledExtractions, queuedExtractions, ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
 
 const FEED_URL = 'https://journal.example/feed'
 const ARTICLE_URL = 'https://journal.example/first-light'
+const SECOND_ARTICLE_URL = 'https://journal.example/evening'
 const ASYNC_EXTRACTOR_TARGET = 'https://www.youtube.com/watch?v=reader-boundary'
 const FINAL_ARTICLE_URL = 'https://journal.example/archive/first-light'
 const FINAL_ARTICLE_IMAGE_URL = 'https://journal.example/archive/media/dawn-large.jpg'
@@ -220,20 +222,155 @@ describe('the Reader article', () => {
     }
   })
 
-  it('asks the publisher once when two devices read at the same time', async () => {
+  it('keeps shared extraction alive when one of two callers leaves', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    const held = await readerWorker.holdNext()
+    const firstController = new AbortController()
+
+    const first = user.get(`/api/items/${feedItemId}/reader`, firstController.signal)
+    const second = user.get(`/api/items/${feedItemId}/reader`)
+    await held.entered
+
+    firstController.abort()
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1)
+
+    held.release()
+    expect((await second).status).toBe(200)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1)
+  })
+
+  it('keeps authenticated requests responsive while extraction is held', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    const held = await readerWorker.holdNext()
+
+    const article = user.get(`/api/items/${feedItemId}/reader`)
+    await held.entered
+
+    expect((await user.get('/api/digest')).status).toBe(200)
+    held.release()
+    expect((await article).status).toBe(200)
+  })
+
+  it('cancels an active extraction when its final caller leaves and retries immediately', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    const held = await readerWorker.holdNext()
+    const controller = new AbortController()
+
+    const abandoned = user.get(`/api/items/${feedItemId}/reader`, controller.signal)
+    await held.entered
+    controller.abort()
+    await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(cancelledExtractions(service.logs)).toBe(1))
+
+    const retried = user.get(`/api/items/${feedItemId}/reader`)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(2))
+    expect((await retried).status).toBe(200)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+  })
+
+  it('removes a cancelled queued extraction before accepting a fresh request', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    const digest = await (await user.get('/api/digest')).json()
+    const secondFeedItemId = readerItemFind(digest, 'Evening notes')
+    service.upstream.stub(SECOND_ARTICLE_URL, {
+      headers: { 'content-type': 'text/html' },
+      body: ARTICLE_HTML,
+    })
+    const held = await readerWorker.holdNext()
+
+    const active = user.get(`/api/items/${feedItemId}/reader`)
+    await held.entered
+    const queuedController = new AbortController()
+    const queued = user.get(`/api/items/${secondFeedItemId}/reader`, queuedController.signal)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(2))
+
+    queuedController.abort()
+    await expect(queued).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(cancelledExtractions(service.logs)).toBe(1))
+    const retried = user.get(`/api/items/${secondFeedItemId}/reader`)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(3))
+
+    held.release()
+    expect((await active).status).toBe(200)
+    expect((await retried).status).toBe(200)
+    expect(service.upstream.requestsTo(SECOND_ARTICLE_URL)).toHaveLength(2)
+  })
+
+  it('degrades a worker crash and replaces it for the next extraction', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    await readerWorker.crashNext()
+
+    const failed = await user.get(`/api/items/${feedItemId}/reader`)
+    expect(failed.status).toBe(422)
+    expect(apiErrorSchema.parse(await failed.json()).error.code).toBe('article_unreadable')
+    expect((await service.fetch('/health/ready')).status).toBe(200)
+
+    const recovered = await user.get(`/api/items/${feedItemId}/reader`)
+    expect(recovered.status).toBe(200)
+    expect(readerArticleSchema.parse(await recovered.json()).markdown).toContain('Field methods')
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+  })
+
+  it('cancels Reader work that outlives the shutdown grace period', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    const digest = await (await user.get('/api/digest')).json()
+    const secondFeedItemId = readerItemFind(digest, 'Evening notes')
+    service.upstream.stub(SECOND_ARTICLE_URL, {
+      headers: { 'content-type': 'text/html' },
+      body: ARTICLE_HTML,
+      delayMs: 5_000,
+    })
+    const held = await readerWorker.holdNext()
+
+    const extracting = user.get(`/api/items/${feedItemId}/reader`)
+    await held.entered
+    const retrieving = user.get(`/api/items/${secondFeedItemId}/reader`)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(SECOND_ARTICLE_URL)).toHaveLength(1))
+
+    const settled = Promise.allSettled([extracting, retrieving])
+    await service.stop()
+    await settled
+
+    expect(service.logs.map((record) => record.message)).toContain('server.stop_forced')
+    expect(cancelledExtractions(service.logs)).toBe(1)
+    expect(service.upstream.aborted).toContain(SECOND_ARTICLE_URL)
+  })
+
+  it('cancels orphaned retrieval when the browser leaves the Reader', async () => {
     const service = await startTestService()
-    const { user, feedItemId } = await readingSetup(service, {
-      article: { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML, delayMs: 50 },
+    const { user, feedItemId } = await readingSetup(service)
+    let attempts = 0
+    service.upstream.stubDynamic(ARTICLE_URL, () => {
+      attempts += 1
+      return attempts === 1
+        ? { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML, delayMs: 5_000 }
+        : { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML }
     })
 
-    const [first, second] = await Promise.all([
-      user.get(`/api/items/${feedItemId}/reader`),
-      user.get(`/api/items/${feedItemId}/reader`),
-    ])
+    const controller = new AbortController()
+    const abandoned = user.get(`/api/items/${feedItemId}/reader`, controller.signal)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1))
 
-    expect(first?.status).toBe(200)
-    expect(second?.status).toBe(200)
-    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1)
+    controller.abort()
+    await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(service.upstream.aborted).toContain(ARTICLE_URL))
+
+    const retried = await user.get(`/api/items/${feedItemId}/reader`)
+    expect(retried.status).toBe(200)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
   })
 
   it('keeps asynchronous extractor targets inside Retrieval', async () => {
@@ -313,9 +450,15 @@ describe('the Reader article', () => {
     const response = await user.get(`/api/items/${feedItemId}/reader`)
     expect(response.status).toBe(422)
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_unreadable')
+
+    const trace = service.logs.find((record) => record.message === 'reader.trace')
+    expect(trace).toMatchObject({ outcome: 'unreadable', host: 'journal.example' })
+    expect(trace?.domMs).toBeGreaterThanOrEqual(0)
+    expect(trace?.defuddleMs).toBeGreaterThanOrEqual(0)
+    expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
   })
 
-  it('lets the offered retry through once, then rate-limits until the cooldown', async () => {
+  it('allows five failed attempts before rate-limiting until the cooldown', async () => {
     const service = await startTestService()
     let healed = false
     const { user, feedItemId } = await readingSetup(service)
@@ -325,15 +468,15 @@ describe('the Reader article', () => {
         : { status: 503, headers: { 'content-type': 'text/html' }, body: 'down' },
     )
 
-    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
-
-    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
-    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+    }
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(5)
 
     const tooSoon = await user.get(`/api/items/${feedItemId}/reader`)
     expect(tooSoon.status).toBe(429)
     expect(Number(tooSoon.headers.get('retry-after'))).toBeGreaterThan(0)
-    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
+    expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(5)
 
     healed = true
     service.clock.advance(30_000)
@@ -344,6 +487,106 @@ describe('the Reader article', () => {
     healed = false
     const failed = await user.get(`/api/items/${feedItemId}/reader`)
     expect(failed.status).toBe(502)
+  })
+
+  it('records one trace correlating retrieval and worker extraction for a Reader operation', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service)
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
+
+    const traces = service.logs.filter((record) => record.message === 'reader.trace')
+    expect(traces).toHaveLength(1)
+    const trace = traces[0]
+    expect(trace).toMatchObject({ outcome: 'extracted', feedItemId, host: 'journal.example', redirects: 0 })
+    expect(typeof trace?.trace).toBe('string')
+    const phases = [
+      'queueMs',
+      'dnsMs',
+      'ttfbMs',
+      'bodyMs',
+      'workerQueueMs',
+      'domMs',
+      'defuddleMs',
+      'markdownPolicyMs',
+      'totalMs',
+    ] as const
+    for (const phase of phases) {
+      expect(trace?.[phase], phase).toBeGreaterThanOrEqual(0)
+    }
+    expect(trace?.bytes).toBeGreaterThan(0)
+    expect(trace).toMatchObject({ connectionReused: true })
+    expect(trace).not.toHaveProperty('connectMs')
+
+    const retrieved = service.logs.find(
+      (record) => record.message === 'upstream.retrieval_completed' && record.operation === 'reader',
+    )
+    expect(retrieved?.trace).toBe(trace?.trace)
+  })
+
+  it('keeps article content, summaries, and query strings out of captured logs', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      articleUrl: 'https://journal.example/first-light?token=secret-query-value',
+    })
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
+
+    const everything = JSON.stringify(service.logs)
+    expect(everything).toContain('reader.trace')
+    expect(everything).not.toContain('secret-query-value')
+    expect(everything).not.toContain('carries the morning along')
+    expect(everything).not.toContain('A clear morning over the valley')
+    expect(everything).not.toContain('<article')
+  })
+
+  it('closes a publisher failure with a coherent terminal trace', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      article: { status: 503, headers: { 'content-type': 'text/html' }, body: 'down' },
+    })
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
+
+    const trace = service.logs.find((record) => record.message === 'reader.trace')
+    expect(trace).toMatchObject({ outcome: 'http_error', status: 503, host: 'journal.example' })
+    expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
+    expect(trace).not.toHaveProperty('domMs')
+  })
+
+  it('closes an abandoned Reader operation with a cancelled trace', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service, {
+      article: { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML, delayMs: 5_000 },
+    })
+    const controller = new AbortController()
+
+    const abandoned = user.get(`/api/items/${feedItemId}/reader`, controller.signal)
+    await vi.waitFor(() => expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(1))
+    controller.abort()
+    await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+
+    await vi.waitFor(() => {
+      const trace = service.logs.find((record) => record.message === 'reader.trace')
+      expect(trace).toMatchObject({ outcome: 'cancelled', feedItemId })
+      expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  it('closes a worker crash with its own terminal trace', async () => {
+    const readerWorker = new ReaderWorkerFixtures()
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
+    const { user, feedItemId } = await readingSetup(service)
+    await readerWorker.crashNext()
+
+    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(422)
+
+    await vi.waitFor(() => {
+      const trace = service.logs.find((record) => record.message === 'reader.trace')
+      expect(trace).toMatchObject({ outcome: 'worker_failed', host: 'journal.example' })
+      expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
+      expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
+    })
   })
 
   it('answers 422 when the Feed Item never had an original link', async () => {

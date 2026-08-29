@@ -29,6 +29,8 @@ export interface HarnessOptions {
   readonly scheduling?: PollSchedulerLimits
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
+  readonly readerWorkerUrl?: URL
+  readonly readerBudgetMs?: number
 }
 
 export interface TestService {
@@ -101,6 +103,8 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       logger,
       scheduling: { nudges: false, ...options.scheduling },
       ...(options.retention ? { retention: options.retention } : {}),
+      ...(options.readerWorkerUrl ? { readerWorkerUrl: options.readerWorkerUrl } : {}),
+      ...(options.readerBudgetMs === undefined ? {} : { readerBudgetMs: options.readerBudgetMs }),
     })
     running.push(started)
     return started

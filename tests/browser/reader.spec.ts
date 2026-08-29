@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { apiErrorSchema } from '../../src/shared/api.js'
 import {
   expect,
   expectNoHorizontalOverflow,
@@ -24,6 +25,8 @@ async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
   await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible()
 }
 
+const rendererChunk = /article-renderer|article-markdown/
+
 test.describe('Reader View', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -35,6 +38,8 @@ test.describe('Reader View', () => {
     await expect(page).toHaveURL(/\/reader\/\d+$/)
 
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
+    await expect(page.getByText('A clear morning.')).toBeVisible()
+    await expect(page.getByText('parsing the original page')).toBeVisible()
     const meta = page.locator('.reader-meta')
     await expect(meta).toContainText('Field Notes')
     await expect(meta).toContainText(/\d+ min/)
@@ -93,7 +98,7 @@ test.describe('Reader View', () => {
   test('brings its Markdown renderer down with the first article, not with the app', async ({ page, installation }) => {
     const renderer: string[] = []
     page.on('request', (request) => {
-      if (/article-renderer|article-markdown/.test(request.url())) renderer.push(request.url())
+      if (rendererChunk.test(request.url())) renderer.push(request.url())
     })
 
     await subscribe(page, installation)
@@ -104,6 +109,26 @@ test.describe('Reader View', () => {
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page.locator('.article-body')).toBeVisible()
     expect(renderer.length).toBeGreaterThan(0)
+    expect(new Set(renderer).size).toBe(renderer.length)
+  })
+
+  test('starts the renderer download before the Reader response settles', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'digest' }).click()
+    await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
+
+    const rendererRequested = page.waitForRequest(rendererChunk)
+    await page.route('**/reader', async (route) => {
+      await rendererRequested
+      await route.continue()
+    })
+
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByText('A clear morning.')).toBeVisible()
+    await expect(page.getByText('parsing the original page')).toBeVisible()
+
+    await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
+    await expect(page.getByText('A clear morning.')).toHaveCount(0)
   })
 
   test('saves from the Reader and the Library agrees', async ({ page, installation }) => {
@@ -120,7 +145,7 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
   })
 
-  test('falls back to the summary with a rate-limited retry when parsing fails', async ({ page, installation }) => {
+  test('falls back to the summary and rate-limits repeated parsing failures', async ({ page, installation }) => {
     await subscribe(page, installation, installation.brokenArticleFeedUrl)
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'Slow water' }).click()
@@ -131,11 +156,17 @@ test.describe('Reader View', () => {
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    await page.getByRole('button', { name: 'retry parsing' }).click()
-    await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
-    await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
+    const retry = page.getByRole('button', { name: 'retry parsing' })
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      const failed = page.waitForResponse((response) => response.url().endsWith('/reader'))
+      await retry.click()
+      expect((await failed).status()).toBe(502)
+      await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
+    }
 
-    await page.getByRole('button', { name: 'retry parsing' }).click()
+    const limited = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    await retry.click()
+    expect((await limited).status()).toBe(429)
     await expect(page.getByText(/wait \d+s, then retry/)).toBeVisible()
 
     await page.getByRole('link', { name: '← digest' }).click()
@@ -185,6 +216,37 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     await page.getByRole('link', { name: '← saved' }).click()
     await expect(page).toHaveURL(/\/saved$/)
+  })
+})
+
+test.describe('Reader View at the server deadline', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, readerBudgetMs: 2_000 })
+
+  test('keeps the summary through the deadline and retries into the article', async ({ page, installation }) => {
+    await subscribe(page, installation, installation.slowArticleFeedUrl)
+    await page.getByRole('link', { name: 'digest' }).click()
+
+    const deadline = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    await page.getByRole('link', { name: 'Slow ridge' }).click()
+
+    await expect(page.getByText('The ridge holds its light.')).toBeVisible()
+    await expect(page.getByText('parsing the original page')).toBeVisible()
+
+    const answered = await deadline
+    expect(answered.status()).toBe(504)
+    expect(apiErrorSchema.parse(await answered.json()).error.code).toBe('article_deadline_exceeded')
+    expect(answered.headers()['cache-control']).toBe('no-store')
+
+    await expect(page.getByText('The ridge holds its light.')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'open original' })).toHaveCount(2)
+    await expect(page.getByText(/could not be parsed/)).toHaveCount(0)
+
+    const retried = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    await page.getByRole('button', { name: 'retry parsing' }).click()
+    expect((await retried).status()).toBe(200)
+
+    await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
+    await expect(page.getByText('The ridge holds its light.')).toHaveCount(0)
   })
 })
 

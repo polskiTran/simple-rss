@@ -17,6 +17,7 @@ export interface Installation {
   readonly url: string
   readonly feedUrl: string
   readonly brokenArticleFeedUrl: string
+  readonly slowArticleFeedUrl: string
   readonly longFeedUrl: string
 }
 
@@ -86,11 +87,18 @@ export interface ForeignSite {
   serve(html: string): void
 }
 
-export const test = base.extend<{ installation: Installation; foreign: ForeignSite }>({
-  installation: async ({}, use) => {
+export interface InstallationOptions {
+  readonly readerBudgetMs: number | undefined
+}
+
+export const test = base.extend<InstallationOptions & { installation: Installation; foreign: ForeignSite }>({
+  readerBudgetMs: [undefined, { option: true }],
+
+  installation: async ({ readerBudgetMs }, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
     const feedUrl = 'https://publisher.example/feed.xml'
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
+    const slowArticleFeedUrl = 'https://publisher.example/ridge.xml'
     const longFeedUrl = 'https://publisher.example/meadow.xml'
     const publishedAt = new Date()
     publishedAt.setUTCHours(7, 15, 0, 0)
@@ -111,6 +119,7 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
       .stub('https://publisher.example/first-light', {
         headers: { 'content-type': 'text/html; charset=utf-8' },
         body: ARTICLE_HTML,
+        delayMs: 500,
       })
       .stub(FIGURE_IMAGE_URL, {
         headers: { 'content-type': 'image/png' },
@@ -132,6 +141,17 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
         headers: { 'content-type': 'text/html' },
         body: 'the shore is closed',
       })
+      .stub(slowArticleFeedUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>The High Ridge</title>
+            <item><guid>ridge</guid><title>Slow ridge</title>
+              <link>https://publisher.example/slow-ridge</link>
+              <pubDate>${publishedEarlier.toUTCString()}</pubDate>
+              <description>The ridge holds its light.</description>
+            </item>
+          </channel></rss>`,
+      })
       .stub(longFeedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
         body: `<?xml version="1.0"?>
@@ -145,6 +165,13 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
             ).join('\n')}
           </channel></rss>`,
       })
+    let ridgeAttempts = 0
+    upstream.stubDynamic('https://publisher.example/slow-ridge', () => {
+      ridgeAttempts += 1
+      return ridgeAttempts === 1
+        ? { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML, delayMs: 60_000 }
+        : { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML }
+    })
     let service: RunningService | undefined
 
     try {
@@ -166,8 +193,9 @@ export const test = base.extend<{ installation: Installation; foreign: ForeignSi
           logger,
           self: new URL(config.publicOrigin),
         }),
+        ...(readerBudgetMs === undefined ? {} : { readerBudgetMs }),
       })
-      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, longFeedUrl })
+      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, slowArticleFeedUrl, longFeedUrl })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })

@@ -225,7 +225,7 @@ Reader View is generated only when requested:
 1. The client requests a Feed Item by ID, never an arbitrary URL.
 2. The server retrieves the stored original link through the hardened retrieval boundary.
 3. The response must be HTML and no larger than five MiB decoded.
-4. Defuddle produces temporary Markdown.
+4. The retrieved bytes transfer to one reusable, service-owned worker, where Defuddle produces temporary Markdown off the main JavaScript thread.
 5. A directly declared Markdown parser builds an AST; the Reader policy reconstructs only its accepted dialect.
 6. Links and images resolve against Retrieval's final page URL; links keep only HTTP(S) destinations, while images keep only HTTP(S) targets rewritten as short-lived signed proxy paths.
 7. Markdown is returned with `Cache-Control: private, max-age=86400`.
@@ -235,6 +235,10 @@ Allowed output includes headings, paragraphs, emphasis, lists, block quotes, the
 The client renders that Markdown with Streamdown in static mode, with KaTeX and Shiki support. Streamdown's sanitize and link-hardening stages remain in place; its raw-HTML stage is explicitly excluded and stubbed out at the bundler. Reader-specific link and image components repeat destination validation, safe opener behavior, signed-image-route enforcement, lazy loading, and alternative-text fallback at the final DOM boundary.
 
 Article HTML and Markdown are never written to SQLite. Extraction failures preserve the Feed Item, show its stored summary and an **Open original** action, and expose a rate-limited **Retry parsing** action. Failed extraction responses are not cached.
+
+One 4.5-second server budget covers steps 2–6, from before capacity queueing through the Markdown policy, keeping the whole interactive path inside the User's five-second boundary. At expiry the service cancels active retrieval or terminates and replaces the worker, then answers an uncached `504 article_deadline_exceeded` — a deadline, not an unreadable page, so it never counts against the retry allowance, and the summary, open-original, and retry actions all remain. The client's longer request deadline is only a defensive ceiling above that response.
+
+The service owns the extraction queue and worker lifecycle. Callers for the same Feed Item share one task; the final caller leaving cancels active or queued work. Cancellation or a worker crash fails only that Reader request. Shutdown stops the scheduler, drains in-flight requests so an extraction already running finishes inside its own budget, and only then terminates worker tasks and Reader retrievals. Work that outlives the grace period is cut off with the connection.
 
 ## Image proxy
 

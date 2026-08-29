@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -101,6 +101,71 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
   })
 
+  it('keeps the summary and actions on a server deadline without claiming a parsing failure', async () => {
+    let healed = false
+    reading().on('GET /api/items/3/reader', () =>
+      healed
+        ? { body: ARTICLE }
+        : { status: 504, body: { error: { code: 'article_deadline_exceeded', message: 'too slow' } } },
+    )
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
+    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/could not be parsed/)).toBeNull()
+
+    healed = true
+    await user.click(screen.getByRole('button', { name: 'retry parsing' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+  })
+
+  it('names the deadline plainly when there is no stored summary', async () => {
+    stubApi()
+      .on('GET /api/items/3', { body: { ...ITEM, summary: null } })
+      .on('GET /api/items/3/reader', {
+        status: 504,
+        body: { error: { code: 'article_deadline_exceeded', message: 'too slow' } },
+      })
+    window.history.replaceState(null, '', '/reader/3')
+    render(<App />)
+
+    expect(await screen.findByText('the original page took too long to prepare')).toBeDefined()
+    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'retry parsing' })).toBeDefined()
+    expect(screen.queryByText(/could not be parsed/)).toBeNull()
+  })
+
+  it('shows the stored summary while the Reader server remains within its response deadline', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(new DOMException('The operation timed out', 'TimeoutError')), milliseconds)
+      return controller.signal
+    })
+
+    try {
+      const api = reading().on('GET /api/items/3/reader', async () => {
+        const { promise, resolve } = Promise.withResolvers<void>()
+        setTimeout(resolve, 35_000)
+        await promise
+        return { body: ARTICLE }
+      })
+      render(<App />)
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
+      expect(screen.getByText('A clear morning over the valley.')).toBeDefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(30_001))
+      expect(screen.getByText('parsing the original page')).toBeDefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(5_000))
+      expect(screen.getByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('says how long to wait when retrying is rate-limited', async () => {
     reading().on('GET /api/items/3/reader', {
       status: 429,
@@ -110,6 +175,33 @@ describe('Reader View', () => {
     render(<App />)
 
     expect(await screen.findByText(/wait 21s, then retry/)).toBeDefined()
+  })
+
+  it('marks the Reader critical path locally without telling any service', async () => {
+    performance.clearMarks()
+    const api = reading()
+    render(<App />)
+
+    await screen.findByRole('heading', { level: 3, name: 'Dawn' })
+    await waitFor(() => expect(performance.getEntriesByName('reader:markdown-committed', 'mark')).not.toHaveLength(0))
+
+    const markedAt = (name: string): number => {
+      const marks = performance.getEntriesByName(name, 'mark')
+      expect(marks.length, name).toBeGreaterThan(0)
+      return marks[marks.length - 1]?.startTime ?? Number.NaN
+    }
+    const entry = markedAt('reader:entry')
+    const articleResponse = markedAt('reader:article-response')
+    const rendererReady = markedAt('reader:renderer-ready')
+    const markdownCommitted = markedAt('reader:markdown-committed')
+    expect(entry).toBeLessThanOrEqual(articleResponse)
+    expect(entry).toBeLessThanOrEqual(rendererReady)
+    expect(articleResponse).toBeLessThanOrEqual(markdownCommitted)
+    expect(rendererReady).toBeLessThanOrEqual(markdownCommitted)
+
+    const asked = api.requests.map((request) => `${request.method} ${request.path}`)
+    expect(asked).toEqual(expect.arrayContaining(['GET /api/items/3', 'GET /api/items/3/reader']))
+    for (const request of asked) expect(request).toMatch(/^GET \/api\//)
   })
 
   it('closes back to the digest when the mark is pressed', async () => {
