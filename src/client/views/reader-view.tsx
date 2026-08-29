@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import type { ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackLink } from '../components/back-link.js'
@@ -10,8 +10,9 @@ import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
 
+const preloadArticleMarkdown = () => import('../components/article-markdown.js')
 const ArticleMarkdown = lazy(async () => ({
-  default: (await import('../components/article-markdown.js')).ArticleMarkdown,
+  default: (await preloadArticleMarkdown()).ArticleMarkdown,
 }))
 
 const parsingNote = <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
@@ -30,6 +31,10 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
     (signal) => fetchReaderArticle(feedItemId, signal),
     [feedItemId],
   )
+
+  useEffect(() => {
+    void preloadArticleMarkdown()
+  }, [])
 
   if (itemState.kind === 'loading') {
     return <LoadingNote className="view measure empty-note">opening the article</LoadingNote>

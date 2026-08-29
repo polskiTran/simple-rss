@@ -24,6 +24,8 @@ async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
   await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible()
 }
 
+const rendererChunk = /article-renderer|article-markdown/
+
 test.describe('Reader View', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -95,7 +97,7 @@ test.describe('Reader View', () => {
   test('brings its Markdown renderer down with the first article, not with the app', async ({ page, installation }) => {
     const renderer: string[] = []
     page.on('request', (request) => {
-      if (/article-renderer|article-markdown/.test(request.url())) renderer.push(request.url())
+      if (rendererChunk.test(request.url())) renderer.push(request.url())
     })
 
     await subscribe(page, installation)
@@ -106,6 +108,26 @@ test.describe('Reader View', () => {
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page.locator('.article-body')).toBeVisible()
     expect(renderer.length).toBeGreaterThan(0)
+    expect(new Set(renderer).size).toBe(renderer.length)
+  })
+
+  test('starts the renderer download before the Reader response settles', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'digest' }).click()
+    await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
+
+    const rendererRequested = page.waitForRequest(rendererChunk)
+    await page.route('**/reader', async (route) => {
+      await rendererRequested
+      await route.continue()
+    })
+
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByText('A clear morning.')).toBeVisible()
+    await expect(page.getByText('parsing the original page')).toBeVisible()
+
+    await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
+    await expect(page.getByText('A clear morning.')).toHaveCount(0)
   })
 
   test('saves from the Reader and the Library agrees', async ({ page, installation }) => {
