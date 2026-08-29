@@ -1,3 +1,4 @@
+import { parseHTML } from 'linkedom'
 import { describe, expect, it } from 'vitest'
 import { extractArticle } from '../../../src/server/reader/extract-article.js'
 
@@ -37,6 +38,20 @@ const HAZARDS = `
   <p><img src="/images/figure.png" alt="a figure"></p>
   <p>raw <b onclick="alert(2)">markup</b> stays textual</p>
 `
+
+const HAZARD_LEAKS = [
+  'schema.org',
+  'framework state',
+  'next data',
+  'color: red',
+  'template shadow',
+  'noscript fallback',
+  'tracker.example',
+  'javascript:',
+  'onclick',
+] as const
+
+const JSON_LD = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Prompt injection","author":{"@type":"Person","name":"Grace Hopper"}}</script>`
 
 describe('extractArticle', () => {
   it('extracts long-form technical content as structured markdown', async () => {
@@ -85,20 +100,13 @@ describe('extractArticle', () => {
   })
 
   it('extracts an ordinary page without leaking JSON-LD, scripts, framework state, or unsigned images', async () => {
-    const head = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Prompt injection","author":{"@type":"Person","name":"Ada Lovelace"}}</script>`
     const { article } = await extractArticle({
-      bytes: page(`${LONG_FORM}${HAZARDS}`, head),
+      bytes: page(`${LONG_FORM}${HAZARDS}`, JSON_LD),
       url: URL,
     })
 
     expect(article?.markdown).toContain('Paragraph 7 keeps the argument moving')
-    expect(article?.markdown).not.toContain('schema.org')
-    expect(article?.markdown).not.toContain('framework state')
-    expect(article?.markdown).not.toContain('next data')
-    expect(article?.markdown).not.toContain('color: red')
-    expect(article?.markdown).not.toContain('template shadow')
-    expect(article?.markdown).not.toContain('noscript fallback')
-    expect(article?.markdown).not.toContain('tracker.example')
+    for (const leak of HAZARD_LEAKS) expect(article?.markdown).not.toContain(leak)
     expect(article?.markdown).not.toContain('figure.png')
   })
 
@@ -114,34 +122,40 @@ describe('extractArticle', () => {
   })
 })
 
-// A document at or below 512 KiB and 5,000 elements gets full cleanup; above
-// either bound the fast profile keeps the article and the Reader Markdown
-// policy, but may retain harmless boilerplate such as bylines, read-time
-// labels, and newsletter prompts.
+// Mirrors of the extractor's Reader policy bounds: changing them there must
+// consciously change these tests.
 const FULL_CLEANUP_BYTES = 512 * 1024
 const FULL_CLEANUP_ELEMENTS = 5_000
 
+// Boilerplate full cleanup removes: a byline, a read-time label, related
+// links, and a newsletter prompt. The markers are the ones only the fast
+// profile retains; the related links happen to fall to cleanup shared by both
+// profiles, which the fast profile is allowed but not required to do.
+const BYLINE = '<p>By Ada Lovelace</p><div>4 min read</div>'
+const TRAILING_BOILERPLATE = `<div><h2>Related posts</h2><ul><li><a href="/writing/a">Another piece</a></li><li><a href="/writing/b">One more piece</a></li></ul></div><div>Subscribe to our newsletter and never miss the latest updates.</div>`
 const BOILERPLATE_MARKERS = ['Ada Lovelace', 'min read', 'newsletter'] as const
 
-/**
- * A page whose parsed element count is exactly `totalElements`: ten fixed
- * elements (html, head, meta, title, body, article, h1, byline, read time,
- * newsletter prompt) plus filler paragraphs.
- */
-function pageWithElements(totalElements: number): Uint8Array {
-  const paragraphs = totalElements - 10
-  return new TextEncoder().encode(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Complexity</title></head><body><article><h1>Complexity</h1><p>By Ada Lovelace</p><div>4 min read</div>${filler(paragraphs)}<div>Subscribe to our newsletter and never miss the latest updates.</div></article></body></html>`,
-  )
+function complexityHtml(body: string, head = ''): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Complexity</title>${head}</head><body><article><h1>Complexity</h1>${body}</article></body></html>`
 }
 
-/** The same page shape padded inside a closing paragraph to exactly `totalBytes`. */
+/**
+ * A page of exactly `totalElements`: seven shell elements (html, head, meta,
+ * title, body, article, h1), ten boilerplate elements, and filler paragraphs.
+ * The boundary tests re-count with the extractor's parser rather than trust
+ * this arithmetic.
+ */
+function pageWithElements(totalElements: number): Uint8Array {
+  const paragraphs = totalElements - 17
+  return new TextEncoder().encode(complexityHtml(`${BYLINE}${filler(paragraphs)}${TRAILING_BOILERPLATE}`))
+}
+
+/** The same page shape padded inside a mid-article paragraph to exactly `totalBytes`. */
 function pageWithBytes(totalBytes: number): Uint8Array {
-  const shell = (pad: string) =>
-    `<!doctype html><html><head><meta charset="utf-8"><title>Complexity</title></head><body><article><h1>Complexity</h1><p>By Ada Lovelace</p><div>4 min read</div>${filler(30)}<div>Subscribe to our newsletter and never miss the latest updates.</div><p>${pad}</p></article></body></html>`
-  const padLength = totalBytes - new TextEncoder().encode(shell('')).byteLength
+  const withPad = (pad: string) => complexityHtml(`${BYLINE}${filler(30)}<p>${pad}</p>${TRAILING_BOILERPLATE}`)
+  const padLength = totalBytes - new TextEncoder().encode(withPad('')).byteLength
   const pad = Array.from({ length: padLength }, (_, index) => (index % 60 === 59 ? ' ' : 'a')).join('')
-  return new TextEncoder().encode(shell(pad))
+  return new TextEncoder().encode(withPad(pad))
 }
 
 function filler(paragraphs: number): string {
@@ -151,16 +165,25 @@ function filler(paragraphs: number): string {
   ).join('')
 }
 
+function parsedElementCount(bytes: Uint8Array): number {
+  return parseHTML(new TextDecoder().decode(bytes)).document.querySelectorAll('*').length
+}
+
 describe('extraction cleanup profiles', () => {
   it('gives a document at the element bound full cleanup', async () => {
-    const { article } = await extractArticle({ bytes: pageWithElements(FULL_CLEANUP_ELEMENTS), url: URL })
+    const bytes = pageWithElements(FULL_CLEANUP_ELEMENTS)
+    expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_ELEMENTS)
+    const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
+    expect(article?.markdown).not.toContain('Related posts')
     for (const marker of BOILERPLATE_MARKERS) expect(article?.markdown).not.toContain(marker)
   })
 
   it('keeps the article of a document above the element bound, tolerating boilerplate', async () => {
-    const { article } = await extractArticle({ bytes: pageWithElements(FULL_CLEANUP_ELEMENTS + 1), url: URL })
+    const bytes = pageWithElements(FULL_CLEANUP_ELEMENTS + 1)
+    expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_ELEMENTS + 1)
+    const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
     for (const marker of BOILERPLATE_MARKERS) expect(article?.markdown).toContain(marker)
@@ -172,6 +195,7 @@ describe('extraction cleanup profiles', () => {
     const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
+    expect(article?.markdown).not.toContain('Related posts')
     for (const marker of BOILERPLATE_MARKERS) expect(article?.markdown).not.toContain(marker)
   })
 
@@ -184,7 +208,10 @@ describe('extraction cleanup profiles', () => {
 
   it('holds the fast profile to the same Reader Markdown policy', async () => {
     const bytes = new TextEncoder().encode(
-      `<!doctype html><html><head><meta charset="utf-8"><title>Complexity</title></head><body><article><h1>Complexity</h1>${HAZARDS}<script type="math/tex; mode=display">E = mc^2</script><pre><code class="language-python">def guard(x):\n    return x</code></pre><table><tr><th>Mitigation</th><th>Holds</th></tr><tr><td>asking nicely</td><td>no</td></tr></table>${filler(5_100)}</article></body></html>`,
+      complexityHtml(
+        `${HAZARDS}<script type="math/tex; mode=display">E = mc^2</script><pre><code class="language-python">def guard(x):\n    return x</code></pre><table><tr><th>Mitigation</th><th>Holds</th></tr><tr><td>asking nicely</td><td>no</td></tr></table>${filler(5_100)}`,
+        JSON_LD,
+      ),
     )
     const { article } = await extractArticle({
       bytes,
@@ -199,16 +226,9 @@ describe('extraction cleanup profiles', () => {
     expect(markdown).toContain('E = mc^2')
     expect(markdown).toContain('[safe link](https://publisher.example/writing/next)')
     expect(markdown).toContain('dangerous link')
-    expect(markdown).not.toContain('javascript:')
     expect(markdown).toContain('![a figure](/reader/images?src=')
     expect(markdown).not.toContain('](https://publisher.example/images/figure.png)')
-    expect(markdown).not.toContain('framework state')
-    expect(markdown).not.toContain('next data')
-    expect(markdown).not.toContain('color: red')
-    expect(markdown).not.toContain('template shadow')
-    expect(markdown).not.toContain('noscript fallback')
-    expect(markdown).not.toContain('tracker.example')
     expect(markdown).not.toContain('<b')
-    expect(markdown).not.toContain('onclick')
+    for (const leak of HAZARD_LEAKS) expect(markdown).not.toContain(leak)
   })
 })
