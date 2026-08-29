@@ -20,6 +20,8 @@ RUN apt-get update \
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patches are part of the install input: the lockfile pins their hashes.
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
