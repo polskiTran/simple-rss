@@ -33,6 +33,16 @@ const IRRELEVANT_DOM_SELECTOR = [
   'embed',
 ].join(', ')
 
+/**
+ * The document surface the extractor touches, alongside whatever the ambient
+ * `Document` means in the current build: the server build (`tsconfig.server.json`)
+ * compiles without the DOM lib, so there `Document` is near-empty and this
+ * intersection carries the members; under the root tsconfig it is redundant.
+ */
+type ArticleDocument = Document & {
+  querySelectorAll(selector: string): Iterable<{ remove(): void }> & { length: number }
+}
+
 export interface ExtractedArticle {
   readonly markdown: string
   readonly wordCount: number
@@ -118,7 +128,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
  * Shims the styleSheets and getComputedStyle Defuddle consults; `document.URL`
  * carries the final address so relative links and extractor matching resolve.
  */
-function articleDocument(html: string, url: string): Document {
+function articleDocument(html: string, url: string): ArticleDocument {
   const { document } = parseHTML(html)
   Object.defineProperty(document, 'styleSheets', {
     configurable: true,
