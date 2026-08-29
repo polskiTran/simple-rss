@@ -12,11 +12,26 @@ import type { Retrieval, RetrievalFailure, RetrievalFailureCode, RetrievalTiming
 import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
 
 /** Every way one Reader operation can end, as named by its `reader.trace` record. */
-type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed'
+type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed' | 'deadline_exceeded'
+
+/**
+ * The total server share of the five-second Reader boundary: one budget from
+ * before capacity queueing through retrieval, worker queueing, extraction, and
+ * the Markdown policy, leaving ~500ms for the response and client rendering.
+ */
+export const READER_BUDGET_MS = 4_500
 
 const RETRY_COOLDOWN_MS = 30_000
 
 const ATTEMPTS_BEFORE_COOLDOWN = 5
+
+/** Marks a budget abort so it is never mistaken for a browser leaving the Reader. */
+class ReaderBudgetExceeded extends Error {
+  constructor() {
+    super('the Reader budget expired')
+    this.name = 'ReaderBudgetExceeded'
+  }
+}
 
 interface FailureEpisode {
   readonly attempts: number
@@ -29,6 +44,7 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number }
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
   | { readonly kind: 'unreadable' }
+  | { readonly kind: 'deadline' }
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
 interface InFlightExtraction {
@@ -42,6 +58,9 @@ const ABANDONED_READER_OUTCOME = {
   failure: { ok: false, code: 'cancelled', reason: 'the browser left the Reader' },
 } satisfies ReaderArticleOutcome
 
+/** Not an unreadable document: the stored summary, open original, and retry all remain valid. */
+const DEADLINE_READER_OUTCOME = { kind: 'deadline' } satisfies ReaderArticleOutcome
+
 export class ReaderService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -50,6 +69,7 @@ export class ReaderService {
   readonly #digest: DigestService
   readonly #extractor: ReaderExtractor
   readonly #logger: Logger
+  readonly #budgetMs: number
   readonly #inFlight = new Map<number, InFlightExtraction>()
   readonly #failures = new Map<number, FailureEpisode>()
 
@@ -61,6 +81,8 @@ export class ReaderService {
     digest: DigestService
     extractor: ReaderExtractor
     logger: Logger
+    /** Tests shorten the budget; production always runs `READER_BUDGET_MS`. */
+    budgetMs?: number
   }) {
     this.#db = options.db
     this.#clock = options.clock
@@ -69,6 +91,7 @@ export class ReaderService {
     this.#digest = options.digest
     this.#extractor = options.extractor
     this.#logger = options.logger
+    this.#budgetMs = options.budgetMs ?? READER_BUDGET_MS
   }
 
   item(feedItemId: number): ReaderItem | undefined {
@@ -138,11 +161,15 @@ export class ReaderService {
       }
     }
 
+    // The budget timer starts before the retrieval is even asked for, so
+    // capacity queueing spends the same budget as every later phase.
     const controller = new AbortController()
+    const budget = setTimeout(() => controller.abort(new ReaderBudgetExceeded()), this.#budgetMs)
     const work = this.#extract(feedItemId, link, controller.signal)
     const extraction: InFlightExtraction = { controller, work, waiters: 0 }
     this.#inFlight.set(feedItemId, extraction)
     const finish = () => {
+      clearTimeout(budget)
       if (this.#inFlight.get(feedItemId) === extraction) this.#inFlight.delete(feedItemId)
     }
     void work.then(finish, finish)
@@ -174,18 +201,22 @@ export class ReaderService {
       return value
     }
 
+    // A budget abort surfaces as a cancellation from Retrieval and the worker;
+    // the signal's reason tells the deadline apart from an abandoning browser.
+    const budgetExpired = () => signal.reason instanceof ReaderBudgetExceeded
+
     const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal, trace })
     if (!result.ok) {
+      const fields = {
+        ...hostField(link),
+        ...(result.status === undefined ? {} : { status: result.status }),
+        ...definedFields(result.timings),
+      }
+      if (result.code === 'cancelled' && budgetExpired()) {
+        return finish('deadline_exceeded', fields, DEADLINE_READER_OUTCOME)
+      }
       if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
-      return finish(
-        result.code,
-        {
-          ...hostField(link),
-          ...(result.status === undefined ? {} : { status: result.status }),
-          ...definedFields(result.timings),
-        },
-        { kind: 'retrieval-failed', failure: result },
-      )
+      return finish(result.code, fields, { kind: 'retrieval-failed', failure: result })
     }
 
     const answered = { ...hostField(result.url), ...definedFields(result.timings) }
@@ -195,7 +226,10 @@ export class ReaderService {
       return finish('unreadable', answered, { kind: 'unreadable' })
     }
     const extraction = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
-    if (extraction.kind === 'cancelled') return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
+    if (extraction.kind === 'cancelled') {
+      if (budgetExpired()) return finish('deadline_exceeded', answered, DEADLINE_READER_OUTCOME)
+      return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
+    }
     if (extraction.kind === 'failed') {
       this.#recordFailure(feedItemId)
       return finish('worker_failed', answered, { kind: 'unreadable' })

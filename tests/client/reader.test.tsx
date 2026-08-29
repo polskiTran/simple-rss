@@ -101,6 +101,41 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
   })
 
+  it('keeps the summary and actions on a server deadline without claiming a parsing failure', async () => {
+    let healed = false
+    reading().on('GET /api/items/3/reader', () =>
+      healed
+        ? { body: ARTICLE }
+        : { status: 504, body: { error: { code: 'article_deadline_exceeded', message: 'too slow' } } },
+    )
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
+    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/could not be parsed/)).toBeNull()
+
+    healed = true
+    await user.click(screen.getByRole('button', { name: 'retry parsing' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+  })
+
+  it('names the deadline plainly when there is no stored summary', async () => {
+    stubApi()
+      .on('GET /api/items/3', { body: { ...ITEM, summary: null } })
+      .on('GET /api/items/3/reader', {
+        status: 504,
+        body: { error: { code: 'article_deadline_exceeded', message: 'too slow' } },
+      })
+    window.history.replaceState(null, '', '/reader/3')
+    render(<App />)
+
+    expect(await screen.findByText('the original page took too long to prepare')).toBeDefined()
+    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'retry parsing' })).toBeDefined()
+    expect(screen.queryByText(/could not be parsed/)).toBeNull()
+  })
+
   it('shows the stored summary while the Reader server remains within its response deadline', async () => {
     vi.useFakeTimers()
     vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {

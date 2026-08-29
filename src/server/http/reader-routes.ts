@@ -55,6 +55,12 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
           422,
           NO_STORE,
         )
+      case 'deadline':
+        return c.json(
+          { error: { code: 'article_deadline_exceeded', message: 'The original page could not be prepared in time' } },
+          504,
+          NO_STORE,
+        )
       case 'rate-limited':
         return c.json(
           { error: { code: 'reader_retry_rate_limited', message: 'Wait before retrying this article' } },

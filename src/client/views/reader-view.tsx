@@ -113,7 +113,12 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </Suspense>
       ) : null}
       {articleState.kind === 'unavailable' || articleState.kind === 'unreachable' ? (
-        <Fallback item={item} waitSeconds={waitSecondsOf(articleState.error)} onRetry={retryParsing} />
+        <Fallback
+          item={item}
+          waitSeconds={waitSecondsOf(articleState.error)}
+          deadline={deadlineExceeded(articleState.error)}
+          onRetry={retryParsing}
+        />
       ) : null}
 
       {next ? (
@@ -140,19 +145,29 @@ function waitSecondsOf(cause: unknown): number | undefined {
     : undefined
 }
 
+/** The server's Reader budget ran out; the page was never judged unreadable. */
+function deadlineExceeded(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.code === 'article_deadline_exceeded'
+}
+
 interface FallbackProps {
   readonly item: ReaderItem
   readonly waitSeconds: number | undefined
+  readonly deadline: boolean
   onRetry(): void
 }
 
-function Fallback({ item, waitSeconds, onRetry }: FallbackProps) {
+function Fallback({ item, waitSeconds, deadline, onRetry }: FallbackProps) {
   return (
     <div className="reader-fallback" role="status">
       {item.summary ? (
         <p className="reader-summary">{item.summary}</p>
       ) : (
-        <p className="empty-note">the original page could not be parsed into an article</p>
+        <p className="empty-note">
+          {deadline
+            ? 'the original page took too long to prepare'
+            : 'the original page could not be parsed into an article'}
+        </p>
       )}
       <p className="reader-fallback-actions">
         {item.link ? (

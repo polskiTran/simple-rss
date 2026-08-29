@@ -31,6 +31,8 @@ export interface HarnessOptions {
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
   readonly readerWorker?: ReaderWorkerControl
+  /** Shortens the total Reader budget so deadline tests never wait 4.5 real seconds. */
+  readonly readerBudgetMs?: number
 }
 
 export interface TestService {
@@ -104,6 +106,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       scheduling: { nudges: false, ...options.scheduling },
       ...(options.retention ? { retention: options.retention } : {}),
       ...(options.readerWorker ? { readerWorkerControl: options.readerWorker } : {}),
+      ...(options.readerBudgetMs === undefined ? {} : { readerBudgetMs: options.readerBudgetMs }),
     })
     running.push(started)
     return started

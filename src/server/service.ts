@@ -34,6 +34,8 @@ export interface ServiceOptions {
   readonly scheduling?: PollSchedulerLimits
   readonly retention?: RetentionLimits
   readonly readerWorkerControl?: ReaderWorkerControl
+  /** Test seam shortening the total Reader budget below its 4.5-second default. */
+  readonly readerBudgetMs?: number
 }
 
 export interface Service {
@@ -109,6 +111,7 @@ export function createService(options: ServiceOptions): Service {
       digest,
       extractor,
       logger,
+      ...(options.readerBudgetMs === undefined ? {} : { budgetMs: options.readerBudgetMs }),
     })
     const search = new SearchService({ db, clock, settings })
     const retention = new RetentionService({ db, clock, logger, ...options.retention })

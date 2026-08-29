@@ -236,6 +236,8 @@ The client renders that Markdown with Streamdown in static mode, with KaTeX and 
 
 Article HTML and Markdown are never written to SQLite. Extraction failures preserve the Feed Item, show its stored summary and an **Open original** action, and expose a rate-limited **Retry parsing** action. Failed extraction responses are not cached.
 
+One 4.5-second server budget covers steps 2–6, from before capacity queueing through the Markdown policy, keeping the whole interactive path inside the User's five-second boundary. At expiry the service cancels active retrieval or terminates and replaces the worker, then answers an uncached `504 article_deadline_exceeded` — a deadline, not an unreadable page, so it never counts against the retry allowance, and the summary, open-original, and retry actions all remain. The client's longer request deadline is only a defensive ceiling above that response.
+
 The service owns the extraction queue and worker lifecycle. Callers for the same Feed Item share one task; the final caller leaving cancels active or queued work. Cancellation or a worker crash fails only that Reader request, and shutdown terminates both worker tasks and Reader retrievals.
 
 ## Image proxy

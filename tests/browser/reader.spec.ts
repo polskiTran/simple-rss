@@ -218,6 +218,37 @@ test.describe('Reader View', () => {
   })
 })
 
+test.describe('Reader View at the server deadline', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, readerBudgetMs: 2_000 })
+
+  test('keeps the summary through the deadline and retries into the article', async ({ page, installation }) => {
+    await subscribe(page, installation, installation.slowArticleFeedUrl)
+    await page.getByRole('link', { name: 'digest' }).click()
+
+    const deadline = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    await page.getByRole('link', { name: 'Slow ridge' }).click()
+
+    await expect(page.getByText('The ridge holds its light.')).toBeVisible()
+    await expect(page.getByText('parsing the original page')).toBeVisible()
+
+    const answered = await deadline
+    expect(answered.status()).toBe(504)
+    expect(((await answered.json()) as { error: { code: string } }).error.code).toBe('article_deadline_exceeded')
+    expect(answered.headers()['cache-control']).toBe('no-store')
+
+    await expect(page.getByText('The ridge holds its light.')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'open original' })).toHaveCount(2)
+    await expect(page.getByText(/could not be parsed/)).toHaveCount(0)
+
+    const retried = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    await page.getByRole('button', { name: 'retry parsing' }).click()
+    expect((await retried).status()).toBe(200)
+
+    await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
+    await expect(page.getByText('The ridge holds its light.')).toHaveCount(0)
+  })
+})
+
 test.describe('Reader View at phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
