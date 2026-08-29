@@ -1,6 +1,10 @@
 import { parseHTML } from 'linkedom'
 import { describe, expect, it } from 'vitest'
-import { extractArticle } from '../../../src/server/reader/extract-article.js'
+import {
+  extractArticle,
+  FULL_CLEANUP_MAX_BYTES,
+  FULL_CLEANUP_MAX_ELEMENTS,
+} from '../../../src/server/reader/extract-article.js'
 
 const URL = 'https://publisher.example/writing/prompt-injection'
 
@@ -121,9 +125,6 @@ describe('extractArticle', () => {
   })
 })
 
-const FULL_CLEANUP_BYTES = 512 * 1024
-const FULL_CLEANUP_ELEMENTS = 5_000
-
 const BYLINE = '<p>By Ada Lovelace</p><div>4 min read</div>'
 const TRAILING_BOILERPLATE = `<div><h2>Related posts</h2><ul><li><a href="/writing/a">Another piece</a></li><li><a href="/writing/b">One more piece</a></li></ul></div><div>Subscribe to our newsletter and never miss the latest updates.</div>`
 const BOILERPLATE_MARKERS = ['Ada Lovelace', 'min read', 'newsletter'] as const
@@ -157,8 +158,8 @@ function parsedElementCount(bytes: Uint8Array): number {
 
 describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   it('gives a document at the element bound full cleanup', async () => {
-    const bytes = pageWithElements(FULL_CLEANUP_ELEMENTS)
-    expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_ELEMENTS)
+    const bytes = pageWithElements(FULL_CLEANUP_MAX_ELEMENTS)
+    expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_MAX_ELEMENTS)
     const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
@@ -167,8 +168,8 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   })
 
   it('keeps the article of a document above the element bound, tolerating boilerplate', async () => {
-    const bytes = pageWithElements(FULL_CLEANUP_ELEMENTS + 1)
-    expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_ELEMENTS + 1)
+    const bytes = pageWithElements(FULL_CLEANUP_MAX_ELEMENTS + 1)
+    expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_MAX_ELEMENTS + 1)
     const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
@@ -176,8 +177,8 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   })
 
   it('gives a document at the byte bound full cleanup', async () => {
-    const bytes = pageWithBytes(FULL_CLEANUP_BYTES)
-    expect(bytes.byteLength).toBe(FULL_CLEANUP_BYTES)
+    const bytes = pageWithBytes(FULL_CLEANUP_MAX_BYTES)
+    expect(bytes.byteLength).toBe(FULL_CLEANUP_MAX_BYTES)
     const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
@@ -186,7 +187,7 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   })
 
   it('keeps the article of a document above the byte bound, tolerating boilerplate', async () => {
-    const { article } = await extractArticle({ bytes: pageWithBytes(FULL_CLEANUP_BYTES + 1), url: URL })
+    const { article } = await extractArticle({ bytes: pageWithBytes(FULL_CLEANUP_MAX_BYTES + 1), url: URL })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
     for (const marker of BOILERPLATE_MARKERS) expect(article?.markdown).toContain(marker)
