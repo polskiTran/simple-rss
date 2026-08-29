@@ -85,8 +85,9 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
       ...(fastProfile ? { removeContentPatterns: false } : {}),
     })
     timings.defuddleMs = elapsedMs(defuddleStartedAt)
-    // A synchronous extractor can represent an otherwise empty page as an
-    // embed. It remains unreadable; Markdown must not turn it into an image.
+    // Page embeds are pruned before Defuddle, but a synchronous site extractor
+    // builds its own embed markup and can represent an otherwise empty page as
+    // one. It remains unreadable; Markdown must not turn it into an image.
     if (result.wordCount === 0 && UNSUPPORTED_ACTIVE_CONTENT.test(result.content)) {
       return { article: undefined, timings }
     }
