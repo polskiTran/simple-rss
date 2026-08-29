@@ -199,7 +199,6 @@ describe('Reader View', () => {
     expect(articleResponse).toBeLessThanOrEqual(markdownCommitted)
     expect(rendererReady).toBeLessThanOrEqual(markdownCommitted)
 
-    // The marks stay in the browser: every request the view made is an API read.
     const asked = api.requests.map((request) => `${request.method} ${request.path}`)
     expect(asked).toEqual(expect.arrayContaining(['GET /api/items/3', 'GET /api/items/3/reader']))
     for (const request of asked) expect(request).toMatch(/^GET \/api\//)

@@ -7,18 +7,11 @@ import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 const WORDS_PER_MINUTE = 225
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
-/**
- * Reader policy bounds for full Defuddle cleanup — not caller-configurable.
- * A document above either bound takes the fast profile: Defuddle content-pattern
- * removal is skipped, so harmless boilerplate may survive, but the article and
- * the Reader Markdown policy are unchanged.
- */
 const FULL_CLEANUP_MAX_BYTES = 512 * 1024
 const FULL_CLEANUP_MAX_ELEMENTS = 5_000
 
 /**
- * Removed after parsing, before Defuddle spends cleanup time on them. JSON-LD
- * stays because Defuddle reads it for metadata; math scripts stay because
+ * JSON-LD stays because Defuddle reads it for metadata; math scripts stay because
  * standardization turns them into math content.
  */
 const IRRELEVANT_DOM_SELECTOR = [
@@ -33,7 +26,6 @@ const IRRELEVANT_DOM_SELECTOR = [
   'embed',
 ].join(', ')
 
-/** linkedom's document, the only thing this module ever parses or prunes. */
 type ArticleDocument = ReturnType<typeof parseHTML>['document']
 
 export interface ExtractedArticle {
@@ -50,7 +42,6 @@ export interface ExtractArticleInput {
   readonly signImageUrl?: SignImageUrl
 }
 
-/** Millisecond phase durations; a phase the extraction never reached is absent. */
 export interface ExtractionTimings {
   readonly domMs?: number | undefined
   readonly defuddleMs?: number | undefined
@@ -58,15 +49,10 @@ export interface ExtractionTimings {
 }
 
 export interface ExtractArticleOutcome {
-  /** `undefined` means no readable article; the caller falls back to the stored summary. */
   readonly article: ExtractedArticle | undefined
   readonly timings: ExtractionTimings
 }
 
-/**
- * Everything here lives and dies with the request — nothing is ever written
- * anywhere. Timings carry the phases that ran, whatever the outcome.
- */
 export async function extractArticle(input: ExtractArticleInput): Promise<ExtractArticleOutcome> {
   const timings: { -readonly [Phase in keyof ExtractionTimings]: ExtractionTimings[Phase] } = {}
   try {

@@ -294,7 +294,6 @@ describe('createNetworkHttpClient', () => {
     expect(fresh?.socketDnsMs).toBeGreaterThanOrEqual(0)
     expect(fresh?.connectMs).toBeGreaterThanOrEqual(0)
     expect(fresh?.ttfbMs).toBeGreaterThanOrEqual(0)
-    // A plain-HTTP origin never runs a TLS handshake, so no phase is reported.
     expect(fresh?.tlsMs).toBeUndefined()
 
     const reused = observed[1]

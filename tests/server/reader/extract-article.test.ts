@@ -26,7 +26,6 @@ const LONG_FORM = `
   <table><tr><th>Mitigation</th><th>Holds</th></tr><tr><td>asking nicely</td><td>no</td></tr></table>
 `
 
-/** Content the Reader Markdown policy must keep out of every profile's output. */
 const HAZARDS = `
   <script>window.__STATE__ = {"secret":"framework state"}</script>
   <script type="application/json" id="__NEXT_DATA__">{"props":{"leak":"next data"}}</script>
@@ -122,15 +121,9 @@ describe('extractArticle', () => {
   })
 })
 
-// Mirrors of the extractor's Reader policy bounds: changing them there must
-// consciously change these tests.
 const FULL_CLEANUP_BYTES = 512 * 1024
 const FULL_CLEANUP_ELEMENTS = 5_000
 
-// Boilerplate full cleanup removes: a byline, a read-time label, related
-// links, and a newsletter prompt. The markers are the ones only the fast
-// profile retains; the related links happen to fall to cleanup shared by both
-// profiles, which the fast profile is allowed but not required to do.
 const BYLINE = '<p>By Ada Lovelace</p><div>4 min read</div>'
 const TRAILING_BOILERPLATE = `<div><h2>Related posts</h2><ul><li><a href="/writing/a">Another piece</a></li><li><a href="/writing/b">One more piece</a></li></ul></div><div>Subscribe to our newsletter and never miss the latest updates.</div>`
 const BOILERPLATE_MARKERS = ['Ada Lovelace', 'min read', 'newsletter'] as const
@@ -139,18 +132,11 @@ function complexityHtml(body: string, head = ''): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Complexity</title>${head}</head><body><article><h1>Complexity</h1>${body}</article></body></html>`
 }
 
-/**
- * A page of exactly `totalElements`: seven shell elements (html, head, meta,
- * title, body, article, h1), ten boilerplate elements, and filler paragraphs.
- * The boundary tests re-count with the extractor's parser rather than trust
- * this arithmetic.
- */
 function pageWithElements(totalElements: number): Uint8Array {
   const paragraphs = totalElements - 17
   return new TextEncoder().encode(complexityHtml(`${BYLINE}${filler(paragraphs)}${TRAILING_BOILERPLATE}`))
 }
 
-/** The same page shape padded inside a mid-article paragraph to exactly `totalBytes`. */
 function pageWithBytes(totalBytes: number): Uint8Array {
   const withPad = (pad: string) => complexityHtml(`${BYLINE}${filler(30)}<p>${pad}</p>${TRAILING_BOILERPLATE}`)
   const padLength = totalBytes - new TextEncoder().encode(withPad('')).byteLength
@@ -169,9 +155,6 @@ function parsedElementCount(bytes: Uint8Array): number {
   return parseHTML(new TextDecoder().decode(bytes)).document.querySelectorAll('*').length
 }
 
-// These tests run the extractor at its policy bounds on purpose, so they are
-// the slowest in the suite (~2s alone) and can cross the 5s default under
-// full-suite CPU contention.
 describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   it('gives a document at the element bound full cleanup', async () => {
     const bytes = pageWithElements(FULL_CLEANUP_ELEMENTS)

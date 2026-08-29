@@ -35,7 +35,6 @@ const rss = (guids: readonly string[]) => `<?xml version="1.0"?>
     )
     .join('')}</channel></rss>`
 
-/** Subscribes to one Feed carrying `guids` and maps each guid to its Feed Item. */
 async function readingSetup(
   service: TestService,
   guids: readonly string[],
@@ -89,8 +88,6 @@ describe('the Reader budget', () => {
   })
 
   it('expires an operation still queued for a retrieval slot with the same contract', async () => {
-    // One operation more than the active Reader slots, so the last spends its
-    // whole budget queued and must still speak the same public contract.
     const slots = RETRIEVAL_PROFILES.reader.capacity.maxConcurrent
     const guids = Array.from({ length: slots + 1 }, (_, index) => `item-${index}`)
     const service = await startTestService({ readerBudgetMs: 400 })
@@ -109,8 +106,6 @@ describe('the Reader budget', () => {
     expect(queued).toHaveLength(1)
     expect(queued[0]).not.toHaveProperty('ttfbMs')
 
-    // Expiry released every slot: a fresh operation reaches its publisher
-    // immediately instead of queueing behind abandoned work.
     const after = user.get(`/api/items/${ids.get('item-after')}/reader`)
     await vi.waitFor(() => expect(service.upstream.requestsTo(articleUrl('item-after'))).toHaveLength(1))
     await expectDeadline(await after)
@@ -180,8 +175,6 @@ describe('the Reader budget', () => {
       await expectDeadline(await user.get(`/api/items/${feedItemId}/reader`))
     }
 
-    // Five deadlines left the allowance untouched: five real failures still
-    // answer as failures before the cooldown takes over.
     mode = 'down'
     for (let attempt = 0; attempt < 5; attempt += 1) {
       expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)

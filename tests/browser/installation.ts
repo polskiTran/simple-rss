@@ -17,7 +17,6 @@ export interface Installation {
   readonly url: string
   readonly feedUrl: string
   readonly brokenArticleFeedUrl: string
-  /** Its article outlasts the Reader budget once, then answers instantly. */
   readonly slowArticleFeedUrl: string
   readonly longFeedUrl: string
 }
@@ -89,7 +88,6 @@ export interface ForeignSite {
 }
 
 export interface InstallationOptions {
-  /** Shortens the server's Reader budget so a deadline test never waits out the production value. */
   readonly readerBudgetMs: number | undefined
 }
 

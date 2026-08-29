@@ -340,8 +340,6 @@ describe('the Reader article', () => {
     const retrieving = user.get(`/api/items/${secondFeedItemId}/reader`)
     await vi.waitFor(() => expect(service.upstream.requestsTo(SECOND_ARTICLE_URL)).toHaveLength(1))
 
-    // Settle handlers attach before the stop, which now drains first and so
-    // leaves these two requests pending long enough to reject unobserved.
     const settled = Promise.allSettled([extracting, retrieving])
     await service.stop()
     await settled
@@ -517,8 +515,6 @@ describe('the Reader article', () => {
       expect(trace?.[phase], phase).toBeGreaterThanOrEqual(0)
     }
     expect(trace?.bytes).toBeGreaterThan(0)
-    // The stubbed transport answers over a warm connection, so the skipped
-    // phases are absent rather than reported as zero elapsed time.
     expect(trace).toMatchObject({ connectionReused: true })
     expect(trace).not.toHaveProperty('connectMs')
 

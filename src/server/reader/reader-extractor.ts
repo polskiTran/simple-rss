@@ -11,7 +11,6 @@ export interface ReaderExtractionInput {
   readonly url: string
 }
 
-/** The worker's extraction phases plus how long the task waited for the worker. */
 export interface ReaderExtractionTimings extends ExtractionTimings {
   readonly workerQueueMs?: number | undefined
 }
@@ -71,7 +70,6 @@ interface ExtractionTask {
   readonly onAbort: () => void
   readonly resolve: (result: ReaderExtractionResult) => void
   readonly enqueuedAt: number
-  /** Set when the task reaches the worker; a task cancelled while queued never waits it out. */
   workerQueueMs?: number
 }
 
@@ -91,7 +89,6 @@ export class ReaderExtractor {
     readonly clock: Clock
     readonly imageSigningKey: Uint8Array
     readonly logger: Logger
-    /** Replaces the extraction worker module, e.g. with a test fixture that crashes or hangs. */
     readonly workerUrl?: URL | undefined
   }) {
     this.#clock = options.clock

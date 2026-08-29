@@ -33,9 +33,7 @@ export interface ServiceOptions {
   readonly sleep?: Sleeper
   readonly scheduling?: PollSchedulerLimits
   readonly retention?: RetentionLimits
-  /** Test seam replacing the extraction worker script, e.g. with a crashing or hanging fixture. */
   readonly readerWorkerUrl?: URL
-  /** Test seam shortening the total Reader budget below its production default. */
   readonly readerBudgetMs?: number
 }
 
@@ -52,13 +50,7 @@ export interface Service {
   readonly settings: InstallationSettingsStore | undefined
   /** The in-process background poller; absent only when startup failed. */
   readonly scheduler: PollScheduler | undefined
-  /**
-   * Shutdown runs in three ordered steps, because they sit on opposite sides of
-   * the HTTP drain: stop background work, drain, then release. The caller owns
-   * the drain, so it owns the order.
-   */
   stopBackgroundWork(): void
-  /** Aborts in-flight Reader operations and retires the extraction worker. */
   releaseRequestResources(): Promise<void>
   close(): void
 }

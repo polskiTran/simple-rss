@@ -67,10 +67,6 @@ const STATUS_PATH = '/api/auth/status'
 const UNAUTHENTICATED = 'unauthenticated'
 
 const REQUEST_TIMEOUT_MS = 30_000
-/**
- * A defensive ceiling only: the server enforces its own shorter Reader budget
- * and answers `article_deadline_exceeded` long before this fires.
- */
 const READER_REQUEST_TIMEOUT_MS = 60_000
 
 interface ApiRequestOptions extends RequestInit {

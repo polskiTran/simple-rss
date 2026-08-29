@@ -108,16 +108,9 @@ export interface RetrievalRequest {
   readonly signal?: AbortSignal
   /** Optional stricter limits; values above the profile are clamped. */
   readonly limits?: RetrievalLimits
-  /** Opaque correlation id stamped on this retrieval's log records. */
   readonly trace?: string
 }
 
-/**
- * Millisecond phase durations for one retrieval. A phase that never ran — a
- * reused connection's DNS, connect, and TLS; a body that never started — is
- * absent rather than reported as zero elapsed time. Connection phases describe
- * the final redirect hop; `dnsMs` sums destination validation across hops.
- */
 export interface RetrievalTimings {
   readonly queueMs?: number
   readonly dnsMs?: number
@@ -127,7 +120,6 @@ export interface RetrievalTimings {
   readonly tlsMs?: number
   readonly ttfbMs?: number
   readonly bodyMs?: number
-  /** Decoded bytes received, counted by the body ceiling. */
   readonly bytes?: number
   readonly redirects: number
   readonly totalMs?: number
@@ -144,7 +136,6 @@ export interface RetrievalSuccess {
   readonly lastModified: string | undefined
   /** True when a conditional request was answered `304` and there is no body. */
   readonly notModified: boolean
-  /** Phases so far; body and total settle once `body` has been fully consumed or cancelled. */
   readonly timings: RetrievalTimings
   /** Reading past the profile's byte ceiling errors the stream with a `RetrievalError`. */
   readonly body: ReadableStream<Uint8Array>
@@ -157,7 +148,6 @@ export interface RetrievalFailure {
   readonly reason: string
   /** Present for `http_error`, so a caller can tell 404 from 503. */
   readonly status?: number
-  /** Present when the boundary itself produced the failure. */
   readonly timings?: RetrievalTimings
 }
 
@@ -333,8 +323,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   let target: string | URL = request.url
   const visited = new Set<string>()
 
-  // Each hop overwrites the connection phases, so the record describes the
-  // final hop rather than mixing a fresh first connection into a reused last one.
   const recordConnection = (connection: HttpTimings): void => {
     delete timings.socketDnsMs
     delete timings.connectMs
