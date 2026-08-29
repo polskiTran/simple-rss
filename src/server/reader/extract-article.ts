@@ -33,15 +33,8 @@ const IRRELEVANT_DOM_SELECTOR = [
   'embed',
 ].join(', ')
 
-/**
- * The document surface the extractor touches, alongside whatever the ambient
- * `Document` means in the current build: the server build (`tsconfig.server.json`)
- * compiles without the DOM lib, so there `Document` is near-empty and this
- * intersection carries the members; under the root tsconfig it is redundant.
- */
-type ArticleDocument = Document & {
-  querySelectorAll(selector: string): Iterable<{ remove(): void }> & { length: number }
-}
+/** linkedom's document, the only thing this module ever parses or prunes. */
+type ArticleDocument = ReturnType<typeof parseHTML>['document']
 
 export interface ExtractedArticle {
   readonly markdown: string

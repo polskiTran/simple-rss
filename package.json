@@ -23,7 +23,7 @@
     "lint": "biome check --error-on-warnings . && pnpm lint:anti-slop",
     "lint:anti-slop": "node --import=tsx node_modules/oxlint/bin/oxlint --config oxlint.config.mjs .",
     "format": "biome format --write .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "cli": "tsx src/server/cli-main.ts"
   },
   "dependencies": {
