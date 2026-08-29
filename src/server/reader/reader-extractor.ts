@@ -5,18 +5,6 @@ import { elapsedMs } from '../clock.js'
 import { errorForLog, type Logger } from '../logger.js'
 import type { ExtractedArticle, ExtractionTimings } from './extract-article.js'
 
-const readerWorkerDirectiveSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('hold'), state: z.instanceof(SharedArrayBuffer) }),
-  z.object({ kind: z.literal('crash') }),
-])
-
-export type ReaderWorkerDirective = z.infer<typeof readerWorkerDirectiveSchema>
-
-export interface ReaderWorkerControl {
-  nextDirective(): ReaderWorkerDirective | undefined
-  taskCancelled?(): void
-}
-
 export interface ReaderExtractionInput {
   readonly bytes: ArrayBuffer
   readonly charset?: string | undefined
@@ -44,7 +32,6 @@ export const readerWorkerRequestSchema = z.object({
   charset: z.string().optional(),
   url: z.string().url(),
   nowMilliseconds: z.number().finite(),
-  directive: readerWorkerDirectiveSchema.optional(),
 })
 
 export type ReaderWorkerRequest = z.infer<typeof readerWorkerRequestSchema>
@@ -80,7 +67,6 @@ export const readerWorkerDataSchema = z.object({
 interface ExtractionTask {
   readonly id: number
   readonly input: ReaderExtractionInput
-  readonly directive: ReaderWorkerDirective | undefined
   readonly signal: AbortSignal
   readonly onAbort: () => void
   readonly resolve: (result: ReaderExtractionResult) => void
@@ -93,7 +79,7 @@ export class ReaderExtractor {
   readonly #clock: Clock
   readonly #imageSigningKey: Uint8Array
   readonly #logger: Logger
-  readonly #control: ReaderWorkerControl | undefined
+  readonly #workerUrl: URL
   readonly #queue: ExtractionTask[] = []
   #nextId = 1
   #worker: Worker | undefined
@@ -105,12 +91,13 @@ export class ReaderExtractor {
     readonly clock: Clock
     readonly imageSigningKey: Uint8Array
     readonly logger: Logger
-    readonly control?: ReaderWorkerControl | undefined
+    /** Replaces the extraction worker module, e.g. with a test fixture that crashes or hangs. */
+    readonly workerUrl?: URL | undefined
   }) {
     this.#clock = options.clock
     this.#imageSigningKey = options.imageSigningKey
     this.#logger = options.logger
-    this.#control = options.control
+    this.#workerUrl = options.workerUrl ?? readerWorkerUrl()
     this.#worker = this.#spawnWorker()
   }
 
@@ -123,7 +110,6 @@ export class ReaderExtractor {
     const task: ExtractionTask = {
       id,
       input,
-      directive: this.#control?.nextDirective(),
       signal,
       onAbort: () => this.#cancel(id),
       resolve,
@@ -131,6 +117,7 @@ export class ReaderExtractor {
     }
     signal.addEventListener('abort', task.onAbort, { once: true })
     this.#queue.push(task)
+    this.#logger.debug('reader.extraction_queued', { taskId: id })
     this.#pump()
     return promise
   }
@@ -177,7 +164,6 @@ export class ReaderExtractor {
       charset: task.input.charset,
       url: task.input.url,
       nowMilliseconds: this.#clock.now().getTime(),
-      directive: task.directive,
     }
     try {
       worker.postMessage(request, [request.bytes])
@@ -255,8 +241,7 @@ export class ReaderExtractor {
   #spawnWorker(): Worker | undefined {
     if (this.#closed) return undefined
     try {
-      const url = readerWorkerUrl()
-      const worker = createReaderWorker(url, this.#imageSigningKey)
+      const worker = createReaderWorker(this.#workerUrl, this.#imageSigningKey)
       worker.on('message', (value) => {
         const reply = readerWorkerReplySchema.safeParse(value)
         this.#onMessage(worker, reply.success ? reply.data : undefined)
@@ -301,7 +286,7 @@ export class ReaderExtractor {
 
   #settleCancelled(task: ExtractionTask): void {
     this.#settle(task, { kind: 'cancelled' })
-    this.#control?.taskCancelled?.()
+    this.#logger.debug('reader.extraction_cancelled', { taskId: task.id })
   }
 }
 

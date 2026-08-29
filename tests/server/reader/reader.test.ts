@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { apiErrorSchema, READER_CACHE_SECONDS, readerArticleSchema, readerItemSchema } from '../../../src/shared/api.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
-import { ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
+import { cancelledExtractions, queuedExtractions, ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
 
 const FEED_URL = 'https://journal.example/feed'
 const ARTICLE_URL = 'https://journal.example/first-light'
@@ -224,9 +224,9 @@ describe('the Reader article', () => {
 
   it('keeps shared extraction alive when one of two callers leaves', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
-    const held = readerWorker.holdNext()
+    const held = await readerWorker.holdNext()
     const firstController = new AbortController()
 
     const first = user.get(`/api/items/${feedItemId}/reader`, firstController.signal)
@@ -244,9 +244,9 @@ describe('the Reader article', () => {
 
   it('keeps authenticated requests responsive while extraction is held', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
-    const held = readerWorker.holdNext()
+    const held = await readerWorker.holdNext()
 
     const article = user.get(`/api/items/${feedItemId}/reader`)
     await held.entered
@@ -258,26 +258,26 @@ describe('the Reader article', () => {
 
   it('cancels an active extraction when its final caller leaves and retries immediately', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
-    const held = readerWorker.holdNext()
+    const held = await readerWorker.holdNext()
     const controller = new AbortController()
 
     const abandoned = user.get(`/api/items/${feedItemId}/reader`, controller.signal)
     await held.entered
     controller.abort()
     await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
-    await readerWorker.waitForCancelledTasks(1)
+    await vi.waitFor(() => expect(cancelledExtractions(service.logs)).toBe(1))
 
     const retried = user.get(`/api/items/${feedItemId}/reader`)
-    await readerWorker.waitForSubmittedTasks(2)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(2))
     expect((await retried).status).toBe(200)
     expect(service.upstream.requestsTo(ARTICLE_URL)).toHaveLength(2)
   })
 
   it('removes a cancelled queued extraction before accepting a fresh request', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
     const digest = await (await user.get('/api/digest')).json()
     const secondFeedItemId = readerItemFind(digest, 'Evening notes')
@@ -285,19 +285,19 @@ describe('the Reader article', () => {
       headers: { 'content-type': 'text/html' },
       body: ARTICLE_HTML,
     })
-    const held = readerWorker.holdNext()
+    const held = await readerWorker.holdNext()
 
     const active = user.get(`/api/items/${feedItemId}/reader`)
     await held.entered
     const queuedController = new AbortController()
     const queued = user.get(`/api/items/${secondFeedItemId}/reader`, queuedController.signal)
-    await readerWorker.waitForSubmittedTasks(2)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(2))
 
     queuedController.abort()
     await expect(queued).rejects.toMatchObject({ name: 'AbortError' })
-    await readerWorker.waitForCancelledTasks(1)
+    await vi.waitFor(() => expect(cancelledExtractions(service.logs)).toBe(1))
     const retried = user.get(`/api/items/${secondFeedItemId}/reader`)
-    await readerWorker.waitForSubmittedTasks(3)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(3))
 
     held.release()
     expect((await active).status).toBe(200)
@@ -307,9 +307,9 @@ describe('the Reader article', () => {
 
   it('degrades a worker crash and replaces it for the next extraction', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
-    readerWorker.crashNext()
+    await readerWorker.crashNext()
 
     const failed = await user.get(`/api/items/${feedItemId}/reader`)
     expect(failed.status).toBe(422)
@@ -324,7 +324,7 @@ describe('the Reader article', () => {
 
   it('cancels worker and publisher work before service shutdown completes', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
     const digest = await (await user.get('/api/digest')).json()
     const secondFeedItemId = readerItemFind(digest, 'Evening notes')
@@ -333,7 +333,7 @@ describe('the Reader article', () => {
       body: ARTICLE_HTML,
       delayMs: 5_000,
     })
-    const held = readerWorker.holdNext()
+    const held = await readerWorker.holdNext()
 
     const extracting = user.get(`/api/items/${feedItemId}/reader`)
     await held.entered
@@ -343,7 +343,7 @@ describe('the Reader article', () => {
     await service.stop()
     await Promise.allSettled([extracting, retrieving])
 
-    expect(readerWorker.cancelledTasks()).toBe(1)
+    expect(cancelledExtractions(service.logs)).toBe(1)
     expect(service.upstream.aborted).toContain(SECOND_ARTICLE_URL)
   })
 
@@ -575,9 +575,9 @@ describe('the Reader article', () => {
 
   it('closes a worker crash with its own terminal trace', async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url })
     const { user, feedItemId } = await readingSetup(service)
-    readerWorker.crashNext()
+    await readerWorker.crashNext()
 
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(422)
 

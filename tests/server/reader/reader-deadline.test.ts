@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { apiErrorSchema, readerItemSchema } from '../../../src/shared/api.js'
 import { RETRIEVAL_PROFILES } from '../../../src/server/upstream/retrieval.js'
 import { claimedDevice, type Device } from '../../support/device.js'
-import { ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
+import { cancelledExtractions, queuedExtractions, ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 import { pacedBody } from '../../support/upstream-fixtures.js'
 
@@ -141,20 +141,20 @@ describe('the Reader budget', () => {
     timeout: 20_000,
   }, async () => {
     const readerWorker = new ReaderWorkerFixtures()
-    const service = await startTestService({ readerWorker, readerBudgetMs: 2_000 })
+    const service = await startTestService({ readerWorkerUrl: readerWorker.url, readerBudgetMs: 2_000 })
     const { user, ids } = await readingSetup(service, ['item-one', 'item-two'])
     service.upstream.stub(articleUrl('item-one'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
     service.upstream.stub(articleUrl('item-two'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
-    const held = readerWorker.holdNext()
+    const held = await readerWorker.holdNext()
 
     const active = user.get(`/api/items/${ids.get('item-one')}/reader`)
     await held.entered
     const queued = user.get(`/api/items/${ids.get('item-two')}/reader`)
-    await readerWorker.waitForSubmittedTasks(2)
+    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(2))
 
     await expectDeadline(await active)
     await expectDeadline(await queued)
-    await readerWorker.waitForCancelledTasks(2)
+    await vi.waitFor(() => expect(cancelledExtractions(service.logs)).toBe(2))
 
     const trace = service.logs.find((record) => record.message === 'reader.trace')
     expect(trace).toMatchObject({ outcome: 'deadline_exceeded', host: 'journal.example' })

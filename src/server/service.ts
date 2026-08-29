@@ -13,7 +13,7 @@ import { createLogger, errorForLog, type Logger } from './logger.js'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
-import { ReaderExtractor, type ReaderWorkerControl } from './reader/reader-extractor.js'
+import { ReaderExtractor } from './reader/reader-extractor.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
@@ -33,7 +33,8 @@ export interface ServiceOptions {
   readonly sleep?: Sleeper
   readonly scheduling?: PollSchedulerLimits
   readonly retention?: RetentionLimits
-  readonly readerWorkerControl?: ReaderWorkerControl
+  /** Test seam replacing the extraction worker script, e.g. with a crashing or hanging fixture. */
+  readonly readerWorkerUrl?: URL
   /** Test seam shortening the total Reader budget below its production default. */
   readonly readerBudgetMs?: number
 }
@@ -101,7 +102,7 @@ export function createService(options: ServiceOptions): Service {
       clock,
       imageSigningKey,
       logger,
-      control: options.readerWorkerControl,
+      workerUrl: options.readerWorkerUrl,
     })
     reader = new ReaderService({
       db,
