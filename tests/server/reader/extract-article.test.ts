@@ -169,7 +169,10 @@ function parsedElementCount(bytes: Uint8Array): number {
   return parseHTML(new TextDecoder().decode(bytes)).document.querySelectorAll('*').length
 }
 
-describe('extraction cleanup profiles', () => {
+// These tests run the extractor at its policy bounds on purpose, so they are
+// the slowest in the suite (~2s alone) and can cross the 5s default under
+// full-suite CPU contention.
+describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   it('gives a document at the element bound full cleanup', async () => {
     const bytes = pageWithElements(FULL_CLEANUP_ELEMENTS)
     expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_ELEMENTS)
