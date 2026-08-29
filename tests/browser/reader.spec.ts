@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { apiErrorSchema } from '../../src/shared/api.js'
 import {
   expect,
   expectNoHorizontalOverflow,
@@ -233,7 +234,7 @@ test.describe('Reader View at the server deadline', () => {
 
     const answered = await deadline
     expect(answered.status()).toBe(504)
-    expect(((await answered.json()) as { error: { code: string } }).error.code).toBe('article_deadline_exceeded')
+    expect(apiErrorSchema.parse(await answered.json()).error.code).toBe('article_deadline_exceeded')
     expect(answered.headers()['cache-control']).toBe('no-store')
 
     await expect(page.getByText('The ridge holds its light.')).toBeVisible()

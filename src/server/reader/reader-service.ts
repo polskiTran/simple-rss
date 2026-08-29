@@ -19,7 +19,7 @@ type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'w
  * before capacity queueing through retrieval, worker queueing, extraction, and
  * the Markdown policy, leaving ~500ms for the response and client rendering.
  */
-export const READER_BUDGET_MS = 4_500
+const READER_BUDGET_MS = 4_500
 
 const RETRY_COOLDOWN_MS = 30_000
 
@@ -161,8 +161,7 @@ export class ReaderService {
       }
     }
 
-    // The budget timer starts before the retrieval is even asked for, so
-    // capacity queueing spends the same budget as every later phase.
+    // Capacity queueing spends the same budget as every later phase.
     const controller = new AbortController()
     const budget = setTimeout(() => controller.abort(new ReaderBudgetExceeded()), this.#budgetMs)
     const work = this.#extract(feedItemId, link, controller.signal)
