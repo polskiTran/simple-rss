@@ -7,8 +7,8 @@ import { applyReaderMarkdownPolicy } from './markdown-policy.js'
 const WORDS_PER_MINUTE = 225
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
-const FULL_CLEANUP_MAX_BYTES = 512 * 1024
-const FULL_CLEANUP_MAX_ELEMENTS = 5_000
+export const FULL_CLEANUP_MAX_BYTES = 512 * 1024
+export const FULL_CLEANUP_MAX_ELEMENTS = 5_000
 
 /**
  * JSON-LD stays because Defuddle reads it for metadata; math scripts stay because
