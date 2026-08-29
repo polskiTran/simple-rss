@@ -4,6 +4,7 @@ import { DATABASE_FILE, loadConfig, type Config } from '../../src/server/config.
 import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { DrizzleDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
+import type { ReaderWorkerControl } from '../../src/server/reader/reader-extractor.js'
 import type { RetentionLimits } from '../../src/server/retention/retention-service.js'
 import { startService, type RunningService } from '../../src/server/server.js'
 import type { PollSchedulerLimits } from '../../src/server/subscriptions/poll-scheduler.js'
@@ -29,6 +30,7 @@ export interface HarnessOptions {
   readonly scheduling?: PollSchedulerLimits
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
+  readonly readerWorker?: ReaderWorkerControl
 }
 
 export interface TestService {
@@ -101,6 +103,7 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
       logger,
       scheduling: { nudges: false, ...options.scheduling },
       ...(options.retention ? { retention: options.retention } : {}),
+      ...(options.readerWorker ? { readerWorkerControl: options.readerWorker } : {}),
     })
     running.push(started)
     return started

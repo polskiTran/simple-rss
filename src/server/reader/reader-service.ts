@@ -4,11 +4,10 @@ import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
-import type { SignImageUrl } from '../images/image-url-signature.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure } from '../upstream/retrieval.js'
-import { extractArticle } from './extract-article.js'
+import type { ReaderExtractor } from './reader-extractor.js'
 
 const RETRY_COOLDOWN_MS = 30_000
 
@@ -44,7 +43,7 @@ export class ReaderService {
   readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
-  readonly #signImageUrl: SignImageUrl
+  readonly #extractor: ReaderExtractor
   readonly #inFlight = new Map<number, InFlightExtraction>()
   readonly #failures = new Map<number, FailureEpisode>()
 
@@ -54,14 +53,14 @@ export class ReaderService {
     settings: InstallationSettingsStore
     retrieval: Retrieval
     digest: DigestService
-    signImageUrl: SignImageUrl
+    extractor: ReaderExtractor
   }) {
     this.#db = options.db
     this.#clock = options.clock
     this.#settings = options.settings
     this.#retrieval = options.retrieval
     this.#digest = options.digest
-    this.#signImageUrl = options.signImageUrl
+    this.#extractor = options.extractor
   }
 
   item(feedItemId: number): ReaderItem | undefined {
@@ -142,6 +141,12 @@ export class ReaderService {
     return this.#waitForExtraction(feedItemId, extraction, signal)
   }
 
+  async close(): Promise<void> {
+    for (const extraction of this.#inFlight.values()) extraction.controller.abort()
+    this.#inFlight.clear()
+    await this.#extractor.close()
+  }
+
   async #extract(feedItemId: number, link: string, signal: AbortSignal): Promise<ReaderArticleOutcome> {
     const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal })
     if (!result.ok) {
@@ -149,16 +154,18 @@ export class ReaderService {
       return { kind: 'retrieval-failed', failure: result }
     }
 
-    const extracted = await extractArticle({
-      bytes: result.bytes,
-      charset: result.charset,
-      url: result.url,
-      signImageUrl: this.#signImageUrl,
-    })
-    if (!extracted) {
+    const bytes = ownedArrayBuffer(result.bytes)
+    if (!bytes) {
       this.#recordFailure(feedItemId)
       return { kind: 'unreadable' }
     }
+    const extraction = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
+    if (extraction.kind === 'cancelled') return ABANDONED_READER_OUTCOME
+    if (extraction.kind !== 'extracted') {
+      this.#recordFailure(feedItemId)
+      return { kind: 'unreadable' }
+    }
+    const extracted = extraction.article
 
     this.#failures.delete(feedItemId)
     return {
@@ -225,4 +232,10 @@ export class ReaderService {
       displayTime: next.displayTime,
     }
   }
+}
+
+function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer | undefined {
+  if (!(bytes.buffer instanceof ArrayBuffer)) return undefined
+  if (bytes.byteOffset !== 0 || bytes.byteLength !== bytes.buffer.byteLength) return undefined
+  return bytes.buffer
 }
