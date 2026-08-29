@@ -14,10 +14,7 @@ const port = parentPort
 const imageSigningKey = data.imageSigningKey
 
 port.on('message', (value) => {
-  const request = readerWorkerRequestSchema.parse(value)
-  if (request.directive?.kind === 'crash') throw new Error('Reader extraction worker crash requested')
-  if (request.directive?.kind === 'hold') hold(request.directive.state)
-  void run(request)
+  void run(readerWorkerRequestSchema.parse(value))
 })
 
 async function run(request: ReaderWorkerRequest): Promise<void> {
@@ -36,11 +33,4 @@ async function run(request: ReaderWorkerRequest): Promise<void> {
     ? { id: request.id, kind: 'extracted', article, timings }
     : { id: request.id, kind: 'unreadable', timings }
   port.postMessage(reply)
-}
-
-function hold(state: SharedArrayBuffer): void {
-  const view = new Int32Array(state)
-  Atomics.store(view, 0, 1)
-  Atomics.notify(view, 0)
-  while (Atomics.load(view, 0) === 1) Atomics.wait(view, 0, 1)
 }
