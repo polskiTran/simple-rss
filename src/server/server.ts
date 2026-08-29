@@ -8,7 +8,7 @@ export interface StartOptions extends ServiceOptions {
 }
 
 /** A listening service. `stop()` is the only way down: it drains before closing the database. */
-export interface RunningService extends Omit<Service, 'stopBackgroundWork' | 'releaseRequestResources' | 'close'> {
+export interface RunningService extends Omit<Service, 'shutdown'> {
   /** The port actually bound, which differs from the request when it was 0. */
   readonly port: number
   /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
@@ -98,10 +98,6 @@ async function shutdown(server: Server, service: Service, graceMs: number): Prom
     })
     server.closeIdleConnections()
   })
-  service.stopBackgroundWork()
-  await drained
-  await service.releaseRequestResources()
-
-  service.close()
+  await service.shutdown(() => drained)
   service.logger.info('server.stopped')
 }
