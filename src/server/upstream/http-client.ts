@@ -1,14 +1,8 @@
-/**
- * Millisecond connection phases for one answered request. A phase an adapter
- * skipped — a reused connection, a plain-HTTP origin — is absent rather than
- * reported as zero elapsed time.
- */
 export interface HttpTimings {
   readonly connectionReused: boolean
   readonly socketDnsMs?: number
   readonly connectMs?: number
   readonly tlsMs?: number
-  /** From dispatch on an established connection to the response headers. */
   readonly ttfbMs?: number
 }
 

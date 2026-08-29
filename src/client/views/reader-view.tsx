@@ -15,8 +15,6 @@ const ArticleMarkdown = lazy(async () => ({
   default: (await preloadArticleMarkdown()).ArticleMarkdown,
 }))
 
-// These marks stay in the browser's performance timeline for the User to
-// inspect; nothing reads or uploads them.
 const READER_MARKS = {
   entry: 'reader:entry',
   articleResponse: 'reader:article-response',
@@ -145,7 +143,6 @@ function waitSecondsOf(cause: unknown): number | undefined {
     : undefined
 }
 
-/** The server's Reader budget ran out; the page was never judged unreadable. */
 function deadlineExceeded(cause: unknown): boolean {
   return cause instanceof ApiError && cause.code === 'article_deadline_exceeded'
 }

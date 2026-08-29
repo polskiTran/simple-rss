@@ -73,12 +73,8 @@ function listen(app: Service['app'], port: number): Promise<ListeningServer> {
 }
 
 /**
- * Refuse new connections, stop the scheduler so no new poll starts, let
- * in-flight requests finish, then release the Reader worker and close the
- * database so no request observes a closed handle. The two release steps sit on
- * opposite sides of the drain, which is why they are separate calls. Whatever
- * outlives the grace period is cut off, because a platform that sent SIGTERM
- * sends SIGKILL next.
+ * Whatever outlives the grace period is cut off, because a platform that sent
+ * SIGTERM sends SIGKILL next.
  */
 async function shutdown(server: Server, service: Service, graceMs: number): Promise<void> {
   service.logger.info('server.stopping', { graceMs })

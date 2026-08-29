@@ -29,9 +29,7 @@ export interface HarnessOptions {
   readonly scheduling?: PollSchedulerLimits
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
-  /** Replaces the extraction worker script, e.g. with the crash-and-hold fixture worker. */
   readonly readerWorkerUrl?: URL
-  /** Shortens the total Reader budget so deadline tests never wait out the production value. */
   readonly readerBudgetMs?: number
 }
 

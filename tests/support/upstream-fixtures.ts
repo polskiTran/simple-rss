@@ -96,8 +96,6 @@ export class UpstreamFixtures {
       // `304` and friends carry no body at all, and `Response` refuses to
       // pretend otherwise.
       const carriesBody = status !== 204 && status !== 205 && status !== 304
-      // The stubbed world has no sockets, so it answers like a warm reused
-      // connection: no DNS, connect, or TLS phases, only time to first byte.
       onTimings?.({ connectionReused: true, ttfbMs: performance.now() - askedAt })
       return new Response(carriesBody ? (body as BodyInit) : null, { status, headers })
     }

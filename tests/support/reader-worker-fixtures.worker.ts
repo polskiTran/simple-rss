@@ -9,13 +9,6 @@ import {
 } from '../../src/server/reader/reader-extractor.js'
 import { readerWorkerFixtureDirectiveSchema, type ReaderWorkerFixtureDirective } from './reader-worker-fixtures.js'
 
-/**
- * The production extraction worker plus fault injection: it speaks the real
- * request and reply schemas and extracts for real, but an armed directive
- * makes the next task crash the thread or park it in `Atomics.wait` until the
- * test releases the shared state. `ReaderWorkerFixtures` names the channel in
- * this module's URL query and arms directives over it.
- */
 const channelName = new URL(import.meta.url).searchParams.get('channel')
 if (!channelName) throw new Error(`Reader worker fixture requires a channel query: ${import.meta.url}`)
 if (!parentPort) throw new Error('Reader worker fixture requires a parent port')

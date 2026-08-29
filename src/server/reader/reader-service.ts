@@ -11,21 +11,14 @@ import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } fro
 import type { Retrieval, RetrievalFailure, RetrievalFailureCode, RetrievalTimings } from '../upstream/retrieval.js'
 import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
 
-/** Every way one Reader operation can end, as named by its `reader.trace` record. */
 type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed' | 'deadline_exceeded'
 
-/**
- * The total server share of the five-second Reader boundary: one budget from
- * before capacity queueing through retrieval, worker queueing, extraction, and
- * the Markdown policy, leaving ~500ms for the response and client rendering.
- */
 const READER_BUDGET_MS = 4_500
 
 const RETRY_COOLDOWN_MS = 30_000
 
 const ATTEMPTS_BEFORE_COOLDOWN = 5
 
-/** Marks a budget abort so it is never mistaken for a browser leaving the Reader. */
 class ReaderBudgetExceeded extends Error {
   constructor() {
     super('the Reader budget expired')
@@ -58,7 +51,6 @@ const ABANDONED_READER_OUTCOME = {
   failure: { ok: false, code: 'cancelled', reason: 'the browser left the Reader' },
 } satisfies ReaderArticleOutcome
 
-/** Not an unreadable document: the stored summary, open original, and retry all remain valid. */
 const DEADLINE_READER_OUTCOME = { kind: 'deadline' } satisfies ReaderArticleOutcome
 
 export class ReaderService {
@@ -81,7 +73,6 @@ export class ReaderService {
     digest: DigestService
     extractor: ReaderExtractor
     logger: Logger
-    /** Tests shorten the budget; production always runs `READER_BUDGET_MS`. */
     budgetMs?: number
   }) {
     this.#db = options.db
@@ -161,7 +152,6 @@ export class ReaderService {
       }
     }
 
-    // Capacity queueing spends the same budget as every later phase.
     const controller = new AbortController()
     const budget = setTimeout(() => controller.abort(new ReaderBudgetExceeded()), this.#budgetMs)
     const work = this.#extract(feedItemId, link, controller.signal)
@@ -200,8 +190,6 @@ export class ReaderService {
       return value
     }
 
-    // A budget abort surfaces as a cancellation from Retrieval and the worker;
-    // the signal's reason tells the deadline apart from an abandoning browser.
     const budgetExpired = () => signal.reason instanceof ReaderBudgetExceeded
 
     const result = await this.#retrieval.retrieveBytes({ url: link, operation: 'reader', signal, trace })
@@ -306,10 +294,6 @@ export class ReaderService {
   }
 }
 
-/**
- * `reader.trace` fields stay at the publisher-host level: never the URL path or
- * query, and never retrieved HTML, extracted Markdown, or Feed Item summaries.
- */
 function hostField(url: string): LogFields {
   try {
     return { host: new URL(url).host }
@@ -329,9 +313,7 @@ function definedFields(timings: RetrievalTimings | ReaderExtractionTimings | und
 
 /**
  * The extractor transfers this buffer to the worker, which detaches every view
- * onto it, so the article has to be the buffer's only occupant. Bytes that
- * already fill their own buffer transfer as they are; a view into a larger or
- * shared one is copied out first, costing at most one copy of the 5 MiB cap.
+ * onto it, so the article has to be the buffer's only occupant.
  */
 function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const owned =
