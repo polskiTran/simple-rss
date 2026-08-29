@@ -74,7 +74,7 @@ export function createService(options: ServiceOptions): Service {
   const readiness = new Readiness()
 
   let scheduler: PollScheduler | undefined
-  let reader: ReaderService | undefined
+  let extractor: ReaderExtractor | undefined
   let services: Services | undefined
 
   try {
@@ -98,13 +98,13 @@ export function createService(options: ServiceOptions): Service {
     const imageSigningKey = randomBytes(32)
     const imageSignature = createImageUrlSignature({ key: imageSigningKey, clock })
     const images = new ImageService({ db, retrieval })
-    const extractor = new ReaderExtractor({
+    extractor = new ReaderExtractor({
       clock,
       imageSigningKey,
       logger,
       workerUrl: options.readerWorkerUrl,
     })
-    reader = new ReaderService({
+    const reader = new ReaderService({
       db,
       clock,
       settings,
@@ -140,7 +140,9 @@ export function createService(options: ServiceOptions): Service {
       applied,
     })
   } catch (error) {
-    void reader?.close()
+    extractor
+      ?.close()
+      .catch((closeError) => logger.error('startup.reader_close_failed', { error: errorForLog(closeError) }))
     readiness.markFailed('migrations failed')
     logger.error('startup.migrations_failed', { databasePath: config.databasePath, error: errorForLog(error) })
   }
