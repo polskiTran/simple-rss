@@ -13,7 +13,11 @@ import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extracto
 
 type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed' | 'deadline_exceeded'
 
-const READER_BUDGET_MS = 4_500
+const READER_USER_BOUNDARY_MS = 5_000
+
+const READER_RESPONSE_AND_RENDER_MS = 500
+
+const READER_BUDGET_MS = READER_USER_BOUNDARY_MS - READER_RESPONSE_AND_RENDER_MS
 
 const RETRY_COOLDOWN_MS = 30_000
 
