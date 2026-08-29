@@ -9,7 +9,7 @@ import {
   type DestinationPolicy,
   type ResolveAddresses,
 } from './destination.js'
-import { elapsedMs } from '../clock.js'
+import { elapsedMs } from '../monotonic.js'
 import { HttpClientError, type HttpClient, type HttpTimings } from './http-client.js'
 import { createNetworkHttpClient } from './network-client.js'
 
