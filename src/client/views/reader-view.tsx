@@ -15,6 +15,22 @@ const ArticleMarkdown = lazy(async () => ({
   default: (await preloadArticleMarkdown()).ArticleMarkdown,
 }))
 
+// These marks stay in the browser's performance timeline for the User to
+// inspect; nothing reads or uploads them.
+const READER_MARKS = {
+  entry: 'reader:entry',
+  articleResponse: 'reader:article-response',
+  rendererReady: 'reader:renderer-ready',
+  markdownCommitted: 'reader:markdown-committed',
+} as const
+
+function MarkdownCommitted() {
+  useEffect(() => {
+    performance.mark(READER_MARKS.markdownCommitted)
+  }, [])
+  return null
+}
+
 const parsingNote = <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
 
 export interface ReaderViewProps {
@@ -28,12 +44,19 @@ export interface ReaderViewProps {
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
   const [itemState, { set: setItem }] = useResource((signal) => fetchReaderItem(feedItemId, signal), [feedItemId])
   const [articleState, { retry: retryParsing }] = useResource(
-    (signal) => fetchReaderArticle(feedItemId, signal),
+    (signal) =>
+      fetchReaderArticle(feedItemId, signal).finally(() => {
+        if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
+      }),
     [feedItemId],
   )
 
   useEffect(() => {
-    void preloadArticleMarkdown()
+    performance.mark(READER_MARKS.entry)
+  }, [feedItemId])
+
+  useEffect(() => {
+    void preloadArticleMarkdown().then(() => performance.mark(READER_MARKS.rendererReady))
   }, [])
 
   if (itemState.kind === 'loading') {
@@ -86,6 +109,7 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
       {articleState.kind === 'loaded' ? (
         <Suspense fallback={waitingContent}>
           <ArticleMarkdown markdown={articleState.value.markdown} />
+          <MarkdownCommitted />
         </Suspense>
       ) : null}
       {articleState.kind === 'unavailable' || articleState.kind === 'unreachable' ? (

@@ -142,6 +142,34 @@ describe('Reader View', () => {
     expect(await screen.findByText(/wait 21s, then retry/)).toBeDefined()
   })
 
+  it('marks the Reader critical path locally without telling any service', async () => {
+    performance.clearMarks()
+    const api = reading()
+    render(<App />)
+
+    await screen.findByRole('heading', { level: 3, name: 'Dawn' })
+    await waitFor(() => expect(performance.getEntriesByName('reader:markdown-committed', 'mark')).not.toHaveLength(0))
+
+    const markedAt = (name: string): number => {
+      const marks = performance.getEntriesByName(name, 'mark')
+      expect(marks.length, name).toBeGreaterThan(0)
+      return marks[marks.length - 1]?.startTime ?? Number.NaN
+    }
+    const entry = markedAt('reader:entry')
+    const articleResponse = markedAt('reader:article-response')
+    const rendererReady = markedAt('reader:renderer-ready')
+    const markdownCommitted = markedAt('reader:markdown-committed')
+    expect(entry).toBeLessThanOrEqual(articleResponse)
+    expect(entry).toBeLessThanOrEqual(rendererReady)
+    expect(articleResponse).toBeLessThanOrEqual(markdownCommitted)
+    expect(rendererReady).toBeLessThanOrEqual(markdownCommitted)
+
+    // The marks stay in the browser: every request the view made is an API read.
+    const asked = api.requests.map((request) => `${request.method} ${request.path}`)
+    expect(asked).toEqual(expect.arrayContaining(['GET /api/items/3', 'GET /api/items/3/reader']))
+    for (const request of asked) expect(request).toMatch(/^GET \/api\//)
+  })
+
   it('closes back to the digest when the mark is pressed', async () => {
     reading()
     render(<App />)

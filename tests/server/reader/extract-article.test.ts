@@ -27,7 +27,7 @@ const LONG_FORM = `
 
 describe('extractArticle', () => {
   it('extracts long-form technical content as structured markdown', async () => {
-    const article = await extractArticle({ bytes: page(LONG_FORM), url: URL })
+    const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
 
     expect(article).toBeDefined()
     expect(article?.markdown).toContain('Paragraph 7 keeps the argument moving')
@@ -39,17 +39,25 @@ describe('extractArticle', () => {
   })
 
   it('estimates reading time from what the Reader will actually show', async () => {
-    const article = await extractArticle({ bytes: page(LONG_FORM), url: URL })
+    const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
 
     expect(article?.wordCount).toBeGreaterThan(700)
     expect(article?.readingTimeMinutes).toBe(Math.ceil((article?.wordCount ?? 0) / 225))
+  })
+
+  it('times each extraction phase it reached, without recording content', async () => {
+    const { timings } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
+
+    expect(timings.domMs).toBeGreaterThanOrEqual(0)
+    expect(timings.defuddleMs).toBeGreaterThanOrEqual(0)
+    expect(timings.markdownPolicyMs).toBeGreaterThanOrEqual(0)
   })
 
   it('honours a declared transport charset over the UTF-8 default', async () => {
     const body =
       '<html><head><title>t</title></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
     const latin1 = Uint8Array.from([...body].map((char) => char.charCodeAt(0)))
-    const article = await extractArticle({ bytes: latin1, charset: 'windows-1252', url: URL })
+    const { article } = await extractArticle({ bytes: latin1, charset: 'windows-1252', url: URL })
 
     expect(article?.markdown).toContain('café terrace')
   })
@@ -58,17 +66,19 @@ describe('extractArticle', () => {
     const body =
       '<html><head><meta charset="windows-1252"></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
     const bytes = Uint8Array.from([...body].map((char) => char.charCodeAt(0)))
-    const article = await extractArticle({ bytes, url: URL })
+    const { article } = await extractArticle({ bytes, url: URL })
 
     expect(article?.markdown).toContain('café terrace')
   })
 
-  it('answers undefined when a page has nothing to extract', async () => {
-    const article = await extractArticle({
+  it('answers no article when a page has nothing to extract, still carrying its timings', async () => {
+    const outcome = await extractArticle({
       bytes: new TextEncoder().encode('<!doctype html><html><head></head><body></body></html>'),
       url: URL,
     })
 
-    expect(article).toBeUndefined()
+    expect(outcome.article).toBeUndefined()
+    expect(outcome.timings.domMs).toBeGreaterThanOrEqual(0)
+    expect(outcome.timings.defuddleMs).toBeGreaterThanOrEqual(0)
   })
 })

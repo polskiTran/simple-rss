@@ -108,6 +108,7 @@ export function createService(options: ServiceOptions): Service {
       retrieval,
       digest,
       extractor,
+      logger,
     })
     const search = new SearchService({ db, clock, settings })
     const retention = new RetentionService({ db, clock, logger, ...options.retention })

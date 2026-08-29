@@ -21,7 +21,7 @@ port.on('message', (value) => {
 })
 
 async function run(request: ReaderWorkerRequest): Promise<void> {
-  const extracted = await extractArticle({
+  const { article, timings } = await extractArticle({
     bytes: new Uint8Array(request.bytes),
     charset: request.charset,
     url: request.url,
@@ -32,9 +32,9 @@ async function run(request: ReaderWorkerRequest): Promise<void> {
         url,
       }),
   })
-  const reply: ReaderWorkerReply = extracted
-    ? { id: request.id, kind: 'extracted', article: extracted }
-    : { id: request.id, kind: 'unreadable' }
+  const reply: ReaderWorkerReply = article
+    ? { id: request.id, kind: 'extracted', article, timings }
+    : { id: request.id, kind: 'unreadable', timings }
   port.postMessage(reply)
 }
 
