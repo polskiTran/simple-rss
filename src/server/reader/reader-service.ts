@@ -220,10 +220,6 @@ export class ReaderService {
 
     const answered = { ...hostField(result.url), ...definedFields(result.timings) }
     const bytes = ownedArrayBuffer(result.bytes)
-    if (!bytes) {
-      this.#recordFailure(feedItemId)
-      return finish('unreadable', answered, { kind: 'unreadable' })
-    }
     const extraction = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
     if (extraction.kind === 'cancelled') {
       if (budgetExpired()) return finish('deadline_exceeded', answered, DEADLINE_READER_OUTCOME)
@@ -331,8 +327,16 @@ function definedFields(timings: RetrievalTimings | ReaderExtractionTimings | und
   return fields
 }
 
-function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer | undefined {
-  if (!(bytes.buffer instanceof ArrayBuffer)) return undefined
-  if (bytes.byteOffset !== 0 || bytes.byteLength !== bytes.buffer.byteLength) return undefined
-  return bytes.buffer
+/**
+ * The extractor transfers this buffer to the worker, which detaches every view
+ * onto it, so the article has to be the buffer's only occupant. Bytes that
+ * already fill their own buffer transfer as they are; a view into a larger or
+ * shared one is copied out first, costing at most one copy of the 5 MiB cap.
+ */
+function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const owned =
+    bytes.buffer instanceof ArrayBuffer && bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+  // `bytes.slice()` will not do. On a Node Buffer it aliases `subarray` and
+  // returns a view onto the very pool this is meant to escape.
+  return owned ? bytes.buffer : new Uint8Array(bytes).buffer
 }
