@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { apiErrorSchema, readerItemSchema } from '../../../src/shared/api.js'
 import { RETRIEVAL_PROFILES } from '../../../src/server/upstream/retrieval.js'
 import { claimedDevice, type Device } from '../../support/device.js'
-import { cancelledExtractions, queuedExtractions, ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
+import { ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 import { pacedBody } from '../../support/upstream-fixtures.js'
 
@@ -56,14 +56,19 @@ async function readingSetup(
   return { user, ids: ids as ReadonlyMap<string, number> }
 }
 
-async function expectDeadline(response: Response): Promise<void> {
+async function expectDeadline(response: Response, stage: 'publisher' | 'parsing'): Promise<void> {
   expect(response.status).toBe(504)
   expect(response.headers.get('cache-control')).toBe('no-store')
-  expect(apiErrorSchema.parse(await response.json()).error.code).toBe('article_deadline_exceeded')
+  const { error } = apiErrorSchema.parse(await response.json())
+  expect(error.code).toBe('article_deadline_exceeded')
+  expect(error.stage).toBe(stage)
 }
 
+const extracted = (service: TestService) =>
+  service.logs.find((record) => record.message === 'reader.trace' && record.outcome === 'extracted')
+
 describe('the Reader budget', () => {
-  it('answers the deadline contract for every waiter when the publisher outlasts the budget', async () => {
+  it('answers every waiter at the deadline and leaves the retrieval running', async () => {
     const service = await startTestService({ readerBudgetMs: 300 })
     const { user, ids } = await readingSetup(service, ['first-light'])
     const feedItemId = ids.get('first-light')
@@ -73,45 +78,52 @@ describe('the Reader budget', () => {
       user.get(`/api/items/${feedItemId}/reader`),
       user.get(`/api/items/${feedItemId}/reader`),
     ])
-    for (const response of responses) await expectDeadline(response)
+    for (const response of responses) await expectDeadline(response, 'publisher')
 
     expect(service.upstream.requestsTo(articleUrl('first-light'))).toHaveLength(1)
-    expect(service.upstream.aborted).toContain(articleUrl('first-light'))
-
-    const trace = service.logs.find((record) => record.message === 'reader.trace')
-    expect(trace).toMatchObject({ outcome: 'deadline_exceeded', feedItemId, host: 'journal.example' })
-    expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
-    expect(trace).not.toHaveProperty('domMs')
+    expect(service.upstream.aborted).not.toContain(articleUrl('first-light'))
+    expect(service.logs.filter((record) => record.message === 'reader.deadline')).toEqual(
+      expect.arrayContaining([expect.objectContaining({ feedItemId, stage: 'publisher' })]),
+    )
 
     const item = readerItemSchema.parse(await (await user.get(`/api/items/${feedItemId}`)).json())
     expect(item.summary).toBe('A clear morning over the valley.')
+  })
+
+  it('finishes detached work and hands the article to the refetch without asking the publisher again', async () => {
+    const service = await startTestService({ readerBudgetMs: 300 })
+    const { user, ids } = await readingSetup(service, ['first-light'])
+    const feedItemId = ids.get('first-light')
+    service.upstream.stub(articleUrl('first-light'), { headers: HTML_HEADERS, body: ARTICLE_HTML, delayMs: 900 })
+
+    await expectDeadline(await user.get(`/api/items/${feedItemId}/reader`), 'publisher')
+
+    const joined = await user.get(`/api/items/${feedItemId}/reader`)
+    await expectDeadline(joined, 'publisher')
+
+    await vi.waitFor(() => expect(extracted(service)).toBeDefined(), { timeout: 5_000 })
+    const collected = await user.get(`/api/items/${feedItemId}/reader`)
+    expect(collected.status).toBe(200)
+    const article = (await collected.json()) as { markdown: string }
+    expect(article.markdown).toContain('follows the light across the valley')
+
+    expect(service.upstream.requestsTo(articleUrl('first-light'))).toHaveLength(1)
   })
 
   it('expires an operation still queued for a retrieval slot with the same contract', async () => {
     const slots = RETRIEVAL_PROFILES.reader.capacity.maxConcurrent
     const guids = Array.from({ length: slots + 1 }, (_, index) => `item-${index}`)
     const service = await startTestService({ readerBudgetMs: 400 })
-    const { user, ids } = await readingSetup(service, [...guids, 'item-after'])
-    for (const guid of [...guids, 'item-after']) {
+    const { user, ids } = await readingSetup(service, guids)
+    for (const guid of guids) {
       service.upstream.stub(articleUrl(guid), { headers: HTML_HEADERS, body: ARTICLE_HTML, delayMs: 60_000 })
     }
 
     const responses = await Promise.all(guids.map((guid) => user.get(`/api/items/${ids.get(guid)}/reader`)))
-    for (const response of responses) await expectDeadline(response)
-
-    const traces = service.logs.filter((record) => record.message === 'reader.trace')
-    expect(traces).toHaveLength(guids.length)
-    for (const trace of traces) expect(trace).toMatchObject({ outcome: 'deadline_exceeded' })
-    const queued = traces.filter((trace) => Number(trace.queueMs) >= 300)
-    expect(queued).toHaveLength(1)
-    expect(queued[0]).not.toHaveProperty('ttfbMs')
-
-    const after = user.get(`/api/items/${ids.get('item-after')}/reader`)
-    await vi.waitFor(() => expect(service.upstream.requestsTo(articleUrl('item-after'))).toHaveLength(1))
-    await expectDeadline(await after)
+    for (const response of responses) await expectDeadline(response, 'publisher')
   })
 
-  it('expires during body receipt with the same contract', async () => {
+  it('answers the publisher stage while the body is still arriving', async () => {
     const service = await startTestService({ readerBudgetMs: 300 })
     const { user, ids } = await readingSetup(service, ['first-light'])
     const chunk = new TextEncoder().encode('<p>the body arrives, slowly, and never finishes</p>')
@@ -123,62 +135,38 @@ describe('the Reader budget', () => {
       ),
     })
 
-    await expectDeadline(await user.get(`/api/items/${ids.get('first-light')}/reader`))
-
-    const trace = service.logs.find((record) => record.message === 'reader.trace')
-    expect(trace).toMatchObject({ outcome: 'deadline_exceeded', host: 'journal.example' })
-    expect(trace?.ttfbMs).toBeGreaterThanOrEqual(0)
-    expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
-    expect(trace).not.toHaveProperty('domMs')
+    await expectDeadline(await user.get(`/api/items/${ids.get('first-light')}/reader`), 'publisher')
   })
 
-  it('expires held and worker-queued extraction, replaces the worker, and answers the next request', {
+  it('answers the parsing stage for a held worker and stashes its article after release', {
     timeout: 20_000,
   }, async () => {
     const readerWorker = new ReaderWorkerFixtures()
     const service = await startTestService({ readerWorkerUrl: readerWorker.url, readerBudgetMs: 2_000 })
-    const { user, ids } = await readingSetup(service, ['item-one', 'item-two'])
+    const { user, ids } = await readingSetup(service, ['item-one'])
     service.upstream.stub(articleUrl('item-one'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
-    service.upstream.stub(articleUrl('item-two'), { headers: HTML_HEADERS, body: ARTICLE_HTML })
     const held = await readerWorker.holdNext()
 
     const active = user.get(`/api/items/${ids.get('item-one')}/reader`)
     await held.entered
-    const queued = user.get(`/api/items/${ids.get('item-two')}/reader`)
-    await vi.waitFor(() => expect(queuedExtractions(service.logs)).toBe(2))
+    await expectDeadline(await active, 'parsing')
 
-    await expectDeadline(await active)
-    await expectDeadline(await queued)
-    await vi.waitFor(() => expect(cancelledExtractions(service.logs)).toBe(2))
-
-    const trace = service.logs.find((record) => record.message === 'reader.trace')
-    expect(trace).toMatchObject({ outcome: 'deadline_exceeded', host: 'journal.example' })
-    expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
-
-    const retried = await user.get(`/api/items/${ids.get('item-one')}/reader`)
-    expect(retried.status).toBe(200)
-    expect(service.upstream.requestsTo(articleUrl('item-one'))).toHaveLength(2)
+    held.release()
+    await vi.waitFor(() => expect(extracted(service)).toBeDefined(), { timeout: 5_000 })
+    const collected = await user.get(`/api/items/${ids.get('item-one')}/reader`)
+    expect(collected.status).toBe(200)
+    expect(service.upstream.requestsTo(articleUrl('item-one'))).toHaveLength(1)
   })
 
-  it('keeps deadlines out of the five-attempt failure allowance', { timeout: 15_000 }, async () => {
+  it('keeps deadline answers out of the five-attempt failure allowance', async () => {
     const service = await startTestService({ readerBudgetMs: 300 })
     const { user, ids } = await readingSetup(service, ['first-light'])
     const feedItemId = ids.get('first-light')
-    let mode: 'slow' | 'down' = 'slow'
-    service.upstream.stubDynamic(articleUrl('first-light'), () =>
-      mode === 'slow'
-        ? { headers: HTML_HEADERS, body: ARTICLE_HTML, delayMs: 60_000 }
-        : { status: 503, headers: HTML_HEADERS, body: 'down' },
-    )
+    service.upstream.stub(articleUrl('first-light'), { headers: HTML_HEADERS, body: ARTICLE_HTML, delayMs: 60_000 })
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await expectDeadline(await user.get(`/api/items/${feedItemId}/reader`))
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      await expectDeadline(await user.get(`/api/items/${feedItemId}/reader`), 'publisher')
     }
-
-    mode = 'down'
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(502)
-    }
-    expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(429)
+    expect(service.upstream.requestsTo(articleUrl('first-light'))).toHaveLength(1)
   })
 })

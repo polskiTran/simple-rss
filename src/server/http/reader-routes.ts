@@ -57,7 +57,13 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
         )
       case 'deadline':
         return c.json(
-          { error: { code: 'article_deadline_exceeded', message: 'The original page could not be prepared in time' } },
+          {
+            error: {
+              code: 'article_deadline_exceeded',
+              message: 'The article is still being prepared',
+              stage: outcome.stage,
+            },
+          },
           504,
           NO_STORE,
         )

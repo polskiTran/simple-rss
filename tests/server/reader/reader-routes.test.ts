@@ -38,13 +38,14 @@ describe('Reader failure answers', () => {
     expect(body.error.code).toBe(answerCode)
   })
 
-  it('answers the deadline as 504 article_deadline_exceeded, uncached', async () => {
-    const response = await appAnswering({ kind: 'deadline' }).request('/items/7/reader')
+  it('answers the deadline as 504 article_deadline_exceeded with its stage, uncached', async () => {
+    const response = await appAnswering({ kind: 'deadline', stage: 'publisher' }).request('/items/7/reader')
 
     expect(response.status).toBe(504)
     expect(response.headers.get('cache-control')).toBe('no-store')
-    const body = (await response.json()) as { error: { code: string } }
+    const body = (await response.json()) as { error: { code: string; stage: string } }
     expect(body.error.code).toBe('article_deadline_exceeded')
+    expect(body.error.stage).toBe('publisher')
   })
 
   it('never caches the rate-limited answer and names the wait', async () => {

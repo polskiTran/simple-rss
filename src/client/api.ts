@@ -28,6 +28,7 @@ import {
   type PollingIntervalMinutes,
   type PollingSchedule,
   type ReaderArticle,
+  type ReaderDeadlineStage,
   type ReaderItem,
   type RefreshFeedResponse,
   type SearchResults,
@@ -41,13 +42,15 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly retryAfterSeconds: number | undefined
+  readonly stage: ReaderDeadlineStage | undefined
 
-  constructor(status: number, code: string, retryAfterSeconds?: number) {
+  constructor(status: number, code: string, retryAfterSeconds?: number, stage?: ReaderDeadlineStage) {
     super(`Request failed with ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.retryAfterSeconds = retryAfterSeconds
+    this.stage = stage
   }
 }
 
@@ -85,11 +88,11 @@ async function request(path: string, options: ApiRequestOptions = {}): Promise<R
 
   if (response.ok) return response
 
-  const code = await errorCode(response)
+  const failure = await failureOf(response)
 
-  if (code === UNAUTHENTICATED && path !== STATUS_PATH) sessionEnded?.()
+  if (failure.code === UNAUTHENTICATED && path !== STATUS_PATH) sessionEnded?.()
 
-  throw new ApiError(response.status, code, retryAfterOf(response))
+  throw new ApiError(response.status, failure.code, retryAfterOf(response), failure.stage)
 }
 
 function read(path: string, signal: AbortSignal | undefined): Promise<Response> {
@@ -248,11 +251,12 @@ export async function fetchServiceMeta(signal?: AbortSignal): Promise<ServiceMet
   return serviceMetaSchema.parse(await response.json())
 }
 
-async function errorCode(response: Response): Promise<string> {
+async function failureOf(response: Response): Promise<{ code: string; stage?: ReaderDeadlineStage }> {
   try {
-    return apiErrorSchema.parse(await response.json()).error.code
+    const { error } = apiErrorSchema.parse(await response.json())
+    return { code: error.code, ...(error.stage === undefined ? {} : { stage: error.stage }) }
   } catch {
-    return 'unknown'
+    return { code: 'unknown' }
   }
 }
 

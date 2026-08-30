@@ -13,6 +13,9 @@ import { UpstreamFixtures } from '../support/upstream-fixtures.js'
 export const SETUP_SECRET = 'a-deployment-setup-secret'
 export const USER_PASSWORD = 'a-calm-reading-password'
 
+export const READER_DEADLINE_BUDGET_MS = 2_000
+const SLOW_RIDGE_DELAY_MS = 2 * READER_DEADLINE_BUDGET_MS
+
 export interface Installation {
   readonly url: string
   readonly feedUrl: string
@@ -169,7 +172,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
     upstream.stubDynamic('https://publisher.example/slow-ridge', () => {
       ridgeAttempts += 1
       return ridgeAttempts === 1
-        ? { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML, delayMs: 60_000 }
+        ? { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML, delayMs: SLOW_RIDGE_DELAY_MS }
         : { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML }
     })
     let service: RunningService | undefined
