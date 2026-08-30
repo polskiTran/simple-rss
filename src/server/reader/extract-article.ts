@@ -12,10 +12,13 @@ export const FULL_CLEANUP_MAX_ELEMENTS = 5_000
 
 /**
  * JSON-LD stays because Defuddle reads it for metadata; math scripts stay because
- * standardization turns them into math content.
+ * standardization turns them into math content. MathJax/KaTeX library scripts stay
+ * because Defuddle only treats raw `$…$` text as LaTeX when it can see the page
+ * loads a math renderer — stripping them left client-rendered math to be escaped
+ * as prose.
  */
 const IRRELEVANT_DOM_SELECTOR = [
-  'script:not([type="application/ld+json"]):not([type^="math/"])',
+  'script:not([type="application/ld+json"]):not([type^="math/"]):not([src*="mathjax" i]):not([src*="katex" i])',
   'style',
   'template',
   'noscript',

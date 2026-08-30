@@ -113,6 +113,27 @@ describe('extractArticle', () => {
     expect(article?.markdown).not.toContain('figure.png')
   })
 
+  it('keeps raw-text LaTeX intact on pages that load a math renderer', async () => {
+    const katexScript = '<script defer src="https://cdn.example/katex@0.16.4/dist/katex.min.js"></script>'
+    const { article } = await extractArticle({
+      bytes: page(
+        `${LONG_FORM}
+         <p>Kaplan et al.: $N^*_{\\setminus E} \\propto C^{0.73}_{\\setminus E}$ cost them $5 and then $10.</p>
+         <p>$$\\begin{align} L(N_{\\setminus E}) &= A(N_{\\setminus E} + \\omega\\, N_{\\setminus E}^{1/3})^{-\\alpha} \\\\ L'(N_{\\setminus E}) &= 0 \\end{align}$$</p>`,
+        katexScript,
+      ),
+      url: URL,
+    })
+    const markdown = article?.markdown ?? ''
+
+    expect(markdown).toContain('$$N^*_{\\setminus E} \\propto C^{0.73}_{\\setminus E}$$')
+    expect(markdown).toContain(
+      "\\begin{align} L(N_{\\setminus E}) &= A(N_{\\setminus E} + \\omega\\, N_{\\setminus E}^{1/3})^{-\\alpha} \\\\ L'(N_{\\setminus E}) &= 0 \\end{align}",
+    )
+    expect(markdown).toContain('cost them $5 and then $10')
+    expect(markdown).not.toContain('katex.min.js')
+  })
+
   it('answers no article when a page has nothing to extract, still carrying its timings', async () => {
     const outcome = await extractArticle({
       bytes: new TextEncoder().encode('<!doctype html><html><head></head><body></body></html>'),
