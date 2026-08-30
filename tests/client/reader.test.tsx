@@ -101,39 +101,83 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
   })
 
-  it('keeps the summary and actions on a server deadline without claiming a parsing failure', async () => {
-    let healed = false
-    reading().on('GET /api/items/3/reader', () =>
-      healed
-        ? { body: ARTICLE }
-        : { status: 504, body: { error: { code: 'article_deadline_exceeded', message: 'too slow' } } },
-    )
-    render(<App />)
-    const user = userEvent.setup()
+  it('holds the summary through a deadline and refetches into the article by itself', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const api = reading().on('GET /api/items/3/reader', () => {
+        calls += 1
+        return calls === 1
+          ? {
+              status: 504,
+              body: { error: { code: 'article_deadline_exceeded', message: 'preparing', stage: 'publisher' } },
+            }
+          : { body: ARTICLE }
+      })
+      render(<App />)
 
-    expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
-    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/could not be parsed/)).toBeNull()
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(screen.getByText('A clear morning over the valley.')).toBeDefined()
+      expect(screen.getByText('waiting on the publisher')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'retry parsing' })).toBeNull()
+      expect(screen.queryByText(/could not be parsed/)).toBeNull()
 
-    healed = true
-    await user.click(screen.getByRole('button', { name: 'retry parsing' }))
-    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      expect(screen.getByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+      expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('names the deadline plainly when there is no stored summary', async () => {
-    stubApi()
-      .on('GET /api/items/3', { body: { ...ITEM, summary: null } })
-      .on('GET /api/items/3/reader', {
-        status: 504,
-        body: { error: { code: 'article_deadline_exceeded', message: 'too slow' } },
-      })
-    window.history.replaceState(null, '', '/reader/3')
-    render(<App />)
+  it('names the publisher plainly once the quiet refetches are spent', async () => {
+    vi.useFakeTimers()
+    try {
+      const api = stubApi()
+        .on('GET /api/items/3', { body: { ...ITEM, summary: null } })
+        .on('GET /api/items/3/reader', {
+          status: 504,
+          body: { error: { code: 'article_deadline_exceeded', message: 'preparing', stage: 'publisher' } },
+        })
+      window.history.replaceState(null, '', '/reader/3')
+      render(<App />)
 
-    expect(await screen.findByText('the original page took too long to prepare')).toBeDefined()
-    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'retry parsing' })).toBeDefined()
-    expect(screen.queryByText(/could not be parsed/)).toBeNull()
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(screen.getByText('waiting on the publisher')).toBeDefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      expect(screen.getByText('the publisher did not answer in time')).toBeDefined()
+      expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
+      expect(screen.getByRole('button', { name: 'retry parsing' })).toBeDefined()
+      expect(screen.queryByText(/could not be parsed/)).toBeNull()
+      expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('says it is parsing when the deadline names that stage', async () => {
+    vi.useFakeTimers()
+    try {
+      stubApi()
+        .on('GET /api/items/3', { body: { ...ITEM, summary: null } })
+        .on('GET /api/items/3/reader', {
+          status: 504,
+          body: { error: { code: 'article_deadline_exceeded', message: 'preparing', stage: 'parsing' } },
+        })
+      window.history.replaceState(null, '', '/reader/3')
+      render(<App />)
+
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(screen.getByText('parsing the article')).toBeDefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      expect(screen.getByText('parsing the article took too long')).toBeDefined()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows the stored summary while the Reader server remains within its response deadline', async () => {

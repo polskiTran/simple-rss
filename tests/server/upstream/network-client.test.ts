@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import type { AddressInfo, LookupFunction } from 'node:net'
+import { createServer as createTcpServer, type AddressInfo, type LookupFunction, type Socket } from 'node:net'
 import { promisify } from 'node:util'
 import { brotliCompress, createGzip, gzip } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -301,6 +301,34 @@ describe('createNetworkHttpClient', () => {
     expect(reused?.socketDnsMs).toBeUndefined()
     expect(reused?.connectMs).toBeUndefined()
     expect(reused?.ttfbMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('settles an abort promptly while other requests hold every connected socket', async () => {
+    const held: Socket[] = []
+    const silent = createTcpServer((socket) => {
+      held.push(socket)
+      socket.on('error', () => {})
+    })
+    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', () => resolve()))
+    const { port } = silent.address() as AddressInfo
+    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup })
+
+    const occupants = Array.from({ length: 8 }, (_, index) =>
+      client(new Request(`http://occupant-${index}.example:${port}/feed`)).catch(() => {}),
+    )
+    try {
+      await expect.poll(() => held.length).toBe(8)
+
+      const controller = new AbortController()
+      const reading = client(new Request(`http://article.example:${port}/post`, { signal: controller.signal }))
+      controller.abort(new Error('the Reader gave up'))
+
+      await expect(reading).rejects.toThrow('the Reader gave up')
+    } finally {
+      for (const socket of held) socket.destroy()
+      await new Promise<void>((resolve) => silent.close(() => resolve()))
+      await Promise.all(occupants)
+    }
   })
 
   it('refuses a private address by default, before anything is connected to', async () => {

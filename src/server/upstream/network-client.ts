@@ -25,16 +25,17 @@ export interface NetworkHttpClientOptions {
   readonly lookup?: LookupFunction
 }
 
-const MAX_TOTAL_SOCKETS_PER_PROTOCOL = 8
 const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
 export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
   const isAllowed = options.isAllowedAddress ?? isPublicAddress
   const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
+  // Concurrency lives in the Retrieval gates; the agents only pool keep-alive
+  // sockets. A socket cap here would make the agent queue requests, and a
+  // queued ClientRequest defers destroy() until a socket frees — an abort
+  // would then hang until some unrelated retrieval lets go of its socket.
   const agentOptions = {
     keepAlive: true,
-    maxSockets: MAX_TOTAL_SOCKETS_PER_PROTOCOL,
-    maxTotalSockets: MAX_TOTAL_SOCKETS_PER_PROTOCOL,
     maxFreeSockets: MAX_FREE_SOCKETS_PER_PROTOCOL,
   }
   const httpAgent = new HttpAgent(agentOptions)
@@ -73,11 +74,19 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
       outbound.destroy()
       throw reasonFor(signal)
     }
-    const abandon = (): void => void outbound.destroy(reasonFor(signal))
-    signal.addEventListener('abort', abandon, { once: true })
-    outbound.on('close', () => signal.removeEventListener('abort', abandon))
 
     const { promise, resolve, reject } = Promise.withResolvers<IncomingMessage>()
+    // Rejects directly rather than waiting for destroy() to surface an
+    // 'error': the caller's abort settles this promise no matter what state
+    // the request is in. The destroyed request's own late error is a no-op
+    // against the already-settled promise.
+    const abandon = (): void => {
+      const reason = reasonFor(signal)
+      outbound.destroy(reason)
+      reject(reason)
+    }
+    signal.addEventListener('abort', abandon, { once: true })
+    outbound.on('close', () => signal.removeEventListener('abort', abandon))
     outbound.on('response', (response) => {
       onTimings?.(connectionTimings())
       resolve(response)

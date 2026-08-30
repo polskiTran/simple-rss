@@ -3,6 +3,7 @@ import { apiErrorSchema } from '../../src/shared/api.js'
 import {
   expect,
   expectNoHorizontalOverflow,
+  READER_DEADLINE_BUDGET_MS,
   USER_PASSWORD,
   SETUP_SECRET,
   test,
@@ -220,9 +221,12 @@ test.describe('Reader View', () => {
 })
 
 test.describe('Reader View at the server deadline', () => {
-  test.use({ viewport: { width: 1280, height: 800 }, readerBudgetMs: 2_000 })
+  test.use({ viewport: { width: 1280, height: 800 }, readerBudgetMs: READER_DEADLINE_BUDGET_MS })
 
-  test('keeps the summary through the deadline and retries into the article', async ({ page, installation }) => {
+  test('keeps the summary through the deadline and refetches into the article by itself', async ({
+    page,
+    installation,
+  }) => {
     await subscribe(page, installation, installation.slowArticleFeedUrl)
     await page.getByRole('link', { name: 'digest' }).click()
 
@@ -234,16 +238,17 @@ test.describe('Reader View at the server deadline', () => {
 
     const answered = await deadline
     expect(answered.status()).toBe(504)
-    expect(apiErrorSchema.parse(await answered.json()).error.code).toBe('article_deadline_exceeded')
+    const failure = apiErrorSchema.parse(await answered.json()).error
+    expect(failure.code).toBe('article_deadline_exceeded')
+    expect(failure.stage).toBe('publisher')
     expect(answered.headers()['cache-control']).toBe('no-store')
 
     await expect(page.getByText('The ridge holds its light.')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'open original' })).toHaveCount(2)
+    await expect(page.getByText('waiting on the publisher')).toBeVisible()
     await expect(page.getByText(/could not be parsed/)).toHaveCount(0)
 
-    const retried = page.waitForResponse((response) => response.url().endsWith('/reader'))
-    await page.getByRole('button', { name: 'retry parsing' }).click()
-    expect((await retried).status()).toBe(200)
+    const refetched = page.waitForResponse((response) => response.url().endsWith('/reader'))
+    expect((await refetched).status()).toBe(200)
 
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('The ridge holds its light.')).toHaveCount(0)

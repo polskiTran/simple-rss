@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import type { ReaderArticle, ReaderItem } from '../../shared/api.js'
+import type { ReaderArticle, ReaderDeadlineStage, ReaderItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
@@ -12,7 +12,7 @@ import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } fro
 import type { Retrieval, RetrievalFailure, RetrievalFailureCode, RetrievalTimings } from '../upstream/retrieval.js'
 import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
 
-type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed' | 'deadline_exceeded'
+type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed'
 
 const READER_USER_BOUNDARY_MS = 5_000
 
@@ -24,9 +24,16 @@ const RETRY_COOLDOWN_MS = 30_000
 
 const ATTEMPTS_BEFORE_COOLDOWN = 5
 
+const STASH_TTL_MS = 60_000
+
 interface FailureEpisode {
   readonly attempts: number
   readonly lastAttemptAt: number
+}
+
+interface StashedArticle {
+  readonly article: ReaderArticle
+  readonly expiresAt: number
 }
 
 export type ReaderArticleOutcome =
@@ -35,21 +42,25 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number }
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
   | { readonly kind: 'unreadable' }
-  | { readonly kind: 'deadline' }
+  | { readonly kind: 'deadline'; readonly stage: ReaderDeadlineStage }
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
-interface InFlightExtraction {
-  readonly controller: AbortController
+class InFlightExtraction {
+  readonly controller = new AbortController()
   readonly work: Promise<ReaderArticleOutcome>
-  waiters: number
+  waiters = 0
+  stage: ReaderDeadlineStage = 'publisher'
+  survivesAbandonment = false
+
+  constructor(start: (extraction: InFlightExtraction) => Promise<ReaderArticleOutcome>) {
+    this.work = start(this)
+  }
 }
 
 const ABANDONED_READER_OUTCOME = {
   kind: 'retrieval-failed',
   failure: { ok: false, code: 'cancelled', reason: 'the browser left the Reader' },
 } satisfies ReaderArticleOutcome
-
-const DEADLINE_READER_OUTCOME = { kind: 'deadline' } satisfies ReaderArticleOutcome
 
 export class ReaderService {
   readonly #db: DrizzleDatabase
@@ -62,6 +73,7 @@ export class ReaderService {
   readonly #budgetMs: number
   readonly #inFlight = new Map<number, InFlightExtraction>()
   readonly #failures = new Map<number, FailureEpisode>()
+  readonly #stash = new Map<number, StashedArticle>()
 
   constructor(options: {
     db: DrizzleDatabase
@@ -135,6 +147,10 @@ export class ReaderService {
     const link = row.link
     if (!link) return { kind: 'no-link' }
 
+    this.#sweepStash()
+    const stashed = this.#stash.get(feedItemId)?.article
+    if (stashed) return { kind: 'extracted', article: stashed }
+
     const inFlight = this.#inFlight.get(feedItemId)
     if (inFlight) return this.#waitForExtraction(feedItemId, inFlight, signal)
 
@@ -150,20 +166,12 @@ export class ReaderService {
       }
     }
 
-    const controller = new AbortController()
-    let deadlineExceeded = false
-    const budget = setTimeout(() => {
-      deadlineExceeded = true
-      controller.abort()
-    }, this.#budgetMs)
-    const work = this.#extract(feedItemId, link, controller.signal, () => deadlineExceeded)
-    const extraction: InFlightExtraction = { controller, work, waiters: 0 }
+    const extraction = new InFlightExtraction((created) => this.#extract(feedItemId, link, created))
     this.#inFlight.set(feedItemId, extraction)
     const finish = () => {
-      clearTimeout(budget)
       if (this.#inFlight.get(feedItemId) === extraction) this.#inFlight.delete(feedItemId)
     }
-    void work.then(finish, finish)
+    void extraction.work.then(finish, finish)
     return this.#waitForExtraction(feedItemId, extraction, signal)
   }
 
@@ -173,13 +181,9 @@ export class ReaderService {
     await this.#extractor.close()
   }
 
-  async #extract(
-    feedItemId: number,
-    link: string,
-    signal: AbortSignal,
-    deadlineExceeded: () => boolean,
-  ): Promise<ReaderArticleOutcome> {
+  async #extract(feedItemId: number, link: string, extraction: InFlightExtraction): Promise<ReaderArticleOutcome> {
     const trace = randomUUID()
+    const signal = extraction.controller.signal
     const startedAt = performance.now()
     const finish = <Outcome extends ReaderArticleOutcome>(
       outcome: ReaderTraceOutcome,
@@ -204,43 +208,36 @@ export class ReaderService {
         ...(result.status === undefined ? {} : { status: result.status }),
         ...definedFields(result.timings),
       }
-      if (result.code === 'cancelled' && deadlineExceeded()) {
-        return finish('deadline_exceeded', fields, DEADLINE_READER_OUTCOME)
-      }
       if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
       return finish(result.code, fields, { kind: 'retrieval-failed', failure: result })
     }
 
+    extraction.stage = 'parsing'
     const answered = { ...hostField(result.url), ...definedFields(result.timings) }
     const bytes = ownedArrayBuffer(result.bytes)
-    const extraction = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
-    if (extraction.kind === 'cancelled') {
-      if (deadlineExceeded()) return finish('deadline_exceeded', answered, DEADLINE_READER_OUTCOME)
+    const parsed = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
+    if (parsed.kind === 'cancelled') {
       return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
     }
-    if (extraction.kind === 'failed') {
+    if (parsed.kind === 'failed') {
       this.#recordFailure(feedItemId)
       return finish('worker_failed', answered, { kind: 'unreadable' })
     }
-    if (extraction.kind !== 'extracted') {
+    if (parsed.kind !== 'extracted') {
       this.#recordFailure(feedItemId)
-      return finish('unreadable', { ...answered, ...definedFields(extraction.timings) }, { kind: 'unreadable' })
+      return finish('unreadable', { ...answered, ...definedFields(parsed.timings) }, { kind: 'unreadable' })
     }
-    const extracted = extraction.article
 
     this.#failures.delete(feedItemId)
-    return finish(
-      'extracted',
-      { ...answered, ...definedFields(extraction.timings) },
-      {
-        kind: 'extracted',
-        article: {
-          feedItemId,
-          markdown: extracted.markdown,
-          readingTimeMinutes: extracted.readingTimeMinutes,
-        },
-      },
-    )
+    const article: ReaderArticle = {
+      feedItemId,
+      markdown: parsed.article.markdown,
+      readingTimeMinutes: parsed.article.readingTimeMinutes,
+    }
+    if (extraction.survivesAbandonment) {
+      this.#stash.set(feedItemId, { article, expiresAt: this.#clock.now().getTime() + STASH_TTL_MS })
+    }
+    return finish('extracted', { ...answered, ...definedFields(parsed.timings) }, { kind: 'extracted', article })
   }
 
   async #waitForExtraction(
@@ -251,7 +248,8 @@ export class ReaderService {
     extraction.waiters += 1
     const release = () => {
       extraction.waiters -= 1
-      if (extraction.waiters === 0 && this.#inFlight.get(feedItemId) === extraction) {
+      if (extraction.waiters > 0 || extraction.survivesAbandonment) return
+      if (this.#inFlight.get(feedItemId) === extraction) {
         this.#inFlight.delete(feedItemId)
         extraction.controller.abort()
       }
@@ -261,22 +259,28 @@ export class ReaderService {
       release()
       return ABANDONED_READER_OUTCOME
     }
-    if (!signal) {
-      try {
-        return await extraction.work
-      } finally {
-        release()
-      }
-    }
 
-    const abandoned = Promise.withResolvers<ReaderArticleOutcome>()
-    const onAbort = () => abandoned.resolve(ABANDONED_READER_OUTCOME)
-    signal.addEventListener('abort', onAbort, { once: true })
+    const answered = Promise.withResolvers<ReaderArticleOutcome>()
+    const budget = setTimeout(() => {
+      extraction.survivesAbandonment = true
+      this.#logger.warn('reader.deadline', { feedItemId, stage: extraction.stage })
+      answered.resolve({ kind: 'deadline', stage: extraction.stage })
+    }, this.#budgetMs)
+    const onAbort = () => answered.resolve(ABANDONED_READER_OUTCOME)
+    signal?.addEventListener('abort', onAbort, { once: true })
     try {
-      return await Promise.race([extraction.work, abandoned.promise])
+      return await Promise.race([extraction.work, answered.promise])
     } finally {
-      signal.removeEventListener('abort', onAbort)
+      clearTimeout(budget)
+      signal?.removeEventListener('abort', onAbort)
       release()
+    }
+  }
+
+  #sweepStash(): void {
+    const now = this.#clock.now().getTime()
+    for (const [id, entry] of this.#stash) {
+      if (entry.expiresAt <= now) this.#stash.delete(id)
     }
   }
 

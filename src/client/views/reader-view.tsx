@@ -1,6 +1,6 @@
 import { Button } from '@base-ui/react/button'
-import { Suspense, lazy, useEffect } from 'react'
-import type { ReaderItem } from '../../shared/api.js'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import type { ReaderArticle, ReaderDeadlineStage, ReaderItem } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackLink } from '../components/back-link.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
@@ -29,7 +29,13 @@ function MarkdownCommitted() {
   return null
 }
 
-const parsingNote = <LoadingNote className="empty-note reader-extracting">parsing the original page</LoadingNote>
+const DEADLINE_REFETCH_DELAY_MS = 2_000
+const DEADLINE_REFETCH_ATTEMPTS = 2
+
+const STAGE_NOTES = {
+  publisher: 'waiting on the publisher',
+  parsing: 'parsing the article',
+} as const satisfies Record<ReaderDeadlineStage, string>
 
 export interface ReaderViewProps {
   readonly feedItemId: number
@@ -41,11 +47,16 @@ export interface ReaderViewProps {
 
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
   const [itemState, { set: setItem }] = useResource((signal) => fetchReaderItem(feedItemId, signal), [feedItemId])
+  const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
   const [articleState, { retry: retryParsing }] = useResource(
-    (signal) =>
-      fetchReaderArticle(feedItemId, signal).finally(() => {
+    async (signal) => {
+      setPreparingStage(undefined)
+      try {
+        return await fetchArticleThroughDeadlines(feedItemId, signal, setPreparingStage)
+      } finally {
         if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
-      }),
+      }
+    },
     [feedItemId],
   )
 
@@ -73,13 +84,14 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   const item = itemState.value
   const next = item.nextInDigest
   const setSaved = (saved: boolean) => setItem((current) => ({ ...current, saved }))
+  const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'parsing the original page'
   const waitingContent = item.summary ? (
     <div className="reader-waiting">
       <p className="reader-summary">{item.summary}</p>
-      <LoadingNote className="empty-note">parsing the original page</LoadingNote>
+      <LoadingNote className="empty-note">{waitingNote}</LoadingNote>
     </div>
   ) : (
-    parsingNote
+    <LoadingNote className="empty-note reader-extracting">{waitingNote}</LoadingNote>
   )
 
   return (
@@ -114,7 +126,7 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         <Fallback
           item={item}
           waitSeconds={waitSecondsOf(articleState.error)}
-          deadline={deadlineExceeded(articleState.error)}
+          stage={deadlineStage(articleState.error)}
           onRetry={retryParsing}
         />
       ) : null}
@@ -143,27 +155,61 @@ function waitSecondsOf(cause: unknown): number | undefined {
     : undefined
 }
 
-function deadlineExceeded(cause: unknown): boolean {
-  return cause instanceof ApiError && cause.code === 'article_deadline_exceeded'
+function deadlineStage(cause: unknown): ReaderDeadlineStage | undefined {
+  if (!(cause instanceof ApiError) || cause.code !== 'article_deadline_exceeded') return undefined
+  return cause.stage ?? 'publisher'
 }
+
+async function fetchArticleThroughDeadlines(
+  feedItemId: number,
+  signal: AbortSignal,
+  onWaiting: (stage: ReaderDeadlineStage) => void,
+): Promise<ReaderArticle> {
+  for (let refetch = 0; ; refetch += 1) {
+    try {
+      return await fetchReaderArticle(feedItemId, signal)
+    } catch (cause) {
+      const stage = deadlineStage(cause)
+      if (stage === undefined || refetch >= DEADLINE_REFETCH_ATTEMPTS) throw cause
+      onWaiting(stage)
+      await pause(DEADLINE_REFETCH_DELAY_MS, signal)
+      if (signal.aborted) throw cause
+    }
+  }
+}
+
+function pause(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    const timer = setTimeout(finish, milliseconds)
+    signal.addEventListener('abort', finish, { once: true })
+  })
+}
+
+const STAGE_FALLBACKS = {
+  publisher: 'the publisher did not answer in time',
+  parsing: 'parsing the article took too long',
+} as const satisfies Record<ReaderDeadlineStage, string>
 
 interface FallbackProps {
   readonly item: ReaderItem
   readonly waitSeconds: number | undefined
-  readonly deadline: boolean
+  readonly stage: ReaderDeadlineStage | undefined
   onRetry(): void
 }
 
-function Fallback({ item, waitSeconds, deadline, onRetry }: FallbackProps) {
+function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
   return (
     <div className="reader-fallback" role="status">
       {item.summary ? (
         <p className="reader-summary">{item.summary}</p>
       ) : (
         <p className="empty-note">
-          {deadline
-            ? 'the original page took too long to prepare'
-            : 'the original page could not be parsed into an article'}
+          {stage ? STAGE_FALLBACKS[stage] : 'the original page could not be parsed into an article'}
         </p>
       )}
       <p className="reader-fallback-actions">

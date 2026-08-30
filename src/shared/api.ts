@@ -17,10 +17,16 @@ export const serviceMetaSchema = z.object({
 })
 export type ServiceMeta = z.infer<typeof serviceMetaSchema>
 
+/** The job a Reader deadline answer was still waiting on when it was sent. */
+export const readerDeadlineStageSchema = z.enum(['publisher', 'parsing'])
+export type ReaderDeadlineStage = z.infer<typeof readerDeadlineStageSchema>
+
 export const apiErrorSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
+    /** Carried only by `article_deadline_exceeded`. */
+    stage: readerDeadlineStageSchema.optional(),
   }),
 })
 export type ApiError = z.infer<typeof apiErrorSchema>
