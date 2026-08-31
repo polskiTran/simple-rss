@@ -170,6 +170,7 @@ describe('a Feed Item’s attribution', () => {
             firstSeenAt: '2026-08-08T09:00:00.000Z',
             displayDate: 'today, 07:15',
             saved: false,
+            snippet: null,
           },
         ],
       },

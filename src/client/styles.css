@@ -811,14 +811,23 @@
     text-wrap: pretty;
   }
 
+  .content-meta,
+  .content-snippet {
+    margin-top: 8px;
+    color: var(--color-meta);
+    font-size: 12.5px;
+  }
+
   .content-meta {
     display: flex;
     align-items: baseline;
     gap: 20px;
-    margin-top: 8px;
-    color: var(--color-meta);
-    font-size: 12.5px;
     line-height: 1;
+  }
+
+  .content-snippet {
+    margin-bottom: 0;
+    line-height: 1.6;
   }
 
   .save-toggle {
@@ -1136,9 +1145,13 @@
     line-height: 1.44;
   }
 
+  .content-meta,
+  .content-snippet {
+    font-size: 12px;
+  }
+
   .content-meta {
     gap: 16px;
-    font-size: 12px;
   }
 
   .reader-view {

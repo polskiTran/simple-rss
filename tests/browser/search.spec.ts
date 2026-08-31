@@ -94,6 +94,23 @@ test.describe('the global search line', () => {
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
   })
 
+  test('shows the matched summary as the grey second line, and no snippet when the title matched', async ({
+    page,
+    installation,
+  }) => {
+    await openDigest(page, installation)
+    const field = page.getByRole('searchbox', { name: 'search your reading' })
+    const results = page.getByRole('region', { name: 'search results' })
+
+    await field.fill('clear morning')
+    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
+    await expect(results.locator('.content-snippet')).toHaveText('A clear morning.')
+
+    await field.fill('first light')
+    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
+    await expect(results.locator('.content-snippet')).toHaveCount(0)
+  })
+
   test('matches a Feed title and says plainly when nothing matches', async ({ page, installation }) => {
     await openDigest(page, installation)
 

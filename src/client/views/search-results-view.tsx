@@ -107,6 +107,7 @@ function SearchOutcome({
           <h3 className="content-item-title">
             <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
           </h3>
+          {result.snippet !== null && <p className="content-snippet">{result.snippet}</p>}
           <div className="content-meta">
             <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
             <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>

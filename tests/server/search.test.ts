@@ -74,7 +74,42 @@ describe('searching retained reading metadata', () => {
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       displayDate: 'today, 07:15',
       saved: false,
+      snippet: null,
     })
+  })
+
+  it('carries a summary snippet as evidence, and none when the visible lines already show the match', async () => {
+    const longSummary = `${Array.from({ length: 40 }, (_, index) => `filler${index}`).join(' ')} and at last the heron lifted`
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(
+      user,
+      service,
+      rss(
+        'Field Notes',
+        item('a', 'Evening walk', {
+          pubDate: '2026-08-07T20:00:00.000Z',
+          summary: 'Notes on tidal patterns along the estuary',
+        }),
+        item('b', 'Morning chronology', { pubDate: '2026-08-08T07:15:00.000Z' }),
+        item('c', 'Long read', { pubDate: '2026-08-06T09:00:00.000Z', summary: longSummary }),
+      ),
+    )
+
+    const [summaryMatch] = (await search(user, 'estuary')).results
+    expect(summaryMatch?.snippet).toBe('Notes on tidal patterns along the estuary')
+
+    // A match deep in a long summary yields a fragment around it, not the opening tokens.
+    const [deepMatch] = (await search(user, 'heron')).results
+    expect(deepMatch?.snippet).toContain('the heron lifted')
+    expect(deepMatch?.snippet).not.toContain('filler0')
+
+    const [titleMatch] = (await search(user, 'chronology')).results
+    expect(titleMatch?.snippet).toBeNull()
+
+    const noSummaryResults = (await search(user, 'field notes')).results
+    const chronologyByFeed = noSummaryResults.find((result) => result.title === 'Morning chronology')
+    expect(chronologyByFeed?.snippet).toBeNull()
   })
 
   it('matches calmly through typing, diacritics, and would-be operators', async () => {

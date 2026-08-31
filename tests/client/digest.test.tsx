@@ -178,6 +178,7 @@ const result = (feedItemId: number, title: string, displayDate: string, saved = 
   firstSeenAt: '2026-08-08T09:00:00.000Z',
   displayDate,
   saved,
+  snippet: null,
 })
 
 describe('searching from the Digest', () => {

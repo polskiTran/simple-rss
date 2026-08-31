@@ -387,6 +387,9 @@ export const searchResultSchema = z.object({
   firstSeenAt: z.string(),
   displayDate: z.string(),
   saved: z.boolean(),
+  // Plain-text fragment of the summary around the match; null when only the
+  // title or Feed title matched — both already visible in the item shape.
+  snippet: z.string().nullable(),
 })
 export type SearchResult = z.infer<typeof searchResultSchema>
 

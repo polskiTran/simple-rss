@@ -142,6 +142,12 @@ meta row    300 12.5px/1   #8C8B86, gap 20, margin-top 8
 ```
 Meta contents by context: digest = source · time · save; single feed = date · save (source drops out, it's redundant); feeds list = domain.
 
+Search results alone may add a line: when the match lives in the summary, its
+plain-text fragment sits between the title and the meta row in the meta line's
+own grey and size, `line-height:1.6` because it wraps. No markup and no accent —
+the fragment itself is the evidence. A match the shape already shows — title or
+source — draws nothing extra, and the item stays two lines.
+
 The source is the way into its Feed: in the Digest, in search results, in the Library, and in the Reader's meta row. It looks no different from the plain text it replaced — meta grey, no underline at rest — and on hover it steps to ink like §5's other grey words.
 
 A save that outlived its Subscription is the exception. `The Slow Press · no longer subscribed` stays plain text, because there is no Feed left to open. Where the source does open, the link is the name alone, never the trailing clause.

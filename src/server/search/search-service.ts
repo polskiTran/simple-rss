@@ -19,6 +19,15 @@ const SUMMARY_WEIGHT = 1
 const FEED_TITLE_WEIGHT = 2
 const RECENCY_DECAY_DAYS = 30
 
+// Snippets come from the summary column only — the title and Feed title are
+// already visible in the item shape, so a fragment of either proves nothing.
+// snippet() windows the column's opening tokens even when the match landed
+// elsewhere, so a bm25 probe weighted to the summary alone answers "did the
+// summary itself match": strictly negative means yes (FTS5 clamps idf above
+// zero), exactly zero means the match lives entirely in the other columns.
+const SNIPPET_COLUMN = 1
+const SNIPPET_TOKENS = 20
+
 export class SearchService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -56,6 +65,11 @@ export class SearchService {
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
         savedAt: libraryItems.savedAt,
+        // NULL whenever the summary itself is NULL.
+        summarySnippet: sql<
+          string | null
+        >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', '…', ${SNIPPET_TOKENS})`,
+        summaryMatchQuality: sql<number>`bm25(${feedItemSearch}, 0, 1, 0)`,
       })
       .from(feedItemSearch)
       .innerJoin(feedItems, eq(feedItems.id, feedItemSearch.rowid))
@@ -84,6 +98,7 @@ export class SearchService {
         firstSeenAt: row.firstSeenAt,
         displayDate: metaRowDate(displayInstant, dateKey(displayInstant, timezone), today, timezone),
         saved: row.savedAt !== null,
+        snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
       }
     })
 
