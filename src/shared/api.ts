@@ -393,7 +393,18 @@ export const searchResultSchema = z.object({
 })
 export type SearchResult = z.infer<typeof searchResultSchema>
 
+// A current Subscription the query matched by effective title or domain —
+// never the Feed Description — offered as a jump to that Feed above the items.
+export const searchSubscriptionMatchSchema = z.object({
+  feedId: z.number().int().positive(),
+  title: z.string(),
+  domain: z.string(),
+  homePageUrl: z.string().nullable(),
+})
+export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSchema>
+
 export const searchResultsSchema = z.object({
+  subscriptions: z.array(searchSubscriptionMatchSchema),
   results: z.array(searchResultSchema),
 })
 export type SearchResults = z.infer<typeof searchResultsSchema>

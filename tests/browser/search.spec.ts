@@ -111,6 +111,21 @@ test.describe('the global search line', () => {
     await expect(results.locator('.content-snippet')).toHaveCount(0)
   })
 
+  test('offers a matching Subscription as a jump into its Feed', async ({ page, installation }) => {
+    await openDigest(page, installation)
+
+    const field = page.getByRole('searchbox', { name: 'search your reading' })
+    await field.fill('quiet coast')
+    const jumpTo = page.getByRole('navigation', { name: 'matching subscriptions' })
+    await expect(jumpTo.getByRole('link', { name: 'The Quiet Coast' })).toBeVisible()
+    await expect(jumpTo).toContainText('publisher.example')
+
+    await jumpTo.getByRole('link', { name: 'The Quiet Coast' }).click()
+    await expect(page).toHaveURL(`${installation.url}/feeds/2`)
+    await expect(page.getByRole('link', { name: 'Slow water' })).toBeVisible()
+    await expect(field).toHaveValue('')
+  })
+
   test('matches a Feed title and says plainly when nothing matches', async ({ page, installation }) => {
     await openDigest(page, installation)
 

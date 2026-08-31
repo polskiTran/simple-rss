@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { SearchResult } from '../../shared/api.js'
+import type { SearchResult, SearchSubscriptionMatch } from '../../shared/api.js'
 import { fetchSearchResults } from '../api.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
+import { HomePageLink } from '../components/home-page-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
+import { routedClick } from '../routed-link.js'
+import { feedPathOf } from '../routing.js'
 import { failureKind } from './failure.js'
 
 export interface SearchResultsViewProps {
@@ -15,7 +18,11 @@ export interface SearchResultsViewProps {
 
 type SearchState =
   | { readonly kind: 'searching' }
-  | { readonly kind: 'found'; readonly results: readonly SearchResult[] }
+  | {
+      readonly kind: 'found'
+      readonly subscriptions: readonly SearchSubscriptionMatch[]
+      readonly results: readonly SearchResult[]
+    }
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'unreachable' }
 
@@ -31,7 +38,8 @@ export function SearchResultsView({ query, onOpenItem, onOpenFeed }: SearchResul
     const settle = window.setTimeout(() => {
       void fetchSearchResults(line, request.signal)
         .then((found) => {
-          if (!request.signal.aborted) setState({ kind: 'found', results: found.results })
+          if (!request.signal.aborted)
+            setState({ kind: 'found', subscriptions: found.subscriptions, results: found.results })
         })
         .catch((cause: unknown) => {
           if (!request.signal.aborted) setState({ kind: failureKind(cause) })
@@ -47,7 +55,7 @@ export function SearchResultsView({ query, onOpenItem, onOpenFeed }: SearchResul
     setState((current) =>
       current.kind === 'found'
         ? {
-            kind: 'found',
+            ...current,
             results: current.results.map((result) =>
               result.feedItemId === feedItemId ? { ...result, saved } : result,
             ),
@@ -92,7 +100,7 @@ function SearchOutcome({
       </p>
     )
   }
-  if (state.results.length === 0) {
+  if (state.subscriptions.length === 0 && state.results.length === 0) {
     return (
       <p className="empty-note" role="status">
         nothing in your reading matches “{line}”
@@ -101,25 +109,66 @@ function SearchOutcome({
   }
 
   return (
-    <div className="content-list" role="region" aria-label="search results">
-      {state.results.map((result) => (
-        <article className="content-item" key={result.feedItemId}>
+    <div className="search-answer" role="region" aria-label="search results">
+      <JumpToGroup subscriptions={state.subscriptions} onOpenFeed={onOpenFeed} />
+      {state.results.length > 0 && (
+        <div className="content-list">
+          {state.results.map((result) => (
+            <article className="content-item" key={result.feedItemId}>
+              <h3 className="content-item-title">
+                <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
+              </h3>
+              {result.snippet !== null && <p className="content-snippet">{result.snippet}</p>}
+              <div className="content-meta">
+                <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
+                <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
+                <SaveToggle
+                  feedItemId={result.feedItemId}
+                  title={result.title}
+                  saved={result.saved}
+                  onSaved={(saved) => onSaved(result.feedItemId, saved)}
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Matching Subscriptions as a jump into their Feeds, atop the item results in
+ * the standard item shape: the title is the way in, the meta is the feeds-list
+ * domain. Whitespace alone separates the group from the items below.
+ */
+function JumpToGroup({
+  subscriptions,
+  onOpenFeed,
+}: {
+  subscriptions: readonly SearchSubscriptionMatch[]
+  onOpenFeed: (feedId: number) => void
+}) {
+  if (subscriptions.length === 0) return null
+
+  return (
+    <nav className="content-list" aria-label="matching subscriptions">
+      {subscriptions.map((subscription) => (
+        <article className="content-item" key={subscription.feedId}>
           <h3 className="content-item-title">
-            <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
+            <a
+              className="feed-open"
+              href={feedPathOf(subscription.feedId)}
+              onClick={routedClick(() => onOpenFeed(subscription.feedId))}
+            >
+              {subscription.title}
+            </a>
           </h3>
-          {result.snippet !== null && <p className="content-snippet">{result.snippet}</p>}
           <div className="content-meta">
-            <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
-            <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
-            <SaveToggle
-              feedItemId={result.feedItemId}
-              title={result.title}
-              saved={result.saved}
-              onSaved={(saved) => onSaved(result.feedItemId, saved)}
-            />
+            <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
           </div>
         </article>
       ))}
-    </div>
+    </nav>
   )
 }

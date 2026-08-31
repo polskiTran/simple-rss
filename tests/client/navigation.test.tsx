@@ -160,6 +160,7 @@ describe('a Feed Item’s attribution', () => {
   it('opens its Feed from a search result too', async () => {
     reading('/digest').on('GET /api/search?q=light', {
       body: {
+        subscriptions: [],
         results: [
           {
             feedItemId: 3,

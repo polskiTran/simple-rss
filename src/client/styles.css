@@ -803,6 +803,13 @@
     gap: 28px;
   }
 
+  /* The jump-to group and the item results, kept apart by whitespace alone. */
+  .search-answer {
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
   .content-item-title {
     margin: 0;
     font-size: 21px;

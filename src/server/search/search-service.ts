@@ -1,5 +1,5 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import type { SearchResults } from '../../shared/api.js'
+import type { SearchResults, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import { chronologySql } from '../digest/list-page.js'
@@ -9,6 +9,7 @@ import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } fro
 import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
+export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
 // Tuning constants for ADR 0009's ranking, not contract: harness tests pin
 // relative order only. BM25 weights follow the FTS5 column order — a Feed
@@ -40,8 +41,9 @@ export class SearchService {
   }
 
   search(query: string): SearchResults {
-    const match = matchExpressionOf(query)
-    if (!match) return { results: [] }
+    const words = wordsOf(query)
+    if (words.length === 0) return { subscriptions: [], results: [] }
+    const match = matchExpressionOf(words)
 
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
@@ -102,23 +104,59 @@ export class SearchService {
       }
     })
 
-    return { results }
+    return { subscriptions: this.#subscriptionMatches(words), results }
   }
+
+  // The jump-to group reads the curated Subscription list, not the FTS index:
+  // every word must appear as a case- and diacritic-folded substring of the
+  // effective title or the domain. The Feed Description never matches, so a
+  // topic word cannot bury the item results under feed rows.
+  #subscriptionMatches(words: readonly string[]): SearchSubscriptionMatch[] {
+    const needles = words.map(folded)
+    return this.#db
+      .select({
+        feedId: feeds.id,
+        title: effectiveFeedTitle,
+        domain: feeds.domain,
+        homePageUrl: feeds.homePageUrl,
+      })
+      .from(subscriptions)
+      .innerJoin(feeds, eq(feeds.id, subscriptions.feedId))
+      .orderBy(effectiveFeedTitle)
+      .all()
+      .filter((row) => {
+        const line = folded(`${row.title} ${row.domain}`)
+        return needles.every((needle) => line.includes(needle))
+      })
+      .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
+  }
+}
+
+/** Case- and diacritic-insensitive, matching the FTS tokenizer's temperament. */
+function folded(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+}
+
+/** The line as words: whitespace-split, quotes dropped, only tokenizable words kept. */
+function wordsOf(query: string): string[] {
+  return (
+    query
+      .split(/\s+/)
+      .map((word) => word.replaceAll('"', ''))
+      // A word with no letter or digit tokenizes to nothing; quoting it would hand FTS5 an empty phrase.
+      .filter((word) => /[\p{L}\p{N}]/u.test(word))
+  )
 }
 
 /**
  * Every word becomes a quoted phrase — all must match, the last as a prefix for
  * search-as-you-type. FTS5 operators are deliberately not offered: a search line
- * is words, not syntax. `undefined` when nothing tokenizable remains.
+ * is words, not syntax.
  */
-function matchExpressionOf(query: string): string | undefined {
-  const words = query
-    .split(/\s+/)
-    .map((word) => word.replaceAll('"', ''))
-    // A word with no letter or digit tokenizes to nothing; quoting it would hand FTS5 an empty phrase.
-    .filter((word) => /[\p{L}\p{N}]/u.test(word))
-  if (words.length === 0) return undefined
-
+function matchExpressionOf(words: readonly string[]): string {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }
 

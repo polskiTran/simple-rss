@@ -148,6 +148,10 @@ own grey and size, `line-height:1.6` because it wraps. No markup and no accent �
 the fragment itself is the evidence. A match the shape already shows — title or
 source — draws nothing extra, and the item stays two lines.
 
+Search may also open with a jump-to group: a handful of matching Subscriptions
+in this same shape, each title the way into its Feed and its meta the feeds-list
+domain. Whitespace alone separates the group from the item results below it.
+
 The source is the way into its Feed: in the Digest, in search results, in the Library, and in the Reader's meta row. It looks no different from the plain text it replaced — meta grey, no underline at rest — and on hover it steps to ink like §5's other grey words.
 
 A save that outlived its Subscription is the exception. `The Slow Press · no longer subscribed` stays plain text, because there is no Feed left to open. Where the source does open, the link is the name alone, never the trailing clause.

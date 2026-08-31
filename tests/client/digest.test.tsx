@@ -187,6 +187,7 @@ describe('searching from the Digest', () => {
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=chronology', {
         body: {
+          subscriptions: [],
           results: [result(9, 'Morning chronology', 'today, 07:15'), result(8, 'Tide chronology', '3 june', true)],
         },
       })
@@ -212,7 +213,7 @@ describe('searching from the Digest', () => {
   it('says while it is searching, and that nothing matched when nothing did', async () => {
     stubApi()
       .on('GET /api/digest', { body: DIGEST })
-      .on('GET /api/search?q=driftwood', { body: { results: [] } })
+      .on('GET /api/search?q=driftwood', { body: { subscriptions: [], results: [] } })
     window.history.replaceState(null, '', '/')
     render(<App />)
     const user = userEvent.setup()
@@ -257,7 +258,9 @@ describe('searching from the Digest', () => {
           })),
         },
       }))
-      .on('GET /api/search?q=first', { body: { results: [result(3, 'First light', 'today, 07:15')] } })
+      .on('GET /api/search?q=first', {
+        body: { subscriptions: [], results: [result(3, 'First light', 'today, 07:15')] },
+      })
       .on('PUT /api/library/3', () => {
         saved = true
         return { body: { feedItemId: 3, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } }

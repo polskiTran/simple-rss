@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { searchResultsSchema, type SearchResults } from '../../src/shared/api.js'
-import { rebuildSearchIndex, SEARCH_RESULT_LIMIT } from '../../src/server/search/search-service.js'
+import {
+  rebuildSearchIndex,
+  SEARCH_RESULT_LIMIT,
+  SEARCH_SUBSCRIPTION_LIMIT,
+} from '../../src/server/search/search-service.js'
 import { claimedDevice, Device } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
 
@@ -22,6 +26,13 @@ const item = (guid: string, title: string, options: { pubDate?: string; summary?
 
 const rss = (title: string, ...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>${title}</title><link>https://journal.example/</link>${items.join('')}</channel></rss>`
+
+// A second Feed with its own domain and a Feed Description, for the jump-to group.
+const COAST_URL = 'https://shore.example/feed'
+const coastXml = `<?xml version="1.0"?>
+  <rss version="2.0"><channel><title>The Quiet Coast</title><link>https://shore.example/</link>
+    <description>Steady coastal drift studies</description>${item('tide', 'Slow water', { pubDate: '2026-08-08T06:00:00.000Z' })}
+  </channel></rss>`
 
 const stubFeed = (service: TestService, body: string, url: string = FEED_URL) =>
   service.upstream.stub(url, { headers: FEED_HEADERS, body })
@@ -183,7 +194,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning light')))
 
-    expect(await search(user, 'nonexistent')).toEqual({ results: [] })
+    expect(await search(user, 'nonexistent')).toEqual({ subscriptions: [], results: [] })
   })
 
   it('follows metadata corrections: a retitled item and a renamed Feed', async () => {
@@ -329,7 +340,10 @@ describe('searching retained reading metadata', () => {
     expect(before.results).toHaveLength(2)
 
     service.database?.$client.exec('DELETE FROM feed_item_search')
-    expect(await search(user, 'notes')).toEqual({ results: [] })
+    // The jump-to group answers from the Subscription list, not the index.
+    const emptied = await search(user, 'notes')
+    expect(emptied.results).toEqual([])
+    expect(emptied.subscriptions.map((entry) => entry.title)).toEqual(['Field Notes'])
 
     if (!service.database) throw new Error('the service has no open database')
     rebuildSearchIndex(service.database)
@@ -396,6 +410,76 @@ describe('searching retained reading metadata', () => {
     expect(results.map((entry) => entry.title)).not.toContain('Numbered entry future')
     expect(results[0]?.title).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
     expect(results.at(-1)?.title).toBe('Numbered entry 5')
+  })
+
+  it('jumps to Subscriptions by effective title and domain, in the same response as the items', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
+    await subscribed(user, service, coastXml, COAST_URL)
+
+    const byTitle = await search(user, 'field')
+    expect(byTitle.subscriptions).toEqual([
+      { feedId: 1, title: 'Field Notes', domain: 'journal.example', homePageUrl: 'https://journal.example/' },
+    ])
+    expect(byTitle.results.map((result) => result.title)).toEqual(['Morning chronology'])
+
+    const byDomain = await search(user, 'shore.example')
+    expect(byDomain.subscriptions.map((entry) => entry.title)).toEqual(['The Quiet Coast'])
+
+    expect((await search(user, 'QUIET')).subscriptions.map((entry) => entry.title)).toEqual(['The Quiet Coast'])
+    expect((await search(user, 'fïeld')).subscriptions.map((entry) => entry.title)).toEqual(['Field Notes'])
+    expect((await search(user, 'quiet chronology')).subscriptions).toEqual([])
+  })
+
+  it('draws no jump-to entry from a word that only the Feed Description carries', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, coastXml, COAST_URL)
+
+    expect(await search(user, 'drift')).toEqual({ subscriptions: [], results: [] })
+  })
+
+  it('jumps by the Custom Title while set, not the reported title', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Morning chronology')))
+    expect(
+      (await user.put('/api/feeds/1/details', { customTitle: 'Tech Tabloid', customDescription: null })).status,
+    ).toBe(200)
+
+    expect((await search(user, 'tabloid')).subscriptions.map((entry) => entry.title)).toEqual(['Tech Tabloid'])
+    expect((await search(user, 'field')).subscriptions).toEqual([])
+  })
+
+  it('keeps an unsubscribed Feed out of the jump-to group while its saved Feed Items still answer', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Saved essay')))
+    expect((await user.put('/api/library/1')).status).toBe(200)
+    expect((await user.delete('/api/feeds/1')).status).toBe(204)
+
+    const answer = await search(user, 'field')
+    expect(answer.subscriptions).toEqual([])
+    expect(answer.results.map((result) => result.title)).toEqual(['Saved essay'])
+  })
+
+  it('caps the jump-to group at the server constant, in the Feeds list order', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    const letters = ['E', 'C', 'G', 'A', 'F', 'B', 'D']
+    expect(letters.length).toBeGreaterThan(SEARCH_SUBSCRIPTION_LIMIT)
+    for (const letter of letters) {
+      await subscribed(user, service, rss(`Harbor ${letter}`), `https://harbor-${letter.toLowerCase()}.example/feed`)
+    }
+
+    const { subscriptions } = await search(user, 'harbor')
+    expect(subscriptions.map((entry) => entry.title)).toEqual(
+      [...letters]
+        .sort()
+        .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
+        .map((letter) => `Harbor ${letter}`),
+    )
   })
 
   it('refuses a missing, empty, or oversized query as a bad request', async () => {
