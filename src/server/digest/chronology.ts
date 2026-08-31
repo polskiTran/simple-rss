@@ -12,8 +12,8 @@ export function plausibleHorizon(now: Date): string {
 }
 
 /**
- * Newest chronology first, ties to the newer row — the one ordering the
- * Digest, the Library, and search all share.
+ * Newest chronology first, ties to the newer row — the ordering the Digest
+ * and the Library share. Search ranks by relevance instead (ADR 0009).
  */
 export function inDigestOrder<Row extends { feedItemId: number; publishedAt: string | null; firstSeenAt: string }>(
   rows: readonly Row[],

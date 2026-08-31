@@ -103,6 +103,46 @@ describe('searching retained reading metadata', () => {
     expect(await foundTitles(user, '"*() -')).toEqual([])
   })
 
+  it('ranks a strong title match from weeks ago above a weak summary match from today', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(
+      user,
+      service,
+      rss(
+        'Field Notes',
+        item('a', 'Estuary crossings', { pubDate: '2026-07-18T08:00:00.000Z' }),
+        item('b', 'Morning links', {
+          pubDate: '2026-08-08T07:15:00.000Z',
+          summary: 'A stray mention of the estuary among other things',
+        }),
+      ),
+    )
+
+    expect(await foundTitles(user, 'estuary')).toEqual(['Estuary crossings', 'Morning links'])
+  })
+
+  it('favors the recent Feed Item among comparable matches', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(
+      user,
+      service,
+      rss(
+        'Field Notes',
+        // Document order gives the older item the higher id, so only recency can win this.
+        item('new', 'Release notes', { pubDate: '2026-08-08T07:15:00.000Z' }),
+        item('old', 'Release notes', { pubDate: '2026-07-18T08:00:00.000Z' }),
+      ),
+    )
+
+    const { results } = await search(user, 'release')
+    expect(results.map((result) => result.publishedAt)).toEqual([
+      '2026-08-08T07:15:00.000Z',
+      '2026-07-18T08:00:00.000Z',
+    ])
+  })
+
   it('says nothing matched with an empty result, not an error', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
@@ -279,6 +319,26 @@ describe('searching retained reading metadata', () => {
     expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
     expect(results[0]?.title).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
     expect(results.at(-1)?.title).toBe('Numbered entry 5')
+  })
+
+  it('keeps a strong old title match inside the bound when newer weak matches would crowd it out', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    const weakMatches = Array.from({ length: SEARCH_RESULT_LIMIT + 5 }, (_, index) =>
+      item(`n${index}`, `Numbered entry ${index}`, {
+        pubDate: new Date(Date.UTC(2026, 7, 7, 12, index)).toISOString(),
+        summary: 'A stray mention of the estuary among other things',
+      }),
+    )
+    await subscribed(
+      user,
+      service,
+      rss('Field Notes', item('old', 'Estuary crossings', { pubDate: '2026-07-18T08:00:00.000Z' }), ...weakMatches),
+    )
+
+    const { results } = await search(user, 'estuary')
+    expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
+    expect(results[0]?.title).toBe('Estuary crossings')
   })
 
   it('does not let a broken publisher clock crowd the bound from the future', async () => {
