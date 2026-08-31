@@ -95,11 +95,22 @@ the tabs never move. It keeps only its own inner rhythm — title scale, the 40p
 header gap, no fixed height. Metadata sits *under* the title, not above. It ends
 in "next in the digest" — never a dead stop.
 
-**Departure — the search field.** The field scrolls with the page rather than
-sticking to the top, so nothing but an overlay is ever drawn over the paper and
-the occluding background a sticky field needs goes with it. `padding:8px 0 32px`,
-the measure of its screen (see the measure departure above), underline
-`1px solid rgba(18,17,15,.15)`, and a 1px × 14px accent caret.
+**Departure — the global search line.** The line lives in the masthead on every
+signed-in screen, including the Reader. Its DOM order is wordmark, search, tabs.
+The masthead uses the same two-column structure at every width: wordmark and
+search share the first row, while the tabs keep their trailing edge on the row
+below. The line therefore gets the remaining width beside the mark on a phone
+instead of collapsing between the mark and four tabs. The whole masthead scrolls
+with the page rather than sticking, so it needs no occluding background. The
+line uses the search underline `1px solid rgba(18,17,15,.15)` and a 1px × 14px
+accent caret.
+
+The Feeds screen keeps its full-width "search or add feeds" line as the first
+control in the content measure, `padding:8px 0 32px`. The two lines are separated
+by the tab row and the screen's opening whitespace, and their widths state their
+scope: the shorter masthead line searches retained reading from anywhere; the
+full-width Feeds line filters Subscriptions or accepts a Feed URL. They repeat
+the same underline rather than inventing a second field style.
 
 ## 5. Components
 

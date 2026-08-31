@@ -245,10 +245,22 @@ describe('searching from the Digest', () => {
   })
 
   it('keeps a save made in the results when the User returns to the Digest', async () => {
+    let saved = false
     stubApi()
-      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/digest', () => ({
+        body: {
+          ...DIGEST,
+          groups: DIGEST.groups.map((group) => ({
+            ...group,
+            items: group.items.map((item) => ({ ...item, saved })),
+          })),
+        },
+      }))
       .on('GET /api/search?q=first', { body: { results: [result(3, 'First light', 'today, 07:15')] } })
-      .on('PUT /api/library/3', { body: { feedItemId: 3, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } })
+      .on('PUT /api/library/3', () => {
+        saved = true
+        return { body: { feedItemId: 3, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } }
+      })
     window.history.replaceState(null, '', '/')
     render(<App />)
     const user = userEvent.setup()

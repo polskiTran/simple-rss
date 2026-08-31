@@ -156,10 +156,10 @@
   }
 
   .masthead {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
-    gap: 24px;
+    gap: 22px 24px;
   }
 
   .wordmark {
@@ -230,6 +230,8 @@
 
   .tab-bar {
     display: flex;
+    grid-column: 1 / -1;
+    justify-self: end;
     align-items: center;
     gap: 24px;
     font-weight: 300;
@@ -440,6 +442,11 @@
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
+  }
+
+  .chrome-search {
+    min-width: 0;
+    margin: 0;
   }
 
   .search-form {
@@ -1084,6 +1091,10 @@
 
   .wordmark-name {
     font-size: 19px;
+  }
+
+  .masthead {
+    gap: 18px 20px;
   }
 
   .tab-bar {

@@ -1,4 +1,5 @@
 import { useAccess, type Gate } from './authentication.js'
+import { GlobalSearch } from './components/global-search.js'
 import { TabBar } from './components/tab-bar.js'
 import { Wordmark } from './components/wordmark.js'
 import {
@@ -17,6 +18,7 @@ import { EmptyView } from './views/empty-view.js'
 import { LoginView } from './views/login-view.js'
 import { ReaderView } from './views/reader-view.js'
 import { SavedView } from './views/saved-view.js'
+import { SearchResultsView } from './views/search-results-view.js'
 import { SettingsView } from './views/settings-view.js'
 import { SetupView } from './views/setup-view.js'
 
@@ -28,7 +30,15 @@ export function App() {
     <div className="paper">
       <header className="masthead">
         <Wordmark onNavigate={gate.access.kind === 'open' ? () => navigation.navigate('digest') : undefined} />
-        {gate.access.kind === 'open' ? <TabBar active={navigation.route} onNavigate={navigation.navigate} /> : null}
+        {gate.access.kind === 'open' ? (
+          <>
+            <GlobalSearch
+              query={navigation.kind === 'search' ? navigation.query : ''}
+              onQueryChange={navigation.updateSearch}
+            />
+            <TabBar active={navigation.route} onNavigate={navigation.navigate} />
+          </>
+        ) : null}
       </header>
       <main>{viewFor(gate, navigation)}</main>
     </div>
@@ -51,6 +61,16 @@ function viewFor(gate: Gate, navigation: Navigation) {
 }
 
 function signedInView(navigation: Navigation, gate: Gate) {
+  if (navigation.kind === 'search') {
+    return (
+      <SearchResultsView
+        query={navigation.query}
+        onOpenItem={(feedItemId) => navigation.openReader(feedItemId, DIGEST_ORIGIN)}
+        onOpenFeed={(feedId) => navigation.openFeed(feedId, DIGEST_ORIGIN)}
+      />
+    )
+  }
+
   if (navigation.readerItemId !== undefined) {
     const feedItemId = navigation.readerItemId
     const origin = navigation.origin ?? DIGEST_ORIGIN
@@ -91,7 +111,13 @@ function signedInView(navigation: Navigation, gate: Gate) {
   }
 }
 
-function OpenedFeed({ navigation, feedId }: { navigation: Navigation; feedId: number }) {
+function OpenedFeed({
+  navigation,
+  feedId,
+}: {
+  navigation: Extract<Navigation, { readonly kind: 'screen' }>
+  feedId: number
+}) {
   return (
     <FeedView
       feedId={feedId}
