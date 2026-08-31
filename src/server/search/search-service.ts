@@ -13,11 +13,11 @@ export const SEARCH_RESULT_LIMIT = 50
 // Tuning constants for ADR 0009's ranking, not contract: harness tests pin
 // relative order only. BM25 weights follow the FTS5 column order — a Feed
 // Item's own title speaks loudest, the effective Feed title next, the summary
-// last. The half-life is how many days of age cost a match half its pull.
+// last. The decay scale is the age at which a match holds half its fresh pull.
 const ITEM_TITLE_WEIGHT = 4
 const SUMMARY_WEIGHT = 1
 const FEED_TITLE_WEIGHT = 2
-const RECENCY_HALF_LIFE_DAYS = 30
+const RECENCY_DECAY_DAYS = 30
 
 export class SearchService {
   readonly #db: DrizzleDatabase
@@ -41,11 +41,11 @@ export class SearchService {
     // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
     // the LIMIT bounds the right fifty. bm25() is more negative the better the
     // match; dividing by the age factor shrinks it toward zero as the item ages
-    // — halved at the half-life — so a strong old title match outlasts a weak
+    // — halved at the decay scale — so a strong old title match outlasts a weak
     // fresh summary match while comparable matches yield to the recent one.
     const chronology = chronologySql(now)
     const relevance = sql`bm25(${feedItemSearch}, ${ITEM_TITLE_WEIGHT}, ${SUMMARY_WEIGHT}, ${FEED_TITLE_WEIGHT})
-      / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_HALF_LIFE_DAYS})`
+      / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_DECAY_DAYS})`
 
     const rows = this.#db
       .select({
