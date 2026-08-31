@@ -1,0 +1,97 @@
+/* PROTOTYPE styles — throwaway, never ships. Bundled so CSP (style-src 'self') allows them. */
+.proto-switcher {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #12110f;
+  color: #f7f7f5;
+  font-size: 12.5px;
+  box-shadow: 0 4px 16px rgba(18, 17, 15, 0.25);
+  z-index: 100;
+}
+.proto-switcher button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.proto-inline {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 24px;
+  row-gap: 8px;
+}
+.proto-inline-name {
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+
+.proto-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.proto-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.proto-row-name {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+.proto-row-domain {
+  font-size: 12.5px;
+  color: var(--color-meta);
+}
+
+.proto-feedrow {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.proto-feedrow-name {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+.proto-strip {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+  align-self: center;
+}
+.proto-strip-day {
+  width: 6px;
+  height: 6px;
+  background: var(--cadence-0, rgba(18, 17, 15, 0.06));
+}
+.proto-strip-day[data-level='1'] { background: var(--cadence-1, rgba(18, 17, 15, 0.2)); }
+.proto-strip-day[data-level='2'] { background: var(--cadence-2, rgba(18, 17, 15, 0.38)); }
+.proto-strip-day[data-level='3'] { background: var(--cadence-3, rgba(18, 17, 15, 0.6)); }
+
+@media (hover: hover) and (pointer: fine) {
+  .proto-inline-name:hover,
+  .proto-row-name:hover,
+  .proto-feedrow-name:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--color-hairline, rgba(18, 17, 15, 0.15));
+    text-underline-offset: 4px;
+  }
+}

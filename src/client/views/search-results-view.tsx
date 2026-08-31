@@ -8,6 +8,8 @@ import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
+// PROTOTYPE: variant switch for the jump-to group; remove with the prototype.
+import { PrototypeJumpTo, PrototypeSwitcher } from './search-jump-to-prototype.js'
 import { failureKind } from './failure.js'
 
 export interface SearchResultsViewProps {
@@ -67,6 +69,7 @@ export function SearchResultsView({ query, onOpenItem, onOpenFeed }: SearchResul
   return (
     <div className="view measure search-results-view">
       <SearchOutcome state={state} line={line} onOpenItem={onOpenItem} onOpenFeed={onOpenFeed} onSaved={setSaved} />
+      <PrototypeSwitcher />
     </div>
   )
 }
@@ -110,7 +113,8 @@ function SearchOutcome({
 
   return (
     <div className="search-answer" role="region" aria-label="search results">
-      <JumpToGroup subscriptions={state.subscriptions} onOpenFeed={onOpenFeed} />
+      {/* PROTOTYPE: was <JumpToGroup subscriptions={state.subscriptions} onOpenFeed={onOpenFeed} /> */}
+      <PrototypeJumpTo subscriptions={state.subscriptions} onOpenFeed={onOpenFeed} />
       {state.results.length > 0 && (
         <div className="content-list">
           {state.results.map((result) => (

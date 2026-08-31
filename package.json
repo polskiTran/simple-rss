@@ -24,7 +24,8 @@
     "lint:anti-slop": "node --import=tsx node_modules/oxlint/bin/oxlint --config oxlint.config.mjs .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "cli": "tsx src/server/cli-main.ts"
+    "cli": "tsx src/server/cli-main.ts",
+    "prototype:search": "pnpm build:client && tsx prototype/search-jump-to.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
