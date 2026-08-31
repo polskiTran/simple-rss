@@ -72,9 +72,9 @@ export class SearchService {
       .limit(SEARCH_RESULT_LIMIT)
       .all()
 
-    // Rows keep the SQL relevance order; chronology here only feeds the display date.
+    // Rows keep the SQL relevance order — no re-sort on the way out.
     const results = rows.map((row) => {
-      const instant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
+      const displayInstant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
       return {
         feedItemId: row.feedItemId,
         title: row.title ?? 'untitled',
@@ -82,7 +82,7 @@ export class SearchService {
         feedTitle: row.feedTitle,
         publishedAt: row.publishedAt,
         firstSeenAt: row.firstSeenAt,
-        displayDate: metaRowDate(instant, dateKey(instant, timezone), today, timezone),
+        displayDate: metaRowDate(displayInstant, dateKey(displayInstant, timezone), today, timezone),
         saved: row.savedAt !== null,
       }
     })
