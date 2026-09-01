@@ -11,15 +11,13 @@ import { feedPathOf } from '../routing.js'
 import { useResource } from '../use-resource.js'
 
 export interface SearchResultsViewProps {
-  query: string
+  settledQuery: string
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
 
-export function SearchResultsView({ query, onOpenItem, onOpenFeed }: SearchResultsViewProps) {
-  const line = query.trim()
-  // The query arrives already settled — GlobalSearch commits per pause, not per
-  // keystroke — so every change is worth fetching immediately.
+export function SearchResultsView({ settledQuery, onOpenItem, onOpenFeed }: SearchResultsViewProps) {
+  const line = settledQuery.trim()
   const [found, { set }] = useResource((signal) => fetchSearchResults(line, signal), [line])
 
   const setSaved = (feedItemId: number, saved: boolean) =>
@@ -87,12 +85,6 @@ export function SearchResultsView({ query, onOpenItem, onOpenFeed }: SearchResul
   return <div className="view measure search-results-view">{outcome()}</div>
 }
 
-/**
- * Matching Subscriptions as a jump into their Feeds, atop the item results as
- * condensed feeds-list rows: the name is the way in, the domain the way out,
- * the cadence strip what marks the row as a Feed rather than an item.
- * Whitespace alone separates the group from the items below.
- */
 function JumpToGroup({
   subscriptions,
   onOpenFeed,

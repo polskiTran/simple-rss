@@ -64,11 +64,10 @@ function viewFor(gate: Gate, navigation: Navigation) {
 
 function signedInView(navigation: Navigation, gate: Gate) {
   if (navigation.kind === 'search') {
-    // A result opens with the search itself as its way back, results and all.
     const origin = searchOrigin(navigation.query, navigation.origin)
     return (
       <SearchResultsView
-        query={navigation.query}
+        settledQuery={navigation.query}
         onOpenItem={(feedItemId) => navigation.openReader(feedItemId, origin)}
         onOpenFeed={(feedId) => navigation.openFeed(feedId, origin)}
       />

@@ -11,11 +11,9 @@ export function emptyCadence(): number[] {
 }
 
 /**
- * Per-feed counts for the trailing thirty days in the installation timezone —
- * the cadence strip's data, shared by the Feeds list and Search's jump-to
- * group. Days follow the chronology instant, not the raw published time.
- * `feedIds` narrows the scan to the feeds a caller will actually decorate —
- * Search's jump-to needs at most a handful; the Feeds list takes them all.
+ * Per-feed counts for the trailing thirty days in the installation timezone.
+ * Days follow the chronology instant, not the raw published time; `feedIds`
+ * narrows the scan to just those feeds.
  */
 export function stripCadenceByFeed(
   db: DrizzleDatabase,

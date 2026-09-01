@@ -12,10 +12,7 @@ import { feedItemSearch } from './search-schema.js'
 export const SEARCH_RESULT_LIMIT = 50
 export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
-// Tuning constants for ADR 0009's ranking, not contract: harness tests pin
-// relative order only. BM25 weights follow the FTS5 column order — a Feed
-// Item's own title speaks loudest, the effective Feed title next, the summary
-// last. The decay scale is the age at which a match holds half its fresh pull.
+// BM25 weights are positional, following the FTS5 column order.
 const ITEM_TITLE_WEIGHT = 4
 const SUMMARY_WEIGHT = 1
 const FEED_TITLE_WEIGHT = 2
@@ -52,9 +49,7 @@ export class SearchService {
 
     // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
     // the LIMIT bounds the right fifty. bm25() is more negative the better the
-    // match; dividing by the age factor shrinks it toward zero as the item ages
-    // — halved at the decay scale — so a strong old title match outlasts a weak
-    // fresh summary match while comparable matches yield to the recent one.
+    // match; dividing by the age factor shrinks it toward zero as the item ages.
     const chronology = chronologySql(now)
     const relevance = sql`bm25(${feedItemSearch}, ${ITEM_TITLE_WEIGHT}, ${SUMMARY_WEIGHT}, ${FEED_TITLE_WEIGHT})
       / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_DECAY_DAYS})`
@@ -68,7 +63,6 @@ export class SearchService {
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
         savedAt: libraryItems.savedAt,
-        // NULL whenever the summary itself is NULL.
         summarySnippet: sql<
           string | null
         >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', '…', ${SNIPPET_TOKENS})`,
@@ -89,7 +83,6 @@ export class SearchService {
       .limit(SEARCH_RESULT_LIMIT)
       .all()
 
-    // Rows keep the SQL relevance order — no re-sort on the way out.
     const results = rows.map((row) => {
       const displayInstant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
       return {
@@ -108,11 +101,6 @@ export class SearchService {
     return { subscriptions: this.#subscriptionMatches(words, timezone, now), results }
   }
 
-  // The jump-to group reads the curated Subscription list, not the FTS index:
-  // every word must appear as a case- and diacritic-folded substring of the
-  // effective title or the domain. The Feed Description never matches, so a
-  // topic word cannot bury the item results under feed rows. Each entry carries
-  // its cadence strip, so the group reads as feeds-list rows, not as items.
   #subscriptionMatches(words: readonly string[], timezone: string, now: Date): SearchSubscriptionMatch[] {
     const needles = words.map(folded)
     const matches = this.#db

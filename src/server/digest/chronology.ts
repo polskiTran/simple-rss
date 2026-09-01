@@ -11,10 +11,6 @@ export function plausibleHorizon(now: Date): string {
   return new Date(now.getTime() + FUTURE_TOLERANCE_MS).toISOString()
 }
 
-/**
- * Newest chronology first, ties to the newer row — the ordering the Digest
- * and the Library share. Search ranks by relevance instead (ADR 0009).
- */
 export function inDigestOrder<Row extends { feedItemId: number; publishedAt: string | null; firstSeenAt: string }>(
   rows: readonly Row[],
   now: Date,
@@ -24,8 +20,6 @@ export function inDigestOrder<Row extends { feedItemId: number; publishedAt: str
     .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
 }
 
-// dateKey runs once per row in the cadence scans, and constructing an
-// Intl.DateTimeFormat costs more than using one — so keep one per timezone.
 const dateKeyFormats = new Map<string, Intl.DateTimeFormat>()
 
 export function dateKey(date: Date, timezone: string): string {

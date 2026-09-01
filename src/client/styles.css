@@ -155,7 +155,6 @@
     max-width: none;
   }
 
-  /* One row: wordmark, the search line, tabs at the trailing edge. */
   .masthead {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -447,7 +446,6 @@
   .chrome-search {
     min-width: 0;
     margin: 0;
-    /* Shorter than the Feeds screen's full-width line: width states scope. */
     max-width: 340px;
     width: 100%;
   }
@@ -806,22 +804,18 @@
     gap: 28px;
   }
 
-  /* The jump-to group and the item results, kept apart by whitespace alone. */
   .search-answer {
     display: flex;
     flex-direction: column;
     gap: 44px;
   }
 
-  /* Condensed feeds-list rows: name, domain, cadence strip on one line. */
   .search-jump-to {
     display: flex;
     flex-direction: column;
     gap: 14px;
   }
 
-  /* Only the name column may wrap: a long name folds in place while the
-     domain keeps its line and the strip keeps the trailing edge. */
   .search-jump-row {
     display: grid;
     grid-template-columns: minmax(0, max-content) max-content 1fr;
@@ -829,8 +823,6 @@
     align-items: baseline;
   }
 
-  /* Pinned to the trailing edge: one aligned strip column, as on the Feeds
-     list — held to the first line even when the name runs to two. */
   .search-jump-row .cadence-strip {
     justify-self: end;
     align-self: start;
@@ -1151,8 +1143,6 @@
     font-size: 19px;
   }
 
-  /* One row can't hold everything on the narrow paper: the tabs keep the
-     trailing edge beside the mark, and the search line takes the row below. */
   .masthead {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 18px 20px;
@@ -1171,7 +1161,6 @@
     font-size: 12px;
   }
 
-  /* Jump-to rows fold like feeds-list rows: name atop, strip and domain below. */
   .search-jump-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);

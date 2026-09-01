@@ -17,11 +17,9 @@ const SETTLE_MS = 250
 export function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
   const input = useRef<HTMLInputElement>(null)
 
-  // The line's live text; navigation only learns it once typing settles.
   const [draft, setDraft] = useState(query)
   const [settled, setSettled] = useState(query)
   if (query !== settled) {
-    // The query moved without us — back, a jump into a Feed, a cleared search.
     setSettled(query)
     setDraft(query)
   }

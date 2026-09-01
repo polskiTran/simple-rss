@@ -39,12 +39,10 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
   return Number.isSafeInteger(id) ? id : undefined
 }
 
-/** The results surface carries its query in the URL, so a search survives reload and travels as a link. */
 export function searchPathOf(query: string): string {
   return `/search?${new URLSearchParams({ q: query })}`
 }
 
-/** The query a `/search` URL carries; undefined on any other path, or when it holds no words. */
 function searchQueryOf(pathname: string, search: string): string | undefined {
   if (pathname !== '/search') return undefined
   const parsed = searchQuerySchema.safeParse(new URLSearchParams(search).get('q'))
@@ -73,7 +71,6 @@ export function readerOrigin(feedItemId: number, from: Origin | undefined): Orig
   return { path: readerPathOf(feedItemId), label: 'article', from }
 }
 
-/** The results surface as an Origin, so a screen opened from a result can lead back to the search. */
 export function searchOrigin(query: string, from: Origin | undefined): Origin {
   return { path: searchPathOf(query), label: 'search', from }
 }
@@ -114,10 +111,8 @@ interface ScreenLocation {
 
 interface SearchLocation {
   readonly kind: 'search'
-  /** The results surface reads under the digest tab, whatever the origin. */
   readonly route: 'digest'
   readonly query: string
-  /** The screen the search replaced; restored when the line clears. */
   readonly origin: Origin | undefined
 }
 
@@ -131,7 +126,6 @@ interface NavigationActions {
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
 
-/** A Navigation narrowed to a plain screen, for views only rendered outside search. */
 export type ScreenNavigation = Extract<Navigation, { readonly kind: 'screen' }>
 
 type Location = ScreenLocation | SearchLocation
@@ -170,7 +164,6 @@ export function useNavigation(): Navigation {
       }
 
       if (location.kind === 'search') {
-        // Refining rewrites the one search entry in place, so Back never walks the drafts.
         const state = location.origin ? { origin: location.origin } : null
         window.history.replaceState(state, '', searchPathOf(query))
         setLocation({ ...location, query })
@@ -200,7 +193,6 @@ function locationOf(path: string, origin: Origin | undefined): Location {
   return screenLocationOf(pathname, origin)
 }
 
-/** The screen a search replaces, as the Origin its clearing restores. */
 function searchScreenOrigin(location: ScreenLocation): Origin {
   if (location.readerItemId !== undefined) return readerOrigin(location.readerItemId, location.origin)
   if (location.feedId !== undefined) return { path: feedPathOf(location.feedId), label: 'feed', from: location.origin }

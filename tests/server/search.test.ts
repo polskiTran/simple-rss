@@ -27,7 +27,6 @@ const item = (guid: string, title: string, options: { pubDate?: string; summary?
 const rss = (title: string, ...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>${title}</title><link>https://journal.example/</link>${items.join('')}</channel></rss>`
 
-// A second Feed with its own domain and a Feed Description, for the jump-to group.
 const COAST_URL = 'https://shore.example/feed'
 const coastXml = `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>The Quiet Coast</title><link>https://shore.example/</link>
@@ -176,7 +175,6 @@ describe('searching retained reading metadata', () => {
       service,
       rss(
         'Field Notes',
-        // Document order gives the older item the higher id, so only recency can win this.
         item('new', 'Release notes', { pubDate: '2026-08-08T07:15:00.000Z' }),
         item('old', 'Release notes', { pubDate: '2026-07-18T08:00:00.000Z' }),
       ),
@@ -187,6 +185,8 @@ describe('searching retained reading metadata', () => {
       '2026-08-08T07:15:00.000Z',
       '2026-07-18T08:00:00.000Z',
     ])
+    // Recency alone can win this: the id tie-break prefers the higher id, and the recent item holds the lower.
+    expect(results.map((result) => result.feedItemId)).toEqual([1, 2])
   })
 
   it('says nothing matched with an empty result, not an error', async () => {
@@ -340,7 +340,6 @@ describe('searching retained reading metadata', () => {
     expect(before.results).toHaveLength(2)
 
     service.database?.$client.exec('DELETE FROM feed_item_search')
-    // The jump-to group answers from the Subscription list, not the index.
     const emptied = await search(user, 'notes')
     expect(emptied.results).toEqual([])
     expect(emptied.subscriptions.map((entry) => entry.title)).toEqual(['Field Notes'])
@@ -422,7 +421,6 @@ describe('searching retained reading metadata', () => {
     expect(byTitle.subscriptions).toMatchObject([
       { feedId: 1, title: 'Field Notes', domain: 'journal.example', homePageUrl: 'https://journal.example/' },
     ])
-    // The entry carries the thirty-day strip, and today's item lands in it.
     expect(byTitle.subscriptions[0]?.cadence).toHaveLength(30)
     expect(byTitle.subscriptions[0]?.cadence.reduce((sum, count) => sum + count, 0)).toBe(1)
     expect(byTitle.results.map((result) => result.title)).toEqual(['Morning chronology'])

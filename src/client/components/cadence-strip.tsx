@@ -1,6 +1,5 @@
 import { cadenceLevel } from '../cadence.js'
 
-/** The thirty-day cadence strip, on Feeds-list rows and Search's jump-to group. */
 export function CadenceStrip({ counts, title }: { counts: readonly number[]; title: string }) {
   const total = counts.reduce((sum, count) => sum + count, 0)
   return (
