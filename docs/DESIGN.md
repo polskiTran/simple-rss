@@ -109,9 +109,25 @@ The Feeds screen keeps its full-width line as the first control in the content
 measure, `padding:8px 0 32px`, but its one job is adding: "add a feed by url"
 accepts a Feed URL and nothing else — finding a Feed is the masthead line's job,
 answered by the jump-to group. The two widths state that scope: the short
-masthead line searches retained reading from anywhere; the full-width Feeds line
-takes an address. They repeat the same underline rather than inventing a second
-field style.
+masthead line searches retained reading; the full-width Feeds line takes an
+address. They repeat the same underline rather than inventing a second field
+style.
+
+**Departure — the line is bounded by its screen.** Invoked from an opened Feed,
+the line answers with that Feed's items alone; from the Library, with saved
+items; from the Feeds screen, with matching Subscriptions and no items. The
+Digest, the Reader and settings bound nothing. The placeholder says which
+before the first keystroke — `search this feed`, `search your saves`, `search
+your feeds`, `search your reading` — and once the words have taken its place, a
+bounded results surface opens with one meta-grey line, `in Field Notes ·
+everywhere`. The `everywhere` word takes §5's grey-to-ink treatment and re-asks
+the same words from the Digest: from then on it is a Digest search, and
+clearing the line lands there. The empty state keeps that line above it, so the
+way out is never further than the miss. A bounded search reads under its
+section's tab — feeds, saved — and an unbounded one under the Digest, so the
+active tab and the bound line never disagree. There is no chip and no toggle:
+the bound is read off the screen the search left, never carried as a second
+variable.
 
 ## 5. Components
 
@@ -149,7 +165,11 @@ own grey and size, `line-height:1.6` because it wraps. No markup and no accent �
 the fragment itself is the evidence. A match the shape already shows — title or
 source — draws nothing extra, and the item stays two lines.
 
-Search may also open with a jump-to group: a handful of matching Subscriptions
+Results bounded to one Feed are a single-Feed list and take its meta row: the
+source drops out, `date · save`.
+
+An unbounded search, or one bounded to the Feeds screen, may also open with a
+jump-to group: a handful of matching Subscriptions
 as condensed feeds-list rows — name at 16px, domain in meta grey beside it, and
 the 30-day cadence strip pinned to the row's trailing edge, so the strips form
 one aligned column as they do on the Feeds list. The strip is what marks the

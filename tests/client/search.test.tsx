@@ -52,6 +52,7 @@ describe('the search line in the chrome', () => {
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=chronology', {
         body: {
+          feed: null,
           subscriptions: [],
           results: [result(9, 'Morning chronology', 'today, 07:15'), result(8, 'Tide chronology', '3 june', true)],
         },
@@ -83,7 +84,7 @@ describe('the search line in the chrome', () => {
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=driftwood', async () => {
         await answer.promise
-        return { body: { subscriptions: [], results: [] } }
+        return { body: { feed: null, subscriptions: [], results: [] } }
       })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -122,7 +123,7 @@ describe('the search line in the chrome', () => {
     stubApi()
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=chronology', {
-        body: { subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
+        body: { feed: null, subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
       })
     window.history.replaceState(null, '', '/search?q=chronology')
     render(<App />)

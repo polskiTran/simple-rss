@@ -32,6 +32,7 @@ import {
   type ReaderItem,
   type RefreshFeedResponse,
   type SearchResults,
+  type SearchScope,
   type SubscriptionList,
   type ServiceMeta,
   type UpdateFeedDetailsRequest,
@@ -198,9 +199,20 @@ export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promis
   return digestSchema.parse(await response.json())
 }
 
-/** Searches retained reading metadata only; results ranked by match quality blended with recency. */
-export async function fetchSearchResults(query: string, signal?: AbortSignal): Promise<SearchResults> {
-  const response = await read(`/api/search?q=${encodeURIComponent(query)}`, signal)
+/**
+ * Searches retained reading metadata only, within the scope; results ranked
+ * by match quality blended with recency. The bound travels as `feed=<id>` or
+ * `in=saved|subscriptions`; everywhere needs no parameter.
+ */
+export async function fetchSearchResults(
+  query: string,
+  scope: SearchScope,
+  signal?: AbortSignal,
+): Promise<SearchResults> {
+  const params = new URLSearchParams({ q: query })
+  if (scope.kind === 'feed') params.set('feed', String(scope.feedId))
+  if (scope.kind === 'saved' || scope.kind === 'subscriptions') params.set('in', scope.kind)
+  const response = await read(`/api/search?${params}`, signal)
   return searchResultsSchema.parse(await response.json())
 }
 

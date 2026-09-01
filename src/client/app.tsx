@@ -36,6 +36,7 @@ export function App() {
           <>
             <GlobalSearch
               query={navigation.kind === 'search' ? navigation.query : ''}
+              scope={navigation.searchScope}
               onQueryChange={navigation.updateSearch}
             />
             <TabBar active={navigation.route} onNavigate={navigation.navigate} />
@@ -68,6 +69,8 @@ function signedInView(navigation: Navigation, gate: Gate) {
     return (
       <SearchResultsView
         settledQuery={navigation.query}
+        scope={navigation.searchScope}
+        onWiden={navigation.widenSearch}
         onOpenItem={(feedItemId) => navigation.openReader(feedItemId, origin)}
         onOpenFeed={(feedId) => navigation.openFeed(feedId, origin)}
       />

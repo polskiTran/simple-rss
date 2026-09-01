@@ -1,4 +1,4 @@
-import type { SearchSubscriptionMatch } from '../../shared/api.js'
+import type { SearchResults, SearchScope, SearchSubscriptionMatch } from '../../shared/api.js'
 import { fetchSearchResults } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
@@ -7,18 +7,22 @@ import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
-import { feedPathOf } from '../routing.js'
+import { feedPathOf, searchPathOf } from '../routing.js'
 import { useResource } from '../use-resource.js'
 
 export interface SearchResultsViewProps {
   settledQuery: string
+  scope: SearchScope
+  /** The way out of a bound: re-ask the same words everywhere. */
+  onWiden(): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
 
-export function SearchResultsView({ settledQuery, onOpenItem, onOpenFeed }: SearchResultsViewProps) {
+export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, onOpenFeed }: SearchResultsViewProps) {
   const line = settledQuery.trim()
-  const [found, { set }] = useResource((signal) => fetchSearchResults(line, signal), [line])
+  const bound = scope.kind === 'feed' ? `feed:${scope.feedId}` : scope.kind
+  const [found, { set }] = useResource((signal) => fetchSearchResults(line, scope, signal), [line, bound])
 
   const setSaved = (feedItemId: number, saved: boolean) =>
     set((current) => ({
@@ -45,44 +49,76 @@ export function SearchResultsView({ settledQuery, onOpenItem, onOpenFeed }: Sear
     }
 
     const { subscriptions, results } = found.value
+    const place = placeOf(scope, found.value)
+    const boundLine = place !== undefined && (
+      <p className="search-scope">
+        in {place} ·{' '}
+        <a className="search-widen" href={searchPathOf(line)} onClick={routedClick(onWiden)}>
+          everywhere
+        </a>
+      </p>
+    )
+
     if (subscriptions.length === 0 && results.length === 0) {
       return (
-        <p className="empty-note" role="status">
-          nothing in your reading matches “{line}”
-        </p>
+        <>
+          {boundLine}
+          <p className="empty-note" role="status">
+            nothing in {place ?? 'your reading'} matches “{line}”
+          </p>
+        </>
       )
     }
 
     return (
-      <div className="search-answer" role="region" aria-label="search results">
-        <JumpToGroup subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
-        {results.length > 0 && (
-          <div className="content-list">
-            {results.map((result) => (
-              <article className="content-item" key={result.feedItemId}>
-                <h3 className="content-item-title">
-                  <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
-                </h3>
-                {result.snippet !== null && <p className="content-snippet">{result.snippet}</p>}
-                <div className="content-meta">
-                  <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
-                  <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
-                  <SaveToggle
-                    feedItemId={result.feedItemId}
-                    title={result.title}
-                    saved={result.saved}
-                    onSaved={(saved) => setSaved(result.feedItemId, saved)}
-                  />
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
+      <>
+        {boundLine}
+        <div className="search-answer" role="region" aria-label="search results">
+          <JumpToGroup subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
+          {results.length > 0 && (
+            <div className="content-list">
+              {results.map((result) => (
+                <article className="content-item" key={result.feedItemId}>
+                  <h3 className="content-item-title">
+                    <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
+                  </h3>
+                  {result.snippet !== null && <p className="content-snippet">{result.snippet}</p>}
+                  <div className="content-meta">
+                    {scope.kind !== 'feed' && (
+                      <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
+                    )}
+                    <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
+                    <SaveToggle
+                      feedItemId={result.feedItemId}
+                      title={result.title}
+                      saved={result.saved}
+                      onSaved={(saved) => setSaved(result.feedItemId, saved)}
+                    />
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </>
     )
   }
 
   return <div className="view measure search-results-view">{outcome()}</div>
+}
+
+/** The bound in prose — the Feed's own name, or the section's — and nothing for everywhere. */
+function placeOf(scope: SearchScope, answer: SearchResults): string | undefined {
+  switch (scope.kind) {
+    case 'everywhere':
+      return undefined
+    case 'saved':
+      return 'your saves'
+    case 'subscriptions':
+      return 'your feeds'
+    case 'feed':
+      return answer.feed?.title
+  }
 }
 
 function JumpToGroup({

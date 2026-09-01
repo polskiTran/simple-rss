@@ -1,5 +1,5 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import type { SearchResults, SearchSubscriptionMatch } from '../../shared/api.js'
+import type { SearchResult, SearchResults, SearchScope, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import { chronologySql } from '../digest/list-page.js'
@@ -38,13 +38,44 @@ export class SearchService {
     this.#settings = options.settings
   }
 
-  search(query: string): SearchResults {
-    const words = wordsOf(query)
-    if (words.length === 0) return { subscriptions: [], results: [] }
-    const match = matchExpressionOf(words)
+  /**
+   * Answers within the scope: the whole of retained reading, the Library, one
+   * Feed's items, or the Subscription list alone. Undefined when the scope
+   * names a Feed this installation has never held.
+   */
+  search(query: string, scope: SearchScope = { kind: 'everywhere' }): SearchResults | undefined {
+    const feed = scope.kind === 'feed' ? this.#feedNamed(scope.feedId) : null
+    if (feed === undefined) return undefined
 
+    const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
+    if (words.length === 0) return { feed, subscriptions: [], results: [] }
+    if (scope.kind === 'subscriptions') {
+      return { feed, subscriptions: this.#subscriptionMatches(words, timezone, now), results: [] }
+    }
+
+    const results = this.#itemMatches(words, scope, timezone, now)
+    const subscriptions = scope.kind === 'everywhere' ? this.#subscriptionMatches(words, timezone, now) : []
+    return { feed, subscriptions, results }
+  }
+
+  #feedNamed(feedId: number): SearchResults['feed'] | undefined {
+    return this.#db
+      .select({ feedId: feeds.id, title: effectiveFeedTitle })
+      .from(feeds)
+      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .where(eq(feeds.id, feedId))
+      .get()
+  }
+
+  #itemMatches(
+    words: readonly string[],
+    scope: Extract<SearchScope, { kind: 'everywhere' | 'saved' | 'feed' }>,
+    timezone: string,
+    now: Date,
+  ): SearchResult[] {
+    const match = matchExpressionOf(words)
     const today = dateKey(now, timezone)
 
     // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
@@ -77,13 +108,15 @@ export class SearchService {
         and(
           sql`${feedItemSearch} MATCH ${match}`,
           or(isNotNull(subscriptions.feedId), isNotNull(libraryItems.feedItemId)),
+          scope.kind === 'saved' ? isNotNull(libraryItems.feedItemId) : undefined,
+          scope.kind === 'feed' ? eq(feedItems.feedId, scope.feedId) : undefined,
         ),
       )
       .orderBy(relevance, sql`${chronology} DESC`, desc(feedItems.id))
       .limit(SEARCH_RESULT_LIMIT)
       .all()
 
-    const results = rows.map((row) => {
+    return rows.map((row) => {
       const displayInstant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
       return {
         feedItemId: row.feedItemId,
@@ -97,8 +130,6 @@ export class SearchService {
         snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
       }
     })
-
-    return { subscriptions: this.#subscriptionMatches(words, timezone, now), results }
   }
 
   #subscriptionMatches(words: readonly string[], timezone: string, now: Date): SearchSubscriptionMatch[] {

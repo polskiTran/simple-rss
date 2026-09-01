@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { useCallback, useEffect, useState } from 'react'
-import { searchQuerySchema } from '../shared/api.js'
+import { searchQuerySchema, type SearchScope } from '../shared/api.js'
 
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
 export type Route = (typeof ROUTES)[number]
@@ -75,6 +75,19 @@ export function searchOrigin(query: string, from: Origin | undefined): Origin {
   return { path: searchPathOf(query), label: 'search', from }
 }
 
+/**
+ * A search is bounded by the screen it was invoked from, read off that
+ * screen's path: an opened Feed, the Library, or the Feeds list. Every other
+ * screen — the Digest, the Reader, settings — searches everywhere.
+ */
+export function searchScopeOf(path: string): SearchScope {
+  const feedId = feedIdOf(path)
+  if (feedId !== undefined) return { kind: 'feed', feedId }
+  if (path === pathOf('saved')) return { kind: 'saved' }
+  if (path === pathOf('feeds')) return { kind: 'subscriptions' }
+  return { kind: 'everywhere' }
+}
+
 const MAX_TRAIL = 6
 
 const historyPathSchema = z.string().regex(/^\/[a-z]+(\/[1-9]\d*)?(\?q=[^#]*)?$/)
@@ -111,17 +124,22 @@ interface ScreenLocation {
 
 interface SearchLocation {
   readonly kind: 'search'
-  readonly route: 'digest'
+  /** A bounded search reads under its section's tab; one that answers everywhere reads under the Digest. */
+  readonly route: Route
   readonly query: string
   readonly origin: Origin | undefined
 }
 
 interface NavigationActions {
+  /** What the search line would answer from here: this screen's bound, or the open search's. */
+  readonly searchScope: SearchScope
   navigate(route: Route): void
   openFeed(feedId: number, from: Origin): void
   openReader(feedItemId: number, from: Origin): void
   returnTo(origin: Origin): void
   updateSearch(query: string): void
+  /** Re-asks the open search from the Digest, so it answers everywhere and clears back to the Digest. */
+  widenSearch(): void
 }
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
@@ -175,7 +193,18 @@ export function useNavigation(): Navigation {
     [location, go],
   )
 
-  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch }
+  const widenSearch = useCallback(() => {
+    if (location.kind !== 'search') return
+    const path = searchPathOf(location.query)
+    window.history.replaceState({ origin: DIGEST_ORIGIN }, '', path)
+    setLocation(locationOf(path, DIGEST_ORIGIN))
+  }, [location])
+
+  const searchScope = searchScopeOf(
+    location.kind === 'search' ? (location.origin?.path ?? pathOf(DEFAULT_ROUTE)) : searchScreenOrigin(location).path,
+  )
+
+  return { ...location, searchScope, navigate, openFeed, openReader, returnTo, updateSearch, widenSearch }
 }
 
 function currentLocation(): Location {
@@ -189,8 +218,13 @@ function locationOf(path: string, origin: Origin | undefined): Location {
   const pathname = cut === -1 ? path : path.slice(0, cut)
   const search = cut === -1 ? '' : path.slice(cut)
   const query = searchQueryOf(pathname, search)
-  if (query !== undefined) return { kind: 'search', route: 'digest', query, origin }
+  if (query !== undefined) return { kind: 'search', route: searchRouteOf(origin), query, origin }
   return screenLocationOf(pathname, origin)
+}
+
+function searchRouteOf(origin: Origin | undefined): Route {
+  if (origin === undefined || searchScopeOf(origin.path).kind === 'everywhere') return DEFAULT_ROUTE
+  return routeOf(origin.path)
 }
 
 function searchScreenOrigin(location: ScreenLocation): Origin {

@@ -1,9 +1,10 @@
 import { Field as BaseField } from '@base-ui/react/field'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { MAX_SEARCH_QUERY_LENGTH } from '../../shared/api.js'
+import { MAX_SEARCH_QUERY_LENGTH, type SearchScope } from '../../shared/api.js'
 
 interface GlobalSearchProps {
   query: string
+  scope: SearchScope
   onQueryChange(query: string): void
 }
 
@@ -14,7 +15,21 @@ interface GlobalSearchProps {
  */
 const SETTLE_MS = 250
 
-export function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
+/** The line says what it would answer from, before the first keystroke takes the words' place. */
+function promptOf(scope: SearchScope): string {
+  switch (scope.kind) {
+    case 'everywhere':
+      return 'search your reading'
+    case 'saved':
+      return 'search your saves'
+    case 'subscriptions':
+      return 'search your feeds'
+    case 'feed':
+      return 'search this feed'
+  }
+}
+
+export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps) {
   const input = useRef<HTMLInputElement>(null)
 
   const [draft, setDraft] = useState(query)
@@ -42,6 +57,7 @@ export function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
     return () => document.removeEventListener('keydown', focusSearch)
   }, [])
 
+  const prompt = promptOf(scope)
   return (
     <form className="chrome-search" role="search" onSubmit={(event) => event.preventDefault()}>
       <BaseField.Root>
@@ -52,8 +68,8 @@ export function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
           autoComplete="off"
           spellCheck={false}
           maxLength={MAX_SEARCH_QUERY_LENGTH}
-          aria-label="search your reading"
-          placeholder="search your reading"
+          aria-label={prompt}
+          placeholder={prompt}
           value={draft}
           onValueChange={setDraft}
         />

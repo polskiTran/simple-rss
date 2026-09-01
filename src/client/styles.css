@@ -429,6 +429,7 @@
   .feed-open:focus-visible,
   .feed-title-link:focus-visible,
   .home-page-link:focus-visible,
+  .search-widen:focus-visible,
   .feed-back:focus-visible {
     outline: none;
     text-decoration: underline;
@@ -804,6 +805,15 @@
     gap: 28px;
   }
 
+  /* A bounded search opens by naming its bound and the one way out of it. */
+  .search-scope {
+    margin: 0 0 28px;
+    font-weight: 300;
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--color-meta);
+  }
+
   .search-answer {
     display: flex;
     flex-direction: column;
@@ -1102,6 +1112,7 @@
     .feed-back:hover,
     .feed-title-link:hover,
     .home-page-link:hover,
+    .search-widen:hover,
     .reader-back:hover,
     .reader-original:hover,
     .interval-option:hover,

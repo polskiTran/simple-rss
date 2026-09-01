@@ -382,6 +382,35 @@ export const MAX_SEARCH_QUERY_LENGTH = 256
 
 export const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)
 
+/**
+ * A search is bounded by the screen it was invoked from: an opened Feed
+ * answers its own Feed Items, the Library its saved ones, and the Feeds
+ * screen only its Subscriptions. The Digest bounds nothing.
+ */
+export const searchScopeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('everywhere') }),
+  z.object({ kind: z.literal('saved') }),
+  z.object({ kind: z.literal('subscriptions') }),
+  z.object({ kind: z.literal('feed'), feedId: z.number().int().positive() }),
+])
+export type SearchScope = z.infer<typeof searchScopeSchema>
+
+/** How a search travels: `q` for the words, then at most one bound — `feed=<id>` or `in=saved|subscriptions`. */
+export const searchRequestSchema = z
+  .object({
+    q: searchQuerySchema,
+    feed: z.coerce.number().int().positive().optional(),
+    in: z.enum(['saved', 'subscriptions']).optional(),
+  })
+  .refine((request) => request.feed === undefined || request.in === undefined, 'A search takes one bound at most')
+  .transform(({ q, feed, in: within }) => ({ query: q, scope: searchScopeOfBound(feed, within) }))
+
+function searchScopeOfBound(feed: number | undefined, within: 'saved' | 'subscriptions' | undefined): SearchScope {
+  if (feed !== undefined) return { kind: 'feed', feedId: feed }
+  if (within !== undefined) return { kind: within }
+  return { kind: 'everywhere' }
+}
+
 export const searchResultSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -405,6 +434,9 @@ export const searchSubscriptionMatchSchema = feedSummarySchema
 export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSchema>
 
 export const searchResultsSchema = z.object({
+  // The Feed a Feed-bounded search answered from, named so the surface can
+  // say so; null under every other scope.
+  feed: feedSummarySchema.pick({ feedId: true, title: true }).nullable(),
   subscriptions: z.array(searchSubscriptionMatchSchema),
   results: z.array(searchResultSchema),
 })

@@ -43,14 +43,15 @@ async function subscribed(user: Device, service: TestService, xml: string, url: 
   await service.wakeScheduler()
 }
 
-async function search(user: Device, query: string): Promise<SearchResults> {
-  const response = await user.get(`/api/search?q=${encodeURIComponent(query)}`)
+/** `bound` is the scope as it travels: `feed=<id>` or `in=saved|subscriptions`; none searches everywhere. */
+async function search(user: Device, query: string, bound = ''): Promise<SearchResults> {
+  const response = await user.get(`/api/search?q=${encodeURIComponent(query)}${bound && `&${bound}`}`)
   expect(response.status).toBe(200)
   return searchResultsSchema.parse(await response.json())
 }
 
-async function foundTitles(user: Device, query: string): Promise<string[]> {
-  return (await search(user, query)).results.map((result) => result.title)
+async function foundTitles(user: Device, query: string, bound = ''): Promise<string[]> {
+  return (await search(user, query, bound)).results.map((result) => result.title)
 }
 
 describe('searching retained reading metadata', () => {
@@ -194,7 +195,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning light')))
 
-    expect(await search(user, 'nonexistent')).toEqual({ subscriptions: [], results: [] })
+    expect(await search(user, 'nonexistent')).toEqual({ feed: null, subscriptions: [], results: [] })
   })
 
   it('follows metadata corrections: a retitled item and a renamed Feed', async () => {
@@ -438,7 +439,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, coastXml, COAST_URL)
 
-    expect(await search(user, 'drift')).toEqual({ subscriptions: [], results: [] })
+    expect(await search(user, 'drift')).toEqual({ feed: null, subscriptions: [], results: [] })
   })
 
   it('jumps by the Custom Title while set, not the reported title', async () => {
@@ -481,6 +482,60 @@ describe('searching retained reading metadata', () => {
         .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
         .map((letter) => `Harbor ${letter}`),
     )
+  })
+
+  it('bounded to an opened Feed, answers only its items, names the Feed, and offers no jump', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(
+      user,
+      service,
+      rss('Field Notes', item('a', 'Slow morning', { pubDate: '2026-08-08T07:15:00.000Z' })),
+    )
+    await subscribed(user, service, coastXml, COAST_URL)
+    expect(
+      (await user.put('/api/feeds/2/details', { customTitle: 'Shore Letters', customDescription: null })).status,
+    ).toBe(200)
+
+    expect(await foundTitles(user, 'slow')).toEqual(['Slow morning', 'Slow water'])
+
+    const bounded = await search(user, 'slow', 'feed=2')
+    expect(bounded.results.map((result) => result.title)).toEqual(['Slow water'])
+    expect(bounded.feed).toEqual({ feedId: 2, title: 'Shore Letters' })
+    expect((await search(user, 'shore', 'feed=2')).subscriptions).toEqual([])
+  })
+
+  it('bounded to the Library, answers only saved Feed Items', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Slow morning'), item('b', 'Slow evening')))
+    expect((await user.put('/api/library/2')).status).toBe(200)
+
+    expect(await foundTitles(user, 'slow')).toEqual(['Slow evening', 'Slow morning'])
+    expect(await foundTitles(user, 'slow', 'in=saved')).toEqual(['Slow evening'])
+    expect((await search(user, 'field', 'in=saved')).subscriptions).toEqual([])
+  })
+
+  it('bounded to the Feeds screen, answers with Subscriptions alone', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, coastXml, COAST_URL)
+
+    expect(await foundTitles(user, 'coast')).toEqual(['Slow water'])
+
+    const bounded = await search(user, 'coast', 'in=subscriptions')
+    expect(bounded.results).toEqual([])
+    expect(bounded.subscriptions.map((match) => match.title)).toEqual(['The Quiet Coast'])
+  })
+
+  it('refuses a bound it cannot honor: an unknown Feed is not found, two bounds at once is a bad request', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(user, service, rss('Field Notes', item('a', 'Slow morning')))
+
+    expect((await user.get('/api/search?q=slow&feed=9')).status).toBe(404)
+    expect((await user.get('/api/search?q=slow&feed=1&in=saved')).status).toBe(400)
+    expect((await user.get('/api/search?q=slow&in=digest')).status).toBe(400)
   })
 
   it('refuses a missing, empty, or oversized query as a bad request', async () => {
