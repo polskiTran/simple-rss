@@ -222,7 +222,7 @@ describe('the Feeds tab', () => {
     expect(css).not.toMatch(/position:\s*sticky/)
     expect(css.match(/position:\s*fixed/g) ?? []).toHaveLength(1)
     expect(css).toMatch(/\.overlay-backdrop,\n\s*\.overlay-viewport\s*\{[^}]*position:\s*fixed/)
-    expect(lightOnly()).toMatch(/\.search-form\s*\{[^}]*padding:\s*8px 0 32px/)
+    expect(lightOnly()).toMatch(/\.add-feed-form\s*\{[^}]*padding:\s*8px 0 32px/)
   })
 
   it('draws the cadence grid at 11px cells on a 3px gap, one step smaller when narrow', () => {

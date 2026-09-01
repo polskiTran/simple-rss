@@ -26,7 +26,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     async (signal) => (await fetchSubscriptions(signal)).subscriptions,
     [],
   )
-  const [query, setQuery] = useState('')
+  const [address, setAddress] = useState('')
   const [notice, setNotice] = useState('')
   const [subscribing, setSubscribing] = useState(false)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
@@ -59,9 +59,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (subscribing) return
-    const url = feedUrlOf(query)
+    const url = feedUrlOf(address)
     if (!url) {
-      if (query.trim()) setNotice('a feed is added by its url — paste the full https:// address')
+      if (address.trim()) setNotice('a feed is added by its url — paste the full https:// address')
       return
     }
 
@@ -70,7 +70,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     try {
       const created = await subscribeToFeed(url)
       await refreshList()
-      setQuery('')
+      setAddress('')
       setNotice('subscribed — checking the feed…')
       setRefreshRound(0)
       setNotice(await watchFirstCheck(created.subscription.feedId))
@@ -116,7 +116,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
 
   return (
     <div className="view measure feeds-view">
-      <form className="search-form" onSubmit={submit}>
+      <form className="add-feed-form" onSubmit={submit}>
         <input
           className="field-input search-input"
           type="text"
@@ -125,8 +125,8 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
           spellCheck={false}
           aria-label="add a feed by url"
           placeholder="add a feed by url"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
         />
       </form>
       <OpmlControls onOutcome={imported} />
@@ -139,8 +139,8 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   )
 }
 
-function feedUrlOf(query: string): string | undefined {
-  const line = query.trim()
+function feedUrlOf(address: string): string | undefined {
+  const line = address.trim()
   return /^https?:\/\/\S+$/i.test(line) ? line : undefined
 }
 

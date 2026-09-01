@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -157,7 +157,7 @@ describe('a Feed Item’s attribution', () => {
     expect(window.location.pathname).toBe('/digest')
   })
 
-  it('opens its Feed from a search result too', async () => {
+  it('opens its Feed from a search result, and that Feed returns to the results', async () => {
     reading('/digest').on('GET /api/search?q=light', {
       body: {
         subscriptions: [],
@@ -180,10 +180,15 @@ describe('a Feed Item’s attribution', () => {
     const user = userEvent.setup()
 
     await user.type(await screen.findByRole('searchbox', { name: /search your reading/i }), 'light')
-    await user.click(await screen.findByRole('link', { name: 'Field Notes' }))
+    const results = await screen.findByRole('region', { name: 'search results' })
+    await user.click(within(results).getByRole('link', { name: 'Field Notes' }))
 
     await openedFeed()
-    expect(wayBack().textContent).toBe('← digest')
+    expect(wayBack().textContent).toBe('← search')
+
+    await user.click(wayBack())
+    expect(await screen.findByRole('region', { name: 'search results' })).toBeDefined()
+    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: /search your reading/i }).value).toBe('light')
   })
 
   it('opens its Feed from the Library, and that Feed returns to the saves', async () => {

@@ -201,9 +201,13 @@ export const feedAvailabilitySchema = z.object({
 })
 export type FeedAvailability = z.infer<typeof feedAvailabilitySchema>
 
+export const CADENCE_STRIP_DAYS = 30
+
+/** Daily item counts, oldest to newest, in the installation timezone. */
+const cadenceStripSchema = z.array(z.number().int().nonnegative()).length(CADENCE_STRIP_DAYS)
+
 export const subscriptionSummarySchema = feedSummarySchema.extend({
-  /** Daily item counts, oldest to newest, in the installation timezone. */
-  cadence: z.array(z.number().int().nonnegative()).length(30),
+  cadence: cadenceStripSchema,
   availability: feedAvailabilitySchema,
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
@@ -396,13 +400,9 @@ export type SearchResult = z.infer<typeof searchResultSchema>
 // A current Subscription the query matched by effective title or domain —
 // never the Feed Description — offered as a jump to that Feed above the items,
 // in the feeds-list shape: name, domain, and the thirty-day cadence strip.
-export const searchSubscriptionMatchSchema = z.object({
-  feedId: z.number().int().positive(),
-  title: z.string(),
-  domain: z.string(),
-  homePageUrl: z.string().nullable(),
-  cadence: z.array(z.number().int().nonnegative()).length(30),
-})
+export const searchSubscriptionMatchSchema = feedSummarySchema
+  .pick({ feedId: true, title: true, domain: true, homePageUrl: true })
+  .extend({ cadence: cadenceStripSchema })
 export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSchema>
 
 export const searchResultsSchema = z.object({

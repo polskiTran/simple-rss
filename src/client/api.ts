@@ -198,7 +198,7 @@ export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promis
   return digestSchema.parse(await response.json())
 }
 
-/** Searches retained reading metadata only; results newest first. */
+/** Searches retained reading metadata only; results ranked by match quality blended with recency. */
 export async function fetchSearchResults(query: string, signal?: AbortSignal): Promise<SearchResults> {
   const response = await read(`/api/search?q=${encodeURIComponent(query)}`, signal)
   return searchResultsSchema.parse(await response.json())

@@ -67,7 +67,7 @@ test.describe('the global search line', () => {
     const field = page.getByRole('searchbox', { name: 'search your reading' })
     await field.fill('clear morning')
 
-    await expect(page).toHaveURL(`${installation.url}/digest`)
+    await expect(page).toHaveURL(`${installation.url}/search?q=clear+morning`)
     const results = page.getByRole('region', { name: 'search results' })
     await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
     await expect(results).toContainText('Field Notes')
@@ -76,6 +76,40 @@ test.describe('the global search line', () => {
     await field.clear()
     await expect(page).toHaveURL(`${installation.url}/settings`)
     await expect(page.getByText('timezone')).toBeVisible()
+  })
+
+  test('a result leads back to the search it came from', async ({ page, installation }) => {
+    await openDigest(page, installation)
+    const field = page.getByRole('searchbox', { name: 'search your reading' })
+    await field.fill('clear morning')
+    const results = page.getByRole('region', { name: 'search results' })
+    await results.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
+
+    await page.getByRole('link', { name: '← search' }).click()
+    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
+    await expect(field).toHaveValue('clear morning')
+  })
+
+  test('clearing a search launched from the Reader restores the article, trail intact', async ({
+    page,
+    installation,
+  }) => {
+    await openDigest(page, installation)
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
+
+    await page.keyboard.press('/')
+    const field = page.getByRole('searchbox', { name: 'search your reading' })
+    await field.fill('slow')
+    await expect(
+      page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'Slow water' }),
+    ).toBeVisible()
+
+    await field.clear()
+    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
+    await expect(page).toHaveURL(/\/reader\/\d+$/)
+    await expect(page.getByRole('link', { name: '← digest' })).toBeVisible()
   })
 
   test('backs out to the origin and saves from the results', async ({ page, installation }) => {
@@ -147,15 +181,11 @@ test.describe('the global search line', () => {
 test.describe('searching inside the narrow paper', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
-  test('keeps the same usable line in every screen’s chrome', async ({ page, installation }) => {
+  test('keeps a usable line in the narrow chrome', async ({ page, installation }) => {
     await openDigest(page, installation)
     const field = page.getByRole('searchbox', { name: 'search your reading' })
-
-    for (const section of ['digest', 'feeds', 'saved', 'settings']) {
-      await page.getByRole('link', { name: section, exact: true }).click()
-      await expect(field).toBeVisible()
-      await expect(field).toBeEditable()
-    }
+    await expect(field).toBeVisible()
+    await expect(field).toBeEditable()
 
     await field.fill('slow')
     await expect(

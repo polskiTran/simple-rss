@@ -39,6 +39,18 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
   return Number.isSafeInteger(id) ? id : undefined
 }
 
+/** The results surface carries its query in the URL, so a search survives reload and travels as a link. */
+export function searchPathOf(query: string): string {
+  return `/search?${new URLSearchParams({ q: query })}`
+}
+
+/** The query a `/search` URL carries; undefined on any other path, or when it holds no words. */
+function searchQueryOf(pathname: string, search: string): string | undefined {
+  if (pathname !== '/search') return undefined
+  const parsed = searchQuerySchema.safeParse(new URLSearchParams(search).get('q'))
+  return parsed.success && parsed.data.trim() !== '' ? parsed.data : undefined
+}
+
 /**
  * The way back out of a nested screen, recursively. Kept in history state, so
  * it survives back, forward and reload.
@@ -61,9 +73,14 @@ export function readerOrigin(feedItemId: number, from: Origin | undefined): Orig
   return { path: readerPathOf(feedItemId), label: 'article', from }
 }
 
+/** The results surface as an Origin, so a screen opened from a result can lead back to the search. */
+export function searchOrigin(query: string, from: Origin | undefined): Origin {
+  return { path: searchPathOf(query), label: 'search', from }
+}
+
 const MAX_TRAIL = 6
 
-const historyPathSchema = z.string().regex(/^\/[a-z]+(\/[1-9]\d*)?$/)
+const historyPathSchema = z.string().regex(/^\/[a-z]+(\/[1-9]\d*)?(\?q=[^#]*)?$/)
 
 const historyOriginSchema = z.object({
   path: historyPathSchema,
@@ -73,7 +90,6 @@ const historyOriginSchema = z.object({
 
 const historyStateSchema = z.object({
   origin: z.unknown().optional(),
-  search: z.unknown().optional(),
 })
 
 function trailOf(value: unknown, depth = 0): Origin | undefined {
@@ -87,11 +103,6 @@ function trailOf(value: unknown, depth = 0): Origin | undefined {
   }
 }
 
-interface SearchOrigin {
-  readonly path: string
-  readonly origin: Origin | undefined
-}
-
 interface ScreenLocation {
   readonly kind: 'screen'
   readonly route: Route
@@ -103,9 +114,11 @@ interface ScreenLocation {
 
 interface SearchLocation {
   readonly kind: 'search'
+  /** The results surface reads under the digest tab, whatever the origin. */
   readonly route: 'digest'
   readonly query: string
-  readonly from: SearchOrigin
+  /** The screen the search replaced; restored when the line clears. */
+  readonly origin: Origin | undefined
 }
 
 interface NavigationActions {
@@ -117,6 +130,9 @@ interface NavigationActions {
 }
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
+
+/** A Navigation narrowed to a plain screen, for views only rendered outside search. */
+export type ScreenNavigation = Extract<Navigation, { readonly kind: 'screen' }>
 
 type Location = ScreenLocation | SearchLocation
 
@@ -132,12 +148,12 @@ export function useNavigation(): Navigation {
   const go = useCallback((path: string, from: Origin | undefined) => {
     const origin = trailOf(from)
     const state = origin ? { origin } : null
-    if (window.location.pathname === path) {
+    if (window.location.pathname + window.location.search === path) {
       window.history.replaceState(state, '', path)
     } else {
       window.history.pushState(state, '', path)
     }
-    setLocation(screenLocationOf(path, origin))
+    setLocation(locationOf(path, origin))
   }, [])
 
   const navigate = useCallback((next: Route) => go(pathOf(next), undefined), [go])
@@ -149,25 +165,21 @@ export function useNavigation(): Navigation {
     (query: string) => {
       if (query.trim() === '') {
         if (location.kind !== 'search') return
-        const { from } = location
-        const state = from.origin ? { origin: from.origin } : null
-        window.history.replaceState(state, '', from.path)
-        setLocation(screenLocationOf(from.path, from.origin))
+        go(location.origin?.path ?? pathOf(DEFAULT_ROUTE), location.origin?.from)
         return
       }
 
       if (location.kind === 'search') {
-        const search = { ...location, query }
-        window.history.replaceState({ search: persistedSearch(search) }, '', pathOf('digest'))
-        setLocation(search)
+        // Refining rewrites the one search entry in place, so Back never walks the drafts.
+        const state = location.origin ? { origin: location.origin } : null
+        window.history.replaceState(state, '', searchPathOf(query))
+        setLocation({ ...location, query })
         return
       }
 
-      const search = searchLocation(query, searchOriginOf(location))
-      window.history.pushState({ search: persistedSearch(search) }, '', pathOf('digest'))
-      setLocation(search)
+      go(searchPathOf(query), searchScreenOrigin(location))
     },
-    [location],
+    [location, go],
   )
 
   return { ...location, navigate, openFeed, openReader, returnTo, updateSearch }
@@ -175,44 +187,24 @@ export function useNavigation(): Navigation {
 
 function currentLocation(): Location {
   const state = historyStateSchema.safeParse(window.history.state)
-  const data = state.success ? state.data : undefined
-  const search = window.location.pathname === pathOf('digest') ? searchOf(data?.search) : undefined
-  return search ?? screenLocationOf(window.location.pathname, trailOf(data?.origin))
+  const origin = trailOf(state.success ? state.data.origin : undefined)
+  return locationOf(window.location.pathname + window.location.search, origin)
 }
 
-const historySearchSchema = z.object({
-  query: searchQuerySchema,
-  from: z.object({
-    path: historyPathSchema,
-    origin: z.unknown().optional(),
-  }),
-})
-
-function searchOf(value: unknown): SearchLocation | undefined {
-  const parsed = historySearchSchema.safeParse(value)
-  if (!parsed.success || parsed.data.query.trim() === '') return undefined
-  return searchLocation(parsed.data.query, {
-    path: parsed.data.from.path,
-    origin: trailOf(parsed.data.from.origin),
-  })
+function locationOf(path: string, origin: Origin | undefined): Location {
+  const cut = path.indexOf('?')
+  const pathname = cut === -1 ? path : path.slice(0, cut)
+  const search = cut === -1 ? '' : path.slice(cut)
+  const query = searchQueryOf(pathname, search)
+  if (query !== undefined) return { kind: 'search', route: 'digest', query, origin }
+  return screenLocationOf(pathname, origin)
 }
 
-function searchLocation(query: string, from: SearchOrigin): SearchLocation {
-  return { kind: 'search', route: 'digest', query, from }
-}
-
-function persistedSearch(search: SearchLocation) {
-  return { query: search.query, from: search.from }
-}
-
-function searchOriginOf(location: ScreenLocation): SearchOrigin {
-  if (location.readerItemId !== undefined) {
-    return { path: readerPathOf(location.readerItemId), origin: location.origin }
-  }
-  if (location.feedId !== undefined) {
-    return { path: feedPathOf(location.feedId), origin: location.origin }
-  }
-  return { path: pathOf(location.route), origin: undefined }
+/** The screen a search replaces, as the Origin its clearing restores. */
+function searchScreenOrigin(location: ScreenLocation): Origin {
+  if (location.readerItemId !== undefined) return readerOrigin(location.readerItemId, location.origin)
+  if (location.feedId !== undefined) return { path: feedPathOf(location.feedId), label: 'feed', from: location.origin }
+  return { path: pathOf(location.route), label: location.route, from: undefined }
 }
 
 function screenLocationOf(pathname: string, origin: Origin | undefined): ScreenLocation {

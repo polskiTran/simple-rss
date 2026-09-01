@@ -8,8 +8,10 @@ import {
   SAVED_ORIGIN,
   feedOrigin,
   readerOrigin,
+  searchOrigin,
   useNavigation,
   type Navigation,
+  type ScreenNavigation,
 } from './routing.js'
 import { DigestView } from './views/digest-view.js'
 import { FeedView } from './views/feed-view.js'
@@ -62,11 +64,13 @@ function viewFor(gate: Gate, navigation: Navigation) {
 
 function signedInView(navigation: Navigation, gate: Gate) {
   if (navigation.kind === 'search') {
+    // A result opens with the search itself as its way back, results and all.
+    const origin = searchOrigin(navigation.query, navigation.origin)
     return (
       <SearchResultsView
         query={navigation.query}
-        onOpenItem={(feedItemId) => navigation.openReader(feedItemId, DIGEST_ORIGIN)}
-        onOpenFeed={(feedId) => navigation.openFeed(feedId, DIGEST_ORIGIN)}
+        onOpenItem={(feedItemId) => navigation.openReader(feedItemId, origin)}
+        onOpenFeed={(feedId) => navigation.openFeed(feedId, origin)}
       />
     )
   }
@@ -111,13 +115,7 @@ function signedInView(navigation: Navigation, gate: Gate) {
   }
 }
 
-function OpenedFeed({
-  navigation,
-  feedId,
-}: {
-  navigation: Extract<Navigation, { readonly kind: 'screen' }>
-  feedId: number
-}) {
+function OpenedFeed({ navigation, feedId }: { navigation: ScreenNavigation; feedId: number }) {
   return (
     <FeedView
       feedId={feedId}

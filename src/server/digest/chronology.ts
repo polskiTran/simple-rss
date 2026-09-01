@@ -24,13 +24,22 @@ export function inDigestOrder<Row extends { feedItemId: number; publishedAt: str
     .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
 }
 
+// dateKey runs once per row in the cadence scans, and constructing an
+// Intl.DateTimeFormat costs more than using one — so keep one per timezone.
+const dateKeyFormats = new Map<string, Intl.DateTimeFormat>()
+
 export function dateKey(date: Date, timezone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date)
+  let format = dateKeyFormats.get(timezone)
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    dateKeyFormats.set(timezone, format)
+  }
+  const parts = format.formatToParts(date)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}-${values.month}-${values.day}`
 }

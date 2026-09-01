@@ -1,29 +1,36 @@
-import { CADENCE_GRID_WEEKS } from '../../shared/api.js'
+import { inArray } from 'drizzle-orm'
+import { CADENCE_GRID_WEEKS, CADENCE_STRIP_DAYS } from '../../shared/api.js'
 import { chronologyTime, dateKey } from '../digest/chronology.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
-const STRIP_DAYS = 30
-
 export function emptyCadence(): number[] {
-  return Array.from({ length: STRIP_DAYS }, () => 0)
+  return Array.from({ length: CADENCE_STRIP_DAYS }, () => 0)
 }
 
 /**
  * Per-feed counts for the trailing thirty days in the installation timezone —
  * the cadence strip's data, shared by the Feeds list and Search's jump-to
  * group. Days follow the chronology instant, not the raw published time.
+ * `feedIds` narrows the scan to the feeds a caller will actually decorate —
+ * Search's jump-to needs at most a handful; the Feeds list takes them all.
  */
-export function stripCadenceByFeed(db: DrizzleDatabase, timezone: string, now: Date): Map<number, number[]> {
+export function stripCadenceByFeed(
+  db: DrizzleDatabase,
+  timezone: string,
+  now: Date,
+  feedIds?: readonly number[],
+): Map<number, number[]> {
   const today = dateKey(now, timezone)
-  const indexByDate = new Map(trailingDayKeys(today, STRIP_DAYS).map((key, index) => [key, index]))
+  const indexByDate = new Map(trailingDayKeys(today, CADENCE_STRIP_DAYS).map((key, index) => [key, index]))
 
   const cadence = new Map<number, number[]>()
   const rows = db
     .select({ feedId: feedItems.feedId, publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
     .from(feedItems)
+    .where(feedIds === undefined ? undefined : inArray(feedItems.feedId, [...feedIds]))
     .all()
   for (const row of rows) {
     const time = chronologyTime(row.publishedAt, row.firstSeenAt, now)

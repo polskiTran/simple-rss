@@ -133,7 +133,12 @@ export class SearchService {
       .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
     if (matches.length === 0) return []
 
-    const cadence = stripCadenceByFeed(this.#db, timezone, now)
+    const cadence = stripCadenceByFeed(
+      this.#db,
+      timezone,
+      now,
+      matches.map((row) => row.feedId),
+    )
     return matches.map((row) => ({ ...row, cadence: cadence.get(row.feedId) ?? emptyCadence() }))
   }
 }

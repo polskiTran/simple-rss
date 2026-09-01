@@ -1,18 +1,42 @@
 import { Field as BaseField } from '@base-ui/react/field'
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { MAX_SEARCH_QUERY_LENGTH } from '../../shared/api.js'
 
-export interface GlobalSearchProps {
+interface GlobalSearchProps {
   query: string
   onQueryChange(query: string): void
 }
 
+/**
+ * How long typing rests before the draft becomes the query. Commits are what
+ * write history and fetch results, so the pause also keeps the line under
+ * Safari's history-write throttle, which throws past ~100 writes in 30s.
+ */
+const SETTLE_MS = 250
+
 export function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
   const input = useRef<HTMLInputElement>(null)
 
+  // The line's live text; navigation only learns it once typing settles.
+  const [draft, setDraft] = useState(query)
+  const [settled, setSettled] = useState(query)
+  if (query !== settled) {
+    // The query moved without us — back, a jump into a Feed, a cleared search.
+    setSettled(query)
+    setDraft(query)
+  }
+
+  const commit = useEffectEvent(onQueryChange)
   useEffect(() => {
-    const focusSearch = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== '/' || event.altKey || event.ctrlKey || event.metaKey || editable(event.target)) return
+    if (draft === query) return
+    const timer = window.setTimeout(() => commit(draft), SETTLE_MS)
+    return () => window.clearTimeout(timer)
+  }, [draft, query])
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if (event.isComposing || event.key !== '/' || event.altKey || event.ctrlKey || event.metaKey) return
+      if (editable(event.target)) return
       event.preventDefault()
       input.current?.focus()
     }
@@ -32,8 +56,8 @@ export function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
           maxLength={MAX_SEARCH_QUERY_LENGTH}
           aria-label="search your reading"
           placeholder="search your reading"
-          value={query}
-          onValueChange={onQueryChange}
+          value={draft}
+          onValueChange={setDraft}
         />
       </BaseField.Root>
     </form>
