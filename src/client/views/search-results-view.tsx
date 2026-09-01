@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { SearchResult, SearchSubscriptionMatch } from '../../shared/api.js'
 import { fetchSearchResults } from '../api.js'
+import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
@@ -138,9 +139,10 @@ function SearchOutcome({
 }
 
 /**
- * Matching Subscriptions as a jump into their Feeds, atop the item results in
- * the standard item shape: the title is the way in, the meta is the feeds-list
- * domain. Whitespace alone separates the group from the items below.
+ * Matching Subscriptions as a jump into their Feeds, atop the item results as
+ * condensed feeds-list rows: the name is the way in, the domain the way out,
+ * the cadence strip what marks the row as a Feed rather than an item.
+ * Whitespace alone separates the group from the items below.
  */
 function JumpToGroup({
   subscriptions,
@@ -152,22 +154,23 @@ function JumpToGroup({
   if (subscriptions.length === 0) return null
 
   return (
-    <nav className="content-list" aria-label="matching subscriptions">
+    <nav className="search-jump-to" aria-label="matching subscriptions">
       {subscriptions.map((subscription) => (
-        <article className="content-item" key={subscription.feedId}>
-          <h3 className="content-item-title">
-            <a
-              className="feed-open"
-              href={feedPathOf(subscription.feedId)}
-              onClick={routedClick(() => onOpenFeed(subscription.feedId))}
-            >
-              {subscription.title}
-            </a>
-          </h3>
-          <div className="content-meta">
-            <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
-          </div>
-        </article>
+        <div className="search-jump-row" key={subscription.feedId}>
+          <a
+            className="feed-open search-jump-name"
+            href={feedPathOf(subscription.feedId)}
+            onClick={routedClick(() => onOpenFeed(subscription.feedId))}
+          >
+            {subscription.title}
+          </a>
+          <HomePageLink
+            className="search-jump-domain"
+            domain={subscription.domain}
+            homePageUrl={subscription.homePageUrl}
+          />
+          <CadenceStrip counts={subscription.cadence} title={subscription.title} />
+        </div>
       ))}
     </nav>
   )

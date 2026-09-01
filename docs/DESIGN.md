@@ -96,21 +96,22 @@ header gap, no fixed height. Metadata sits *under* the title, not above. It ends
 in "next in the digest" — never a dead stop.
 
 **Departure — the global search line.** The line lives in the masthead on every
-signed-in screen, including the Reader. Its DOM order is wordmark, search, tabs.
-The masthead uses the same two-column structure at every width: wordmark and
-search share the first row, while the tabs keep their trailing edge on the row
-below. The line therefore gets the remaining width beside the mark on a phone
-instead of collapsing between the mark and four tabs. The whole masthead scrolls
-with the page rather than sticking, so it needs no occluding background. The
-line uses the search underline `1px solid rgba(18,17,15,.15)` and a 1px × 14px
-accent caret.
+signed-in screen, including the Reader. Its DOM order is wordmark, search, tabs,
+and the masthead is one row: the mark leads, the search line follows at a capped
+340px, and the tabs keep the trailing edge — no control sits on a row of its
+own. On the narrow paper one row cannot hold all three, so the tabs stay beside
+the mark and the search line takes the full row below. The whole masthead
+scrolls with the page rather than sticking, so it needs no occluding background.
+The line uses the search underline `1px solid rgba(18,17,15,.15)` and a
+1px × 14px accent caret.
 
-The Feeds screen keeps its full-width "search or add feeds" line as the first
-control in the content measure, `padding:8px 0 32px`. The two lines are separated
-by the tab row and the screen's opening whitespace, and their widths state their
-scope: the shorter masthead line searches retained reading from anywhere; the
-full-width Feeds line filters Subscriptions or accepts a Feed URL. They repeat
-the same underline rather than inventing a second field style.
+The Feeds screen keeps its full-width line as the first control in the content
+measure, `padding:8px 0 32px`, but its one job is adding: "add a feed by url"
+accepts a Feed URL and nothing else — finding a Feed is the masthead line's job,
+answered by the jump-to group. The two widths state that scope: the short
+masthead line searches retained reading from anywhere; the full-width Feeds line
+takes an address. They repeat the same underline rather than inventing a second
+field style.
 
 ## 5. Components
 
@@ -149,8 +150,12 @@ the fragment itself is the evidence. A match the shape already shows — title o
 source — draws nothing extra, and the item stays two lines.
 
 Search may also open with a jump-to group: a handful of matching Subscriptions
-in this same shape, each title the way into its Feed and its meta the feeds-list
-domain. Whitespace alone separates the group from the item results below it.
+as condensed feeds-list rows — name at 16px, domain in meta grey beside it, and
+the 30-day cadence strip pinned to the row's trailing edge, so the strips form
+one aligned column as they do on the Feeds list. The strip is what marks the
+row as a Feed rather than an item at a glance. The name is the way in, the
+domain the way out, and whitespace alone separates the group from the item
+results below.
 
 The source is the way into its Feed: in the Digest, in search results, in the Library, and in the Reader's meta row. It looks no different from the plain text it replaced — meta grey, no underline at rest — and on hover it steps to ink like §5's other grey words.
 

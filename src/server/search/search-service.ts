@@ -6,6 +6,7 @@ import { chronologySql } from '../digest/list-page.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { emptyCadence, stripCadenceByFeed } from '../subscriptions/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
@@ -104,16 +105,17 @@ export class SearchService {
       }
     })
 
-    return { subscriptions: this.#subscriptionMatches(words), results }
+    return { subscriptions: this.#subscriptionMatches(words, timezone, now), results }
   }
 
   // The jump-to group reads the curated Subscription list, not the FTS index:
   // every word must appear as a case- and diacritic-folded substring of the
   // effective title or the domain. The Feed Description never matches, so a
-  // topic word cannot bury the item results under feed rows.
-  #subscriptionMatches(words: readonly string[]): SearchSubscriptionMatch[] {
+  // topic word cannot bury the item results under feed rows. Each entry carries
+  // its cadence strip, so the group reads as feeds-list rows, not as items.
+  #subscriptionMatches(words: readonly string[], timezone: string, now: Date): SearchSubscriptionMatch[] {
     const needles = words.map(folded)
-    return this.#db
+    const matches = this.#db
       .select({
         feedId: feeds.id,
         title: effectiveFeedTitle,
@@ -129,6 +131,10 @@ export class SearchService {
         return needles.every((needle) => line.includes(needle))
       })
       .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
+    if (matches.length === 0) return []
+
+    const cadence = stripCadenceByFeed(this.#db, timezone, now)
+    return matches.map((row) => ({ ...row, cadence: cadence.get(row.feedId) ?? emptyCadence() }))
   }
 }
 

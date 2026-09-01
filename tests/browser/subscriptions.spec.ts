@@ -18,7 +18,7 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await page.getByLabel('confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'claim' }).click()
   await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
+  await page.getByRole('textbox', { name: 'add a feed by url' }).fill(installation.feedUrl)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
@@ -74,7 +74,7 @@ async function expectOpenFeed(page: Page): Promise<void> {
   await expect(page.getByText('checked a moment ago — wait a little before retrying')).toBeVisible()
 
   await page.getByRole('link', { name: '← feeds' }).click()
-  await expect(page.getByRole('textbox', { name: 'search or add feeds' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'add a feed by url' })).toBeVisible()
 }
 
 test.describe('desktop Feed and Digest rendering', () => {

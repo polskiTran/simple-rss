@@ -86,4 +86,4 @@ _Avoid_: Stored article, cached content
 
 **Search**:
 A line of words — never syntax — the User types from any screen, answered with the best-matching retained Feed Items, recent ones favored, plus any Subscriptions matching by name or domain as a jump to them. It reads only what Feed Items carry; Reader View text is never searched.
-_Avoid_: Filter (that is the Feeds screen's field), query
+_Avoid_: Filter, query

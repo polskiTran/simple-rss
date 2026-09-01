@@ -15,7 +15,7 @@ async function openDigest(page: Page, installation: Installation): Promise<void>
   await page.getByLabel('confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'claim' }).click()
   await page.getByRole('link', { name: 'feeds' }).click()
-  const control = page.getByRole('textbox', { name: 'search or add feeds' })
+  const control = page.getByRole('textbox', { name: 'add a feed by url' })
   await control.fill(installation.feedUrl)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
@@ -53,7 +53,7 @@ test.describe('the global search line', () => {
     await expect(field).toBeFocused()
 
     await page.getByRole('link', { name: 'feeds', exact: true }).click()
-    const feedLine = page.getByRole('textbox', { name: 'search or add feeds' })
+    const feedLine = page.getByRole('textbox', { name: 'add a feed by url' })
     await feedLine.focus()
     await page.keyboard.press('/')
     await expect(feedLine).toBeFocused()
@@ -119,6 +119,7 @@ test.describe('the global search line', () => {
     const jumpTo = page.getByRole('navigation', { name: 'matching subscriptions' })
     await expect(jumpTo.getByRole('link', { name: 'The Quiet Coast' })).toBeVisible()
     await expect(jumpTo).toContainText('publisher.example')
+    await expect(jumpTo.getByRole('img', { name: /items from The Quiet Coast/ })).toBeVisible()
 
     await jumpTo.getByRole('link', { name: 'The Quiet Coast' }).click()
     await expect(page).toHaveURL(`${installation.url}/feeds/2`)

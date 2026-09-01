@@ -24,7 +24,7 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
-import { gridDayKeys, trailingDayKeys } from './cadence-window.js'
+import { emptyCadence, gridDayKeys, stripCadenceByFeed } from './cadence-window.js'
 import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
@@ -351,7 +351,7 @@ export class SubscriptionService {
   }
 
   list(): readonly SubscriptionSummary[] {
-    const cadence = this.#cadenceByFeed()
+    const cadence = this.#stripCadence()
     return this.#subscribedFeeds().map((record) => summaryOf(record, cadence))
   }
 
@@ -444,7 +444,7 @@ export class SubscriptionService {
   }
 
   #withCadence(feed: SubscribedFeedRecord): SubscriptionSummary {
-    return summaryOf(feed, this.#cadenceByFeed())
+    return summaryOf(feed, this.#stripCadence())
   }
 
   #feedByCanonicalUrl(url: string): SubscribedFeedRecord | undefined {
@@ -469,29 +469,8 @@ export class SubscriptionService {
       .all()[0]
   }
 
-  #cadenceByFeed(): Map<number, number[]> {
-    const timezone = this.#settings.effectiveTimezone()
-    const now = this.#clock.now()
-    const today = dateKey(now, timezone)
-    const indexByDate = new Map(trailingDayKeys(today, 30).map((key, index) => [key, index]))
-
-    const cadence = new Map<number, number[]>()
-    const rows = this.#db
-      .select({ feedId: feedItems.feedId, publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
-      .from(feedItems)
-      .all()
-    for (const row of rows) {
-      const time = chronologyTime(row.publishedAt, row.firstSeenAt, now)
-      const index = indexByDate.get(dateKey(new Date(time), timezone))
-      if (index === undefined) continue
-      let counts = cadence.get(row.feedId)
-      if (!counts) {
-        counts = emptyCadence()
-        cadence.set(row.feedId, counts)
-      }
-      counts[index] = (counts[index] ?? 0) + 1
-    }
-    return cadence
+  #stripCadence(): Map<number, number[]> {
+    return stripCadenceByFeed(this.#db, this.#settings.effectiveTimezone(), this.#clock.now())
   }
 }
 
@@ -528,8 +507,4 @@ function canonicalFeedUrl(value: string): string | undefined {
   } catch {
     return undefined
   }
-}
-
-function emptyCadence(): number[] {
-  return Array.from({ length: 30 }, () => 0)
 }

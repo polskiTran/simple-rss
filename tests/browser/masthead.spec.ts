@@ -24,7 +24,7 @@ test.describe('the masthead mark', () => {
   test('leads back to the digest from a Feed Item', async ({ page, installation }) => {
     await claim(page, installation)
     await page.getByRole('link', { name: 'feeds' }).click()
-    await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
+    await page.getByRole('textbox', { name: 'add a feed by url' }).fill(installation.feedUrl)
     await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 

@@ -155,9 +155,10 @@
     max-width: none;
   }
 
+  /* One row: wordmark, the search line, tabs at the trailing edge. */
   .masthead {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 22px 24px;
   }
@@ -230,7 +231,6 @@
 
   .tab-bar {
     display: flex;
-    grid-column: 1 / -1;
     justify-self: end;
     align-items: center;
     gap: 24px;
@@ -447,6 +447,9 @@
   .chrome-search {
     min-width: 0;
     margin: 0;
+    /* Shorter than the Feeds screen's full-width line: width states scope. */
+    max-width: 340px;
+    width: 100%;
   }
 
   .search-form {
@@ -810,6 +813,45 @@
     gap: 44px;
   }
 
+  /* Condensed feeds-list rows: name, domain, cadence strip on one line. */
+  .search-jump-to {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Only the name column may wrap: a long name folds in place while the
+     domain keeps its line and the strip keeps the trailing edge. */
+  .search-jump-row {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) max-content 1fr;
+    column-gap: 16px;
+    align-items: baseline;
+  }
+
+  /* Pinned to the trailing edge: one aligned strip column, as on the Feeds
+     list — held to the first line even when the name runs to two. */
+  .search-jump-row .cadence-strip {
+    justify-self: end;
+    align-self: start;
+    margin-top: 8px;
+    padding-bottom: 0;
+  }
+
+  .search-jump-name {
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--color-ink);
+    text-wrap: pretty;
+  }
+
+  .search-jump-domain {
+    font-size: 12.5px;
+    color: var(--color-meta);
+    white-space: nowrap;
+  }
+
   .content-item-title {
     margin: 0;
     font-size: 21px;
@@ -1109,12 +1151,50 @@
     font-size: 19px;
   }
 
+  /* One row can't hold everything on the narrow paper: the tabs keep the
+     trailing edge beside the mark, and the search line takes the row below. */
   .masthead {
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 18px 20px;
   }
 
+  .masthead .chrome-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none;
+  }
+
   .tab-bar {
+    grid-column: 2;
+    grid-row: 1;
     gap: 18px;
+    font-size: 12px;
+  }
+
+  /* Jump-to rows fold like feeds-list rows: name atop, strip and domain below. */
+  .search-jump-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 24px;
+    row-gap: 8px;
+    align-items: end;
+  }
+
+  .search-jump-name {
+    grid-column: 1 / -1;
+  }
+
+  .search-jump-row .cadence-strip {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .search-jump-domain {
+    grid-column: 2;
+    grid-row: 2;
     font-size: 12px;
   }
 

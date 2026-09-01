@@ -394,12 +394,14 @@ export const searchResultSchema = z.object({
 export type SearchResult = z.infer<typeof searchResultSchema>
 
 // A current Subscription the query matched by effective title or domain —
-// never the Feed Description — offered as a jump to that Feed above the items.
+// never the Feed Description — offered as a jump to that Feed above the items,
+// in the feeds-list shape: name, domain, and the thirty-day cadence strip.
 export const searchSubscriptionMatchSchema = z.object({
   feedId: z.number().int().positive(),
   title: z.string(),
   domain: z.string(),
   homePageUrl: z.string().nullable(),
+  cadence: z.array(z.number().int().nonnegative()).length(30),
 })
 export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSchema>
 

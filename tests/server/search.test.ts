@@ -419,9 +419,12 @@ describe('searching retained reading metadata', () => {
     await subscribed(user, service, coastXml, COAST_URL)
 
     const byTitle = await search(user, 'field')
-    expect(byTitle.subscriptions).toEqual([
+    expect(byTitle.subscriptions).toMatchObject([
       { feedId: 1, title: 'Field Notes', domain: 'journal.example', homePageUrl: 'https://journal.example/' },
     ])
+    // The entry carries the thirty-day strip, and today's item lands in it.
+    expect(byTitle.subscriptions[0]?.cadence).toHaveLength(30)
+    expect(byTitle.subscriptions[0]?.cadence.reduce((sum, count) => sum + count, 0)).toBe(1)
     expect(byTitle.results.map((result) => result.title)).toEqual(['Morning chronology'])
 
     const byDomain = await search(user, 'shore.example')
