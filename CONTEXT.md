@@ -83,7 +83,3 @@ _Avoid_: Expiry, archiving, garbage collection
 **Reader View**:
 A temporary, distraction-reduced rendering derived from a Feed Item's original webpage.
 _Avoid_: Stored article, cached content
-
-**Search**:
-A line of words — never syntax — the User types from any screen, answered with the best-matching retained Feed Items, recent ones favored, plus any Subscriptions matching by name or domain as a jump to them. It reads only what Feed Items carry; Reader View text is never searched.
-_Avoid_: Filter, query
