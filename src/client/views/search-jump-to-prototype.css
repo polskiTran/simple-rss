@@ -1,4 +1,6 @@
 /* PROTOTYPE styles — throwaway, never ships. Bundled so CSP (style-src 'self') allows them. */
+
+/* ---- floating variant switcher ---- */
 .proto-switcher {
   position: fixed;
   bottom: 20px;
@@ -26,40 +28,12 @@
   padding: 0 2px;
 }
 
-.proto-inline {
-  display: flex;
-  flex-wrap: wrap;
-  column-gap: 24px;
-  row-gap: 8px;
-}
-.proto-inline-name {
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 1.4;
-  color: var(--color-ink);
-}
-
+/* ---- settled jump-to rendering (feeds echo) ---- */
 .proto-rows {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-.proto-row {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-}
-.proto-row-name {
-  font-size: 15px;
-  font-weight: 300;
-  line-height: 1.4;
-  color: var(--color-ink);
-}
-.proto-row-domain {
-  font-size: 12.5px;
-  color: var(--color-meta);
-}
-
 .proto-feedrow {
   display: flex;
   align-items: baseline;
@@ -70,6 +44,10 @@
   font-weight: 300;
   line-height: 1.4;
   color: var(--color-ink);
+}
+.proto-row-domain {
+  font-size: 12.5px;
+  color: var(--color-meta);
 }
 .proto-strip {
   margin-left: auto;
@@ -87,11 +65,81 @@
 .proto-strip-day[data-level='3'] { background: var(--cadence-3, rgba(18, 17, 15, 0.6)); }
 
 @media (hover: hover) and (pointer: fine) {
-  .proto-inline-name:hover,
-  .proto-row-name:hover,
   .proto-feedrow-name:hover {
     text-decoration: underline;
     text-decoration-color: var(--color-hairline, rgba(18, 17, 15, 0.15));
     text-underline-offset: 4px;
+  }
+}
+
+/* ---- masthead variants ---- */
+
+/* B — one row: wordmark · search (capped) · tabs trailing. */
+.masthead[data-masthead='B'] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.masthead[data-masthead='B'] .chrome-search {
+  max-width: 340px;
+  width: 100%;
+}
+.masthead[data-masthead='B'] .tab-bar {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+
+/* C — tabs up top: the pre-search masthead, search line beneath. */
+.masthead[data-masthead='C'] .tab-bar {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+.masthead[data-masthead='C'] .chrome-search {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+/* D — controls row: brand alone, then search + tabs sharing a line. */
+.masthead[data-masthead='D'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.masthead[data-masthead='D'] .wordmark {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.masthead[data-masthead='D'] .chrome-search {
+  grid-column: 1;
+  grid-row: 2;
+  max-width: 420px;
+}
+.masthead[data-masthead='D'] .tab-bar {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+}
+
+/* Narrow paper: one row can't hold everything, so B and D converge on C's
+   answer — brand and tabs share the first row, the search line sits below. */
+@media (max-width: 640px) {
+  .masthead[data-masthead='B'],
+  .masthead[data-masthead='D'] {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .masthead[data-masthead='B'] .wordmark,
+  .masthead[data-masthead='D'] .wordmark {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .masthead[data-masthead='B'] .tab-bar,
+  .masthead[data-masthead='D'] .tab-bar {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .masthead[data-masthead='B'] .chrome-search,
+  .masthead[data-masthead='D'] .chrome-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none;
   }
 }

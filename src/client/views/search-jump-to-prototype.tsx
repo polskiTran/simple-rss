@@ -1,18 +1,22 @@
 /**
- * PROTOTYPE — throwaway, never ships. Four renderings of the Search jump-to
- * group, switchable via `?variant=` (floating bar, or ← → outside inputs):
+ * PROTOTYPE — throwaway, never ships.
  *
- *   A  as shipped — full item shape, indistinguishable from results
- *   B  one quiet line — names only, a single wayfinding line
- *   C  compact rows — name + domain, a register below item titles
- *   D  feeds echo — name + domain + cadence strip (stubbed counts)
+ * Verdict so far: the jump-to group question is settled — D "feeds echo"
+ * (name + domain + cadence strip) won; it renders pinned below. The open
+ * question is now the masthead: where the search line and the tab bar sit.
+ * Four layouts, switchable via `?masthead=` (floating bar, or ← → outside
+ * inputs):
  *
- * Lives on a throwaway branch; the winner gets rewritten properly.
+ *   A  as shipped — wordmark + search share row one, tabs pushed to row two
+ *   B  one row — wordmark · search · tabs on a single line
+ *   C  tabs up top — the pre-search masthead restored, search line beneath
+ *   D  controls row — brand alone, then search + tabs sharing a line
+ *
+ * Lives on a throwaway branch; winners get rewritten properly.
  */
 import { useEffect, useState } from 'react'
 import './search-jump-to-prototype.css'
 import type { SearchSubscriptionMatch } from '../../shared/api.js'
-import { HomePageLink } from '../components/home-page-link.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 
@@ -20,32 +24,32 @@ const VARIANTS = ['A', 'B', 'C', 'D'] as const
 type Variant = (typeof VARIANTS)[number]
 const VARIANT_NAMES: Record<Variant, string> = {
   A: 'as shipped',
-  B: 'one quiet line',
-  C: 'compact rows',
-  D: 'feeds echo',
+  B: 'one row',
+  C: 'tabs up top',
+  D: 'controls row',
 }
 
-// The app's own pushState drops query params, so capture ?variant= once at
+// The app's own pushState drops query params, so capture ?masthead= once at
 // module load (before routing can strip it); sessionStorage keeps it sticky.
-const fromUrl = new URLSearchParams(window.location.search).get('variant')?.toUpperCase()
+const fromUrl = new URLSearchParams(window.location.search).get('masthead')?.toUpperCase()
 if (fromUrl && (VARIANTS as readonly string[]).includes(fromUrl)) {
-  window.sessionStorage.setItem('proto-variant', fromUrl)
+  window.sessionStorage.setItem('proto-masthead', fromUrl)
 }
 
 function currentVariant(): Variant {
-  const stored = window.sessionStorage.getItem('proto-variant')?.toUpperCase()
+  const stored = window.sessionStorage.getItem('proto-masthead')?.toUpperCase()
   return (VARIANTS as readonly string[]).includes(stored ?? '') ? (stored as Variant) : 'A'
 }
 
 function setVariant(variant: Variant) {
-  window.sessionStorage.setItem('proto-variant', variant)
+  window.sessionStorage.setItem('proto-masthead', variant)
   const url = new URL(window.location.href)
-  url.searchParams.set('variant', variant)
+  url.searchParams.set('masthead', variant)
   window.history.replaceState(window.history.state, '', url)
   window.dispatchEvent(new Event('prototype-variant'))
 }
 
-function useVariant(): Variant {
+export function useMastheadVariant(): Variant {
   const [variant, set] = useState<Variant>(currentVariant)
   useEffect(() => {
     const read = () => set(currentVariant())
@@ -64,71 +68,20 @@ export interface JumpToProps {
   onOpenFeed: (feedId: number) => void
 }
 
+/** The settled jump-to rendering: the feeds-list row condensed (cadence stubbed). */
 export function PrototypeJumpTo({ subscriptions, onOpenFeed }: JumpToProps) {
-  const variant = useVariant()
   if (subscriptions.length === 0) return null
-  const Group = { A: VariantA, B: VariantB, C: VariantC, D: VariantD }[variant]
-  return <Group subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
-}
-
-const openLink = (subscription: SearchSubscriptionMatch, onOpenFeed: (feedId: number) => void, className: string) => (
-  <a
-    className={className}
-    href={feedPathOf(subscription.feedId)}
-    onClick={routedClick(() => onOpenFeed(subscription.feedId))}
-  >
-    {subscription.title}
-  </a>
-)
-
-/** A — what shipped: standard item shape, 21px title + domain meta row. */
-function VariantA({ subscriptions, onOpenFeed }: JumpToProps) {
-  return (
-    <nav className="content-list" aria-label="matching subscriptions">
-      {subscriptions.map((subscription) => (
-        <article className="content-item" key={subscription.feedId}>
-          <h3 className="content-item-title">{openLink(subscription, onOpenFeed, 'feed-open')}</h3>
-          <div className="content-meta">
-            <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
-          </div>
-        </article>
-      ))}
-    </nav>
-  )
-}
-
-/** B — a single line of Feed names; the group is wayfinding, not content. */
-function VariantB({ subscriptions, onOpenFeed }: JumpToProps) {
-  return (
-    <nav className="proto-inline" aria-label="matching subscriptions">
-      {subscriptions.map((subscription) => (
-        <span key={subscription.feedId}>{openLink(subscription, onOpenFeed, 'proto-inline-name')}</span>
-      ))}
-    </nav>
-  )
-}
-
-/** C — one compact row per Feed: name in ink, domain in meta grey beside it. */
-function VariantC({ subscriptions, onOpenFeed }: JumpToProps) {
-  return (
-    <nav className="proto-rows" aria-label="matching subscriptions">
-      {subscriptions.map((subscription) => (
-        <div className="proto-row" key={subscription.feedId}>
-          {openLink(subscription, onOpenFeed, 'proto-row-name')}
-          <span className="proto-row-domain">{subscription.domain}</span>
-        </div>
-      ))}
-    </nav>
-  )
-}
-
-/** D — the feeds-list row condensed: name, domain, and a cadence strip (stubbed). */
-function VariantD({ subscriptions, onOpenFeed }: JumpToProps) {
   return (
     <nav className="proto-rows" aria-label="matching subscriptions">
       {subscriptions.map((subscription) => (
         <div className="proto-feedrow" key={subscription.feedId}>
-          {openLink(subscription, onOpenFeed, 'proto-feedrow-name')}
+          <a
+            className="proto-feedrow-name"
+            href={feedPathOf(subscription.feedId)}
+            onClick={routedClick(() => onOpenFeed(subscription.feedId))}
+          >
+            {subscription.title}
+          </a>
           <span className="proto-row-domain">{subscription.domain}</span>
           <span className="proto-strip" aria-hidden="true">
             {stubCadence(subscription.feedId).map((level, index) => (
@@ -142,7 +95,7 @@ function VariantD({ subscriptions, onOpenFeed }: JumpToProps) {
   )
 }
 
-/** Deterministic fake 14-day cadence so D is judgeable without API changes. */
+/** Deterministic fake 14-day cadence so the strip is judgeable without API changes. */
 function stubCadence(feedId: number): number[] {
   return Array.from({ length: 14 }, (_, day) => {
     const noise = (feedId * 31 + day * 17) % 7
@@ -151,7 +104,7 @@ function stubCadence(feedId: number): number[] {
 }
 
 export function PrototypeSwitcher() {
-  const variant = useVariant()
+  const variant = useMastheadVariant()
   const step = (direction: 1 | -1) => {
     const index = (VARIANTS.indexOf(variant) + direction + VARIANTS.length) % VARIANTS.length
     const next = VARIANTS[index]
@@ -186,18 +139,16 @@ export function PrototypeSwitcher() {
   })
 
   return (
-    <>
-      <div className="proto-switcher">
-        <button type="button" onClick={() => step(-1)} aria-label="previous variant">
-          ‹
-        </button>
-        <span>
-          {variant} · {VARIANT_NAMES[variant]}
-        </span>
-        <button type="button" onClick={() => step(1)} aria-label="next variant">
-          ›
-        </button>
-      </div>
-    </>
+    <div className="proto-switcher">
+      <button type="button" onClick={() => step(-1)} aria-label="previous variant">
+        ‹
+      </button>
+      <span>
+        {variant} · {VARIANT_NAMES[variant]}
+      </span>
+      <button type="button" onClick={() => step(1)} aria-label="next variant">
+        ›
+      </button>
+    </div>
   )
 }

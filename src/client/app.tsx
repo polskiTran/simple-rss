@@ -18,6 +18,8 @@ import { EmptyView } from './views/empty-view.js'
 import { LoginView } from './views/login-view.js'
 import { ReaderView } from './views/reader-view.js'
 import { SavedView } from './views/saved-view.js'
+// PROTOTYPE: masthead layout variants; remove with the prototype.
+import { PrototypeSwitcher, useMastheadVariant } from './views/search-jump-to-prototype.js'
 import { SearchResultsView } from './views/search-results-view.js'
 import { SettingsView } from './views/settings-view.js'
 import { SetupView } from './views/setup-view.js'
@@ -25,10 +27,13 @@ import { SetupView } from './views/setup-view.js'
 export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
+  // PROTOTYPE: masthead layout variant, set by the floating switcher.
+  const mastheadVariant = useMastheadVariant()
 
   return (
     <div className="paper">
-      <header className="masthead">
+      <PrototypeSwitcher />
+      <header className="masthead" data-masthead={mastheadVariant}>
         <Wordmark onNavigate={gate.access.kind === 'open' ? () => navigation.navigate('digest') : undefined} />
         {gate.access.kind === 'open' ? (
           <>
