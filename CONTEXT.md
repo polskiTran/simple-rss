@@ -83,3 +83,11 @@ _Avoid_: Expiry, archiving, garbage collection
 **Reader View**:
 A temporary, distraction-reduced rendering derived from a Feed Item's original webpage.
 _Avoid_: Stored article, cached content
+
+**Search Scope**:
+The part of the User's reading a search answers from, taken from the screen the search line was invoked on: an opened Feed's items, the Library, the Subscriptions, or everywhere. It travels in the search address and changes what is searched, never how results are ordered.
+_Avoid_: Bound, filter, facet
+
+**Jump-to Group**:
+The matching Subscriptions a search offers above its Feed Items, matched by effective title or domain, as a way into a Feed rather than a result. Everywhere it is a handful; scoped to the Subscriptions it is every match, the whole answer.
+_Avoid_: Suggestions, feed matches

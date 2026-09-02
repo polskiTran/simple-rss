@@ -2,7 +2,7 @@ import { Button } from '@base-ui/react/button'
 import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
-import { cadenceLevel } from '../cadence.js'
+import { CadenceStrip } from '../components/cadence-strip.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
@@ -26,7 +26,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     async (signal) => (await fetchSubscriptions(signal)).subscriptions,
     [],
   )
-  const [query, setQuery] = useState('')
+  const [address, setAddress] = useState('')
   const [notice, setNotice] = useState('')
   const [subscribing, setSubscribing] = useState(false)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
@@ -58,15 +58,19 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const url = feedUrlOf(query)
-    if (!url || subscribing) return
+    if (subscribing) return
+    const url = feedUrlOf(address)
+    if (!url) {
+      if (address.trim()) setNotice('a feed is added by its url — paste the full https:// address')
+      return
+    }
 
     setSubscribing(true)
     setNotice('subscribing…')
     try {
       const created = await subscribeToFeed(url)
       await refreshList()
-      setQuery('')
+      setAddress('')
       setNotice('subscribed — checking the feed…')
       setRefreshRound(0)
       setNotice(await watchFirstCheck(created.subscription.feedId))
@@ -112,17 +116,17 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
 
   return (
     <div className="view measure feeds-view">
-      <form className="search-form" onSubmit={submit}>
+      <form className="add-feed-form" onSubmit={submit}>
         <input
           className="field-input search-input"
           type="text"
           inputMode="url"
           autoComplete="off"
           spellCheck={false}
-          aria-label="search or add feeds"
-          placeholder="search or add feeds"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          aria-label="add a feed by url"
+          placeholder="add a feed by url"
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
         />
       </form>
       <OpmlControls onOutcome={imported} />
@@ -130,19 +134,13 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         {notice}
       </p>
       <ImportReport report={report} />
-      <SubscriptionList
-        state={state}
-        query={query}
-        retryingFeedId={retryingFeedId}
-        onRetry={retry}
-        onOpen={onOpenFeed}
-      />
+      <SubscriptionList state={state} retryingFeedId={retryingFeedId} onRetry={retry} onOpen={onOpenFeed} />
     </div>
   )
 }
 
-function feedUrlOf(query: string): string | undefined {
-  const line = query.trim()
+function feedUrlOf(address: string): string | undefined {
+  const line = address.trim()
   return /^https?:\/\/\S+$/i.test(line) ? line : undefined
 }
 
@@ -174,13 +172,11 @@ function wait(milliseconds: number): Promise<void> {
 
 function SubscriptionList({
   state,
-  query,
   retryingFeedId,
   onRetry,
   onOpen,
 }: {
   state: Resource<readonly SubscriptionSummary[]>
-  query: string
   retryingFeedId: number | undefined
   onRetry: (feedId: number) => void
   onOpen: (feedId: number) => void
@@ -190,12 +186,9 @@ function SubscriptionList({
   if (state.kind !== 'loaded') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
   if (state.value.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
 
-  const shown = state.value.filter((subscription) => matches(subscription, query))
-  if (shown.length === 0) return <p className="empty-note subscription-list-state">no feeds match</p>
-
   return (
     <div className="content-list subscription-list" role="region" aria-label="Subscriptions">
-      {shown.map((subscription) => (
+      {state.value.map((subscription) => (
         <article className="content-item feed-row" key={subscription.feedId}>
           <div className="feed-row-main">
             <h2 className="content-item-title">
@@ -220,17 +213,6 @@ function SubscriptionList({
         </article>
       ))}
     </div>
-  )
-}
-
-/** Matches the effective title, the effective description, and the domain. */
-function matches(subscription: SubscriptionSummary, query: string): boolean {
-  const line = query.trim().toLowerCase()
-  if (!line || line.startsWith('http://') || line.startsWith('https://')) return true
-  return (
-    subscription.title.toLowerCase().includes(line) ||
-    subscription.domain.toLowerCase().includes(line) ||
-    (subscription.description?.toLowerCase().includes(line) ?? false)
   )
 }
 
@@ -262,17 +244,5 @@ function SubscriptionAvailability({
         {retrying ? 'retrying…' : 'retry now'}
       </Button>
     </p>
-  )
-}
-
-function CadenceStrip({ counts, title }: { counts: readonly number[]; title: string }) {
-  const total = counts.reduce((sum, count) => sum + count, 0)
-  return (
-    <span className="cadence-strip" role="img" aria-label={`${total} items from ${title} in the last 30 days`}>
-      {counts.map((count, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: counts is a fixed window of consecutive days — the cell's position is the day it stands for.
-        <span className="cadence-day" data-level={cadenceLevel(count)} key={index} aria-hidden="true" />
-      ))}
-    </span>
   )
 }

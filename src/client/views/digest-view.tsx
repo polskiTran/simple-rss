@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
-import { useEffect, useState } from 'react'
-import { MAX_SEARCH_QUERY_LENGTH, type Digest, type SearchResult } from '../../shared/api.js'
-import { fetchDigest, fetchSearchResults } from '../api.js'
+import { useState } from 'react'
+import type { Digest } from '../../shared/api.js'
+import { fetchDigest } from '../api.js'
 import { DailyBand } from '../components/daily-band.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
@@ -9,21 +9,10 @@ import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { useResource } from '../use-resource.js'
-import { failureKind } from './failure.js'
-
 export interface DigestViewProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
-
-type SearchState =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'searching' }
-  | { readonly kind: 'found'; readonly results: readonly SearchResult[] }
-  | { readonly kind: 'unavailable' }
-  | { readonly kind: 'unreachable' }
-
-const SEARCH_SETTLE_MS = 250
 
 function withOlderPage(digest: Digest, page: Digest): Digest {
   const groups = [...digest.groups]
@@ -52,32 +41,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       .catch(() => setOlder('failed'))
   }
 
-  const [query, setQuery] = useState('')
-  const [search, setSearch] = useState<SearchState>({ kind: 'idle' })
-  const line = query.trim()
-
-  useEffect(() => {
-    if (line === '') {
-      setSearch({ kind: 'idle' })
-      return
-    }
-    const request = new AbortController()
-    setSearch({ kind: 'searching' })
-    const settle = window.setTimeout(() => {
-      void fetchSearchResults(line, request.signal)
-        .then((found) => {
-          if (!request.signal.aborted) setSearch({ kind: 'found', results: found.results })
-        })
-        .catch((cause: unknown) => {
-          if (!request.signal.aborted) setSearch({ kind: failureKind(cause) })
-        })
-    }, SEARCH_SETTLE_MS)
-    return () => {
-      request.abort()
-      window.clearTimeout(settle)
-    }
-  }, [line])
-
   const tryAgain = () => {
     setOlder('idle')
     retry()
@@ -91,16 +54,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
         items: group.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
       })),
     }))
-    setSearch((current) =>
-      current.kind === 'found'
-        ? {
-            kind: 'found',
-            results: current.results.map((result) =>
-              result.feedItemId === feedItemId ? { ...result, saved } : result,
-            ),
-          }
-        : current,
-    )
   }
 
   if (state.kind === 'loading') {
@@ -132,119 +85,40 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
 
   return (
     <div className="view measure digest-view digest-view-today">
-      <form className="search-form" role="search" onSubmit={(event) => event.preventDefault()}>
-        <input
-          className="field-input search-input"
-          type="search"
-          autoComplete="off"
-          spellCheck={false}
-          maxLength={MAX_SEARCH_QUERY_LENGTH}
-          aria-label="search your reading"
-          placeholder="search your reading"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </form>
-      {search.kind === 'idle' ? (
-        <>
-          <DailyBand date={today.date} volume={today.volume} />
-          {digest.groups.map((group) => (
-            <section className="day-group" aria-labelledby={`day-${group.date}`} key={group.date}>
-              <h2
-                className={group.label === 'today' ? 'day-heading' : 'day-heading day-heading-past'}
-                id={`day-${group.date}`}
-              >
-                {group.label}
-                {group.label === 'today' ? (
-                  <span className="day-heading-count"> · {countLabel(digest.today.volume)}</span>
-                ) : null}
-              </h2>
-              <div className="content-list">
-                {group.items.map((item) => (
-                  <article className="content-item" key={item.feedItemId}>
-                    <h3 className="content-item-title">
-                      <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
-                    </h3>
-                    <div className="content-meta">
-                      <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
-                      <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayTime}</time>
-                      <SaveToggle
-                        feedItemId={item.feedItemId}
-                        title={item.title}
-                        saved={item.saved}
-                        onSaved={(saved) => setSaved(item.feedItemId, saved)}
-                      />
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ))}
-          <OlderItems nextCursor={digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
-        </>
-      ) : (
-        <SearchOutcome state={search} line={line} onOpenItem={onOpenItem} onOpenFeed={onOpenFeed} onSaved={setSaved} />
-      )}
-    </div>
-  )
-}
-
-function SearchOutcome({
-  state,
-  line,
-  onOpenItem,
-  onOpenFeed,
-  onSaved,
-}: {
-  state: Exclude<SearchState, { kind: 'idle' }>
-  line: string
-  onOpenItem: (feedItemId: number) => void
-  onOpenFeed: (feedId: number) => void
-  onSaved: (feedItemId: number, saved: boolean) => void
-}) {
-  if (state.kind === 'searching') {
-    return (
-      <LoadingNote className="empty-note" announce>
-        searching…
-      </LoadingNote>
-    )
-  }
-  if (state.kind === 'unavailable' || state.kind === 'unreachable') {
-    return (
-      <p className="empty-note" role="status">
-        {state.kind === 'unreachable'
-          ? 'search is out of reach — check the connection, then try again'
-          : 'search is unavailable — try again in a moment'}
-      </p>
-    )
-  }
-  if (state.results.length === 0) {
-    return (
-      <p className="empty-note" role="status">
-        nothing in your reading matches “{line}”
-      </p>
-    )
-  }
-
-  return (
-    <div className="content-list" role="region" aria-label="search results">
-      {state.results.map((result) => (
-        <article className="content-item" key={result.feedItemId}>
-          <h3 className="content-item-title">
-            <ItemTitleLink feedItemId={result.feedItemId} title={result.title} onOpen={onOpenItem} />
-          </h3>
-          <div className="content-meta">
-            <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
-            <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
-            <SaveToggle
-              feedItemId={result.feedItemId}
-              title={result.title}
-              saved={result.saved}
-              onSaved={(saved) => onSaved(result.feedItemId, saved)}
-            />
+      <DailyBand date={today.date} volume={today.volume} />
+      {digest.groups.map((group) => (
+        <section className="day-group" aria-labelledby={`day-${group.date}`} key={group.date}>
+          <h2
+            className={group.label === 'today' ? 'day-heading' : 'day-heading day-heading-past'}
+            id={`day-${group.date}`}
+          >
+            {group.label}
+            {group.label === 'today' ? (
+              <span className="day-heading-count"> · {countLabel(digest.today.volume)}</span>
+            ) : null}
+          </h2>
+          <div className="content-list">
+            {group.items.map((item) => (
+              <article className="content-item" key={item.feedItemId}>
+                <h3 className="content-item-title">
+                  <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
+                </h3>
+                <div className="content-meta">
+                  <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
+                  <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayTime}</time>
+                  <SaveToggle
+                    feedItemId={item.feedItemId}
+                    title={item.title}
+                    saved={item.saved}
+                    onSaved={(saved) => setSaved(item.feedItemId, saved)}
+                  />
+                </div>
+              </article>
+            ))}
           </div>
-        </article>
+        </section>
       ))}
+      <OlderItems nextCursor={digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
     </div>
   )
 }

@@ -102,7 +102,7 @@ describe('Feeds', () => {
     const { container } = render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
     expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
@@ -152,7 +152,7 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
     expect(await screen.findByText('that Feed could not be reached')).toBeDefined()
@@ -171,14 +171,14 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), 'https://alias.example/feed')
+    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), 'https://alias.example/feed')
     await user.keyboard('{Enter}')
 
     expect(await screen.findByText('already subscribed')).toBeDefined()
     await waitFor(() => expect(screen.getAllByText('Field Notes')).toHaveLength(1))
   })
 
-  it('treats a line that is not a URL as a search, never as something to submit', async () => {
+  it('answers a line that is not a URL with a gentle notice, never a request', async () => {
     const api = stubApi().on('GET /api/feeds', {
       body: { subscriptions: [FEED, { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example' }] },
     })
@@ -187,46 +187,12 @@ describe('Feeds', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText('Other Wire')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'field{Enter}')
+    await user.type(screen.getByRole('textbox', { name: /add a feed by url/i }), 'field{Enter}')
 
+    expect(await screen.findByText('a feed is added by its url — paste the full https:// address')).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
-    expect(screen.queryByText('Other Wire')).toBeNull()
+    expect(screen.getByText('Other Wire')).toBeDefined()
     expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
-
-    await user.clear(screen.getByRole('textbox', { name: /search or add feeds/i }))
-    expect(await screen.findByText('Other Wire')).toBeDefined()
-  })
-
-  it('finds a Feed by its effective description', async () => {
-    stubApi().on('GET /api/feeds', {
-      body: {
-        subscriptions: [
-          { ...FEED, description: 'read weekly' },
-          { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example' },
-        ],
-      },
-    })
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    expect(await screen.findByText('Other Wire')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'weekly')
-
-    expect(screen.getByText('Field Notes')).toBeDefined()
-    expect(screen.queryByText('Other Wire')).toBeNull()
-  })
-
-  it('says calmly when no Feed matches the search', async () => {
-    stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    expect(await screen.findByText('Field Notes')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /search or add feeds/i }), 'nothing like this')
-
-    expect(await screen.findByText('no feeds match')).toBeDefined()
   })
 
   it('does not let a stale initial list replace a Subscription that just completed', async () => {
@@ -248,7 +214,7 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
     expect(await screen.findByText('Field Notes')).toBeDefined()
 
@@ -267,7 +233,7 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /search or add feeds/i }), FEED.enteredUrl)
+    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
     await user.keyboard('{Enter}')
 
     expect(await screen.findByText('already subscribed')).toBeDefined()
@@ -388,7 +354,7 @@ describe('OPML portability', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('textbox', { name: /search or add feeds/i }))
+    await user.click(await screen.findByRole('textbox', { name: /add a feed by url/i }))
     await user.tab()
     expect(document.activeElement).toBe(screen.getByLabelText(/import opml/i))
     await user.tab()

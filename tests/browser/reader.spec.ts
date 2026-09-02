@@ -21,7 +21,7 @@ async function subscribe(page: Page, installation: Installation, feedUrl = insta
 
 async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
   await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(feedUrl)
+  await page.getByRole('textbox', { name: 'add a feed by url' }).fill(feedUrl)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible()
 }

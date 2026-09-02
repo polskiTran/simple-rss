@@ -13,6 +13,7 @@ import {
   readerArticleSchema,
   readerItemSchema,
   refreshFeedResponseSchema,
+  searchParamsOf,
   searchResultsSchema,
   subscriptionListSchema,
   serviceMetaSchema,
@@ -32,6 +33,7 @@ import {
   type ReaderItem,
   type RefreshFeedResponse,
   type SearchResults,
+  type SearchScope,
   type SubscriptionList,
   type ServiceMeta,
   type UpdateFeedDetailsRequest,
@@ -198,9 +200,13 @@ export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promis
   return digestSchema.parse(await response.json())
 }
 
-/** Searches retained reading metadata only; results newest first. */
-export async function fetchSearchResults(query: string, signal?: AbortSignal): Promise<SearchResults> {
-  const response = await read(`/api/search?q=${encodeURIComponent(query)}`, signal)
+/** Searches retained reading metadata only, within the scope; results ranked by match quality blended with recency. */
+export async function fetchSearchResults(
+  query: string,
+  scope: SearchScope,
+  signal?: AbortSignal,
+): Promise<SearchResults> {
+  const response = await read(`/api/search?${searchParamsOf(query, scope)}`, signal)
   return searchResultsSchema.parse(await response.json())
 }
 

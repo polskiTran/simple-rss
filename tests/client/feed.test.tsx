@@ -154,7 +154,7 @@ describe('opening one Feed', () => {
 
     await user.click(await screen.findByRole('link', { name: /← feeds/i }))
 
-    expect(await screen.findByRole('textbox', { name: /search or add feeds/i })).toBeDefined()
+    expect(await screen.findByRole('textbox', { name: /add a feed by url/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
   })
 
@@ -288,7 +288,7 @@ describe('managing one Feed', () => {
     await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
     await user.click(screen.getByRole('button', { name: 'confirm' }))
 
-    expect(await screen.findByRole('textbox', { name: /search or add feeds/i })).toBeDefined()
+    expect(await screen.findByRole('textbox', { name: /add a feed by url/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(1)
   })

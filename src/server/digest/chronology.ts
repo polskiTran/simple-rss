@@ -11,10 +11,6 @@ export function plausibleHorizon(now: Date): string {
   return new Date(now.getTime() + FUTURE_TOLERANCE_MS).toISOString()
 }
 
-/**
- * Newest chronology first, ties to the newer row — the one ordering the
- * Digest, the Library, and search all share.
- */
 export function inDigestOrder<Row extends { feedItemId: number; publishedAt: string | null; firstSeenAt: string }>(
   rows: readonly Row[],
   now: Date,
@@ -24,13 +20,20 @@ export function inDigestOrder<Row extends { feedItemId: number; publishedAt: str
     .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
 }
 
+const dateKeyFormats = new Map<string, Intl.DateTimeFormat>()
+
 export function dateKey(date: Date, timezone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date)
+  let format = dateKeyFormats.get(timezone)
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    dateKeyFormats.set(timezone, format)
+  }
+  const parts = format.formatToParts(date)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}-${values.month}-${values.day}`
 }

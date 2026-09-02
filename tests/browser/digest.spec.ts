@@ -18,7 +18,7 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await page.getByLabel('confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'claim' }).click()
   await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.feedUrl)
+  await page.getByRole('textbox', { name: 'add a feed by url' }).fill(installation.feedUrl)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
@@ -87,7 +87,7 @@ test.describe('the Digest presentation', () => {
     await page.getByLabel('confirm password').fill(USER_PASSWORD)
     await page.getByRole('button', { name: 'claim' }).click()
     await page.getByRole('link', { name: 'feeds' }).click()
-    await page.getByRole('textbox', { name: 'search or add feeds' }).fill(installation.longFeedUrl)
+    await page.getByRole('textbox', { name: 'add a feed by url' }).fill(installation.longFeedUrl)
     await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'digest' }).click()

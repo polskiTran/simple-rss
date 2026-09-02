@@ -95,11 +95,39 @@ the tabs never move. It keeps only its own inner rhythm — title scale, the 40p
 header gap, no fixed height. Metadata sits *under* the title, not above. It ends
 in "next in the digest" — never a dead stop.
 
-**Departure — the search field.** The field scrolls with the page rather than
-sticking to the top, so nothing but an overlay is ever drawn over the paper and
-the occluding background a sticky field needs goes with it. `padding:8px 0 32px`,
-the measure of its screen (see the measure departure above), underline
-`1px solid rgba(18,17,15,.15)`, and a 1px × 14px accent caret.
+**Departure — the global search line.** The line lives in the masthead on every
+signed-in screen, including the Reader. Its DOM order is wordmark, search, tabs,
+and the masthead is one row: the mark leads, the search line follows at a capped
+340px, and the tabs keep the trailing edge — no control sits on a row of its
+own. On the narrow paper one row cannot hold all three, so the tabs stay beside
+the mark and the search line takes the full row below. The whole masthead
+scrolls with the page rather than sticking, so it needs no occluding background.
+The line uses the search underline `1px solid rgba(18,17,15,.15)` and a
+1px × 14px accent caret.
+
+The Feeds screen keeps its full-width line as the first control in the content
+measure, `padding:8px 0 32px`, but its one job is adding: "add a feed by url"
+accepts a Feed URL and nothing else — finding a Feed is the masthead line's job,
+answered by the jump-to group. The two widths state that scope: the short
+masthead line searches retained reading; the full-width Feeds line takes an
+address. They repeat the same underline rather than inventing a second field
+style.
+
+**Departure — the line takes its scope from its screen.** Invoked from an
+opened Feed, the line answers with that Feed's items alone; from the Library,
+with saved items; from the Feeds screen, with matching Subscriptions and no
+items. The Digest, the Reader and settings search everywhere. The placeholder
+says which before the first keystroke — `search this feed`, `search your
+saves`, `search your feeds`, `search your reading` — and once the words have
+taken its place, a scoped results surface opens with one meta-grey line, `in
+Field Notes · everywhere`. The `everywhere` word takes §5's grey-to-ink
+treatment and re-asks the same words everywhere; clearing the line still lands
+on the screen the search left. The empty state keeps that line above it, so the
+way out is never further than the miss. A scoped search reads under its
+section's tab — feeds, saved — and one everywhere under the Digest, so the
+active tab and the scope line never disagree. There is no chip and no toggle:
+the scope is read off the screen the search left and travels in the address,
+`/search?q=notes&feed=2`, so a reloaded or shared search answers the same.
 
 ## 5. Components
 
@@ -130,6 +158,25 @@ title       300 21px/1.42  #12110F
 meta row    300 12.5px/1   #8C8B86, gap 20, margin-top 8
 ```
 Meta contents by context: digest = source · time · save; single feed = date · save (source drops out, it's redundant); feeds list = domain.
+
+Search results alone may add a line: when the match lives in the summary, its
+plain-text fragment sits between the title and the meta row in the meta line's
+own grey and size, `line-height:1.6` because it wraps. No markup and no accent —
+the fragment itself is the evidence. A match the shape already shows — title or
+source — draws nothing extra, and the item stays two lines.
+
+Results scoped to one Feed are a single-Feed list and take its meta row: the
+source drops out, `date · save`.
+
+A search everywhere, or one scoped to the Feeds screen, may also open with a
+jump-to group: matching Subscriptions as condensed feeds-list rows — a handful
+everywhere, every match on the Feeds screen, where the group is the whole
+answer. Each row is name at 16px, domain in meta grey beside it, and the
+30-day cadence strip pinned to the row's trailing edge, so the strips form one
+aligned column as they do on the Feeds list. The strip is what marks the
+row as a Feed rather than an item at a glance. The name is the way in, the
+domain the way out, and whitespace alone separates the group from the item
+results below.
 
 The source is the way into its Feed: in the Digest, in search results, in the Library, and in the Reader's meta row. It looks no different from the plain text it replaced — meta grey, no underline at rest — and on hover it steps to ink like §5's other grey words.
 
