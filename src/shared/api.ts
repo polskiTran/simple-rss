@@ -383,9 +383,10 @@ export const MAX_SEARCH_QUERY_LENGTH = 256
 export const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)
 
 /**
- * A search is bounded by the screen it was invoked from: an opened Feed
- * answers its own Feed Items, the Library its saved ones, and the Feeds
- * screen only its Subscriptions. The Digest bounds nothing.
+ * The Search Scope: the part of the reading a search answers from, taken from
+ * the screen the line was invoked on. An opened Feed answers its own Feed
+ * Items, the Library its saved ones, and the Feeds screen only its
+ * Subscriptions. The Digest, the Reader and settings search everywhere.
  */
 export type SearchScope =
   | { readonly kind: 'everywhere' }
@@ -394,9 +395,10 @@ export type SearchScope =
   | { readonly kind: 'feed'; readonly feedId: number }
 
 /**
- * How a search travels: `q` for the words, then at most one bound beside it —
- * `feed=<id>` or `in=saved|subscriptions`. Everywhere needs no parameter.
- * `searchParamsOf` and `searchRequestSchema` are the two directions of one encoding.
+ * How a search travels, in the client address and the API request alike: `q`
+ * for the words, then at most one scope parameter beside it — `feed=<id>` or
+ * `in=saved|subscriptions`. Everywhere needs none. `searchParamsOf` and
+ * `searchRequestSchema` are the two directions of one encoding.
  */
 export function searchParamsOf(query: string, scope: SearchScope): URLSearchParams {
   const params = new URLSearchParams({ q: query })
@@ -408,17 +410,18 @@ export function searchParamsOf(query: string, scope: SearchScope): URLSearchPara
 export const searchRequestSchema = z
   .object({
     q: searchQuerySchema,
-    feed: z.coerce.number().int().positive().optional(),
+    feed: feedIdParameterSchema.optional(),
     in: z.enum(['saved', 'subscriptions']).optional(),
   })
-  .refine((request) => request.feed === undefined || request.in === undefined, 'A search takes one bound at most')
-  .transform(({ q, feed, in: within }) => ({ query: q, scope: searchScopeOfParams(feed, within) }))
-
-function searchScopeOfParams(feed: number | undefined, within: 'saved' | 'subscriptions' | undefined): SearchScope {
-  if (feed !== undefined) return { kind: 'feed', feedId: feed }
-  if (within !== undefined) return { kind: within }
-  return { kind: 'everywhere' }
-}
+  .refine((request) => request.feed === undefined || request.in === undefined, 'A search takes one scope at most')
+  .transform(({ q, feed, in: within }) => ({
+    query: q,
+    scope: (feed !== undefined
+      ? { kind: 'feed', feedId: feed }
+      : within !== undefined
+        ? { kind: within }
+        : { kind: 'everywhere' }) satisfies SearchScope,
+  }))
 
 export const searchResultSchema = z.object({
   feedItemId: z.number().int().positive(),
@@ -442,13 +445,21 @@ export const searchSubscriptionMatchSchema = feedSummarySchema
   .extend({ cadence: cadenceStripSchema })
 export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSchema>
 
-export const searchResultsSchema = z.object({
-  // Effective title of the Feed a Feed-bounded search answered from, so the
-  // surface can name its bound; null under every other scope.
-  feedTitle: z.string().nullable(),
-  subscriptions: z.array(searchSubscriptionMatchSchema),
-  results: z.array(searchResultSchema),
-})
+const searchItemsSchema = z.array(searchResultSchema)
+const searchJumpToSchema = z.array(searchSubscriptionMatchSchema)
+
+/**
+ * The answer carries only what its scope can hold: the jump-to group
+ * everywhere and on the Feeds screen, ranked Feed Items everywhere else, and
+ * the effective title of the Feed a Feed-scoped search answered from, so the
+ * surface can name it.
+ */
+export const searchResultsSchema = z.discriminatedUnion('scope', [
+  z.object({ scope: z.literal('everywhere'), subscriptions: searchJumpToSchema, results: searchItemsSchema }),
+  z.object({ scope: z.literal('saved'), results: searchItemsSchema }),
+  z.object({ scope: z.literal('subscriptions'), subscriptions: searchJumpToSchema }),
+  z.object({ scope: z.literal('feed'), feed: z.object({ title: z.string() }), results: searchItemsSchema }),
+])
 export type SearchResults = z.infer<typeof searchResultsSchema>
 
 export const READER_CACHE_SECONDS = 86_400

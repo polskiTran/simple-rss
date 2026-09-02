@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -52,7 +52,7 @@ describe('the search line in the chrome', () => {
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=chronology', {
         body: {
-          feedTitle: null,
+          scope: 'everywhere',
           subscriptions: [],
           results: [result(9, 'Morning chronology', 'today, 07:15'), result(8, 'Tide chronology', '3 june', true)],
         },
@@ -84,7 +84,7 @@ describe('the search line in the chrome', () => {
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=driftwood', async () => {
         await answer.promise
-        return { body: { feedTitle: null, subscriptions: [], results: [] } }
+        return { body: { scope: 'everywhere', subscriptions: [], results: [] } }
       })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -95,6 +95,35 @@ describe('the search line in the chrome', () => {
     expect((await screen.findByRole('status')).textContent).toBe('searching…')
     answer.resolve()
     expect((await screen.findByText('nothing in your reading matches “driftwood”')).getAttribute('role')).toBe('status')
+  })
+
+  it('keeps the last results in view while the next search is answered', async () => {
+    const answer = Promise.withResolvers<void>()
+    const api = stubApi()
+      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/search?q=drift', {
+        body: { scope: 'everywhere', subscriptions: [], results: [result(9, 'Driftwood morning', 'today, 07:15')] },
+      })
+      .on('GET /api/search?q=driftwood', async () => {
+        await answer.promise
+        return { body: { scope: 'everywhere', subscriptions: [], results: [] } }
+      })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const field = await screen.findByRole('searchbox', { name: 'search your reading' })
+    await user.type(field, 'drift')
+    const results = await screen.findByRole('region', { name: 'search results' })
+
+    await user.type(field, 'wood')
+    await waitFor(() => expect(api.requestsTo('GET /api/search?q=driftwood')).toHaveLength(1))
+    expect(results.getAttribute('aria-busy')).toBe('true')
+    expect(within(results).getByRole('link', { name: 'Driftwood morning' })).toBeDefined()
+    expect(screen.queryByText('searching…')).toBeNull()
+
+    answer.resolve()
+    expect(await screen.findByText('nothing in your reading matches “driftwood”')).toBeDefined()
   })
 
   it('tells a silent network apart from a refusing server for a search too', async () => {
@@ -123,7 +152,7 @@ describe('the search line in the chrome', () => {
     stubApi()
       .on('GET /api/digest', { body: DIGEST })
       .on('GET /api/search?q=chronology', {
-        body: { feedTitle: null, subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
+        body: { scope: 'everywhere', subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
       })
     window.history.replaceState(null, '', '/search?q=chronology')
     render(<App />)

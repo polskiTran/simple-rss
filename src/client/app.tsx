@@ -65,12 +65,12 @@ function viewFor(gate: Gate, navigation: Navigation) {
 
 function signedInView(navigation: Navigation, gate: Gate) {
   if (navigation.kind === 'search') {
-    const origin = searchOrigin(navigation.query, navigation.origin)
+    const origin = searchOrigin(navigation.query, navigation.searchScope, navigation.origin)
     return (
       <SearchResultsView
         settledQuery={navigation.query}
         scope={navigation.searchScope}
-        onWiden={navigation.widenSearch}
+        onEverywhere={navigation.searchEverywhere}
         onOpenItem={(feedItemId) => navigation.openReader(feedItemId, origin)}
         onOpenFeed={(feedId) => navigation.openFeed(feedId, origin)}
       />

@@ -160,7 +160,7 @@ describe('a Feed Item’s attribution', () => {
   it('opens its Feed from a search result, and that Feed returns to the results', async () => {
     reading('/digest').on('GET /api/search?q=light', {
       body: {
-        feedTitle: null,
+        scope: 'everywhere',
         subscriptions: [],
         results: [
           {
@@ -384,35 +384,33 @@ describe('the section an open article reads under', () => {
   })
 })
 
-describe('the bound a search takes from its screen', () => {
-  const answered = (feedTitle: string | null, ...titles: string[]) => ({
-    body: {
-      feedTitle,
-      subscriptions: [],
-      results: titles.map((title, index) => ({
-        feedItemId: 3 + index,
-        title,
-        feedId: 1,
-        feedTitle: 'Field Notes',
-        publishedAt: '2026-08-08T07:15:00.000Z',
-        firstSeenAt: '2026-08-08T09:00:00.000Z',
-        displayDate: 'today, 07:15',
-        saved: false,
-        snippet: null,
-      })),
-    },
-  })
+describe('the scope a search takes from its screen', () => {
+  const found = (...titles: string[]) =>
+    titles.map((title, index) => ({
+      feedItemId: 3 + index,
+      title,
+      feedId: 1,
+      feedTitle: 'Field Notes',
+      publishedAt: '2026-08-08T07:15:00.000Z',
+      firstSeenAt: '2026-08-08T09:00:00.000Z',
+      displayDate: 'today, 07:15',
+      saved: false,
+      snippet: null,
+    }))
+  const withinFeed = { body: { scope: 'feed', feed: { title: 'Field Notes' }, results: found('First light') } }
+  const everywhere = { body: { scope: 'everywhere', subscriptions: [], results: found('First light', 'Coast light') } }
 
-  it('from an opened Feed, answers within it and names it, then steps out to everywhere', async () => {
+  it('from an opened Feed, answers within it and names it; everywhere steps out, and clearing lands back on the Feed', async () => {
     const api = reading('/feeds/1')
-      .on('GET /api/search?q=light&feed=1', answered('Field Notes', 'First light'))
-      .on('GET /api/search?q=light', answered(null, 'First light', 'Coast light'))
+      .on('GET /api/search?q=light&feed=1', withinFeed)
+      .on('GET /api/search?q=light', everywhere)
     render(<App />)
     const user = userEvent.setup()
     await openedFeed()
 
     await user.type(screen.getByRole('searchbox', { name: 'search this feed' }), 'light')
     const results = await screen.findByRole('region', { name: 'search results' })
+    expect(window.location.pathname + window.location.search).toBe('/search?q=light&feed=1')
     expect(within(results).getByRole('link', { name: 'First light' })).toBeDefined()
     expect(within(results).queryByRole('link', { name: 'Field Notes' })).toBeNull()
     expect(screen.getByText(/^in Field Notes ·/)).toBeDefined()
@@ -420,6 +418,7 @@ describe('the bound a search takes from its screen', () => {
 
     await user.click(screen.getByRole('link', { name: 'everywhere' }))
     expect(await screen.findByRole('link', { name: 'Coast light' })).toBeDefined()
+    expect(window.location.pathname + window.location.search).toBe('/search?q=light')
     expect(api.requestsTo('GET /api/search?q=light')).toHaveLength(1)
     expect(screen.queryByText(/^in Field Notes/)).toBeNull()
     expect(activeTab()).toBe('digest')
@@ -427,12 +426,23 @@ describe('the bound a search takes from its screen', () => {
     expect(field.value).toBe('light')
 
     await user.clear(field)
-    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
-    expect(window.location.pathname).toBe('/digest')
+    await openedFeed()
+    expect(window.location.pathname).toBe('/feeds/1')
+  })
+
+  it('keeps its scope in the address, so a reloaded or shared search answers the same', async () => {
+    reading('/search?q=light&feed=1').on('GET /api/search?q=light&feed=1', withinFeed)
+    render(<App />)
+
+    const results = await screen.findByRole('region', { name: 'search results' })
+    expect(within(results).getByRole('link', { name: 'First light' })).toBeDefined()
+    expect(screen.getByText(/^in Field Notes ·/)).toBeDefined()
+    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: 'search this feed' }).value).toBe('light')
+    expect(activeTab()).toBe('feeds')
   })
 
   it('from the Library, answers within it and says so when nothing matches', async () => {
-    reading('/saved').on('GET /api/search?q=light&in=saved', answered(null))
+    reading('/saved').on('GET /api/search?q=light&in=saved', { body: { scope: 'saved', results: [] } })
     render(<App />)
     const user = userEvent.setup()
     await screen.findByRole('link', { name: 'First light' })
@@ -446,7 +456,7 @@ describe('the bound a search takes from its screen', () => {
   it('from the Feeds screen, answers with Subscriptions alone', async () => {
     reading('/feeds').on('GET /api/search?q=field&in=subscriptions', {
       body: {
-        feedTitle: null,
+        scope: 'subscriptions',
         subscriptions: [
           {
             feedId: 1,
@@ -456,7 +466,6 @@ describe('the bound a search takes from its screen', () => {
             cadence: Array.from({ length: 30 }, () => 0),
           },
         ],
-        results: [],
       },
     })
     render(<App />)
@@ -471,7 +480,7 @@ describe('the bound a search takes from its screen', () => {
   })
 
   it('from the Reader, answers everywhere', async () => {
-    reading('/reader/3').on('GET /api/search?q=light', answered(null, 'First light'))
+    reading('/reader/3').on('GET /api/search?q=light', everywhere)
     render(<App />)
     const user = userEvent.setup()
     await openedArticle()

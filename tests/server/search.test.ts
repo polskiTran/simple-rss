@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { searchResultsSchema, type SearchResults } from '../../src/shared/api.js'
+import { searchParamsOf, searchResultsSchema, type SearchResults, type SearchScope } from '../../src/shared/api.js'
 import {
   rebuildSearchIndex,
   SEARCH_RESULT_LIMIT,
@@ -43,14 +43,34 @@ async function subscribed(user: Device, service: TestService, xml: string, url: 
   await service.wakeScheduler()
 }
 
-async function search(user: Device, query: string, bound = ''): Promise<SearchResults> {
-  const response = await user.get(`/api/search?q=${encodeURIComponent(query)}${bound && `&${bound}`}`)
+type Answer<K extends SearchScope['kind']> = Extract<SearchResults, { scope: K }>
+
+/** An answer takes the shape of its scope; the default is everywhere. */
+function search(user: Device, query: string): Promise<Answer<'everywhere'>>
+function search<K extends SearchScope['kind']>(
+  user: Device,
+  query: string,
+  scope: SearchScope & { kind: K },
+): Promise<Answer<K>>
+async function search(
+  user: Device,
+  query: string,
+  scope: SearchScope = { kind: 'everywhere' },
+): Promise<SearchResults> {
+  const response = await user.get(`/api/search?${searchParamsOf(query, scope)}`)
   expect(response.status).toBe(200)
-  return searchResultsSchema.parse(await response.json())
+  const answer = searchResultsSchema.parse(await response.json())
+  expect(answer.scope).toBe(scope.kind)
+  return answer
 }
 
-async function foundTitles(user: Device, query: string, bound = ''): Promise<string[]> {
-  return (await search(user, query, bound)).results.map((result) => result.title)
+async function foundTitles(
+  user: Device,
+  query: string,
+  scope: SearchScope = { kind: 'everywhere' },
+): Promise<string[]> {
+  const answer = await search(user, query, scope)
+  return 'results' in answer ? answer.results.map((result) => result.title) : []
 }
 
 describe('searching retained reading metadata', () => {
@@ -194,7 +214,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning light')))
 
-    expect(await search(user, 'nonexistent')).toEqual({ feedTitle: null, subscriptions: [], results: [] })
+    expect(await search(user, 'nonexistent')).toEqual({ scope: 'everywhere', subscriptions: [], results: [] })
   })
 
   it('follows metadata corrections: a retitled item and a renamed Feed', async () => {
@@ -438,7 +458,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, coastXml, COAST_URL)
 
-    expect(await search(user, 'drift')).toEqual({ feedTitle: null, subscriptions: [], results: [] })
+    expect(await search(user, 'drift')).toEqual({ scope: 'everywhere', subscriptions: [], results: [] })
   })
 
   it('jumps by the Custom Title while set, not the reported title', async () => {
@@ -465,7 +485,7 @@ describe('searching retained reading metadata', () => {
     expect(answer.results.map((result) => result.title)).toEqual(['Saved essay'])
   })
 
-  it('caps the jump-to group at the server constant, in the Feeds list order', async () => {
+  it('caps the jump-to group everywhere, and leaves it whole where it is the answer: the Feeds screen', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     const letters = ['E', 'C', 'G', 'A', 'F', 'B', 'D']
@@ -474,16 +494,16 @@ describe('searching retained reading metadata', () => {
       await subscribed(user, service, rss(`Harbor ${letter}`), `https://harbor-${letter.toLowerCase()}.example/feed`)
     }
 
-    const { subscriptions } = await search(user, 'harbor')
-    expect(subscriptions.map((entry) => entry.title)).toEqual(
-      [...letters]
-        .sort()
-        .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
-        .map((letter) => `Harbor ${letter}`),
+    const inListOrder = [...letters].sort().map((letter) => `Harbor ${letter}`)
+    const everywhere = await search(user, 'harbor')
+    expect(everywhere.subscriptions.map((entry) => entry.title)).toEqual(
+      inListOrder.slice(0, SEARCH_SUBSCRIPTION_LIMIT),
     )
+    const feedsScreen = await search(user, 'harbor', { kind: 'subscriptions' })
+    expect(feedsScreen.subscriptions.map((entry) => entry.title)).toEqual(inListOrder)
   })
 
-  it('bounded to an opened Feed, answers only its items, names the Feed, and offers no jump', async () => {
+  it('scoped to an opened Feed, answers only its items, names the Feed, and offers no jump', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(
@@ -498,43 +518,69 @@ describe('searching retained reading metadata', () => {
 
     expect(await foundTitles(user, 'slow')).toEqual(['Slow morning', 'Slow water'])
 
-    const bounded = await search(user, 'slow', 'feed=2')
-    expect(bounded.results.map((result) => result.title)).toEqual(['Slow water'])
-    expect(bounded.feedTitle).toBe('Shore Letters')
-    expect((await search(user, 'shore', 'feed=2')).subscriptions).toEqual([])
+    const scoped = await search(user, 'slow', { kind: 'feed', feedId: 2 })
+    expect(scoped.feed.title).toBe('Shore Letters')
+    expect(scoped.results.map((result) => result.title)).toEqual(['Slow water'])
+    const byFeedTitle = await search(user, 'shore', { kind: 'feed', feedId: 2 })
+    expect(byFeedTitle.results.map((result) => result.title)).toEqual(['Slow water'])
+    expect(byFeedTitle).not.toHaveProperty('subscriptions')
   })
 
-  it('bounded to the Library, answers only saved Feed Items', async () => {
+  it('scoped to the Library, answers only saved Feed Items, in the order everywhere gives them', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
-    await subscribed(user, service, rss('Field Notes', item('a', 'Slow morning'), item('b', 'Slow evening')))
+    await subscribed(
+      user,
+      service,
+      rss(
+        'Field Notes',
+        item('a', 'Estuary crossings', { pubDate: '2026-07-18T08:00:00.000Z' }),
+        item('b', 'Morning links', {
+          pubDate: '2026-08-08T07:15:00.000Z',
+          summary: 'A stray mention of the estuary among other things',
+        }),
+        item('c', 'Estuary tides', { pubDate: '2026-08-01T08:00:00.000Z' }),
+      ),
+    )
+    expect((await user.put('/api/library/1')).status).toBe(200)
     expect((await user.put('/api/library/2')).status).toBe(200)
 
-    expect(await foundTitles(user, 'slow')).toEqual(['Slow evening', 'Slow morning'])
-    expect(await foundTitles(user, 'slow', 'in=saved')).toEqual(['Slow evening'])
-    expect((await search(user, 'field', 'in=saved')).subscriptions).toEqual([])
+    expect(await foundTitles(user, 'estuary')).toEqual(['Estuary tides', 'Estuary crossings', 'Morning links'])
+    // The scope changes what is searched, never how it is ordered (ADR 0009).
+    expect(await search(user, 'estuary', { kind: 'saved' })).toMatchObject({
+      scope: 'saved',
+      results: [{ title: 'Estuary crossings' }, { title: 'Morning links' }],
+    })
   })
 
-  it('bounded to the Feeds screen, answers with Subscriptions alone', async () => {
+  it('scoped to the Feeds screen, answers with Subscriptions alone', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, coastXml, COAST_URL)
 
     expect(await foundTitles(user, 'coast')).toEqual(['Slow water'])
 
-    const bounded = await search(user, 'coast', 'in=subscriptions')
-    expect(bounded.results).toEqual([])
-    expect(bounded.subscriptions.map((match) => match.title)).toEqual(['The Quiet Coast'])
+    const scoped = await search(user, 'coast', { kind: 'subscriptions' })
+    expect(scoped.subscriptions.map((match) => match.title)).toEqual(['The Quiet Coast'])
+    expect(scoped).not.toHaveProperty('results')
   })
 
-  it('refuses a bound it cannot honor: an unknown Feed is not found, two bounds at once is a bad request', async () => {
+  it('refuses a scope it cannot honor: a Feed not subscribed to is not found, two scopes at once is a bad request', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Slow morning')))
 
     expect((await user.get('/api/search?q=slow&feed=9')).status).toBe(404)
+    expect((await user.get('/api/search?q=slow&feed=1e0')).status).toBe(400)
     expect((await user.get('/api/search?q=slow&feed=1&in=saved')).status).toBe(400)
     expect((await user.get('/api/search?q=slow&in=digest')).status).toBe(400)
+
+    // A Feed kept only by its saves has no screen to search from: its scope is refused as the Feed screen is.
+    expect((await user.put('/api/library/1')).status).toBe(200)
+    expect((await user.delete('/api/feeds/1')).status).toBe(204)
+    expect((await user.get('/api/feeds/1')).status).toBe(404)
+    expect((await user.get('/api/search?q=slow&feed=1')).status).toBe(404)
+    expect(await foundTitles(user, 'slow', { kind: 'saved' })).toEqual(['Slow morning'])
   })
 
   it('refuses a missing, empty, or oversized query as a bad request', async () => {

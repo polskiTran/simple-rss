@@ -6,10 +6,11 @@ import { chronologySql } from '../digest/list-page.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import { emptyCadence, stripCadenceByFeed } from '../subscriptions/cadence-window.js'
+import { stripCadenceByFeed } from '../subscriptions/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
+/** Everywhere, the jump-to group is a handful above the items; scoped to the Subscriptions it is the whole answer, uncapped. */
 export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
 // BM25 weights are positional, following the FTS5 column order.
@@ -38,28 +39,43 @@ export class SearchService {
     this.#settings = options.settings
   }
 
+  /** Undefined when scoped to a Feed the User is not subscribed to — the screen that scope came from is gone too. */
   search(query: string, scope: SearchScope): SearchResults | undefined {
-    const feedTitle = scope.kind === 'feed' ? this.#effectiveTitleOf(scope.feedId) : null
-    if (feedTitle === undefined) return undefined
-
     const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
-    if (words.length === 0) return { feedTitle, subscriptions: [], results: [] }
-    if (scope.kind === 'subscriptions') {
-      return { feedTitle, subscriptions: this.#subscriptionMatches(words, timezone, now), results: [] }
-    }
 
-    const results = this.#itemMatches(words, scope, timezone, now)
-    const subscriptions = scope.kind === 'everywhere' ? this.#subscriptionMatches(words, timezone, now) : []
-    return { feedTitle, subscriptions, results }
+    switch (scope.kind) {
+      case 'everywhere':
+        return {
+          scope: 'everywhere',
+          subscriptions: this.#withCadence(
+            this.#matchingSubscriptions(words).slice(0, SEARCH_SUBSCRIPTION_LIMIT),
+            timezone,
+            now,
+          ),
+          results: this.#itemMatches(words, scope, timezone, now),
+        }
+      case 'saved':
+        return { scope: 'saved', results: this.#itemMatches(words, scope, timezone, now) }
+      case 'subscriptions':
+        return {
+          scope: 'subscriptions',
+          subscriptions: this.#withCadence(this.#matchingSubscriptions(words), timezone, now),
+        }
+      case 'feed': {
+        const title = this.#subscribedTitleOf(scope.feedId)
+        if (title === undefined) return undefined
+        return { scope: 'feed', feed: { title }, results: this.#itemMatches(words, scope, timezone, now) }
+      }
+    }
   }
 
-  #effectiveTitleOf(feedId: number): string | undefined {
+  #subscribedTitleOf(feedId: number): string | undefined {
     return this.#db
       .select({ title: effectiveFeedTitle })
       .from(feeds)
-      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .where(eq(feeds.id, feedId))
       .get()?.title
   }
@@ -70,6 +86,7 @@ export class SearchService {
     timezone: string,
     now: Date,
   ): SearchResult[] {
+    if (words.length === 0) return []
     const match = matchExpressionOf(words)
     const today = dateKey(now, timezone)
 
@@ -127,9 +144,11 @@ export class SearchService {
     })
   }
 
-  #subscriptionMatches(words: readonly string[], timezone: string, now: Date): SearchSubscriptionMatch[] {
+  /** Every word of the line somewhere in the effective title or the domain, in Feeds list order. */
+  #matchingSubscriptions(words: readonly string[]): Omit<SearchSubscriptionMatch, 'cadence'>[] {
+    if (words.length === 0) return []
     const needles = words.map(folded)
-    const matches = this.#db
+    return this.#db
       .select({
         feedId: feeds.id,
         title: effectiveFeedTitle,
@@ -144,16 +163,20 @@ export class SearchService {
         const line = folded(`${row.title} ${row.domain}`)
         return needles.every((needle) => line.includes(needle))
       })
-      .slice(0, SEARCH_SUBSCRIPTION_LIMIT)
-    if (matches.length === 0) return []
+  }
 
-    const cadence = stripCadenceByFeed(
+  #withCadence(
+    matches: readonly Omit<SearchSubscriptionMatch, 'cadence'>[],
+    timezone: string,
+    now: Date,
+  ): SearchSubscriptionMatch[] {
+    const cadenceOf = stripCadenceByFeed(
       this.#db,
       timezone,
       now,
       matches.map((row) => row.feedId),
     )
-    return matches.map((row) => ({ ...row, cadence: cadence.get(row.feedId) ?? emptyCadence() }))
+    return matches.map((row) => ({ ...row, cadence: cadenceOf(row.feedId) }))
   }
 }
 

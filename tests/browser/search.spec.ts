@@ -137,7 +137,7 @@ test.describe('the global search line', () => {
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
   })
 
-  test('bounds itself to the opened Feed, and steps out to everywhere', async ({ page, installation }) => {
+  test('scopes itself to the opened Feed, and steps out to everywhere', async ({ page, installation }) => {
     await openDigest(page, installation)
     await page.getByRole('link', { name: 'feeds' }).click()
     await page.getByRole('link', { name: 'The Quiet Coast' }).click()
@@ -145,12 +145,14 @@ test.describe('the global search line', () => {
 
     await page.getByRole('searchbox', { name: 'search this feed' }).fill('notes')
     const results = page.getByRole('region', { name: 'search results' })
+    await expect(page).toHaveURL(`${installation.url}/search?q=notes&feed=2`)
     await expect(results.getByRole('link', { name: 'Slow water' })).toBeVisible()
     await expect(results.getByRole('link', { name: 'First light' })).not.toBeVisible()
     await expect(results.getByRole('link', { name: 'The Quiet Coast' })).not.toBeVisible()
     await expect(page.getByText('in The Quiet Coast')).toBeVisible()
 
     await page.getByRole('link', { name: 'everywhere' }).click()
+    await expect(page).toHaveURL(`${installation.url}/search?q=notes`)
     await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
     await expect(page.getByText('in The Quiet Coast')).not.toBeVisible()
     await expect(page.getByRole('searchbox', { name: 'search your reading' })).toHaveValue('notes')

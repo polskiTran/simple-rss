@@ -429,7 +429,7 @@
   .feed-open:focus-visible,
   .feed-title-link:focus-visible,
   .home-page-link:focus-visible,
-  .search-widen:focus-visible,
+  .search-everywhere:focus-visible,
   .feed-back:focus-visible {
     outline: none;
     text-decoration: underline;
@@ -1111,7 +1111,7 @@
     .feed-back:hover,
     .feed-title-link:hover,
     .home-page-link:hover,
-    .search-widen:hover,
+    .search-everywhere:hover,
     .reader-back:hover,
     .reader-original:hover,
     .interval-option:hover,

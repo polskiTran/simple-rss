@@ -14,7 +14,7 @@ export function searchRoutes(deps: SearchRouteDependencies): Hono {
     const request = searchRequestSchema.safeParse(c.req.query())
     if (!request.success) {
       return c.json(
-        { error: { code: 'invalid_request', message: 'A search takes a query and at most one bound' } },
+        { error: { code: 'invalid_request', message: 'A search takes a query and at most one scope' } },
         400,
         NO_STORE,
       )

@@ -212,7 +212,7 @@ Unsubscribing immediately removes the Feed from the Digest and stops polling. Un
 
 Library membership is explicit and independent of reading or Reader View success. Saving and unsaving are authenticated server mutations.
 
-SQLite FTS5 indexes Feed titles, item titles, and normalized summaries. Search covers retained Feed Items and Library items. FTS data is derived and excluded from portable exports.
+SQLite FTS5 indexes Feed titles, item titles, and normalized summaries. Search covers retained Feed Items and Library items, ranked by match quality blended with recency (ADR 0009), scoped by the screen the search line was invoked from, and may open with matching Subscriptions to jump to. FTS data is derived and excluded from portable exports.
 
 ## Reader View
 

@@ -1,5 +1,5 @@
-import type { SearchScope, SearchSubscriptionMatch } from '../../shared/api.js'
-import { fetchSearchResults } from '../api.js'
+import { searchParamsOf, type SearchScope, type SearchSubscriptionMatch } from '../../shared/api.js'
+import { ApiError, fetchSearchResults } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { HomePageLink } from '../components/home-page-link.js'
@@ -9,71 +9,94 @@ import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf, searchPathOf } from '../routing.js'
 import { SEARCH_SCOPE_COPY } from '../search-scope.js'
-import { useResource } from '../use-resource.js'
+import { useResource, valueInView } from '../use-resource.js'
 
 export interface SearchResultsViewProps {
   settledQuery: string
   scope: SearchScope
-  onWiden(): void
+  onEverywhere(): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
 
-export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, onOpenFeed }: SearchResultsViewProps) {
+export function SearchResultsView({
+  settledQuery,
+  scope,
+  onEverywhere,
+  onOpenItem,
+  onOpenFeed,
+}: SearchResultsViewProps) {
   const line = settledQuery.trim()
-  const [found, { set }] = useResource((signal) => fetchSearchResults(line, scope, signal), [line, scope])
+  const request = searchParamsOf(line, scope).toString()
+  const [found, { set }] = useResource((signal) => fetchSearchResults(line, scope, signal), [request])
+  const answer = valueInView(found)
 
   const setSaved = (feedItemId: number, saved: boolean) =>
-    set((current) => ({
-      ...current,
-      results: current.results.map((result) => (result.feedItemId === feedItemId ? { ...result, saved } : result)),
-    }))
+    set((current) =>
+      'results' in current
+        ? {
+            ...current,
+            results: current.results.map((result) =>
+              result.feedItemId === feedItemId ? { ...result, saved } : result,
+            ),
+          }
+        : current,
+    )
 
-  const outcome = () => {
-    if (found.kind === 'loading') {
-      return (
+  const everywhere = (
+    <a
+      className="search-everywhere"
+      href={searchPathOf(line, { kind: 'everywhere' })}
+      onClick={routedClick(onEverywhere)}
+    >
+      everywhere
+    </a>
+  )
+
+  if (found.kind === 'unreachable' || found.kind === 'unavailable') {
+    return (
+      <div className="view measure search-results-view">
+        <p className="empty-note" role="status">
+          {found.kind === 'unreachable' ? (
+            'search is out of reach — check the connection, then try again'
+          ) : found.error instanceof ApiError && found.error.status === 404 ? (
+            <>that feed is gone — try {everywhere}</>
+          ) : (
+            'search is unavailable — try again in a moment'
+          )}
+        </p>
+      </div>
+    )
+  }
+
+  if (answer === undefined) {
+    return (
+      <div className="view measure search-results-view">
         <LoadingNote className="empty-note" announce>
           searching…
         </LoadingNote>
-      )
-    }
-    if (found.kind !== 'loaded') {
-      return (
-        <p className="empty-note" role="status">
-          {found.kind === 'unreachable'
-            ? 'search is out of reach — check the connection, then try again'
-            : 'search is unavailable — try again in a moment'}
-        </p>
-      )
-    }
-
-    const { feedTitle, subscriptions, results } = found.value
-    const place =
-      scope.kind === 'feed' ? (feedTitle ?? SEARCH_SCOPE_COPY.feed.place) : SEARCH_SCOPE_COPY[scope.kind].place
-    const boundLine = place !== undefined && (
-      <p className="search-scope">
-        in {place} ·{' '}
-        <a className="search-widen" href={searchPathOf(line)} onClick={routedClick(onWiden)}>
-          everywhere
-        </a>
-      </p>
+      </div>
     )
+  }
 
-    if (subscriptions.length === 0 && results.length === 0) {
-      return (
-        <>
-          {boundLine}
-          <p className="empty-note" role="status">
-            nothing in {place ?? 'your reading'} matches “{line}”
-          </p>
-        </>
-      )
-    }
+  const place = answer.scope === 'feed' ? answer.feed.title : SEARCH_SCOPE_COPY[answer.scope].place
+  const scopeLine = answer.scope !== 'everywhere' && (
+    <p className="search-scope">
+      in {place} · {everywhere}
+    </p>
+  )
+  const subscriptions = 'subscriptions' in answer ? answer.subscriptions : []
+  const results = 'results' in answer ? answer.results : []
 
-    return (
-      <>
-        {boundLine}
-        <div className="search-answer" role="region" aria-label="search results">
+  return (
+    <div className="view measure search-results-view">
+      {scopeLine}
+      {subscriptions.length === 0 && results.length === 0 ? (
+        <p className="empty-note" role="status">
+          nothing in {place} matches “{line}”
+        </p>
+      ) : (
+        <div className="search-answer" role="region" aria-label="search results" aria-busy={found.kind === 'loading'}>
           <JumpToGroup subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
           {results.length > 0 && (
             <div className="content-list">
@@ -84,7 +107,7 @@ export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, on
                   </h3>
                   {result.snippet !== null && <p className="content-snippet">{result.snippet}</p>}
                   <div className="content-meta">
-                    {scope.kind !== 'feed' && (
+                    {answer.scope !== 'feed' && (
                       <FeedTitleLink feedId={result.feedId} title={result.feedTitle} onOpen={onOpenFeed} />
                     )}
                     <time dateTime={result.publishedAt ?? result.firstSeenAt}>{result.displayDate}</time>
@@ -100,11 +123,9 @@ export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, on
             </div>
           )}
         </div>
-      </>
-    )
-  }
-
-  return <div className="view measure search-results-view">{outcome()}</div>
+      )}
+    </div>
+  )
 }
 
 function JumpToGroup({
