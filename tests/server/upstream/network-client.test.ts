@@ -303,6 +303,37 @@ describe('createNetworkHttpClient', () => {
     expect(reused?.ttfbMs).toBeGreaterThanOrEqual(0)
   })
 
+  it('leaves nothing on a pooled socket, however many requests borrow it', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml' })
+      response.end('<rss></rss>')
+    })
+    const port = new URL(running.url).port
+    const url = `http://publisher.example:${port}/feed.xml`
+    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup })
+    const warnings: Error[] = []
+    const onWarning = (warning: Error): void => {
+      if (warning.name === 'MaxListenersExceededWarning') warnings.push(warning)
+    }
+    process.on('warning', onWarning)
+
+    try {
+      const observed: HttpTimings[] = []
+      // Node warns at the eleventh listener for one event on one emitter;
+      // a leak of one listener per request crosses that on the twelfth request.
+      for (let sent = 0; sent < 12; sent += 1) {
+        const response = await client(new Request(url), (timings) => observed.push(timings))
+        await response.text()
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve))
+
+      expect(observed.filter((timings) => timings.connectionReused)).toHaveLength(11)
+      expect(warnings).toEqual([])
+    } finally {
+      process.off('warning', onWarning)
+    }
+  })
+
   it('settles an abort promptly while other requests hold every connected socket', async () => {
     const held: Socket[] = []
     const silent = createTcpServer((socket) => {

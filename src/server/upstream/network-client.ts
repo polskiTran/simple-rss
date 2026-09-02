@@ -241,6 +241,10 @@ function observeConnection(outbound: ClientRequest): () => HttpTimings {
   outbound.on('socket', (socket) => {
     socketAt = performance.now()
     reused = outbound.reusedSocket
+    // A pooled socket finished these phases before this request existed. A
+    // `once` for an event that never fires stays on the socket, and every
+    // later request borrowing it would leave three more behind.
+    if (reused) return
     socket.once('lookup', () => {
       lookupAt = performance.now()
     })
