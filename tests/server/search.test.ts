@@ -43,7 +43,6 @@ async function subscribed(user: Device, service: TestService, xml: string, url: 
   await service.wakeScheduler()
 }
 
-/** `bound` is the scope as it travels: `feed=<id>` or `in=saved|subscriptions`; none searches everywhere. */
 async function search(user: Device, query: string, bound = ''): Promise<SearchResults> {
   const response = await user.get(`/api/search?q=${encodeURIComponent(query)}${bound && `&${bound}`}`)
   expect(response.status).toBe(200)

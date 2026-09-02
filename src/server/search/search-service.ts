@@ -38,11 +38,6 @@ export class SearchService {
     this.#settings = options.settings
   }
 
-  /**
-   * Answers within the scope: the whole of retained reading, the Library, one
-   * Feed's items, or the Subscription list alone. Undefined when the scope
-   * names a Feed this installation has never held.
-   */
   search(query: string, scope: SearchScope): SearchResults | undefined {
     const feedTitle = scope.kind === 'feed' ? this.#effectiveTitleOf(scope.feedId) : null
     if (feedTitle === undefined) return undefined

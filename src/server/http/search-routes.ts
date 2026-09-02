@@ -7,11 +7,6 @@ export interface SearchRouteDependencies {
   readonly search: SearchService
 }
 
-/**
- * The query travels as `?q=`, which request logging already omits, so what
- * the User searched for never lands in a log line. Its bound, if any, rides
- * beside it as `feed=<id>` or `in=saved|subscriptions`.
- */
 export function searchRoutes(deps: SearchRouteDependencies): Hono {
   const app = new Hono()
 

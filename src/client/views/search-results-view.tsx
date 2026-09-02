@@ -14,7 +14,6 @@ import { useResource } from '../use-resource.js'
 export interface SearchResultsViewProps {
   settledQuery: string
   scope: SearchScope
-  /** The way out of a bound: re-ask the same words everywhere. */
   onWiden(): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void

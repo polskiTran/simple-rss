@@ -75,11 +75,6 @@ export function searchOrigin(query: string, from: Origin | undefined): Origin {
   return { path: searchPathOf(query), label: 'search', from }
 }
 
-/**
- * A search is bounded by the screen it was invoked from, read off that
- * screen's path: an opened Feed, the Library, or the Feeds list. Every other
- * screen — the Digest, the Reader, settings — searches everywhere.
- */
 function searchScopeOfScreen(pathname: string): SearchScope {
   const feedId = feedIdOf(pathname)
   if (feedId !== undefined) return { kind: 'feed', feedId }
@@ -120,17 +115,14 @@ interface ScreenLocation {
   readonly readerItemId: number | undefined
   /** Set while a nested screen is open. */
   readonly origin: Origin | undefined
-  /** What the search line would answer from here. */
   readonly searchScope: SearchScope
 }
 
 interface SearchLocation {
   readonly kind: 'search'
-  /** A bounded search reads under its section's tab; one that answers everywhere reads under the Digest. */
   readonly route: Route
   readonly query: string
   readonly origin: Origin | undefined
-  /** The bound the search left with, read off its origin. */
   readonly searchScope: SearchScope
 }
 
@@ -140,7 +132,6 @@ interface NavigationActions {
   openReader(feedItemId: number, from: Origin): void
   returnTo(origin: Origin): void
   updateSearch(query: string): void
-  /** Re-asks the open search from the Digest, so it answers everywhere and clears back to the Digest. */
   widenSearch(): void
 }
 
