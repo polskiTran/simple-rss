@@ -1,6 +1,7 @@
 import { Field as BaseField } from '@base-ui/react/field'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { MAX_SEARCH_QUERY_LENGTH, type SearchScope } from '../../shared/api.js'
+import { SEARCH_SCOPE_COPY } from '../search-scope.js'
 
 interface GlobalSearchProps {
   query: string
@@ -14,20 +15,6 @@ interface GlobalSearchProps {
  * Safari's history-write throttle, which throws past ~100 writes in 30s.
  */
 const SETTLE_MS = 250
-
-/** The line says what it would answer from, before the first keystroke takes the words' place. */
-function promptOf(scope: SearchScope): string {
-  switch (scope.kind) {
-    case 'everywhere':
-      return 'search your reading'
-    case 'saved':
-      return 'search your saves'
-    case 'subscriptions':
-      return 'search your feeds'
-    case 'feed':
-      return 'search this feed'
-  }
-}
 
 export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps) {
   const input = useRef<HTMLInputElement>(null)
@@ -57,7 +44,7 @@ export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps)
     return () => document.removeEventListener('keydown', focusSearch)
   }, [])
 
-  const prompt = promptOf(scope)
+  const { prompt } = SEARCH_SCOPE_COPY[scope.kind]
   return (
     <form className="chrome-search" role="search" onSubmit={(event) => event.preventDefault()}>
       <BaseField.Root>

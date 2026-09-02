@@ -1233,7 +1233,8 @@
   }
 
   .content-meta,
-  .content-snippet {
+  .content-snippet,
+  .search-scope {
     font-size: 12px;
   }
 

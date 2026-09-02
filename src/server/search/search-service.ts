@@ -43,30 +43,30 @@ export class SearchService {
    * Feed's items, or the Subscription list alone. Undefined when the scope
    * names a Feed this installation has never held.
    */
-  search(query: string, scope: SearchScope = { kind: 'everywhere' }): SearchResults | undefined {
-    const feed = scope.kind === 'feed' ? this.#feedNamed(scope.feedId) : null
-    if (feed === undefined) return undefined
+  search(query: string, scope: SearchScope): SearchResults | undefined {
+    const feedTitle = scope.kind === 'feed' ? this.#effectiveTitleOf(scope.feedId) : null
+    if (feedTitle === undefined) return undefined
 
     const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
-    if (words.length === 0) return { feed, subscriptions: [], results: [] }
+    if (words.length === 0) return { feedTitle, subscriptions: [], results: [] }
     if (scope.kind === 'subscriptions') {
-      return { feed, subscriptions: this.#subscriptionMatches(words, timezone, now), results: [] }
+      return { feedTitle, subscriptions: this.#subscriptionMatches(words, timezone, now), results: [] }
     }
 
     const results = this.#itemMatches(words, scope, timezone, now)
     const subscriptions = scope.kind === 'everywhere' ? this.#subscriptionMatches(words, timezone, now) : []
-    return { feed, subscriptions, results }
+    return { feedTitle, subscriptions, results }
   }
 
-  #feedNamed(feedId: number): SearchResults['feed'] | undefined {
+  #effectiveTitleOf(feedId: number): string | undefined {
     return this.#db
-      .select({ feedId: feeds.id, title: effectiveFeedTitle })
+      .select({ title: effectiveFeedTitle })
       .from(feeds)
       .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .where(eq(feeds.id, feedId))
-      .get()
+      .get()?.title
   }
 
   #itemMatches(

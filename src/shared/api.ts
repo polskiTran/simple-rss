@@ -387,15 +387,24 @@ export const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)
  * answers its own Feed Items, the Library its saved ones, and the Feeds
  * screen only its Subscriptions. The Digest bounds nothing.
  */
-export const searchScopeSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('everywhere') }),
-  z.object({ kind: z.literal('saved') }),
-  z.object({ kind: z.literal('subscriptions') }),
-  z.object({ kind: z.literal('feed'), feedId: z.number().int().positive() }),
-])
-export type SearchScope = z.infer<typeof searchScopeSchema>
+export type SearchScope =
+  | { readonly kind: 'everywhere' }
+  | { readonly kind: 'saved' }
+  | { readonly kind: 'subscriptions' }
+  | { readonly kind: 'feed'; readonly feedId: number }
 
-/** How a search travels: `q` for the words, then at most one bound — `feed=<id>` or `in=saved|subscriptions`. */
+/**
+ * How a search travels: `q` for the words, then at most one bound beside it —
+ * `feed=<id>` or `in=saved|subscriptions`. Everywhere needs no parameter.
+ * `searchParamsOf` and `searchRequestSchema` are the two directions of one encoding.
+ */
+export function searchParamsOf(query: string, scope: SearchScope): URLSearchParams {
+  const params = new URLSearchParams({ q: query })
+  if (scope.kind === 'feed') params.set('feed', String(scope.feedId))
+  else if (scope.kind !== 'everywhere') params.set('in', scope.kind)
+  return params
+}
+
 export const searchRequestSchema = z
   .object({
     q: searchQuerySchema,
@@ -403,9 +412,9 @@ export const searchRequestSchema = z
     in: z.enum(['saved', 'subscriptions']).optional(),
   })
   .refine((request) => request.feed === undefined || request.in === undefined, 'A search takes one bound at most')
-  .transform(({ q, feed, in: within }) => ({ query: q, scope: searchScopeOfBound(feed, within) }))
+  .transform(({ q, feed, in: within }) => ({ query: q, scope: searchScopeOfParams(feed, within) }))
 
-function searchScopeOfBound(feed: number | undefined, within: 'saved' | 'subscriptions' | undefined): SearchScope {
+function searchScopeOfParams(feed: number | undefined, within: 'saved' | 'subscriptions' | undefined): SearchScope {
   if (feed !== undefined) return { kind: 'feed', feedId: feed }
   if (within !== undefined) return { kind: within }
   return { kind: 'everywhere' }
@@ -434,9 +443,9 @@ export const searchSubscriptionMatchSchema = feedSummarySchema
 export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSchema>
 
 export const searchResultsSchema = z.object({
-  // The Feed a Feed-bounded search answered from, named so the surface can
-  // say so; null under every other scope.
-  feed: feedSummarySchema.pick({ feedId: true, title: true }).nullable(),
+  // Effective title of the Feed a Feed-bounded search answered from, so the
+  // surface can name its bound; null under every other scope.
+  feedTitle: z.string().nullable(),
   subscriptions: z.array(searchSubscriptionMatchSchema),
   results: z.array(searchResultSchema),
 })

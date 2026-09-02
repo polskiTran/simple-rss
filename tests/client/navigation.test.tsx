@@ -160,7 +160,7 @@ describe('a Feed Item’s attribution', () => {
   it('opens its Feed from a search result, and that Feed returns to the results', async () => {
     reading('/digest').on('GET /api/search?q=light', {
       body: {
-        feed: null,
+        feedTitle: null,
         subscriptions: [],
         results: [
           {
@@ -385,9 +385,9 @@ describe('the section an open article reads under', () => {
 })
 
 describe('the bound a search takes from its screen', () => {
-  const answered = (feed: { feedId: number; title: string } | null, ...titles: string[]) => ({
+  const answered = (feedTitle: string | null, ...titles: string[]) => ({
     body: {
-      feed,
+      feedTitle,
       subscriptions: [],
       results: titles.map((title, index) => ({
         feedItemId: 3 + index,
@@ -405,7 +405,7 @@ describe('the bound a search takes from its screen', () => {
 
   it('from an opened Feed, answers within it and names it, then steps out to everywhere', async () => {
     const api = reading('/feeds/1')
-      .on('GET /api/search?q=light&feed=1', answered({ feedId: 1, title: 'Field Notes' }, 'First light'))
+      .on('GET /api/search?q=light&feed=1', answered('Field Notes', 'First light'))
       .on('GET /api/search?q=light', answered(null, 'First light', 'Coast light'))
     render(<App />)
     const user = userEvent.setup()
@@ -431,7 +431,7 @@ describe('the bound a search takes from its screen', () => {
     expect(window.location.pathname).toBe('/digest')
   })
 
-  it('from the Library, answers within the saves and says so when nothing matches', async () => {
+  it('from the Library, answers within it and says so when nothing matches', async () => {
     reading('/saved').on('GET /api/search?q=light&in=saved', answered(null))
     render(<App />)
     const user = userEvent.setup()
@@ -446,7 +446,7 @@ describe('the bound a search takes from its screen', () => {
   it('from the Feeds screen, answers with Subscriptions alone', async () => {
     reading('/feeds').on('GET /api/search?q=field&in=subscriptions', {
       body: {
-        feed: null,
+        feedTitle: null,
         subscriptions: [
           {
             feedId: 1,

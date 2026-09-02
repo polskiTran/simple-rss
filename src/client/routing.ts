@@ -80,11 +80,11 @@ export function searchOrigin(query: string, from: Origin | undefined): Origin {
  * screen's path: an opened Feed, the Library, or the Feeds list. Every other
  * screen — the Digest, the Reader, settings — searches everywhere.
  */
-export function searchScopeOf(path: string): SearchScope {
-  const feedId = feedIdOf(path)
+function searchScopeOfScreen(pathname: string): SearchScope {
+  const feedId = feedIdOf(pathname)
   if (feedId !== undefined) return { kind: 'feed', feedId }
-  if (path === pathOf('saved')) return { kind: 'saved' }
-  if (path === pathOf('feeds')) return { kind: 'subscriptions' }
+  if (pathname === pathOf('saved')) return { kind: 'saved' }
+  if (pathname === pathOf('feeds')) return { kind: 'subscriptions' }
   return { kind: 'everywhere' }
 }
 
@@ -120,6 +120,8 @@ interface ScreenLocation {
   readonly readerItemId: number | undefined
   /** Set while a nested screen is open. */
   readonly origin: Origin | undefined
+  /** What the search line would answer from here. */
+  readonly searchScope: SearchScope
 }
 
 interface SearchLocation {
@@ -128,11 +130,11 @@ interface SearchLocation {
   readonly route: Route
   readonly query: string
   readonly origin: Origin | undefined
+  /** The bound the search left with, read off its origin. */
+  readonly searchScope: SearchScope
 }
 
 interface NavigationActions {
-  /** What the search line would answer from here: this screen's bound, or the open search's. */
-  readonly searchScope: SearchScope
   navigate(route: Route): void
   openFeed(feedId: number, from: Origin): void
   openReader(feedItemId: number, from: Origin): void
@@ -200,11 +202,7 @@ export function useNavigation(): Navigation {
     setLocation(locationOf(path, DIGEST_ORIGIN))
   }, [location])
 
-  const searchScope = searchScopeOf(
-    location.kind === 'search' ? (location.origin?.path ?? pathOf(DEFAULT_ROUTE)) : searchScreenOrigin(location).path,
-  )
-
-  return { ...location, searchScope, navigate, openFeed, openReader, returnTo, updateSearch, widenSearch }
+  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch, widenSearch }
 }
 
 function currentLocation(): Location {
@@ -218,13 +216,11 @@ function locationOf(path: string, origin: Origin | undefined): Location {
   const pathname = cut === -1 ? path : path.slice(0, cut)
   const search = cut === -1 ? '' : path.slice(cut)
   const query = searchQueryOf(pathname, search)
-  if (query !== undefined) return { kind: 'search', route: searchRouteOf(origin), query, origin }
-  return screenLocationOf(pathname, origin)
-}
+  if (query === undefined) return screenLocationOf(pathname, origin)
 
-function searchRouteOf(origin: Origin | undefined): Route {
-  if (origin === undefined || searchScopeOf(origin.path).kind === 'everywhere') return DEFAULT_ROUTE
-  return routeOf(origin.path)
+  const searchScope = searchScopeOfScreen(origin?.path ?? pathOf(DEFAULT_ROUTE))
+  const route = origin && searchScope.kind !== 'everywhere' ? routeOf(origin.path) : DEFAULT_ROUTE
+  return { kind: 'search', route, query, origin, searchScope }
 }
 
 function searchScreenOrigin(location: ScreenLocation): Origin {
@@ -236,5 +232,12 @@ function searchScreenOrigin(location: ScreenLocation): Origin {
 function screenLocationOf(pathname: string, origin: Origin | undefined): ScreenLocation {
   const readerItemId = readerItemIdOf(pathname)
   const route = readerItemId !== undefined && origin ? routeOf(origin.path) : routeOf(pathname)
-  return { kind: 'screen', route, feedId: feedIdOf(pathname), readerItemId, origin }
+  return {
+    kind: 'screen',
+    route,
+    feedId: feedIdOf(pathname),
+    readerItemId,
+    origin,
+    searchScope: searchScopeOfScreen(pathname),
+  }
 }

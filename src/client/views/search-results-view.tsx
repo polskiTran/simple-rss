@@ -1,4 +1,4 @@
-import type { SearchResults, SearchScope, SearchSubscriptionMatch } from '../../shared/api.js'
+import type { SearchScope, SearchSubscriptionMatch } from '../../shared/api.js'
 import { fetchSearchResults } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
@@ -8,6 +8,7 @@ import { LoadingNote } from '../components/loading-note.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf, searchPathOf } from '../routing.js'
+import { SEARCH_SCOPE_COPY } from '../search-scope.js'
 import { useResource } from '../use-resource.js'
 
 export interface SearchResultsViewProps {
@@ -21,8 +22,7 @@ export interface SearchResultsViewProps {
 
 export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, onOpenFeed }: SearchResultsViewProps) {
   const line = settledQuery.trim()
-  const bound = scope.kind === 'feed' ? `feed:${scope.feedId}` : scope.kind
-  const [found, { set }] = useResource((signal) => fetchSearchResults(line, scope, signal), [line, bound])
+  const [found, { set }] = useResource((signal) => fetchSearchResults(line, scope, signal), [line, scope])
 
   const setSaved = (feedItemId: number, saved: boolean) =>
     set((current) => ({
@@ -48,8 +48,9 @@ export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, on
       )
     }
 
-    const { subscriptions, results } = found.value
-    const place = placeOf(scope, found.value)
+    const { feedTitle, subscriptions, results } = found.value
+    const place =
+      scope.kind === 'feed' ? (feedTitle ?? SEARCH_SCOPE_COPY.feed.place) : SEARCH_SCOPE_COPY[scope.kind].place
     const boundLine = place !== undefined && (
       <p className="search-scope">
         in {place} ·{' '}
@@ -105,20 +106,6 @@ export function SearchResultsView({ settledQuery, scope, onWiden, onOpenItem, on
   }
 
   return <div className="view measure search-results-view">{outcome()}</div>
-}
-
-/** The bound in prose — the Feed's own name, or the section's — and nothing for everywhere. */
-function placeOf(scope: SearchScope, answer: SearchResults): string | undefined {
-  switch (scope.kind) {
-    case 'everywhere':
-      return undefined
-    case 'saved':
-      return 'your saves'
-    case 'subscriptions':
-      return 'your feeds'
-    case 'feed':
-      return answer.feed?.title
-  }
 }
 
 function JumpToGroup({

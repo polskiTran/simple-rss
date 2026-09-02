@@ -153,11 +153,11 @@ test.describe('the global search line', () => {
     await page.getByRole('link', { name: 'everywhere' }).click()
     await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
     await expect(page.getByText('in The Quiet Coast')).not.toBeVisible()
-    const field = page.getByRole('searchbox', { name: 'search your reading' })
-    await expect(field).toHaveValue('notes')
+    await expect(page.getByRole('searchbox', { name: 'search your reading' })).toHaveValue('notes')
 
-    await field.clear()
-    await expect(page).toHaveURL(`${installation.url}/digest`)
+    await page.goBack()
+    await expect(page).toHaveURL(`${installation.url}/feeds/2`)
+    await expect(page.getByRole('searchbox', { name: 'search this feed' })).toHaveValue('')
   })
 
   test('shows the matched summary as the grey second line, and no snippet when the title matched', async ({

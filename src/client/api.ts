@@ -13,6 +13,7 @@ import {
   readerArticleSchema,
   readerItemSchema,
   refreshFeedResponseSchema,
+  searchParamsOf,
   searchResultsSchema,
   subscriptionListSchema,
   serviceMetaSchema,
@@ -199,20 +200,13 @@ export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promis
   return digestSchema.parse(await response.json())
 }
 
-/**
- * Searches retained reading metadata only, within the scope; results ranked
- * by match quality blended with recency. The bound travels as `feed=<id>` or
- * `in=saved|subscriptions`; everywhere needs no parameter.
- */
+/** Searches retained reading metadata only, within the scope; results ranked by match quality blended with recency. */
 export async function fetchSearchResults(
   query: string,
   scope: SearchScope,
   signal?: AbortSignal,
 ): Promise<SearchResults> {
-  const params = new URLSearchParams({ q: query })
-  if (scope.kind === 'feed') params.set('feed', String(scope.feedId))
-  if (scope.kind === 'saved' || scope.kind === 'subscriptions') params.set('in', scope.kind)
-  const response = await read(`/api/search?${params}`, signal)
+  const response = await read(`/api/search?${searchParamsOf(query, scope)}`, signal)
   return searchResultsSchema.parse(await response.json())
 }
 

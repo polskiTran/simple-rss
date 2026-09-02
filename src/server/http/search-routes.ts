@@ -18,7 +18,11 @@ export function searchRoutes(deps: SearchRouteDependencies): Hono {
   app.get('/search', (c) => {
     const request = searchRequestSchema.safeParse(c.req.query())
     if (!request.success) {
-      return c.json({ error: { code: 'invalid_request', message: 'A search needs a query' } }, 400, NO_STORE)
+      return c.json(
+        { error: { code: 'invalid_request', message: 'A search takes a query and at most one bound' } },
+        400,
+        NO_STORE,
+      )
     }
 
     const answer = deps.search.search(request.data.query, request.data.scope)

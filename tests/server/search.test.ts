@@ -195,7 +195,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning light')))
 
-    expect(await search(user, 'nonexistent')).toEqual({ feed: null, subscriptions: [], results: [] })
+    expect(await search(user, 'nonexistent')).toEqual({ feedTitle: null, subscriptions: [], results: [] })
   })
 
   it('follows metadata corrections: a retitled item and a renamed Feed', async () => {
@@ -439,7 +439,7 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, coastXml, COAST_URL)
 
-    expect(await search(user, 'drift')).toEqual({ feed: null, subscriptions: [], results: [] })
+    expect(await search(user, 'drift')).toEqual({ feedTitle: null, subscriptions: [], results: [] })
   })
 
   it('jumps by the Custom Title while set, not the reported title', async () => {
@@ -501,7 +501,7 @@ describe('searching retained reading metadata', () => {
 
     const bounded = await search(user, 'slow', 'feed=2')
     expect(bounded.results.map((result) => result.title)).toEqual(['Slow water'])
-    expect(bounded.feed).toEqual({ feedId: 2, title: 'Shore Letters' })
+    expect(bounded.feedTitle).toBe('Shore Letters')
     expect((await search(user, 'shore', 'feed=2')).subscriptions).toEqual([])
   })
 
