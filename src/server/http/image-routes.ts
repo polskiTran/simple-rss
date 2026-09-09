@@ -15,8 +15,8 @@ export interface ImageRouteDependencies {
 }
 
 /**
- * The image proxy accepts a Feed Item identity or a URL extraction itself
- * signed, never an arbitrary target. Refusals that name a wait keep their
+ * The image proxy accepts a Feed Item identity or a signed Reader image URL,
+ * never an arbitrary target. Refusals that name a wait keep their
  * status (429, 503); every other failure is the same 404.
  */
 export function imageRoutes(deps: ImageRouteDependencies): Hono {

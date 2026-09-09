@@ -1,4 +1,6 @@
 import { join } from 'node:path'
+import type { Root, RootContent } from 'mdast'
+import { fromMarkdown } from 'mdast-util-from-markdown'
 import { describe, expect, it } from 'vitest'
 import { DATABASE_FILE } from '../../../src/server/config.js'
 import { openDatabase } from '../../../src/server/persistence/database.js'
@@ -10,6 +12,18 @@ import { claimedDevice } from '../../support/device.js'
 import { startTestService } from '../../support/service-harness.js'
 
 const FEED_URL = 'https://journal.example/feed'
+const PNG_PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+function imagePaths(markdown: string): string[] {
+  function images(node: Root | RootContent): string[] {
+    if (node.type === 'image') return [node.url]
+    return 'children' in node ? node.children.flatMap(images) : []
+  }
+  return images(fromMarkdown(markdown))
+}
 const atom = (fields: string, base = '') =>
   `<feed xmlns="http://www.w3.org/2005/Atom" ${base}><title>Notes</title><entry><id>one</id><title>First light</title><link href="https://journal.example/notes/one"/>${fields}</entry></feed>`
 const rss = (fields: string) =>
@@ -29,6 +43,133 @@ async function ingest(document: string) {
 }
 
 describe('Feed Content in Reader View', () => {
+  it('prefers an image-only body to a separate summary and serves it through the signed proxy', async () => {
+    const { service, read, user, id } = await ingest(
+      rss(
+        '<description>Short preview.</description><content:encoded><![CDATA[<img src="panels/dawn.png" alt="Dawn over the valley"/>]]></content:encoded><enclosure url="https://journal.example/cover.png" type="image/png"/>',
+      ),
+    )
+    const item = await read()
+    expect(item.summary).toBe('Short preview.')
+    expect(item.feedContent).toMatchObject({ truncated: false, readingTimeMinutes: 1 })
+    expect(item.feedContent?.markdown).toMatch(/^!\[Dawn over the valley\]\(\/api\/reader\/image\?/)
+    const path = imagePaths(item.feedContent?.markdown ?? '')[0]
+    if (!path) throw new Error('No Feed Content image')
+    expect(new URL(path, 'https://reader.test').searchParams.get('url')).toBe(
+      'https://journal.example/notes/panels/dawn.png',
+    )
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([FEED_URL])
+    service.upstream.stub('https://journal.example/notes/panels/dawn.png', {
+      headers: { 'content-type': 'image/png' },
+      body: PNG_PIXEL,
+    })
+    expect((await service.fetch(path)).status).toBe(401)
+    const image = await user.get(path)
+    expect(image.status).toBe(200)
+    expect(new Uint8Array(await image.arrayBuffer())).toEqual(new Uint8Array(PNG_PIXEL))
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
+    expect(digest.groups[0]?.items[0]?.imageUrl).toBe(`/api/items/${id}/image`)
+  })
+  it.each([
+    'javascript:alert(1)',
+    'data:image/png;base64,aGVsbG8=',
+    'file:///tmp/panel.png',
+    'blob:https://journal.example/id',
+    'https://user:secret@journal.example/panel.png',
+    'http://',
+    '',
+    ' ',
+  ])('does not count the rejected image destination %s as renderable Feed Content', async (src) => {
+    const { read, service } = await ingest(
+      rss(
+        `<content:encoded><![CDATA[<img src="${src}" alt="Rejected illustration"/>]]></content:encoded><description>Usable summary.</description>`,
+      ),
+    )
+    expect((await read()).feedContent?.markdown).toBe('Usable summary.')
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([FEED_URL])
+  })
+
+  it('keeps an image-only Atom summary even without alternative text or an original link', async () => {
+    const { read } = await ingest(
+      atom('<summary type="html">&lt;img src="panel.png"/&gt;</summary>').replace(
+        '<link href="https://journal.example/notes/one"/>',
+        '',
+      ),
+    )
+    const item = await read()
+    expect(item.summary).toBeNull()
+    expect(item.link).toBeNull()
+    expect(item.feedContent?.markdown).toMatch(/^!\[\]\(\/api\/reader\/image\?/)
+    expect(
+      imagePaths(item.feedContent?.markdown ?? '').map((path) =>
+        new URL(path, 'https://reader.test').searchParams.get('url'),
+      ),
+    ).toEqual(['https://journal.example/panel.png'])
+  })
+
+  it.each([
+    [
+      'RSS declarations',
+      rss('<description><![CDATA[<img src="panel.png"/>]]></description>')
+        .replace('<channel>', '<channel xml:base="assets/">')
+        .replace('<item>', '<item xml:base="comic/">'),
+      'https://journal.example/assets/comic/panel.png',
+    ],
+    [
+      'Atom Feed base',
+      atom(
+        '<content type="html">&lt;img src="panel.png"/&gt;</content><summary>Separate preview.</summary>',
+        'xml:base="https://cdn.example/comics/"',
+      ),
+      'https://cdn.example/comics/panel.png',
+    ],
+    [
+      'Atom entry base',
+      atom(
+        '<content type="xhtml"><div><img src="panel.png"/></div></content><summary>Separate preview.</summary>',
+      ).replace('<entry>', '<entry xml:base="comics/">'),
+      'https://journal.example/comics/panel.png',
+    ],
+    [
+      'nested XHTML declarations',
+      atom(
+        '<content type="xhtml" xml:base="assets/"><x:div xmlns:x="http://www.w3.org/1999/xhtml" xml:base="comic/"><x:img xml:base="../panels/" src="dawn.png?size=2&amp;quality=1"/></x:div></content><summary>Separate preview.</summary>',
+      ),
+      'https://journal.example/assets/panels/dawn.png?size=2&quality=1',
+    ],
+  ])('resolves image destinations using %s before persistence', async (_name, document, target) => {
+    const { read, service } = await ingest(document)
+    const paths = imagePaths((await read()).feedContent?.markdown ?? '')
+    expect(paths.map((path) => new URL(path, 'https://reader.test').searchParams.get('url'))).toEqual([target])
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([FEED_URL])
+  })
+
+  it('preserves the image-only fallback inside a linked picture without choosing or retrieving responsive sources', async () => {
+    const { read, service } = await ingest(
+      rss(
+        '<content:encoded><![CDATA[<a href="/comic"><picture xml:base="panels/"><source srcset="https://cdn.example/large.png 2x"/><img src="dawn.png" alt="Dawn"/></picture></a>]]></content:encoded><description>Separate preview.</description>',
+      ),
+    )
+    const content = (await read()).feedContent?.markdown ?? ''
+    expect(imagePaths(content).map((path) => new URL(path, 'https://reader.test').searchParams.get('url'))).toEqual([
+      'https://journal.example/panels/dawn.png',
+    ])
+    expect(content).toContain('![Dawn]')
+    expect(content).toContain('](https://journal.example/comic)')
+    expect(content).not.toContain('Separate preview.')
+    expect(content).not.toContain('large.png')
+    expect(service.upstream.requests.map((request) => request.url)).toEqual([FEED_URL])
+  })
+
+  it('leaves no Feed Content when every image is rejected and no text is supplied', async () => {
+    const { read } = await ingest(
+      rss(
+        '<description><![CDATA[<img src="data:image/svg+xml,bad" alt="Rejected"/><img alt="Missing destination"/>]]></description>',
+      ),
+    )
+    expect((await read()).feedContent).toBeNull()
+  })
+
   it('stores rich content separately from the publisher summary without retrieving the original', async () => {
     const { service, read, user } = await ingest(
       rss(
@@ -55,7 +196,7 @@ describe('Feed Content in Reader View', () => {
     [
       'active-only preferred content',
       rss(
-        '<content:encoded><![CDATA[<script>bad()</script><img src="https://tracker.example/pixel"/>]]></content:encoded><description><![CDATA[<p>A <strong>rich description</strong>.</p>]]></description>',
+        '<content:encoded><![CDATA[<script>bad()</script><img src="data:image/png;base64,bad"/>]]></content:encoded><description><![CDATA[<p>A <strong>rich description</strong>.</p>]]></description>',
       ),
       '**rich description**',
     ],
@@ -161,7 +302,7 @@ describe('Feed Content in Reader View', () => {
     }
   })
 
-  it('keeps allowed structure and readable rejected links, but no active markup or publisher images', async () => {
+  it('keeps allowed structure and readable rejected links, but no active markup or direct publisher images', async () => {
     const { read } = await ingest(
       rss(`<description><![CDATA[
       <blockquote><p>A steady hand.</p></blockquote><ol><li>One<ul><li>Nested</li></ul></li></ol>
@@ -183,8 +324,9 @@ describe('Feed Content in Reader View', () => {
     expect(content).toContain('$$e^{i\\pi} = -1$$')
     expect(content).toContain('Readable unsafe link')
     expect(content).toContain('Readable data link')
+    expect(imagePaths(content ?? '')).toHaveLength(1)
     expect(content).not.toMatch(
-      /hostile|evil|Subscribe now|SVG payload|javascript:|data:|tracker.example|<script|<iframe/,
+      /hostile|evil|Subscribe now|SVG payload|javascript:|data:|https:\/\/tracker.example|<script|<iframe/,
     )
   })
 
@@ -216,6 +358,22 @@ describe('Feed Content in Reader View', () => {
 })
 
 describe('Feed Content conversion limits', () => {
+  it('keeps an oversized image-only body usable within the storage bound, allowing response-time signature expansion', async () => {
+    const { read } = await ingest(
+      rss(`<description><![CDATA[<img src="/panel.png" alt="${'朝🌄 '.repeat(60_000)}"/>]]></description>`),
+    )
+    const content = (await read()).feedContent
+    expect(content?.truncated).toBe(true)
+    expect(imagePaths(content?.markdown ?? '')).toHaveLength(1)
+    expect(content?.markdown).toContain('朝🌄 ')
+    expect(content?.markdown).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u)
+    // The signature is delivery overhead, not part of the stored body budget.
+    expect(Buffer.byteLength(content?.markdown ?? '')).toBeGreaterThan(256 * 1024)
+    const path = imagePaths(content?.markdown ?? '')[0]
+    if (!path) throw new Error('No bounded image')
+    const durable = content?.markdown.replace(path.replaceAll('&', '\\&'), 'https://journal.example/panel.png') ?? ''
+    expect(Buffer.byteLength(durable)).toBeLessThanOrEqual(256 * 1024)
+  })
   it('records a list cut at the node limit even when no later block follows', async () => {
     const { read } = await ingest(rss(`<description><![CDATA[<ul>${'<li>x</li>'.repeat(20_001)}</ul>]]></description>`))
     expect((await read()).feedContent).toMatchObject({ truncated: true })
@@ -258,16 +416,50 @@ describe('Feed Content conversion limits', () => {
 })
 
 describe('Feed Content lifecycle', () => {
+  it('refreshes image signatures after expiry and restart without re-ingestion or original-webpage retrieval', async () => {
+    const { read, service, user, id } = await ingest(
+      rss(
+        '<description><![CDATA[<figure><img src="/panel.png" alt="The valley"/><figcaption>A quiet morning.</figcaption></figure>]]></description>',
+      ),
+    )
+    service.upstream.stub('https://journal.example/panel.png', {
+      headers: { 'content-type': 'image/png' },
+      body: PNG_PIXEL,
+    })
+    const earlier = imagePaths((await read()).feedContent?.markdown ?? '')[0]
+    if (!earlier) throw new Error('No initial image')
+    expect((await user.get(earlier)).status).toBe(200)
+    service.clock.advance(3 * 24 * 60 * 60 * 1000)
+    expect((await user.get(earlier)).status).toBe(404)
+    const response = await user.get(`/api/items/${id}`)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    const item = readerItemSchema.parse(await response.json())
+    const fresh = imagePaths(item.feedContent?.markdown ?? '')[0]
+    if (!fresh) throw new Error('No refreshed image')
+    expect(fresh).not.toBe(earlier)
+    expect(item.feedContent?.markdown).toContain('A quiet morning.')
+    expect((await user.get(fresh)).status).toBe(200)
+    await service.restart()
+    expect((await user.get(fresh)).status).toBe(404)
+    const restarted = imagePaths((await read()).feedContent?.markdown ?? '')[0]
+    if (!restarted) throw new Error('No image after restart')
+    expect((await user.get(restarted)).status).toBe(200)
+    expect(service.upstream.requestsTo(FEED_URL)).toHaveLength(1)
+    expect(service.upstream.requestsTo('https://journal.example/notes/one')).toHaveLength(0)
+    expect(service.upstream.requestsTo('https://journal.example/panel.png')).toHaveLength(3)
+  })
   it('updates reappearing Feed Content without changing identity, first-seen time or Library membership', async () => {
     const { read, service, user, id } = await ingest(
-      rss('<description>Preview.</description><content:encoded>First body.</content:encoded>'),
+      rss(
+        '<description>Preview.</description><content:encoded><![CDATA[<p>First body.</p><img src="/first.png"/>]]></content:encoded>',
+      ),
     )
     await user.put(`/api/library/${id}`)
     const original = await read()
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/xml' },
       body: rss(
-        '<description>Corrected preview.</description><content:encoded><![CDATA[<h2>Corrected body</h2>]]></content:encoded>',
+        '<description>Corrected preview.</description><content:encoded><![CDATA[<h2>Corrected body</h2><img src="/corrected.png"/>]]></content:encoded>',
       ),
     })
     service.clock.advance(3 * 60 * 60 * 1000)
@@ -277,9 +469,12 @@ describe('Feed Content lifecycle', () => {
     expect(corrected.firstSeenAt).toBe(original.firstSeenAt)
     expect(corrected.saved).toBe(true)
     expect(corrected.summary).toBe('Corrected preview.')
-    expect(corrected.feedContent?.markdown).toBe('## Corrected body')
-    await service.restart()
-    expect((await read()).feedContent).toEqual(corrected.feedContent)
+    expect(corrected.feedContent?.markdown).toContain('## Corrected body')
+    expect(
+      imagePaths(corrected.feedContent?.markdown ?? '').map((path) =>
+        new URL(path, 'https://reader.test').searchParams.get('url'),
+      ),
+    ).toEqual(['https://journal.example/corrected.png'])
     expect(service.upstream.requestsTo('https://journal.example/notes/one')).toHaveLength(0)
   })
 
@@ -287,26 +482,35 @@ describe('Feed Content lifecycle', () => {
     'retains Feed Content outside the Feed Window until Retention judges its Feed Item (saved=%s)',
     async (saved) => {
       const { read, service, user, id } = await ingest(
-        rss('<description><![CDATA[<p>A <strong>durable</strong> body.</p>]]></description>'),
+        rss('<description><![CDATA[<p>A <strong>durable</strong> body.</p><img src="/durable.png"/>]]></description>'),
       )
       if (saved) await user.put(`/api/library/${id}`)
-      const original = (await read()).feedContent
+      const expectDurableContent = async () => {
+        const content = (await read()).feedContent
+        expect(content?.markdown).toContain('A **durable** body.')
+        expect(
+          imagePaths(content?.markdown ?? '').map((path) =>
+            new URL(path, 'https://reader.test').searchParams.get('url'),
+          ),
+        ).toEqual(['https://journal.example/durable.png'])
+      }
+      await expectDurableContent()
       service.upstream.stub(FEED_URL, {
         headers: { 'content-type': 'application/xml' },
         body: '<rss><channel><title>Notes</title></channel></rss>',
       })
       service.clock.advance(3 * 60 * 60 * 1000)
       await service.wakeScheduler()
-      expect((await read()).feedContent).toEqual(original)
+      await expectDurableContent()
       service.clock.advance(91 * 24 * 60 * 60 * 1000)
       await service.wakeScheduler()
       expect((await user.signIn()).status).toBe(200)
       expect((await user.get(`/api/items/${id}`)).status).toBe(saved ? 200 : 404)
       if (saved) {
-        expect((await read()).feedContent).toEqual(original)
+        await expectDurableContent()
         await user.delete(`/api/feeds/${(await read()).feedId}`)
         await service.wakeScheduler()
-        expect((await read()).feedContent).toEqual(original)
+        await expectDurableContent()
         await user.delete(`/api/library/${id}`)
         await service.wakeScheduler()
         expect((await user.get(`/api/items/${id}`)).status).toBe(404)

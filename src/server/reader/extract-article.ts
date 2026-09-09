@@ -87,7 +87,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     const policyStartedAt = performance.now()
     const markdown = applyReaderMarkdownPolicy(result.contentMarkdown ?? '', {
       baseUrl: input.url,
-      ...(input.signImageUrl ? { signImageUrl: input.signImageUrl } : {}),
+      ...(input.signImageUrl ? { images: input.signImageUrl } : {}),
     })
     timings.markdownPolicyMs = elapsedMs(policyStartedAt)
     if (!markdown) return { article: undefined, timings }

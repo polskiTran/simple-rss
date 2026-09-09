@@ -185,7 +185,7 @@ function normalizeItem(
     atom ? asRecord(linkElement)['@_href'] : linkElement,
     xmlBase(asRecord(linkElement), itemBase),
   )
-  // Declared XML bases outrank the item address; without one, HTML links use
+  // Declared XML bases outrank the item address; without one, HTML destinations use
   // the original page, then the Feed address as their natural context.
   const contentBase = record['@_xml:base'] !== undefined || inheritedBase ? itemBase : (link ?? itemBase)
   const preferred = recordField(record, atom ? ['content', 'atom:content'] : ['content:encoded'])
@@ -193,7 +193,7 @@ function normalizeItem(
   const normalize = (value: unknown) => contentOf(value, atom, itemBase, contentBase)
   const publisherSummary = normalize(summaryField)
   const feedContent = normalize(preferred) ?? publisherSummary
-  const summary = (publisherSummary ?? feedContent)?.plainText.slice(0, MAX_SUMMARY_LENGTH) ?? null
+  const summary = (publisherSummary?.plainText || feedContent?.plainText)?.slice(0, MAX_SUMMARY_LENGTH) || null
   const publishedAt = normalizeDate(
     recordField(record, atom ? ['published', 'updated', 'atom:published', 'atom:updated'] : ['pubDate', 'dc:date']),
   )

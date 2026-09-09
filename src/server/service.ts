@@ -108,6 +108,7 @@ export function createService(options: ServiceOptions): Service {
       retrieval,
       digest,
       extractor,
+      signImageUrl: imageSignature.sign,
       logger,
       ...(options.readerBudgetMs === undefined ? {} : { budgetMs: options.readerBudgetMs }),
     })

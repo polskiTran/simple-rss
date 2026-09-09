@@ -53,6 +53,11 @@ test.describe('Reader View', () => {
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
       await expect(page.locator('.article-body em')).toHaveText('carefully')
       await expect(page.locator('.article-body li')).toHaveText('Keep a steady hand')
+      const illustration = page.getByRole('img', { name: 'The valley in the Feed' })
+      await expect(illustration).toHaveAttribute('src', /^\/api\/reader\/image\?url=.+&exp=\d+&sig=[\w-]+$/)
+      await expect(illustration).toHaveAttribute('loading', 'lazy')
+      await expect(illustration).toHaveJSProperty('naturalWidth', 1)
+      await expect(page.getByText('The first light from the Feed.')).toBeVisible()
     } finally {
       held.resolve()
     }
@@ -312,8 +317,44 @@ test.describe('Reader View at phone width', () => {
     await expect(page.getByRole('link', { name: 'unsafe link text' })).toHaveCount(0)
     await expect(page.locator('.article-body pre code')).toContainText('measure(tide)')
     await expect(page.locator('.article-body table')).toBeVisible()
-    await expect(page.locator('.article-body img, .article-body script, .article-body iframe')).toHaveCount(0)
+    const illustration = page.getByRole('img', { name: 'Low tide on the coast' })
+    await expect(illustration).toHaveAttribute('src', /^\/api\/reader\/image\?url=.+&exp=\d+&sig=[\w-]+$/)
+    await expect(illustration).toHaveJSProperty('naturalWidth', 1)
+    await expect(page.getByText('A study of the shore.')).toBeVisible()
+    await expect(page.locator('.article-image-fallback')).toHaveText('Unavailable tide chart')
+    await expect(page.locator('.article-body img')).toHaveCount(1)
+    await expect(page.locator('.article-body script, .article-body iframe')).toHaveCount(0)
     await expect(page.getByText('Beyond the application limit.')).toHaveCount(0)
+    await expectNoHorizontalOverflow(page)
+    expect(publisherRequests).toEqual([])
+  })
+
+  test('makes an image-only fallback useful, including alternative text when the image fails', async ({
+    page,
+    installation,
+  }) => {
+    const publisherRequests: string[] = []
+    page.on('request', (request) => {
+      if (!request.url().startsWith(installation.url)) publisherRequests.push(request.url())
+    })
+    await subscribe(page, installation, installation.imageOnlyFeedUrl)
+    await page.getByRole('link', { name: 'digest' }).click()
+    await page.getByRole('link', { name: 'Moonrise' }).click()
+    await expect(page.getByRole('button', { name: 'retry parsing' })).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('from the feed')
+    await expect(page.getByText('A separate preview, not the drawing.')).toHaveCount(0)
+    const image = page.getByRole('img', { name: 'The moon rises over a sleeping valley' })
+    await expect(image).toBeVisible()
+    await expect(image).toHaveAttribute('src', /^\/api\/reader\/image\?url=.+&exp=\d+&sig=[\w-]+$/)
+    await expect(image).toHaveAttribute('loading', 'lazy')
+    await expect(image).toHaveJSProperty('naturalWidth', 1)
+    await expectNoHorizontalOverflow(page)
+
+    await page.route('**/api/reader/image?*', (route) => route.fulfill({ status: 404 }))
+    await page.reload()
+    await expect(page.locator('.article-image-fallback')).toHaveText('The moon rises over a sleeping valley')
+    await expect(page.getByRole('heading', { name: 'Moonrise' })).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('from the feed')
     await expectNoHorizontalOverflow(page)
     expect(publisherRequests).toEqual([])
   })

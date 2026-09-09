@@ -4,6 +4,8 @@ import type { ReaderArticle, ReaderDeadlineStage, ReaderItem } from '../../share
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
+import type { SignImageUrl } from '../images/image-url-signature.js'
+import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
 import type { LogField, LogFields, Logger } from '../logger.js'
 import { elapsedMs } from '../monotonic.js'
 import { readingInformation } from '../markdown/reading-information.js'
@@ -69,6 +71,7 @@ export class ReaderService {
   readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
+  readonly #signImageUrl: SignImageUrl
   readonly #extractor: ReaderExtractor
   readonly #logger: Logger
   readonly #budgetMs: number
@@ -83,6 +86,7 @@ export class ReaderService {
     retrieval: Retrieval
     digest: DigestService
     extractor: ReaderExtractor
+    signImageUrl: SignImageUrl
     logger: Logger
     budgetMs?: number
   }) {
@@ -92,6 +96,7 @@ export class ReaderService {
     this.#retrieval = options.retrieval
     this.#digest = options.digest
     this.#extractor = options.extractor
+    this.#signImageUrl = options.signImageUrl
     this.#logger = options.logger
     this.#budgetMs = options.budgetMs ?? READER_BUDGET_MS
   }
@@ -136,7 +141,8 @@ export class ReaderService {
       summary: row.summary,
       feedContent: row.feedContentMarkdown
         ? {
-            markdown: row.feedContentMarkdown,
+            // Stored destinations are absolute; no original webpage is needed to refresh capabilities.
+            markdown: applyReaderMarkdownPolicy(row.feedContentMarkdown, { images: this.#signImageUrl }),
             truncated: row.feedContentTruncated !== 0,
             readingTimeMinutes: readingInformation(row.feedContentMarkdown).readingTimeMinutes,
           }

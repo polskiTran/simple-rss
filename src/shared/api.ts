@@ -477,13 +477,11 @@ export const readerNextSchema = z.object({
 })
 export type ReaderNext = z.infer<typeof readerNextSchema>
 
+/** Durable Markdown budget; response-time image signatures add delivery overhead. */
 export const FEED_CONTENT_MAX_BYTES = 256 * 1024
 
 export const feedContentSchema = z.object({
-  markdown: z
-    .string()
-    .min(1)
-    .refine((value) => utf8ByteLength(value) <= FEED_CONTENT_MAX_BYTES),
+  markdown: z.string().min(1),
   truncated: z.boolean(),
   readingTimeMinutes: z.number().int().positive(),
 })

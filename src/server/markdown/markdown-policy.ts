@@ -43,10 +43,10 @@ const SERIALIZER_OPTIONS = {
 const CODE_LANGUAGE = /^[\w+#.-]+$/u
 
 export interface ReaderMarkdownPolicyOptions {
-  /** The source address after resolving declared bases and Retrieval redirects. */
-  readonly baseUrl: string
-  /** Images are omitted unless they can be replaced with a signed Reader path. */
-  readonly signImageUrl?: (url: string) => string
+  /** The source address after resolving declared bases and Retrieval redirects; stored destinations are already absolute. */
+  readonly baseUrl?: string
+  /** Keep durable destinations for storage, or sign them for Reader delivery. Omitted means no images. */
+  readonly images?: 'preserve' | ((url: string) => string)
 }
 
 type PolicyContext = ReaderMarkdownPolicyOptions
@@ -186,7 +186,7 @@ function policyLink(node: Link, context: PolicyContext): PhrasingContent[] {
 
   const link: Link = {
     type: 'link',
-    url,
+    url: url.href,
     children,
     ...(node.title ? { title: node.title } : {}),
   }
@@ -194,24 +194,24 @@ function policyLink(node: Link, context: PolicyContext): PhrasingContent[] {
 }
 
 function policyImage(node: Image, context: PolicyContext): PhrasingContent[] {
-  if (!context.signImageUrl) return []
+  if (!context.images) return []
   const alt = node.alt?.trim() ?? ''
   const url = absoluteHttpUrl(node.url, context.baseUrl)
-  if (!url) return []
+  if (!url || url.username || url.password) return []
 
   const image: Image = {
     type: 'image',
-    url: context.signImageUrl(url),
+    url: context.images === 'preserve' ? url.href : context.images(url.href),
     alt,
     ...(node.title ? { title: node.title } : {}),
   }
   return [image]
 }
 
-function absoluteHttpUrl(candidate: string, baseUrl: string): string | undefined {
+function absoluteHttpUrl(candidate: string, baseUrl: string | undefined): URL | undefined {
   try {
     const url = new URL(candidate, baseUrl)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : undefined
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : undefined
   } catch {
     return undefined
   }

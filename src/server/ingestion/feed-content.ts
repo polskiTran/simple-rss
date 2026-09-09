@@ -32,7 +32,11 @@ export function normalizeFeedContent(
   context: FeedContentContext,
 ): NormalizedFeedContent | null {
   const input = unicodePrefix(source, MAX_INPUT_CHARACTERS)
-  const budget = { nodes: MAX_NODES, linkCharacters: MAX_INPUT_CHARACTERS, truncated: input.length < source.length }
+  const budget = {
+    nodes: MAX_NODES,
+    destinationCharacters: MAX_INPUT_CHARACTERS,
+    truncated: input.length < source.length,
+  }
   const tree: Root =
     format === 'text'
       ? { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', value: input }] }] }
@@ -45,15 +49,17 @@ export function normalizeFeedContent(
             0,
           ),
         }
-  const safe = readerMarkdownTree(tree, { baseUrl: context.linkBase })
+  const safe = readerMarkdownTree(tree, { baseUrl: context.linkBase, images: 'preserve' })
   const plainText = textOf(safe).replace(/\s+/g, ' ').trim()
-  if (!plainText) return null
+  if (!plainText && !containsImage(safe)) return null
   const full = serializeReaderMarkdown(safe)
   const stored = boundedMarkdown(safe, full)
-  return { markdown: stored.markdown, truncated: budget.truncated || stored.truncated, plainText }
+  return stored.markdown
+    ? { markdown: stored.markdown, truncated: budget.truncated || stored.truncated, plainText }
+    : null
 }
 
-type Budget = { nodes: number; linkCharacters: number; truncated: boolean }
+type Budget = { nodes: number; destinationCharacters: number; truncated: boolean }
 
 /** Exhaustion stops all walkers and records application truncation. */
 function consumeNode(budget: Budget, depth: number): boolean {
@@ -223,36 +229,64 @@ function htmlPhrase(element: HtmlNode, context: FeedContentContext, budget: Budg
   if (tag === 'br') return [{ type: 'break' }]
   if (tag === 'code' || tag === 'kbd' || tag === 'samp')
     return [{ type: 'inlineCode', value: element.textContent ?? '' }]
+  if (tag === 'img') {
+    const url = destination(element.getAttribute('src'), base.linkBase, budget)
+    return url
+      ? [{ type: 'image', url, alt: element.getAttribute('alt') ?? '', title: element.getAttribute('title') }]
+      : []
+  }
   if (tag === 'math') {
     const tex = element.querySelector('annotation[encoding="application/x-tex"]')?.textContent
     return tex ? [{ type: 'inlineMath', value: tex }] : []
   }
-  if (!['a', 'em', 'i', 'strong', 'b', 'span', 's', 'del', 'small', 'sub', 'sup', 'u', 'mark', 'abbr'].includes(tag))
+  if (
+    ![
+      'a',
+      'em',
+      'i',
+      'strong',
+      'b',
+      'span',
+      's',
+      'del',
+      'small',
+      'sub',
+      'sup',
+      'u',
+      'mark',
+      'abbr',
+      'picture',
+    ].includes(tag)
+  )
     return []
   const children = htmlPhrases(element.childNodes, base, budget, depth)
   if (tag === 'em' || tag === 'i') return [{ type: 'emphasis', children }]
   if (tag === 'strong' || tag === 'b') return [{ type: 'strong', children }]
   if (tag === 'a') {
-    const href = element.getAttribute('href')
-    if (!href) return children
-    if (href.length > 4096) {
-      budget.truncated = true
-      return children
-    }
-    try {
-      const url = new URL(href, base.linkBase).href
-      // A long inherited base can multiply a tiny relative href across many links.
-      if (url.length > 4096 || url.length > budget.linkCharacters) {
-        budget.truncated = true
-        return children
-      }
-      budget.linkCharacters -= url.length
-      return [{ type: 'link', url, children }]
-    } catch {
-      return children
-    }
+    const url = destination(element.getAttribute('href'), base.linkBase, budget)
+    return url ? [{ type: 'link', url, children }] : children
   }
   return children
+}
+
+/** Bound both authored destinations and amplification from inherited bases. */
+function destination(candidate: string | null, baseUrl: string, budget: Budget): string | undefined {
+  if (!candidate?.trim()) return undefined
+  if (candidate.length > 4096) {
+    budget.truncated = true
+    return undefined
+  }
+  try {
+    const url = new URL(candidate, baseUrl).href
+    if (url.length > 4096 || url.length > budget.destinationCharacters) {
+      budget.truncated = true
+      return undefined
+    }
+    budget.destinationCharacters -= url.length
+    return url
+  } catch {
+    return undefined
+  }
 }
 
 /** XML declarations inherit from the document, never the alternate webpage fallback. */
@@ -265,6 +299,10 @@ function declaredBase(element: HtmlNode, context: FeedContentContext): FeedConte
   } catch {
     return context
   }
+}
+
+function containsImage(node: Root | RootContent): boolean {
+  return node.type === 'image' || ('children' in node && node.children.some(containsImage))
 }
 
 function textOf(node: Root | RootContent): string {
@@ -296,6 +334,15 @@ function boundedMarkdown(tree: Root, full: string) {
 }
 
 function prefixTree<Node extends Root | RootContent>(node: Node, budget: { remaining: number }): Node {
+  if (node.type === 'image') {
+    // Keep the destination whole; alternative text and title can form a readable prefix.
+    budget.remaining -= node.url.length + 1
+    const alt = unicodePrefix(node.alt ?? '', Math.max(0, budget.remaining))
+    budget.remaining -= alt.length
+    const title = unicodePrefix(node.title ?? '', Math.max(0, budget.remaining))
+    budget.remaining -= title.length
+    return { ...node, alt, title }
+  }
   if ('value' in node) {
     const value = unicodePrefix(node.value, Math.max(0, budget.remaining))
     budget.remaining -= value.length
