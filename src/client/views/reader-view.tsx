@@ -82,6 +82,8 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   }
 
   const item = itemState.value
+  const displayed = articleState.kind === 'loaded' ? articleState.value : item.feedContent
+  const showingFeedContent = articleState.kind !== 'loaded' && item.feedContent !== null
   const next = item.nextInDigest
   const setSaved = (saved: boolean) => setItem((current) => ({ ...current, saved }))
   const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'parsing the original page'
@@ -106,7 +108,8 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         <p className="content-meta reader-meta">
           <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
           <span>{item.displayDate}</span>
-          {articleState.kind === 'loaded' ? <span>{articleState.value.readingTimeMinutes} min</span> : null}
+          {displayed ? <span>{displayed.readingTimeMinutes} min</span> : null}
+          {displayed ? <span>{showingFeedContent ? 'from the feed' : 'original webpage'}</span> : null}
           {item.link ? (
             <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
               open original
@@ -115,12 +118,23 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
         </p>
       </header>
 
-      {articleState.kind === 'loading' ? waitingContent : null}
-      {articleState.kind === 'loaded' ? (
-        <Suspense fallback={waitingContent}>
-          <ArticleMarkdown markdown={articleState.value.markdown} />
-          <MarkdownCommitted />
+      {showingFeedContent && item.feedContent?.truncated ? (
+        <p className="empty-note" role="status">
+          {item.link ? 'shortened by simple — open original for more' : 'shortened by simple'}
+        </p>
+      ) : null}
+      {displayed ? (
+        <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
+          <ArticleMarkdown markdown={displayed.markdown} />
+          {articleState.kind === 'loaded' ? <MarkdownCommitted /> : null}
         </Suspense>
+      ) : null}
+      {articleState.kind === 'loading' ? (
+        displayed ? (
+          <LoadingNote className="empty-note">{waitingNote}</LoadingNote>
+        ) : (
+          waitingContent
+        )
       ) : null}
       {articleState.kind === 'unavailable' || articleState.kind === 'unreachable' ? (
         <Fallback
@@ -205,7 +219,7 @@ interface FallbackProps {
 function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
   return (
     <div className="reader-fallback" role="status">
-      {item.summary ? (
+      {!item.feedContent && item.summary ? (
         <p className="reader-summary">{item.summary}</p>
       ) : (
         <p className="empty-note">

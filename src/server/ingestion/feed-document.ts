@@ -2,6 +2,7 @@ import { hasOwn } from '../../shared/record.js'
 import { createHash } from 'node:crypto'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { convert } from 'html-to-text'
+import { normalizeFeedContent, type NormalizedFeedContent } from './feed-content.js'
 import { arrayOf, asRecord, declaresXmlEntities } from './xml.js'
 
 const MAX_TITLE_LENGTH = 512
@@ -18,6 +19,7 @@ export interface NormalizedFeedItem {
   readonly publishedAt: string | null
   readonly imageUrl: string | null
   readonly summary: string | null
+  readonly feedContent: NormalizedFeedContent | null
 }
 
 export interface ParsedFeedDocument {
@@ -43,7 +45,7 @@ export class FeedDocumentError extends Error {
 
 /**
  * XML declarations able to introduce external entities are rejected before parsing;
- * publisher HTML is converted to plain text and never leaves here.
+ * publisher HTML becomes safe Feed Content and a separate plain-text summary.
  *
  * `priorUrls` are the other URLs this retrieval was reached through — entered and
  * requested — so a declared site naming a pre-redirect address is still the Feed itself.
@@ -110,7 +112,14 @@ function parseRss(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
   const title = requiredFeedTitle(recordField(record, ['title']), baseUrl)
   const description = boundedPlainText(recordField(record, ['description']), MAX_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(recordField(record, ['link']), baseUrl, feedUrls)
-  const items = arrayOf(recordField(record, ['item'])).map((item) => normalizeItem(asRecord(item), baseUrl, false))
+  const items = arrayOf(recordField(record, ['item'])).map((item) =>
+    normalizeItem(
+      asRecord(item),
+      xmlBase(record, xmlBase(asRecord(root), baseUrl)),
+      false,
+      record['@_xml:base'] !== undefined || asRecord(root)['@_xml:base'] !== undefined,
+    ),
+  )
   return { title, description, homePageUrl, items }
 }
 
@@ -120,7 +129,9 @@ function parseAtom(root: unknown, baseUrl: string, feedUrls: readonly string[]):
   const description = boundedPlainText(recordField(record, ['subtitle', 'atom:subtitle']), MAX_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(atomLink(record, 'alternate'), baseUrl, feedUrls)
   const entries = recordField(record, ['entry', 'atom:entry'])
-  const items = arrayOf(entries).map((entry) => normalizeItem(asRecord(entry), baseUrl, true))
+  const items = arrayOf(entries).map((entry) =>
+    normalizeItem(asRecord(entry), xmlBase(record, baseUrl), true, record['@_xml:base'] !== undefined),
+  )
   return { title, description, homePageUrl, items }
 }
 
@@ -134,7 +145,9 @@ function parseRdf(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
   const title = requiredFeedTitle(recordField(channel, ['title']), baseUrl)
   const description = boundedPlainText(recordField(channel, ['description']), MAX_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(recordField(channel, ['link']), baseUrl, feedUrls)
-  const items = arrayOf(recordField(record, ['item'])).map((item) => normalizeItem(asRecord(item), baseUrl, false))
+  const items = arrayOf(recordField(record, ['item'])).map((item) =>
+    normalizeItem(asRecord(item), xmlBase(record, baseUrl), false, record['@_xml:base'] !== undefined),
+  )
   return { title, description, homePageUrl, items }
 }
 
@@ -159,16 +172,28 @@ function pageKey(value: string): string {
   return `${url.host}${url.pathname.replace(/\/$/, '')}${url.search}`
 }
 
-function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: boolean): NormalizedFeedItem {
+function normalizeItem(
+  record: Record<string, unknown>,
+  baseUrl: string,
+  atom: boolean,
+  inheritedBase: boolean,
+): NormalizedFeedItem {
   const title = boundedPlainText(recordField(record, ['title', 'atom:title']), MAX_TITLE_LENGTH)
-  const summary = boundedPlainText(
-    recordField(
-      record,
-      atom ? ['summary', 'content', 'atom:summary', 'atom:content'] : ['description', 'content:encoded'],
-    ),
-    MAX_SUMMARY_LENGTH,
+  const itemBase = xmlBase(record, baseUrl)
+  const linkElement = atom ? atomLinkElement(record, 'alternate') : recordField(record, ['link'])
+  const link = normalizeHttpUrl(
+    atom ? asRecord(linkElement)['@_href'] : linkElement,
+    xmlBase(asRecord(linkElement), itemBase),
   )
-  const link = normalizeHttpUrl(atom ? atomLink(record, 'alternate') : recordField(record, ['link']), baseUrl)
+  // Declared XML bases outrank the item address; without one, HTML links use
+  // the original page, then the Feed address as their natural context.
+  const contentBase = record['@_xml:base'] !== undefined || inheritedBase ? itemBase : (link ?? itemBase)
+  const preferred = recordField(record, atom ? ['content', 'atom:content'] : ['content:encoded'])
+  const summaryField = recordField(record, atom ? ['summary', 'atom:summary'] : ['description'])
+  const normalize = (value: unknown) => contentOf(value, atom, itemBase, contentBase)
+  const publisherSummary = normalize(summaryField)
+  const feedContent = normalize(preferred) ?? publisherSummary
+  const summary = (publisherSummary ?? feedContent)?.plainText.slice(0, MAX_SUMMARY_LENGTH) ?? null
   const publishedAt = normalizeDate(
     recordField(record, atom ? ['published', 'updated', 'atom:published', 'atom:updated'] : ['pubDate', 'dc:date']),
   )
@@ -185,6 +210,7 @@ function normalizeItem(record: Record<string, unknown>, baseUrl: string, atom: b
     publishedAt,
     imageUrl,
     summary,
+    feedContent,
   }
 }
 
@@ -269,10 +295,8 @@ function boundedPlainText(value: unknown, limit: number): string | null {
   const raw = plainValue(value)
   if (!raw) return null
 
-  // Stop nodes arrive raw. CDATA already wraps literal markup; outside it, XML entities
-  // are still encoded — `&lt;p&gt;` is markup to interpret — so decode once before the HTML-to-text pass.
-  const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(raw)
-  const source = cdata?.[1] ?? decodeXmlEntities(raw)
+  // Stop nodes arrive raw; unwrap CDATA and decode only the surrounding XML text.
+  const source = decodeXmlText(raw)
 
   const text = convert(source, {
     wordwrap: false,
@@ -309,6 +333,13 @@ function decodeXmlEntities(text: string): string {
       return entity
     }
   })
+}
+
+/** Decode each XML text segment once; CDATA may be interleaved with escaped text. */
+function decodeXmlText(text: string): string {
+  return text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>|&(?:#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, cdata) =>
+    typeof cdata === 'string' ? cdata : decodeXmlEntities(match),
+  )
 }
 
 function plainValue(value: unknown): string | null {
@@ -358,4 +389,27 @@ function decodeXml(bytes: Uint8Array): string {
   } catch {
     throw new FeedDocumentError('malformed_feed', 'Feed text encoding is invalid or unsupported')
   }
+}
+
+function xmlBase(record: Record<string, unknown>, baseUrl: string): string {
+  try {
+    return new URL(String(record['@_xml:base'] ?? ''), baseUrl).href
+  } catch {
+    return baseUrl
+  }
+}
+
+function contentOf(value: unknown, atom: boolean, itemBase: string, linkBase: string): NormalizedFeedContent | null {
+  const record = asRecord(value)
+  if (atom && record['@_src'] !== undefined) return null
+  const raw = plainValue(value)
+  if (!raw) return null
+  const type = atom ? String(record['@_type'] ?? 'text').toLowerCase() : 'html'
+  if (!['text', 'html', 'xhtml', 'text/plain', 'text/html'].includes(type)) return null
+  const source = type === 'xhtml' ? raw : decodeXmlText(raw)
+  const base = xmlBase(record, itemBase)
+  return normalizeFeedContent(source, type === 'text' || type === 'text/plain' ? 'text' : 'html', {
+    xmlBase: base,
+    linkBase: record['@_xml:base'] !== undefined ? base : linkBase,
+  })
 }

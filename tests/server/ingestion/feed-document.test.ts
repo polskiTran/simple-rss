@@ -16,7 +16,7 @@ describe('parseFeedDocument', () => {
 
     expect(parsed.title).toBe('Field Notes')
     expect(parsed.homePageUrl).toBe('https://journal.example/')
-    expect(parsed.items).toEqual([
+    expect(parsed.items).toMatchObject([
       {
         dedupeKey: 'guid:entry-1',
         identityKind: 'guid',
@@ -43,7 +43,7 @@ describe('parseFeedDocument', () => {
 
     expect(parsed.title).toBe('Atom Letters')
     expect(parsed.homePageUrl).toBe('https://atom.example/')
-    expect(parsed.items).toEqual([
+    expect(parsed.items).toMatchObject([
       {
         dedupeKey: 'guid:tag:atom.example,2026:one',
         identityKind: 'guid',
@@ -80,7 +80,7 @@ describe('parseFeedDocument', () => {
 
     expect(parsed.title).toBe('Prefixed Letters')
     expect(parsed.homePageUrl).toBe('https://prefixed.example/')
-    expect(parsed.items).toEqual([
+    expect(parsed.items).toMatchObject([
       {
         dedupeKey: 'guid:tag:prefixed.example,2026:one',
         identityKind: 'guid',

@@ -164,6 +164,8 @@ export const feedItems = sqliteTable(
     publishedAt: text('published_at'),
     imageUrl: text('image_url'),
     summary: text('summary'),
+    feedContentMarkdown: text('feed_content_markdown'),
+    feedContentTruncated: integer('feed_content_truncated').notNull().default(0),
     firstSeenAt: text('first_seen_at').notNull(),
     lastObservedAt: text('last_observed_at').notNull(),
   },

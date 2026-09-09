@@ -75,6 +75,8 @@ export function upsertFeedItem(tx: DatabaseTransaction, feedId: number, item: No
       publishedAt: item.publishedAt,
       imageUrl: item.imageUrl,
       summary: item.summary,
+      feedContentMarkdown: item.feedContent?.markdown ?? null,
+      feedContentTruncated: item.feedContent?.truncated ? 1 : 0,
       firstSeenAt: now,
       lastObservedAt: now,
     })
@@ -86,6 +88,8 @@ export function upsertFeedItem(tx: DatabaseTransaction, feedId: number, item: No
         publishedAt: item.publishedAt,
         imageUrl: item.imageUrl,
         summary: item.summary,
+        feedContentMarkdown: item.feedContent?.markdown ?? null,
+        feedContentTruncated: item.feedContent?.truncated ? 1 : 0,
         lastObservedAt: now,
       },
     })

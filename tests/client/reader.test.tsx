@@ -15,6 +15,7 @@ const ITEM = {
   displayDate: 'saturday, 8 august',
   summary: 'A clear morning over the valley.',
   saved: false,
+  feedContent: null,
   nextInDigest: {
     feedItemId: 4,
     title: 'Evening notes',
@@ -45,6 +46,46 @@ afterEach(() => {
 })
 
 describe('Reader View', () => {
+  it('shows Feed Content through loading and failure, then replaces it with the original on retry', async () => {
+    const pending = Promise.withResolvers<void>()
+    let healed = false
+    const api = reading()
+      .on('GET /api/items/3', {
+        body: {
+          ...ITEM,
+          feedContent: {
+            markdown: '## Feed methods\n\nRead [the notes](https://journal.example/notes).',
+            truncated: true,
+            readingTimeMinutes: 2,
+          },
+        },
+      })
+      .on('GET /api/items/3/reader', async () => {
+        await pending.promise
+        return healed
+          ? { body: ARTICLE }
+          : { status: 502, body: { error: { code: 'article_unreachable', message: 'not today' } } }
+      })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
+    expect(screen.getByText('from the feed')).toBeDefined()
+    expect(screen.getByText('2 min')).toBeDefined()
+    expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
+    expect(screen.getByText('parsing the original page')).toBeDefined()
+    pending.resolve()
+    await screen.findByRole('button', { name: 'retry parsing' })
+    expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
+    healed = true
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry parsing' }))
+    await screen.findByRole('heading', { name: 'Dawn' })
+    expect(screen.getByText('original webpage')).toBeDefined()
+    expect(screen.getByText('4 min')).toBeDefined()
+    expect(screen.queryByText('from the feed')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Feed methods' })).toBeNull()
+    expect(screen.queryByText('shortened by simple — open original for more')).toBeNull()
+  })
+
   it('presents title, Feed, date, reading time, save, open original, and the article', async () => {
     reading()
     render(<App />)
@@ -208,6 +249,21 @@ describe('Reader View', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('keeps metadata usable without either reading source and does not loop', async () => {
+    const api = reading()
+      .on('GET /api/items/3', { body: { ...ITEM, link: null, summary: null, feedContent: null } })
+      .on('GET /api/items/3/reader', {
+        status: 422,
+        body: { error: { code: 'no_original_link', message: 'No original link' } },
+      })
+    render(<App />)
+    await screen.findByText('the original page could not be parsed into an article')
+    expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'save First light' })).toBeDefined()
+    expect(screen.queryByRole('link', { name: 'open original' })).toBeNull()
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
   it('says how long to wait when retrying is rate-limited', async () => {

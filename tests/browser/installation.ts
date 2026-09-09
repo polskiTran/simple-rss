@@ -116,6 +116,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
               <link>https://publisher.example/first-light</link>
               <pubDate>${publishedAt.toUTCString()}</pubDate>
               <description>A clear morning.</description>
+              <content:encoded><![CDATA[<p>A clear morning.</p><h2>From the field</h2><p>Observe <em>carefully</em> and read <a href="/feed-notes">the feed notebook</a>.</p><ul><li>Keep a steady hand</li></ul>]]></content:encoded>
             </item>
           </channel></rss>`,
       })
@@ -136,6 +137,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
               <link>https://publisher.example/slow-water</link>
               <pubDate>${publishedEarlier.toUTCString()}</pubDate>
               <description>Tide notes from the shore.</description>
+              <content:encoded><![CDATA[<h2>Coastal notes</h2><p>Tide notes from the shore.</p><p>Read <a href="/coastal-notes">the coastal notebook</a> and <a href="javascript:alert(1)">unsafe link text</a>.</p><blockquote><p>The water moves slowly.</p></blockquote><pre><code>measure(tide)</code></pre><table><tr><th>Time</th><th>Tide</th></tr><tr><td>Morning</td><td>Low</td></tr></table><img src="https://tracker.example/pixel"/><script>document.body.innerHTML = 'hostile'</script><iframe src="https://tracker.example/frame"></iframe><p>Quoted address: ${QUOTED_LONG_URL}</p>${'<!-- padding -->'.repeat(40_000)}<p>Beyond the application limit.</p>]]></content:encoded>
             </item>
           </channel></rss>`,
       })

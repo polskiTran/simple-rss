@@ -6,6 +6,7 @@ import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { LogField, LogFields, Logger } from '../logger.js'
 import { elapsedMs } from '../monotonic.js'
+import { readingInformation } from '../markdown/reading-information.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -105,6 +106,8 @@ export class ReaderService {
         link: feedItems.link,
         publishedAt: feedItems.publishedAt,
         summary: feedItems.summary,
+        feedContentMarkdown: feedItems.feedContentMarkdown,
+        feedContentTruncated: feedItems.feedContentTruncated,
         firstSeenAt: feedItems.firstSeenAt,
         savedAt: libraryItems.savedAt,
       })
@@ -131,6 +134,13 @@ export class ReaderService {
       firstSeenAt: row.firstSeenAt,
       displayDate: readerDate(instant, dateKey(now, timezone), timezone),
       summary: row.summary,
+      feedContent: row.feedContentMarkdown
+        ? {
+            markdown: row.feedContentMarkdown,
+            truncated: row.feedContentTruncated !== 0,
+            readingTimeMinutes: readingInformation(row.feedContentMarkdown).readingTimeMinutes,
+          }
+        : null,
       saved: row.savedAt !== null,
       nextInDigest: this.#nextInDigest(feedItemId),
     }

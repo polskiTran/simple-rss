@@ -77,6 +77,7 @@ const ITEM = {
   displayDate: 'saturday, 8 august',
   summary: 'A clear morning over the valley.',
   saved: false,
+  feedContent: null,
   nextInDigest: null,
 }
 
