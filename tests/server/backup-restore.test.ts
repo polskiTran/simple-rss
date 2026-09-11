@@ -207,6 +207,7 @@ describe('backup and restore, round-tripped through the running application', ()
     const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId
     await user.put(`/api/feeds/${feedId}/interval`, { pollingIntervalMinutes: 360 })
+    await user.put(`/api/feeds/${feedId}/reading-source`, { readingSource: 'feed-content' })
     const detail = await (await user.get(`/api/feeds/${feedId}`)).json()
     expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
     const reader = readerItemSchema.parse(await (await user.get(`/api/items/${detail.items[0].feedItemId}`)).json())
@@ -248,9 +249,11 @@ describe('backup and restore, round-tripped through the running application', ()
 
     const restoredDetail = await (await device.get(`/api/feeds/${restoredFeeds.subscriptions[0].feedId}`)).json()
     expect(restoredDetail.schedule.pollingIntervalMinutes).toBe(360)
+    expect(restoredDetail.readingSource).toBe('feed-content')
     expect(restoredDetail.items).toHaveLength(1)
 
     const restoredReader = readerItemSchema.parse(await (await device.get(`/api/items/${reader.feedItemId}`)).json())
+    expect(restoredReader.readingSource).toBe('feed-content')
     expect(restoredReader.feedContent?.markdown).toContain('A **morning** note')
     const restoredImage = restoredReader.feedContent?.markdown
       .match(/!\[A morning sky\]\(([^)]+)\)/)?.[1]

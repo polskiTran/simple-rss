@@ -15,6 +15,7 @@ const ITEM = {
   displayDate: 'saturday, 8 august',
   summary: 'A clear morning over the valley.',
   saved: false,
+  readingSource: 'original-webpage',
   feedContent: null,
   nextInDigest: {
     feedItemId: 4,
@@ -67,8 +68,9 @@ describe('Reader View', () => {
           : { status: 502, body: { error: { code: 'article_unreachable', message: 'not today' } } }
       })
     render(<App />)
+    const user = userEvent.setup()
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('from the feed')).toBeDefined()
+    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
     expect(screen.getByText('2 min')).toBeDefined()
     expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
     expect(screen.getByText('parsing the original page')).toBeDefined()
@@ -77,13 +79,58 @@ describe('Reader View', () => {
     expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
     healed = true
-    await userEvent.setup().click(screen.getByRole('button', { name: 'retry parsing' }))
+    await user.click(screen.getByRole('button', { name: 'retry parsing' }))
     await screen.findByRole('heading', { name: 'Dawn' })
-    expect(screen.getByText('original webpage')).toBeDefined()
+    expect(screen.getByText('original webpage', { selector: 'span' })).toBeDefined()
     expect(screen.getByText('4 min')).toBeDefined()
-    expect(screen.queryByText('from the feed')).toBeNull()
+    expect(screen.queryByText('feed content', { selector: 'span' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Feed methods' })).toBeNull()
     expect(screen.queryByText('shortened by simple — open original for more')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'feed content' }))
+    expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
+    expect(screen.queryByRole('heading', { name: 'Dawn' })).toBeNull()
+    expect(screen.getByText('2 min')).toBeDefined()
+    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+  })
+
+  it('uses the Subscription preference without requesting the original and ignores a held old source', async () => {
+    const original = Promise.withResolvers<{ body: typeof ARTICLE }>()
+    const feedContent = {
+      markdown: '## Feed methods\n\nA short body from the Feed.',
+      truncated: true,
+      readingTimeMinutes: 1,
+    }
+    const api = reading()
+      .on('GET /api/items/3', { body: { ...ITEM, readingSource: 'feed-content', feedContent } })
+      .on('GET /api/items/3/reader', async () => original.promise)
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
+    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('1 min')).toBeDefined()
+    expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'original webpage' }))
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
+    expect(screen.getByText('parsing the original page')).toBeDefined()
+    await user.click(screen.getByRole('button', { name: 'feed content' }))
+    original.resolve({ body: ARTICLE })
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined())
+    expect(screen.queryByRole('heading', { name: 'Dawn' })).toBeNull()
+    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+  })
+
+  it('uses the Original webpage when Feed Content is preferred but unavailable', async () => {
+    const api = reading().on('GET /api/items/3', { body: { ...ITEM, readingSource: 'feed-content' } })
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+    expect(screen.getByText('original webpage', { selector: 'span' })).toBeDefined()
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
   it('presents title, Feed, date, reading time, save, open original, and the article', async () => {
@@ -138,7 +185,7 @@ describe('Reader View', () => {
     expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
 
     healed = true
-    await user.click(screen.getByRole('button', { name: 'retry parsing' }))
+    await user.click(await screen.findByRole('button', { name: 'retry parsing' }))
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
   })
 
@@ -253,17 +300,19 @@ describe('Reader View', () => {
 
   it('keeps metadata usable without either reading source and does not loop', async () => {
     const api = reading()
-      .on('GET /api/items/3', { body: { ...ITEM, link: null, summary: null, feedContent: null } })
+      .on('GET /api/items/3', { body: { ...ITEM, link: null, feedContent: null } })
       .on('GET /api/items/3/reader', {
         status: 422,
         body: { error: { code: 'no_original_link', message: 'No original link' } },
       })
     render(<App />)
-    await screen.findByText('the original page could not be parsed into an article')
+    expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
+    expect(screen.queryByText('the original page could not be parsed into an article')).toBeNull()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'save First light' })).toBeDefined()
     expect(screen.queryByRole('link', { name: 'open original' })).toBeNull()
-    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'retry parsing' })).toBeNull()
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
   })
 
   it('says how long to wait when retrying is rate-limited', async () => {

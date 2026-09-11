@@ -1,12 +1,16 @@
 import { and, eq, isNull, lte } from 'drizzle-orm'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
+  DEFAULT_READING_SOURCE,
   pollingIntervalMinutesSchema,
+  readingSourceSchema,
   type FeedDetail,
   type FeedDetailsUpdate,
   type FeedItemRow,
   type PollingIntervalMinutes,
   type PollingSchedule,
+  type ReadingSource,
+  type ReadingSourcePreference,
   type SubscriptionSummary,
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
@@ -48,6 +52,10 @@ export type SetPollingIntervalOutcome =
   | { readonly kind: 'updated'; readonly schedule: PollingSchedule }
   | { readonly kind: 'missing' }
 
+export type SetReadingSourceOutcome =
+  | { readonly kind: 'updated'; readonly preference: ReadingSourcePreference }
+  | { readonly kind: 'missing' }
+
 export type UnsubscribeOutcome = { readonly kind: 'unsubscribed' } | { readonly kind: 'missing' }
 
 export type SetFeedDetailsOutcome =
@@ -64,7 +72,9 @@ interface FeedRecord {
   readonly resolvedUrl: string
 }
 
-interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {}
+interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {
+  readonly readingSource: ReadingSource
+}
 
 const FEED_RECORD_COLUMNS = {
   feedId: feeds.id,
@@ -84,6 +94,7 @@ const SUBSCRIBED_FEED_COLUMNS = {
   lastSuccessAt: subscriptions.lastSuccessAt,
   consecutiveFailures: subscriptions.consecutiveFailures,
   lastFailureCategory: subscriptions.lastFailureCategory,
+  readingSource: subscriptions.readingSource,
 }
 
 /** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
@@ -152,6 +163,7 @@ export class SubscriptionService {
           lastSuccessAt: null,
           consecutiveFailures: 0,
           lastFailureCategory: null,
+          readingSource: DEFAULT_READING_SOURCE,
         }
       })
     } catch (error) {
@@ -193,6 +205,7 @@ export class SubscriptionService {
         lastSuccessAt: null,
         consecutiveFailures: 0,
         lastFailureCategory: null,
+        readingSource: DEFAULT_READING_SOURCE,
       }),
     }
   }
@@ -234,7 +247,7 @@ export class SubscriptionService {
    * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor:
    * the poll discovers the duplicate, but the Subscription writes belong here.
    */
-  mergeInto(duplicate: PolledFeed, existingFeedId: number): void {
+  mergeInto(duplicate: PolledFeed & { readonly readingSource: ReadingSource }, existingFeedId: number): void {
     const now = this.#clock.now().toISOString()
     this.#db.transaction((tx) => {
       const existingSubscribed = tx
@@ -260,7 +273,11 @@ export class SubscriptionService {
 
       if (!existingSubscribed) {
         tx.insert(subscriptions)
-          .values({ ...newSubscription(existingFeedId, now), pollingIntervalMinutes: duplicate.pollingIntervalMinutes })
+          .values({
+            ...newSubscription(existingFeedId, now),
+            pollingIntervalMinutes: duplicate.pollingIntervalMinutes,
+            readingSource: duplicate.readingSource,
+          })
           .run()
       }
     })
@@ -295,6 +312,14 @@ export class SubscriptionService {
       nextPollAt,
     })
     return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
+  }
+
+  setReadingSource(feedId: number, readingSource: ReadingSource): SetReadingSourceOutcome {
+    const updated = this.#db.update(subscriptions).set({ readingSource }).where(eq(subscriptions.feedId, feedId)).run()
+    if (updated.changes === 0) return { kind: 'missing' }
+
+    this.#logger.info('subscriptions.reading_source_changed', { feedId, readingSource })
+    return { kind: 'updated', preference: { readingSource } }
   }
 
   /** Replaces both overrides; the Feed's reported title and description keep being tracked underneath. */
@@ -429,6 +454,7 @@ export class SubscriptionService {
         pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(record.pollingIntervalMinutes),
         nextPollAt: record.nextPollAt,
       },
+      readingSource: readingSourceSchema.parse(record.readingSource),
       cadence: gridDayKeys(today).map((date) => ({ date, count: counts.get(date) ?? 0 })),
       items,
     }
@@ -494,6 +520,7 @@ function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => 
     homePageUrl: record.homePageUrl,
     enteredUrl: record.enteredUrl,
     resolvedUrl: record.resolvedUrl,
+    readingSource: readingSourceSchema.parse(record.readingSource),
     cadence: cadenceOf(record.feedId),
     availability: availabilityOf(record),
   }

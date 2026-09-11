@@ -289,6 +289,14 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE feed_items ADD COLUMN feed_content_truncated INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 15,
+    name: 'subscription-reading-source',
+    sql: `
+      ALTER TABLE subscriptions ADD COLUMN reading_source TEXT NOT NULL DEFAULT 'original-webpage'
+        CHECK (reading_source IN ('original-webpage', 'feed-content'));
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

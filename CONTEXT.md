@@ -48,6 +48,10 @@ _Avoid_: Feed health, broken Feed, pending feed
 An entry published by a Feed, represented by its available title, link, summary, publication time, and image URL.
 _Avoid_: Post, article
 
+**Original webpage**:
+The webpage a Feed Item links to, distinct from the Feed Content supplied inside the Feed.
+_Avoid_: Full article, source page
+
 **Feed Home Page**:
 The site a Feed declares as its own, read from the Feed document and absent when the Feed names only its own URL. It supplies the host shown beside a Feed and the link behind it, so the Feeds list names the publisher rather than whichever host serves the XML.
 _Avoid_: Site URL, website, channel link
@@ -85,7 +89,7 @@ The reading material a Feed supplies for a Feed Item, distinct from its preview 
 _Avoid_: Stored article, cached content
 
 **Reader View**:
-A distraction-reduced rendering of a Feed Item's original webpage, with available Feed Content to read while that webpage is being prepared or cannot be read.
+A distraction-reduced rendering of a Feed Item's chosen reading source: its Original webpage or available Feed Content, with the other used as a fallback when needed.
 _Avoid_: Stored article, cached content
 
 **Search Scope**:

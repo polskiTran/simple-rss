@@ -90,6 +90,27 @@ test.describe('desktop Feed and Digest rendering', () => {
     await expectOpenFeed(page)
   })
 
+  test('changes the reading source by keyboard and keeps the server choice when the Feed is reopened', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+
+    const original = page.getByRole('button', { name: 'original webpage' })
+    const feedContent = page.getByRole('button', { name: 'feed content' })
+    await expect(original).toHaveAttribute('aria-pressed', 'true')
+    await original.focus()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Space')
+
+    await expect(feedContent).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByText('items now open with feed content')).toBeVisible()
+    await page.getByRole('link', { name: '← feeds' }).click()
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    await expect(page.getByRole('button', { name: 'feed content' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('sets a custom title and description in the edit overlay, and clearing them restores the reported values', async ({
     page,
     installation,

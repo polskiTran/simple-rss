@@ -158,13 +158,43 @@ describe('migrations', () => {
 
     const applied = applyMigrations(db)
 
-    expect(applied).toEqual([8, 9, 10, 11, 12, 13, 14])
+    expect(applied).toEqual([8, 9, 10, 11, 12, 13, 14, 15])
     expect(db.$client.prepare('SELECT domain, home_page_url, etag, last_modified FROM feeds').get()).toEqual({
       domain: 'journal.example',
       home_page_url: null,
       etag: null,
       last_modified: null,
     })
+    db.$client.close()
+  })
+
+  it('gives every existing Subscription the Original webpage default without inspecting its Feed Content', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version < 15),
+    )
+    db.$client
+      .prepare(`INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
+        VALUES (1, 'https://short.example/feed', 'https://short.example/feed', 'Short', 'short.example', '2026-01-01', '2026-01-01'),
+               (2, 'https://image.example/feed', 'https://image.example/feed', 'Image', 'image.example', '2026-01-01', '2026-01-01')`)
+      .run()
+    db.$client
+      .prepare(`INSERT INTO subscriptions (feed_id, created_at) VALUES (1, '2026-01-01'), (2, '2026-01-01')`)
+      .run()
+    db.$client
+      .prepare(`INSERT INTO feed_items
+        (feed_id, dedupe_key, identity_kind, feed_content_markdown, feed_content_truncated, first_seen_at, last_observed_at)
+        VALUES (1, 'short', 'guid', 'Read more', 1, '2026-01-01', '2026-01-01'),
+               (2, 'image', 'guid', '![drawing](https://image.example/drawing.png)', 0, '2026-01-01', '2026-01-01')`)
+      .run()
+
+    expect(applyMigrations(db)).toEqual([15])
+    expect(db.$client.prepare('SELECT reading_source FROM subscriptions ORDER BY feed_id').all()).toEqual([
+      { reading_source: 'original-webpage' },
+      { reading_source: 'original-webpage' },
+    ])
     db.$client.close()
   })
 

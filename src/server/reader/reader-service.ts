@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import type { ReaderArticle, ReaderDeadlineStage, ReaderItem } from '../../shared/api.js'
+import {
+  DEFAULT_READING_SOURCE,
+  type ReaderArticle,
+  type ReaderDeadlineStage,
+  type ReaderItem,
+} from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
@@ -115,6 +120,7 @@ export class ReaderService {
         feedContentTruncated: feedItems.feedContentTruncated,
         firstSeenAt: feedItems.firstSeenAt,
         savedAt: libraryItems.savedAt,
+        readingSource: subscriptions.readingSource,
       })
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
@@ -148,6 +154,7 @@ export class ReaderService {
           }
         : null,
       saved: row.savedAt !== null,
+      readingSource: row.readingSource ?? DEFAULT_READING_SOURCE,
       nextInDigest: this.#nextInDigest(feedItemId),
     }
   }

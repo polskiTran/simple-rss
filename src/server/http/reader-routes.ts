@@ -15,10 +15,10 @@ export interface ReaderRouteDependencies {
 }
 
 /**
- * Reader View over persisted Feed Items; no route here accepts an article URL
- * from the caller. Feed Item responses stay uncached so stored image destinations
- * get fresh signatures. Only a successful extraction may be cached; failures are
- * uncached so a retry is a fresh question.
+ * Reader View over persisted Feed Item identity; no route accepts an article URL.
+ * The item response carries the Subscription preference and stored Feed Content,
+ * while `/reader` is only Original webpage extraction. Item responses stay
+ * uncached for fresh image signatures; only successful extraction may be cached.
  */
 export function readerRoutes(deps: ReaderRouteDependencies): Hono {
   const app = new Hono()

@@ -51,6 +51,7 @@ const DETAIL = {
     category: null,
   },
   schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
+  readingSource: 'original-webpage',
   cadence: cadenceWindow({ '2026-08-08': 1 }),
   items: [
     {
@@ -77,6 +78,7 @@ const ITEM = {
   displayDate: 'saturday, 8 august',
   summary: 'A clear morning over the valley.',
   saved: false,
+  readingSource: 'original-webpage',
   feedContent: null,
   nextInDigest: null,
 }

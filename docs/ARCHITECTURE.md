@@ -128,7 +128,7 @@ The initial relational model contains:
 | `user_auth` | Singleton setup state and Argon2id password verifier |
 | `sessions` | Hashed opaque session tokens and expiry state |
 | `feeds` | External Feed identity, URL, metadata, and retrieval validators |
-| `subscriptions` | Active relationship, Polling Interval, due time, and availability state |
+| `subscriptions` | Active relationship, Polling Interval, reading-source preference, due time, and availability state |
 | `feed_items` | Normalized metadata, durable Feed Content, and observation timestamps |
 | `library_items` | Saved membership and saved time |
 | FTS virtual tables | Rebuildable search indexes |
@@ -220,9 +220,11 @@ SQLite FTS5 indexes Feed titles, item titles, and normalized summaries. Search c
 
 ## Reader View
 
-Reader View requests stored metadata and Feed Content by Feed Item ID. Available Feed Content is displayed through the existing Markdown renderer while original-webpage extraction is pending and after terminal failure. Success replaces it with the original webpage. The header names the displayed source and estimates reading time from that source; application-shortened Feed Content carries a notice. Preparing the Feed Item response signs its stored inline image destinations with fresh two-day capabilities. These responses use `Cache-Control: no-store`, so reopening stored Feed Content after signature expiry or a service restart yields usable image paths without re-ingestion or an original-webpage request to refresh them. Signing adds delivery overhead beyond the durable 256 KiB bound; the shared response contract accepts that expansion.
+Reader View requests stored metadata, the Subscription's reading-source preference, and Feed Content by Feed Item ID. Existing and new Subscriptions default to Original webpage. Feed Content mode displays any renderable stored Feed Content immediately and does not request the original webpage; short text, image-only bodies, read-more wording, and application truncation never imply incompleteness. When Feed Content is unavailable, it falls back once to Original webpage extraction if the Feed Item has a stored link. Original webpage mode displays available Feed Content while extraction is pending and after terminal failure. Neither fallback mutates the Subscription preference, and the User may override the source for the current view without persisting that choice.
 
-Original-webpage extraction remains primary and is generated only when requested:
+The header names the body actually displayed and estimates reading time from that body; application-shortened Feed Content carries a notice. Preparing the Feed Item response signs its stored inline image destinations with fresh two-day capabilities. These responses use `Cache-Control: no-store`, so reopening stored Feed Content after signature expiry or a service restart yields usable image paths without re-ingestion or an original-webpage request to refresh them. Signing adds delivery overhead beyond the durable 256 KiB bound; the shared response contract accepts that expansion.
+
+Original-webpage extraction is generated only when selected or used as the missing-content fallback:
 
 1. The client requests a Feed Item by ID, never an arbitrary URL.
 2. The server retrieves the stored original link through the hardened retrieval boundary.
@@ -321,7 +323,7 @@ The client is a responsive web application, not a PWA. It has no service worker,
 
 OPML is the interoperability format for Subscriptions. A versioned JSON export includes:
 
-- Subscriptions and Polling Intervals
+- Subscriptions, Polling Intervals, and reading-source preferences
 - Feed metadata
 - Retained Feed Items
 - Library membership

@@ -26,6 +26,12 @@ async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
   await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible()
 }
 
+async function preferFeedContent(page: Page, feedTitle: string): Promise<void> {
+  await page.getByRole('link', { name: feedTitle }).click()
+  await page.getByRole('button', { name: 'feed content' }).click()
+  await expect(page.getByText('items now open with feed content')).toBeVisible()
+}
+
 const rendererChunk = /article-renderer|article-markdown/
 
 test.describe('Reader View', () => {
@@ -45,7 +51,7 @@ test.describe('Reader View', () => {
     try {
       await page.getByRole('link', { name: 'First light' }).click()
       await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
-      await expect(page.locator('.reader-meta')).toContainText('from the feed')
+      await expect(page.locator('.reader-meta')).toContainText('feed content')
       await expect(page.locator('.reader-meta')).toContainText('1 min')
       await expect(page.getByText('parsing the original page')).toBeVisible()
       const link = page.getByRole('link', { name: 'the feed notebook' })
@@ -64,7 +70,49 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'From the field' })).toHaveCount(0)
     await expect(page.locator('.reader-meta')).toContainText('original webpage')
-    await expect(page.locator('.reader-meta')).not.toContainText('from the feed')
+    await expect(page.locator('.reader-meta')).not.toContainText('feed content')
+  })
+
+  test('uses the Subscription source and a view-only switch cannot be overwritten by an old response', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await preferFeedContent(page, 'Field Notes')
+    await page.getByRole('link', { name: 'digest' }).click()
+
+    const held = Promise.withResolvers<void>()
+    const articleRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().endsWith('/reader')) articleRequests.push(request.url())
+    })
+    await page.route('**/api/items/*/reader', async (route) => {
+      await held.promise
+      try {
+        await route.continue()
+      } catch {}
+    })
+
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('feed content')
+    await expect(page.getByRole('button', { name: 'feed content' })).toHaveAttribute('aria-pressed', 'true')
+    expect(articleRequests).toHaveLength(0)
+
+    await page.getByRole('button', { name: 'original webpage' }).click()
+    await expect.poll(() => articleRequests.length).toBe(1)
+    await expect(page.getByText('parsing the original page')).toBeVisible()
+    await page.getByRole('button', { name: 'feed content' }).click()
+    held.resolve()
+
+    await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Field methods' })).toHaveCount(0)
+    await expect(page.locator('.reader-meta')).toContainText('feed content')
+
+    await page.getByRole('link', { name: '← digest' }).click()
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'feed content' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('opens from the Digest, reads clean structured content, and returns', async ({ page, installation }) => {
@@ -190,7 +238,7 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Slow water' })).toBeVisible()
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('from the feed')
+    await expect(page.locator('.reader-meta')).toContainText('feed content')
     await expect(page.getByText('shortened by simple — open original for more')).toBeVisible()
     const originals = page.getByRole('link', { name: 'open original' })
     await expect(originals).toHaveCount(2)
@@ -308,7 +356,7 @@ test.describe('Reader View at phone width', () => {
     await expect(page.getByRole('button', { name: 'retry parsing' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
     await expect(page.getByText('shortened by simple — open original for more')).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('from the feed')
+    await expect(page.locator('.reader-meta')).toContainText('feed content')
     await expect(page.getByRole('link', { name: 'the coastal notebook' })).toHaveAttribute(
       'href',
       'https://publisher.example/coastal-notes',
@@ -341,7 +389,7 @@ test.describe('Reader View at phone width', () => {
     await page.getByRole('link', { name: 'digest' }).click()
     await page.getByRole('link', { name: 'Moonrise' }).click()
     await expect(page.getByRole('button', { name: 'retry parsing' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('from the feed')
+    await expect(page.locator('.reader-meta')).toContainText('feed content')
     await expect(page.getByText('A separate preview, not the drawing.')).toHaveCount(0)
     const image = page.getByRole('img', { name: 'The moon rises over a sleeping valley' })
     await expect(image).toBeVisible()
@@ -354,7 +402,7 @@ test.describe('Reader View at phone width', () => {
     await page.reload()
     await expect(page.locator('.article-image-fallback')).toHaveText('The moon rises over a sleeping valley')
     await expect(page.getByRole('heading', { name: 'Moonrise' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('from the feed')
+    await expect(page.locator('.reader-meta')).toContainText('feed content')
     await expectNoHorizontalOverflow(page)
     expect(publisherRequests).toEqual([])
   })

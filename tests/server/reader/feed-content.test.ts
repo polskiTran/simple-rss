@@ -188,6 +188,26 @@ describe('Feed Content in Reader View', () => {
     expect((await (await user.get('/api/search?q=carefully')).json()).results).toHaveLength(0)
   })
   it.each([
+    ['short text', rss('<description>Read more.</description>')],
+    [
+      'image-only content',
+      rss(
+        '<content:encoded><![CDATA[<img src="/panel.png" alt="Dawn"/>]]></content:encoded><description>Preview.</description>',
+      ),
+    ],
+    ['application-truncated content', rss(`<description>${'word '.repeat(60_000)}</description>`)],
+  ])('serves preferred %s without an original-webpage request', async (_name, document) => {
+    const { service, user, read } = await ingest(document)
+    expect((await user.put('/api/feeds/1/reading-source', { readingSource: 'feed-content' })).status).toBe(200)
+
+    const item = await read()
+
+    expect(item.readingSource).toBe('feed-content')
+    expect(item.feedContent).not.toBeNull()
+    expect(service.upstream.requestsTo('https://journal.example/notes/one')).toHaveLength(0)
+  })
+
+  it.each([
     [
       'empty preferred content',
       rss('<content:encoded> </content:encoded><description>&lt;h2&gt;Description body&lt;/h2&gt;</description>'),

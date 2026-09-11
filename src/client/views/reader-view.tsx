@@ -1,11 +1,12 @@
 import { Button } from '@base-ui/react/button'
 import { Suspense, lazy, useEffect, useState } from 'react'
-import type { ReaderArticle, ReaderDeadlineStage, ReaderItem } from '../../shared/api.js'
+import type { FeedContent, ReaderArticle, ReaderDeadlineStage, ReaderItem, ReadingSource } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackLink } from '../components/back-link.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
+import { ReadingSourceOptions } from '../components/reading-source-options.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
@@ -47,18 +48,6 @@ export interface ReaderViewProps {
 
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
   const [itemState, { set: setItem }] = useResource((signal) => fetchReaderItem(feedItemId, signal), [feedItemId])
-  const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
-  const [articleState, { retry: retryParsing }] = useResource(
-    async (signal) => {
-      setPreparingStage(undefined)
-      try {
-        return await fetchArticleThroughDeadlines(feedItemId, signal, setPreparingStage)
-      } finally {
-        if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
-      }
-    },
-    [feedItemId],
-  )
 
   useEffect(() => {
     performance.mark(READER_MARKS.entry)
@@ -81,11 +70,65 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
     )
   }
 
-  const item = itemState.value
-  const displayed = articleState.kind === 'loaded' ? articleState.value : item.feedContent
-  const showingFeedContent = articleState.kind !== 'loaded' && item.feedContent !== null
+  return (
+    <OpenReader
+      key={itemState.value.feedItemId}
+      item={itemState.value}
+      origin={origin}
+      onBack={onBack}
+      onOpenItem={onOpenItem}
+      onOpenFeed={onOpenFeed}
+      onSaved={(saved) => setItem((current) => ({ ...current, saved }))}
+    />
+  )
+}
+
+type SourceResult =
+  | { readonly source: 'feed-content'; readonly content: FeedContent }
+  | { readonly source: 'original-webpage'; readonly content: ReaderArticle }
+
+function OpenReader({
+  item,
+  origin,
+  onBack,
+  onOpenItem,
+  onOpenFeed,
+  onSaved,
+}: {
+  item: ReaderItem
+  origin: Origin
+  onBack(origin: Origin): void
+  onOpenItem(feedItemId: number): void
+  onOpenFeed(feedId: number): void
+  onSaved(saved: boolean): void
+}) {
+  const [viewSource, setViewSource] = useState<ReadingSource>(item.readingSource)
+  const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
+  const [sourceState, { retry: retryParsing }] = useResource(
+    async (signal): Promise<SourceResult> => {
+      setPreparingStage(undefined)
+      if (viewSource === 'feed-content' && item.feedContent) {
+        return { source: 'feed-content', content: item.feedContent }
+      }
+      if (!item.link) throw new Error('the Feed Item has no original link')
+      try {
+        const content = await fetchArticleThroughDeadlines(item.feedItemId, signal, setPreparingStage)
+        return { source: 'original-webpage', content }
+      } finally {
+        if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
+      }
+    },
+    [item.feedItemId, viewSource],
+  )
+
+  const loaded = sourceState.kind === 'loaded' ? sourceState.value : undefined
+  const selectedLoaded =
+    loaded?.source === viewSource || (viewSource === 'feed-content' && !item.feedContent) ? loaded : undefined
+  const fallback = !selectedLoaded && item.feedContent ? item.feedContent : undefined
+  const displayed = selectedLoaded?.content ?? fallback
+  const displayedSource = selectedLoaded?.source ?? (fallback ? 'feed-content' : undefined)
+  const showingFeedContent = displayedSource === 'feed-content'
   const next = item.nextInDigest
-  const setSaved = (saved: boolean) => setItem((current) => ({ ...current, saved }))
   const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'parsing the original page'
   const waitingContent = item.summary ? (
     <div className="reader-waiting">
@@ -95,12 +138,13 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   ) : (
     <LoadingNote className="empty-note reader-extracting">{waitingNote}</LoadingNote>
   )
+  const canSwitchSource = item.link !== null && item.feedContent !== null
 
   return (
     <article className="view measure reader-view">
       <div className="reader-topline">
         <BackLink className="reader-back" origin={origin} onBack={onBack} />
-        <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} onSaved={setSaved} />
+        <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} onSaved={onSaved} />
       </div>
 
       <header className="reader-header">
@@ -109,13 +153,18 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
           <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
           <span>{item.displayDate}</span>
           {displayed ? <span>{displayed.readingTimeMinutes} min</span> : null}
-          {displayed ? <span>{showingFeedContent ? 'from the feed' : 'original webpage'}</span> : null}
+          {displayedSource ? (
+            <span>{displayedSource === 'feed-content' ? 'feed content' : 'original webpage'}</span>
+          ) : null}
           {item.link ? (
             <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
               open original
             </a>
           ) : null}
         </p>
+        {canSwitchSource ? (
+          <ReadingSourceOptions value={viewSource} className="reader-source-options" onChange={setViewSource} />
+        ) : null}
       </header>
 
       {showingFeedContent && item.feedContent?.truncated ? (
@@ -126,22 +175,22 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
       {displayed ? (
         <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
           <ArticleMarkdown markdown={displayed.markdown} />
-          {articleState.kind === 'loaded' ? <MarkdownCommitted /> : null}
+          {selectedLoaded ? <MarkdownCommitted /> : null}
         </Suspense>
       ) : null}
-      {articleState.kind === 'loading' ? (
+      {sourceState.kind === 'loading' && viewSource === 'original-webpage' ? (
         displayed ? (
           <LoadingNote className="empty-note">{waitingNote}</LoadingNote>
         ) : (
           waitingContent
         )
       ) : null}
-      {articleState.kind === 'unavailable' || articleState.kind === 'unreachable' ? (
+      {sourceState.kind === 'unavailable' || sourceState.kind === 'unreachable' ? (
         <Fallback
           item={item}
-          waitSeconds={waitSecondsOf(articleState.error)}
-          stage={deadlineStage(articleState.error)}
-          onRetry={retryParsing}
+          waitSeconds={waitSecondsOf(sourceState.error)}
+          stage={deadlineStage(sourceState.error)}
+          onRetry={item.link ? retryParsing : undefined}
         />
       ) : null}
 
@@ -213,10 +262,18 @@ interface FallbackProps {
   readonly item: ReaderItem
   readonly waitSeconds: number | undefined
   readonly stage: ReaderDeadlineStage | undefined
-  onRetry(): void
+  onRetry: (() => void) | undefined
 }
 
 function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
+  if (!item.link && !item.feedContent) {
+    return item.summary ? (
+      <div className="reader-fallback" role="status">
+        <p className="reader-summary">{item.summary}</p>
+      </div>
+    ) : null
+  }
+
   return (
     <div className="reader-fallback" role="status">
       {!item.feedContent && item.summary ? (
@@ -226,16 +283,20 @@ function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
           {stage ? STAGE_FALLBACKS[stage] : 'the original page could not be parsed into an article'}
         </p>
       )}
-      <p className="reader-fallback-actions">
-        {item.link ? (
-          <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
-            open original
-          </a>
-        ) : null}
-        <Button className="text-button" onClick={onRetry}>
-          retry parsing
-        </Button>
-      </p>
+      {item.link || onRetry ? (
+        <p className="reader-fallback-actions">
+          {item.link ? (
+            <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
+              open original
+            </a>
+          ) : null}
+          {onRetry ? (
+            <Button className="text-button" onClick={onRetry}>
+              retry parsing
+            </Button>
+          ) : null}
+        </p>
+      ) : null}
       {waitSeconds !== undefined ? (
         <p className="empty-note">the last try was a moment ago — wait {waitSeconds}s, then retry</p>
       ) : null}

@@ -3,6 +3,7 @@ import {
   createSubscriptionRequestSchema,
   feedIdParameterSchema,
   importOpmlRequestSchema,
+  readingSourcePreferenceSchema,
   updateFeedDetailsRequestSchema,
   updatePollingIntervalRequestSchema,
   type CreateSubscriptionResponse,
@@ -11,6 +12,7 @@ import {
   type FeedDetailsUpdate,
   type OpmlImportReport,
   type PollingSchedule,
+  type ReadingSourcePreference,
   type RefreshFeedResponse,
   type SubscriptionList,
 } from '../../shared/api.js'
@@ -126,6 +128,18 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const outcome = deps.subscriptions.setPollingInterval(feedId.value, body.value.pollingIntervalMinutes)
     if (outcome.kind === 'missing') return notFound(c)
     return c.json<PollingSchedule>(outcome.schedule, 200, NO_STORE)
+  })
+
+  app.put('/feeds/:feedId/reading-source', async (c) => {
+    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    if (!feedId.ok) return feedId.response
+
+    const body = await readJsonBody(c, readingSourcePreferenceSchema)
+    if (!body.ok) return body.response
+
+    const outcome = deps.subscriptions.setReadingSource(feedId.value, body.value.readingSource)
+    if (outcome.kind === 'missing') return notFound(c)
+    return c.json<ReadingSourcePreference>(outcome.preference, 200, NO_STORE)
   })
 
   app.get('/digest', (c) => {

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import {
   pollingIntervalMinutesSchema,
+  readingSourceSchema,
   type UserExport,
   type UserExportFeed,
   type UserExportItem,
@@ -32,6 +33,7 @@ export function buildUserExport(options: {
         homePageUrl: feeds.homePageUrl,
         createdAt: feeds.createdAt,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
+        readingSource: subscriptions.readingSource,
         customTitle: subscriptions.customTitle,
         customDescription: subscriptions.customDescription,
         subscribedAt: subscriptions.createdAt,
@@ -81,6 +83,7 @@ export function buildUserExport(options: {
             ? null
             : {
                 pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(feed.pollingIntervalMinutes),
+                readingSource: readingSourceSchema.parse(feed.readingSource),
                 customTitle: feed.customTitle,
                 customDescription: feed.customDescription,
                 createdAt: feed.subscribedAt,
