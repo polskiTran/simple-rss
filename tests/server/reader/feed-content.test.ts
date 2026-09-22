@@ -350,6 +350,23 @@ describe('Feed Content in Reader View', () => {
     )
   })
 
+  it('keeps prose inside unrecognized elements in Feed Content, summary, and search', async () => {
+    const { read, user } = await ingest(
+      rss(`<description><![CDATA[
+      <p>As <cite>Knuth</cite> said, <q>premature optimization</q> at <time>noon</time>.</p>
+      <dl><dt>Lantern</dt><dd>A portable light.</dd></dl>
+      <details><summary>Footnote</summary>Measured twice.</details>
+    ]]></description>`),
+    )
+    const item = await read()
+    for (const text of ['As Knuth said, premature optimization at noon.', 'Lantern', 'A portable light.', 'Footnote']) {
+      expect(item.feedContent?.markdown).toContain(text)
+    }
+    expect(item.summary).toContain('As Knuth said, premature optimization at noon.')
+    expect(item.summary).toContain('Measured twice.')
+    expect((await (await user.get('/api/search?q=Knuth')).json()).results).toHaveLength(1)
+  })
+
   it.each(['paragraph', 'code', 'list'] as const)(
     'caps an oversized multibyte %s at a closed, readable UTF-8 prefix',
     async (kind) => {

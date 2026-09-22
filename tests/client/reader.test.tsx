@@ -133,6 +133,21 @@ describe('Reader View', () => {
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
+  it('reads Feed Content without claiming a parse failure when the Original webpage has no link', async () => {
+    const feedContent = {
+      markdown: '## Feed methods\n\nA body from the Feed.',
+      truncated: false,
+      readingTimeMinutes: 1,
+    }
+    const api = reading().on('GET /api/items/3', { body: { ...ITEM, link: null, feedContent } })
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
+    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.queryByText('the original page could not be parsed into an article')).toBeNull()
+    expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
+  })
+
   it('presents title, Feed, date, reading time, save, open original, and the article', async () => {
     reading()
     render(<App />)

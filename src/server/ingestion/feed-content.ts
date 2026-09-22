@@ -11,6 +11,29 @@ const MAX_DEPTH = 64
 const MAX_TABLE_COLUMNS = 64
 const MAX_TABLE_ROWS = 512
 
+// Unknown elements are transparent so their prose survives; these carry no prose
+// a reader should see and drop with everything inside them.
+const NON_PROSE_ELEMENTS = new Set([
+  'script',
+  'style',
+  'template',
+  'noscript',
+  'iframe',
+  'frame',
+  'object',
+  'embed',
+  'applet',
+  'svg',
+  'canvas',
+  'audio',
+  'video',
+  'form',
+  'button',
+  'input',
+  'select',
+  'textarea',
+])
+
 type HtmlNode = ReturnType<typeof parseHTML>['document']['body']['children'][number]
 type DomNode = HtmlNode['childNodes'][number]
 
@@ -106,6 +129,12 @@ function htmlBlocks(
         'figcaption',
         'aside',
         'address',
+        'dl',
+        'dt',
+        'dd',
+        'details',
+        'summary',
+        'hgroup',
       ].includes(tag)
     ) {
       flush()
@@ -239,26 +268,7 @@ function htmlPhrase(element: HtmlNode, context: FeedContentContext, budget: Budg
     const tex = element.querySelector('annotation[encoding="application/x-tex"]')?.textContent
     return tex ? [{ type: 'inlineMath', value: tex }] : []
   }
-  if (
-    ![
-      'a',
-      'em',
-      'i',
-      'strong',
-      'b',
-      'span',
-      's',
-      'del',
-      'small',
-      'sub',
-      'sup',
-      'u',
-      'mark',
-      'abbr',
-      'picture',
-    ].includes(tag)
-  )
-    return []
+  if (NON_PROSE_ELEMENTS.has(tag)) return []
   const children = htmlPhrases(element.childNodes, base, budget, depth)
   if (tag === 'em' || tag === 'i') return [{ type: 'emphasis', children }]
   if (tag === 'strong' || tag === 'b') return [{ type: 'strong', children }]

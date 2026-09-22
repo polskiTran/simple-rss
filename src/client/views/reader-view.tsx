@@ -103,11 +103,20 @@ function OpenReader({
   onSaved(saved: boolean): void
 }) {
   const [viewSource, setViewSource] = useState<ReadingSource>(item.readingSource)
+  // The chosen source, unless this Feed Item lacks it and the other one is available.
+  const source: ReadingSource =
+    viewSource === 'feed-content'
+      ? item.feedContent
+        ? 'feed-content'
+        : 'original-webpage'
+      : item.link || !item.feedContent
+        ? 'original-webpage'
+        : 'feed-content'
   const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
   const [sourceState, { retry: retryParsing }] = useResource(
     async (signal): Promise<SourceResult> => {
       setPreparingStage(undefined)
-      if (viewSource === 'feed-content' && item.feedContent) {
+      if (source === 'feed-content' && item.feedContent) {
         return { source: 'feed-content', content: item.feedContent }
       }
       if (!item.link) throw new Error('the Feed Item has no original link')
@@ -118,12 +127,11 @@ function OpenReader({
         if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
       }
     },
-    [item.feedItemId, viewSource],
+    [item.feedItemId, source],
   )
 
   const loaded = sourceState.kind === 'loaded' ? sourceState.value : undefined
-  const selectedLoaded =
-    loaded?.source === viewSource || (viewSource === 'feed-content' && !item.feedContent) ? loaded : undefined
+  const selectedLoaded = loaded?.source === source ? loaded : undefined
   const fallback = !selectedLoaded && item.feedContent ? item.feedContent : undefined
   const displayed = selectedLoaded?.content ?? fallback
   const displayedSource = selectedLoaded?.source ?? (fallback ? 'feed-content' : undefined)
@@ -178,7 +186,7 @@ function OpenReader({
           {selectedLoaded ? <MarkdownCommitted /> : null}
         </Suspense>
       ) : null}
-      {sourceState.kind === 'loading' && viewSource === 'original-webpage' ? (
+      {sourceState.kind === 'loading' && source === 'original-webpage' ? (
         displayed ? (
           <LoadingNote className="empty-note">{waitingNote}</LoadingNote>
         ) : (
