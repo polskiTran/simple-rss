@@ -3,7 +3,6 @@ import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   DEFAULT_READING_SOURCE,
   pollingIntervalMinutesSchema,
-  readingSourceSchema,
   type FeedDetail,
   type FeedDetailsUpdate,
   type FeedItemRow,
@@ -454,7 +453,7 @@ export class SubscriptionService {
         pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(record.pollingIntervalMinutes),
         nextPollAt: record.nextPollAt,
       },
-      readingSource: readingSourceSchema.parse(record.readingSource),
+      readingSource: record.readingSource,
       cadence: gridDayKeys(today).map((date) => ({ date, count: counts.get(date) ?? 0 })),
       items,
     }
@@ -520,7 +519,7 @@ function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => 
     homePageUrl: record.homePageUrl,
     enteredUrl: record.enteredUrl,
     resolvedUrl: record.resolvedUrl,
-    readingSource: readingSourceSchema.parse(record.readingSource),
+    readingSource: record.readingSource,
     cadence: cadenceOf(record.feedId),
     availability: availabilityOf(record),
   }

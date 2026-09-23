@@ -2,14 +2,15 @@ import { join } from 'node:path'
 import type { Root, RootContent } from 'mdast'
 import { fromMarkdown } from 'mdast-util-from-markdown'
 import { describe, expect, it } from 'vitest'
-import { DATABASE_FILE } from '../../../src/server/config.js'
-import { openDatabase } from '../../../src/server/persistence/database.js'
-import { applyMigrations, migrations } from '../../../src/server/persistence/migrations.js'
-import { ManualClock } from '../../support/manual-clock.js'
-import { makeTempDataDir } from '../../support/temp-dir.js'
-import { digestSchema, readerItemSchema } from '../../../src/shared/api.js'
-import { claimedDevice } from '../../support/device.js'
-import { startTestService } from '../../support/service-harness.js'
+import { DATABASE_FILE } from '../../src/server/config.js'
+import { FEED_CONTENT_MAX_BYTES } from '../../src/server/ingestion/feed-content.js'
+import { openDatabase } from '../../src/server/persistence/database.js'
+import { applyMigrations, migrations } from '../../src/server/persistence/migrations.js'
+import { ManualClock } from '../support/manual-clock.js'
+import { makeTempDataDir } from '../support/temp-dir.js'
+import { digestSchema, readerItemSchema } from '../../src/shared/api.js'
+import { claimedDevice } from '../support/device.js'
+import { startTestService } from '../support/service-harness.js'
 
 const FEED_URL = 'https://journal.example/feed'
 const PNG_PIXEL = Buffer.from(
@@ -70,22 +71,29 @@ describe('Feed Content in Reader View', () => {
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
     expect(digest.groups[0]?.items[0]?.imageUrl).toBe(`/api/items/${id}/image`)
   })
-  it.each([
-    'javascript:alert(1)',
-    'data:image/png;base64,aGVsbG8=',
-    'file:///tmp/panel.png',
-    'blob:https://journal.example/id',
-    'https://user:secret@journal.example/panel.png',
-    'http://',
-    '',
-    ' ',
-  ])('does not count the rejected image destination %s as renderable Feed Content', async (src) => {
-    const { read, service } = await ingest(
-      rss(
-        `<content:encoded><![CDATA[<img src="${src}" alt="Rejected illustration"/>]]></content:encoded><description>Usable summary.</description>`,
-      ),
+  it('does not count rejected image destinations as renderable Feed Content', async () => {
+    const rejected = [
+      'javascript:alert(1)',
+      'data:image/png;base64,aGVsbG8=',
+      'file:///tmp/panel.png',
+      'blob:https://journal.example/id',
+      'https://user:secret@journal.example/panel.png',
+      'http://',
+      '',
+      ' ',
+    ]
+    const items = rejected.map(
+      (src, index) =>
+        `<item><guid>${index}</guid><title>Rejected ${index}</title><content:encoded><![CDATA[<img src="${src}" alt="Rejected illustration"/>]]></content:encoded><description>Usable summary.</description></item>`,
     )
-    expect((await read()).feedContent?.markdown).toBe('Usable summary.')
+    const { service, user } = await ingest(rss('').replace(/<item>.*<\/item>/, items.join('')))
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
+    const ids = digest.groups.flatMap((group) => group.items.map((item) => item.feedItemId))
+    expect(ids).toHaveLength(rejected.length)
+    for (const id of ids) {
+      const item = readerItemSchema.parse(await (await user.get(`/api/items/${id}`)).json())
+      expect(item.feedContent?.markdown).toBe('Usable summary.')
+    }
     expect(service.upstream.requests.map((request) => request.url)).toEqual([FEED_URL])
   })
 
@@ -382,7 +390,7 @@ describe('Feed Content in Reader View', () => {
       )
       const content = (await read()).feedContent
       expect(content?.truncated).toBe(true)
-      expect(Buffer.byteLength(content?.markdown ?? '')).toBeLessThanOrEqual(256 * 1024)
+      expect(Buffer.byteLength(content?.markdown ?? '')).toBeLessThanOrEqual(FEED_CONTENT_MAX_BYTES)
       expect(content?.markdown.length).toBeGreaterThan(50_000)
       expect(content?.markdown).not.toContain('Not in the prefix.')
       expect(content?.markdown).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u)
@@ -405,11 +413,11 @@ describe('Feed Content conversion limits', () => {
     expect(content?.markdown).toContain('朝🌄 ')
     expect(content?.markdown).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u)
     // The signature is delivery overhead, not part of the stored body budget.
-    expect(Buffer.byteLength(content?.markdown ?? '')).toBeGreaterThan(256 * 1024)
+    expect(Buffer.byteLength(content?.markdown ?? '')).toBeGreaterThan(FEED_CONTENT_MAX_BYTES)
     const path = imagePaths(content?.markdown ?? '')[0]
     if (!path) throw new Error('No bounded image')
     const durable = content?.markdown.replace(path.replaceAll('&', '\\&'), 'https://journal.example/panel.png') ?? ''
-    expect(Buffer.byteLength(durable)).toBeLessThanOrEqual(256 * 1024)
+    expect(Buffer.byteLength(durable)).toBeLessThanOrEqual(FEED_CONTENT_MAX_BYTES)
   })
   it('records a list cut at the node limit even when no later block follows', async () => {
     const { read } = await ingest(rss(`<description><![CDATA[<ul>${'<li>x</li>'.repeat(20_001)}</ul>]]></description>`))
@@ -448,7 +456,7 @@ describe('Feed Content conversion limits', () => {
     expect(content?.truncated).toBe(true)
     expect(content?.markdown).toContain('Readable prefix.')
     expect(content?.markdown).not.toContain('Beyond the limit.')
-    expect(Buffer.byteLength(content?.markdown ?? '')).toBeLessThanOrEqual(256 * 1024)
+    expect(Buffer.byteLength(content?.markdown ?? '')).toBeLessThanOrEqual(FEED_CONTENT_MAX_BYTES)
   })
 })
 

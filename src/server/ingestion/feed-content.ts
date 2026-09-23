@@ -1,11 +1,12 @@
 import { parseHTML } from 'linkedom'
 import type { BlockContent, ListItem, PhrasingContent, Root, RootContent, TableRow } from 'mdast'
-import { FEED_CONTENT_MAX_BYTES } from '../../shared/api.js'
 import { readerMarkdownTree, serializeReaderMarkdown } from '../markdown/markdown-policy.js'
 
 // A Feed document is already bounded by Retrieval. Each body's DOM and AST also
 // have ceilings so one entry cannot monopolize conversion or recursive traversal.
 const MAX_INPUT_CHARACTERS = 512 * 1024
+/** Durable Markdown budget; response-time image signatures add delivery overhead. */
+export const FEED_CONTENT_MAX_BYTES = 256 * 1024
 const MAX_NODES = 20_000
 const MAX_DEPTH = 64
 const MAX_TABLE_COLUMNS = 64
@@ -84,12 +85,16 @@ export function normalizeFeedContent(
 
 type Budget = { nodes: number; destinationCharacters: number; truncated: boolean }
 
-/** Exhaustion stops all walkers and records application truncation. */
 function consumeNode(budget: Budget, depth: number): boolean {
   if (budget.nodes-- > 0 && depth < MAX_DEPTH) return true
+  exhaust(budget)
+  return false
+}
+
+/** Exhaustion stops all walkers and records application truncation. */
+function exhaust(budget: Budget): void {
   budget.nodes = 0
   budget.truncated = true
-  return false
 }
 
 function htmlBlocks(
@@ -191,8 +196,7 @@ function htmlBlocks(
       const rows: TableRow[] = []
       for (const { row, base: rowBase } of tableRows(element, base, budget, depth + 1)) {
         if (rows.length >= MAX_TABLE_ROWS) {
-          budget.nodes = 0
-          budget.truncated = true
+          exhaust(budget)
           break
         }
         const cells = [...row.children].filter((cell) => ['td', 'th'].includes(localTag(cell)))
@@ -209,8 +213,7 @@ function htmlBlocks(
           })),
         })
         if (cells.length > MAX_TABLE_COLUMNS) {
-          budget.nodes = 0
-          budget.truncated = true
+          exhaust(budget)
           break
         }
       }

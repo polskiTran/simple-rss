@@ -55,4 +55,32 @@ describe('Subscription reading source', () => {
     expect(service.upstream.requestsTo(ITEM_URL)).toHaveLength(1)
     expect((await (await user.get('/api/feeds/1')).json()).readingSource).toBe('feed-content')
   })
+
+  it('extracts when Feed Content is missing and keeps Feed Content when extraction fails', async () => {
+    const BARE_URL = 'https://journal.example/bare'
+    const service = await startTestService()
+    service.upstream
+      .stub(FEED_URL, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: RSS.replace('<item>', `<item><guid>bare</guid><title>Bare</title><link>${BARE_URL}</link></item><item>`),
+      })
+      .stub(BARE_URL, { headers: { 'content-type': 'text/html' }, body: '<main><p>Original body.</p></main>' })
+      .stub(ITEM_URL, { status: 500, headers: { 'content-type': 'text/html' }, body: 'unavailable' })
+    const user = await claimedDevice(service)
+    await user.post('/api/subscriptions', { url: FEED_URL })
+    await service.wakeScheduler()
+    await user.put('/api/feeds/1/reading-source', { readingSource: 'feed-content' })
+    const { items } = await (await user.get('/api/feeds/1')).json()
+    const idOf = (title: string) => items.find((item: { title: string }) => item.title === title).feedItemId
+
+    const bare = idOf('Bare')
+    expect((await (await user.get(`/api/items/${bare}`)).json()).feedContent).toBeNull()
+    expect((await user.get(`/api/items/${bare}/reader`)).status).toBe(200)
+    expect(service.upstream.requestsTo(BARE_URL)).toHaveLength(1)
+
+    const rich = idOf('First light')
+    expect((await user.get(`/api/items/${rich}/reader`)).ok).toBe(false)
+    expect(service.upstream.requestsTo(ITEM_URL)).toHaveLength(1)
+    expect((await (await user.get(`/api/items/${rich}`)).json()).feedContent.markdown).toBe('A short body.')
+  })
 })

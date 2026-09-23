@@ -103,6 +103,7 @@ export const subscriptions = sqliteTable(
     /** The Custom Description; null means the Feed Description stands. */
     customDescription: text('custom_description'),
     pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
+    // Keep in step with READING_SOURCES (shared/api.ts).
     readingSource: text('reading_source', { enum: ['original-webpage', 'feed-content'] })
       .notNull()
       .default('original-webpage'),

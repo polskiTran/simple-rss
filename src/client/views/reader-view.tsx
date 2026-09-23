@@ -132,10 +132,9 @@ function OpenReader({
 
   const loaded = sourceState.kind === 'loaded' ? sourceState.value : undefined
   const selectedLoaded = loaded?.source === source ? loaded : undefined
-  const fallback = !selectedLoaded && item.feedContent ? item.feedContent : undefined
-  const displayed = selectedLoaded?.content ?? fallback
-  const displayedSource = selectedLoaded?.source ?? (fallback ? 'feed-content' : undefined)
-  const showingFeedContent = displayedSource === 'feed-content'
+  // Feed Content stands in while the Original webpage is pending or has failed.
+  const displayed: SourceResult | undefined =
+    selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
   const next = item.nextInDigest
   const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'parsing the original page'
   const waitingContent = item.summary ? (
@@ -160,8 +159,8 @@ function OpenReader({
         <p className="content-meta reader-meta">
           <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
           <span>{item.displayDate}</span>
-          {displayed ? <span>{displayed.readingTimeMinutes} min</span> : null}
-          {displayedSource ? <span>{READING_SOURCE_LABELS[displayedSource]}</span> : null}
+          {displayed ? <span>{displayed.content.readingTimeMinutes} min</span> : null}
+          {displayed ? <span>{READING_SOURCE_LABELS[displayed.source]}</span> : null}
           {item.link ? (
             <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
               open original
@@ -169,18 +168,18 @@ function OpenReader({
           ) : null}
         </p>
         {canSwitchSource ? (
-          <ReadingSourceOptions value={viewSource} className="reader-source-options" onChange={setViewSource} />
+          <ReadingSourceOptions value={viewSource} className="reader-reading-source" onChange={setViewSource} />
         ) : null}
       </header>
 
-      {showingFeedContent && item.feedContent?.truncated ? (
+      {displayed?.source === 'feed-content' && displayed.content.truncated ? (
         <p className="empty-note" role="status">
           {item.link ? 'shortened by simple — open original for more' : 'shortened by simple'}
         </p>
       ) : null}
       {displayed ? (
         <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
-          <ArticleMarkdown markdown={displayed.markdown} />
+          <ArticleMarkdown markdown={displayed.content.markdown} />
           {selectedLoaded ? <MarkdownCommitted /> : null}
         </Suspense>
       ) : null}
