@@ -43,7 +43,7 @@ const SERIALIZER_OPTIONS = {
 const CODE_LANGUAGE = /^[\w+#.-]+$/u
 
 export interface ReaderMarkdownPolicyOptions {
-  /** The source address after resolving declared bases and Retrieval redirects; stored destinations are already absolute. */
+  /** Relative destinations resolve here, after declared bases and Retrieval redirects; stored destinations are already absolute. */
   readonly baseUrl?: string
   /** Keep durable destinations for storage, or sign them for Reader delivery. Omitted means no images. */
   readonly images?: 'preserve' | ((url: string) => string)

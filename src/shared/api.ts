@@ -343,7 +343,7 @@ export type Library = z.infer<typeof librarySchema>
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-/** Version 4 adds the per-Subscription reading source. */
+/** Version 4 adds the per-Subscription Reading Source. */
 export const USER_EXPORT_VERSION = 4
 
 export const userExportItemSchema = z.object({

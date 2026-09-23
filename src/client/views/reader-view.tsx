@@ -6,7 +6,7 @@ import { BackLink } from '../components/back-link.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { ReadingSourceOptions } from '../components/reading-source-options.js'
+import { READING_SOURCE_LABELS, ReadingSourceOptions } from '../components/reading-source-options.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
@@ -161,9 +161,7 @@ function OpenReader({
           <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
           <span>{item.displayDate}</span>
           {displayed ? <span>{displayed.readingTimeMinutes} min</span> : null}
-          {displayedSource ? (
-            <span>{displayedSource === 'feed-content' ? 'feed content' : 'original webpage'}</span>
-          ) : null}
+          {displayedSource ? <span>{READING_SOURCE_LABELS[displayedSource]}</span> : null}
           {item.link ? (
             <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
               open original

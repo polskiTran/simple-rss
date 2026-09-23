@@ -89,8 +89,12 @@ The reading material a Feed supplies for a Feed Item, distinct from its preview 
 _Avoid_: Stored article, cached content
 
 **Reader View**:
-A distraction-reduced rendering of a Feed Item's chosen reading source: its Original webpage or available Feed Content, with the other used as a fallback when needed.
+A distraction-reduced rendering of a Feed Item's chosen Reading Source, with the other used as a fallback when needed.
 _Avoid_: Stored article, cached content
+
+**Reading Source**:
+Which of a Feed Item's readings Reader View renders: its Original webpage or its Feed Content. Each Subscription holds a preferred Reading Source, Original webpage by default; choosing the other inside a Reader View lasts only for that view and never changes the preference.
+_Avoid_: Source, reading mode, content mode
 
 **Search Scope**:
 The part of the User's reading a search answers from, taken from the screen the search line was invoked on: an opened Feed's items, the Library, the Subscriptions, or everywhere. It travels in the search address and changes what is searched, never how results are ordered.

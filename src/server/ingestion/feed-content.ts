@@ -115,7 +115,7 @@ function htmlBlocks(
     // SAFETY: DOM nodeType 1 identifies an Element in this parsed document.
     const element = node as HtmlNode
     const tag = localTag(element)
-    const base = declaredBase(element, context)
+    const base = withXmlBase(context, element.getAttribute('xml:base'))
     if (
       [
         'p',
@@ -162,7 +162,7 @@ function htmlBlocks(
         if (localTag(child) !== 'li') continue
         children.push({
           type: 'listItem',
-          children: htmlBlocks(child.childNodes, declaredBase(child, base), budget, depth + 1),
+          children: htmlBlocks(child.childNodes, withXmlBase(base, child.getAttribute('xml:base')), budget, depth + 1),
         })
       }
       blocks.push({
@@ -200,7 +200,12 @@ function htmlBlocks(
           type: 'tableRow',
           children: cells.slice(0, MAX_TABLE_COLUMNS).map((cell) => ({
             type: 'tableCell',
-            children: htmlPhrases(cell.childNodes, declaredBase(cell, rowBase), budget, depth + 1),
+            children: htmlPhrases(
+              cell.childNodes,
+              withXmlBase(rowBase, cell.getAttribute('xml:base')),
+              budget,
+              depth + 1,
+            ),
           })),
         })
         if (cells.length > MAX_TABLE_COLUMNS) {
@@ -228,7 +233,7 @@ function* tableRows(
   for (const child of element.children) {
     if (!consumeNode(budget, depth)) break
     const tag = localTag(child)
-    const base = declaredBase(child, context)
+    const base = withXmlBase(context, child.getAttribute('xml:base'))
     if (tag === 'tr') yield { row: child, base }
     else if (['thead', 'tbody', 'tfoot'].includes(tag)) yield* tableRows(child, base, budget, depth + 1)
   }
@@ -254,7 +259,7 @@ function htmlPhrases(
 
 function htmlPhrase(element: HtmlNode, context: FeedContentContext, budget: Budget, depth: number): PhrasingContent[] {
   const tag = localTag(element)
-  const base = declaredBase(element, context)
+  const base = withXmlBase(context, element.getAttribute('xml:base'))
   if (tag === 'br') return [{ type: 'break' }]
   if (tag === 'code' || tag === 'kbd' || tag === 'samp')
     return [{ type: 'inlineCode', value: element.textContent ?? '' }]
@@ -299,10 +304,16 @@ function destination(candidate: string | null, baseUrl: string, budget: Budget):
   }
 }
 
-/** XML declarations inherit from the document, never the alternate webpage fallback. */
-function declaredBase(element: HtmlNode, context: FeedContentContext): FeedContentContext {
-  const declared = element.getAttribute('xml:base')
-  if (declared === null) return context
+/**
+ * A declared `xml:base` resolves against the inherited XML base and also becomes
+ * the link base. Feed documents start without a link base and let the item link
+ * decide; content bodies always have one. Invalid declarations are ignored.
+ */
+export function withXmlBase<Context extends { readonly xmlBase: string }>(
+  context: Context,
+  declared: string | null | undefined,
+): Context | FeedContentContext {
+  if (declared === undefined || declared === null) return context
   try {
     const base = new URL(declared, context.xmlBase).href
     return { xmlBase: base, linkBase: base }

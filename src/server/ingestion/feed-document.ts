@@ -2,7 +2,12 @@ import { hasOwn } from '../../shared/record.js'
 import { createHash } from 'node:crypto'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { convert } from 'html-to-text'
-import { normalizeFeedContent, type NormalizedFeedContent } from './feed-content.js'
+import {
+  type FeedContentContext,
+  normalizeFeedContent,
+  type NormalizedFeedContent,
+  withXmlBase,
+} from './feed-content.js'
 import { arrayOf, asRecord, declaresXmlEntities } from './xml.js'
 
 const MAX_TITLE_LENGTH = 512
@@ -113,12 +118,7 @@ function parseRss(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
   const description = boundedPlainText(recordField(record, ['description']), MAX_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(recordField(record, ['link']), baseUrl, feedUrls)
   const items = arrayOf(recordField(record, ['item'])).map((item) =>
-    normalizeItem(
-      asRecord(item),
-      xmlBase(record, xmlBase(asRecord(root), baseUrl)),
-      false,
-      record['@_xml:base'] !== undefined || asRecord(root)['@_xml:base'] !== undefined,
-    ),
+    normalizeItem(asRecord(item), declaredBase(record, declaredBase(asRecord(root), { xmlBase: baseUrl })), false),
   )
   return { title, description, homePageUrl, items }
 }
@@ -130,7 +130,7 @@ function parseAtom(root: unknown, baseUrl: string, feedUrls: readonly string[]):
   const homePageUrl = homePageUrlOf(atomLink(record, 'alternate'), baseUrl, feedUrls)
   const entries = recordField(record, ['entry', 'atom:entry'])
   const items = arrayOf(entries).map((entry) =>
-    normalizeItem(asRecord(entry), xmlBase(record, baseUrl), true, record['@_xml:base'] !== undefined),
+    normalizeItem(asRecord(entry), declaredBase(record, { xmlBase: baseUrl }), true),
   )
   return { title, description, homePageUrl, items }
 }
@@ -146,7 +146,7 @@ function parseRdf(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
   const description = boundedPlainText(recordField(channel, ['description']), MAX_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(recordField(channel, ['link']), baseUrl, feedUrls)
   const items = arrayOf(recordField(record, ['item'])).map((item) =>
-    normalizeItem(asRecord(item), xmlBase(record, baseUrl), false, record['@_xml:base'] !== undefined),
+    normalizeItem(asRecord(item), declaredBase(record, { xmlBase: baseUrl }), false),
   )
   return { title, description, homePageUrl, items }
 }
@@ -172,32 +172,27 @@ function pageKey(value: string): string {
   return `${url.host}${url.pathname.replace(/\/$/, '')}${url.search}`
 }
 
-function normalizeItem(
-  record: Record<string, unknown>,
-  baseUrl: string,
-  atom: boolean,
-  inheritedBase: boolean,
-): NormalizedFeedItem {
+function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase, atom: boolean): NormalizedFeedItem {
   const title = boundedPlainText(recordField(record, ['title', 'atom:title']), MAX_TITLE_LENGTH)
-  const itemBase = xmlBase(record, baseUrl)
+  const itemBase = declaredBase(record, inherited)
   const linkElement = atom ? atomLinkElement(record, 'alternate') : recordField(record, ['link'])
   const link = normalizeHttpUrl(
     atom ? asRecord(linkElement)['@_href'] : linkElement,
-    xmlBase(asRecord(linkElement), itemBase),
+    declaredBase(asRecord(linkElement), itemBase).xmlBase,
   )
   // Declared XML bases outrank the item address; without one, HTML destinations use
   // the original page, then the Feed address as their natural context.
-  const contentBase = record['@_xml:base'] !== undefined || inheritedBase ? itemBase : (link ?? itemBase)
+  const contentBase = { xmlBase: itemBase.xmlBase, linkBase: itemBase.linkBase ?? link ?? itemBase.xmlBase }
   const preferred = recordField(record, atom ? ['content', 'atom:content'] : ['content:encoded'])
   const summaryField = recordField(record, atom ? ['summary', 'atom:summary'] : ['description'])
-  const normalize = (value: unknown) => contentOf(value, atom, itemBase, contentBase)
+  const normalize = (value: unknown) => contentOf(value, atom, contentBase)
   const publisherSummary = normalize(summaryField)
   const feedContent = normalize(preferred) ?? publisherSummary
   const summary = (publisherSummary?.plainText || feedContent?.plainText)?.slice(0, MAX_SUMMARY_LENGTH) || null
   const publishedAt = normalizeDate(
     recordField(record, atom ? ['published', 'updated', 'atom:published', 'atom:updated'] : ['pubDate', 'dc:date']),
   )
-  const imageUrl = normalizeHttpUrl(imageOf(record, atom), baseUrl)
+  const imageUrl = normalizeHttpUrl(imageOf(record, atom), inherited.xmlBase)
   const guid = plainValue(recordField(record, atom ? ['id', 'atom:id'] : ['guid']))
 
   const identity = itemIdentity(guid, link, title, publishedAt)
@@ -391,15 +386,19 @@ function decodeXml(bytes: Uint8Array): string {
   }
 }
 
-function xmlBase(record: Record<string, unknown>, baseUrl: string): string {
-  try {
-    return new URL(String(record['@_xml:base'] ?? ''), baseUrl).href
-  } catch {
-    return baseUrl
-  }
+/** The XML base in scope; `linkBase` is set only once a document or item declares one. */
+type DocumentBase = { readonly xmlBase: string; readonly linkBase?: string }
+
+function declaredBase(record: Record<string, unknown>, inherited: DocumentBase): DocumentBase {
+  return withXmlBase(inherited, xmlBaseAttribute(record))
 }
 
-function contentOf(value: unknown, atom: boolean, itemBase: string, linkBase: string): NormalizedFeedContent | null {
+function xmlBaseAttribute(record: Record<string, unknown>): string | undefined {
+  const declared = record['@_xml:base']
+  return declared === undefined ? undefined : String(declared)
+}
+
+function contentOf(value: unknown, atom: boolean, context: FeedContentContext): NormalizedFeedContent | null {
   const record = asRecord(value)
   if (atom && record['@_src'] !== undefined) return null
   const raw = plainValue(value)
@@ -407,9 +406,9 @@ function contentOf(value: unknown, atom: boolean, itemBase: string, linkBase: st
   const type = atom ? String(record['@_type'] ?? 'text').toLowerCase() : 'html'
   if (!['text', 'html', 'xhtml', 'text/plain', 'text/html'].includes(type)) return null
   const source = type === 'xhtml' ? raw : decodeXmlText(raw)
-  const base = xmlBase(record, itemBase)
-  return normalizeFeedContent(source, type === 'text' || type === 'text/plain' ? 'text' : 'html', {
-    xmlBase: base,
-    linkBase: record['@_xml:base'] !== undefined ? base : linkBase,
-  })
+  return normalizeFeedContent(
+    source,
+    type === 'text' || type === 'text/plain' ? 'text' : 'html',
+    withXmlBase(context, xmlBaseAttribute(record)),
+  )
 }
