@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 
 export interface LoadFailureProps {
-  /** What failed to load, as a sentence opens: `The digest`. */
+  /** What failed to load, as a sentence opens: `The digest`, `Your saves` — the verbs agree with either. */
   readonly subject: string
   readonly kind: 'unreachable' | 'unavailable'
   onRetry(): void
@@ -13,8 +13,8 @@ export function LoadFailure({ subject, kind, onRetry }: LoadFailureProps) {
     <div className="load-failure">
       <p className="note" role="status">
         {kind === 'unreachable'
-          ? `${subject} is out of reach. Check the connection, then try again.`
-          : `${subject} is unavailable. Try again in a moment.`}
+          ? `${subject} can’t be reached. Check the connection, then try again.`
+          : `${subject} didn’t load. Try again in a moment.`}
       </p>
       <Button className="button" onClick={onRetry}>
         Retry

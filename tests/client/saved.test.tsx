@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -16,7 +16,7 @@ const LIBRARY = {
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       savedAt: '2026-08-08T09:05:00.000Z',
-      displayDate: 'today, 07:15',
+      displayDate: 'Today, 07:15',
     },
     {
       feedItemId: 1,
@@ -28,7 +28,7 @@ const LIBRARY = {
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       savedAt: '2026-08-01T08:00:00.000Z',
-      displayDate: '3 june',
+      displayDate: '3 June',
     },
   ],
   nextCursor: null,
@@ -48,8 +48,9 @@ describe('the Saved tab', () => {
     expect(screen.getByRole('heading', { name: 'A June letter' })).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(screen.getByText('The Slow Press')).toBeDefined()
-    expect(screen.getByText('today, 07:15')).toBeDefined()
-    expect(screen.getByText('3 june')).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1, name: 'Saved' })).toBeDefined()
+    expect(screen.getByText('Today, 07:15')).toBeDefined()
+    expect(screen.getByText('3 June')).toBeDefined()
 
     for (const title of ['First light', 'A June letter']) {
       const toggle = screen.getByRole('button', { name: `Save ${title}` })
@@ -60,7 +61,7 @@ describe('the Saved tab', () => {
     expect(container.querySelector('main')?.textContent).not.toMatch(/unread|mark|archive|\d+ (posts|items)/i)
   })
 
-  it('unsaves in place and keeps the row, so a misread tap can be undone', async () => {
+  it('leaves an undo line where an unsaved item was, and undoes through the Library', async () => {
     const api = stubApi()
       .on('GET /api/library', { body: LIBRARY })
       .on('DELETE /api/library/3', { body: { feedItemId: 3, saved: false, savedAt: null } })
@@ -69,17 +70,34 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'Save First light' })
-    await user.click(toggle)
+    await user.click(await screen.findByRole('button', { name: 'Save First light' }))
 
-    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
+    expect(await screen.findByText('“First light” is no longer saved.')).toBeDefined()
+    expect(screen.queryByRole('heading', { name: 'First light' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'A June letter' })).toBeDefined()
     expect(api.requestsTo('DELETE /api/library/3')).toHaveLength(1)
-    expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
 
-    await user.click(toggle)
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
 
-    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
+  })
+
+  it('keeps the undo line when saving again fails', async () => {
+    stubApi()
+      .on('GET /api/library', { body: LIBRARY })
+      .on('DELETE /api/library/3', { body: { feedItemId: 3, saved: false, savedAt: null } })
+      .on('PUT /api/library/3', { status: 503, body: { error: { code: 'unavailable', message: 'Unavailable' } } })
+    window.history.replaceState(null, '', '/saved')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Save First light' }))
+    await user.click(await screen.findByRole('button', { name: 'Undo' }))
+
+    expect(await screen.findByText('“First light” couldn’t be saved again. Try once more.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDefined()
   })
 
   it('says quietly when a save outlived its Subscription, keeping the attribution', async () => {
@@ -88,7 +106,8 @@ describe('the Saved tab', () => {
     window.history.replaceState(null, '', '/saved')
     const { container } = render(<App />)
 
-    expect(await screen.findByText('The Slow Press · no longer subscribed')).toBeDefined()
+    expect(await screen.findByText('3 June · No longer subscribed')).toBeDefined()
+    expect(screen.getByText('The Slow Press').tagName).toBe('SPAN')
     expect(screen.getByText('Field Notes').textContent).toBe('Field Notes')
     expect(container.querySelector('main')?.textContent).not.toMatch(/remove|delete|clean/i)
   })
@@ -99,7 +118,7 @@ describe('the Saved tab', () => {
     render(<App />)
 
     expect(
-      await screen.findByText('nothing saved yet — save an item from the digest or a feed to keep it here'),
+      await screen.findByText('Nothing saved yet. Save an item from the digest or a feed to keep it here.'),
     ).toBeDefined()
   })
 
@@ -111,10 +130,10 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByText('the library is out of reach — check the connection, then try again')).toBeDefined()
+    expect(await screen.findByText('Your saves can’t be reached. Check the connection, then try again.')).toBeDefined()
 
     api.on('GET /api/library', { body: LIBRARY })
-    await user.click(screen.getByRole('button', { name: 'try again' }))
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByRole('heading', { name: 'First light' })).toBeDefined()
   })
@@ -124,6 +143,6 @@ describe('the Saved tab', () => {
     window.history.replaceState(null, '', '/saved')
     render(<App />)
 
-    expect(await screen.findByText('the library is unavailable — try again in a moment')).toBeDefined()
+    expect(await screen.findByText('Your saves didn’t load. Try again in a moment.')).toBeDefined()
   })
 })

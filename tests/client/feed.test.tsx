@@ -353,6 +353,6 @@ describe('the quiet states of one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
 
-    expect(await screen.findByText('The feed is unavailable. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The feed didn’t load. Try again in a moment.')).toBeDefined()
   })
 })

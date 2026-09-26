@@ -139,7 +139,7 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByText('The digest is out of reach. Check the connection, then try again.')).toBeDefined()
+    expect(await screen.findByText('The digest can’t be reached. Check the connection, then try again.')).toBeDefined()
 
     api.on('GET /api/digest', { body: DIGEST })
     await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -152,7 +152,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('The digest is unavailable. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The digest didn’t load. Try again in a moment.')).toBeDefined()
   })
 
   it('names a server failure without dressing it up', async () => {
@@ -163,7 +163,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('The digest is unavailable. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The digest didn’t load. Try again in a moment.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
   })
 })

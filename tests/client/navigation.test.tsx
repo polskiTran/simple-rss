@@ -213,7 +213,7 @@ describe('a Feed Item’s attribution', () => {
     reading('/saved')
     render(<App />)
 
-    expect(await screen.findByText('The Slow Press · no longer subscribed')).toBeDefined()
+    expect(await screen.findByText('3 june · No longer subscribed')).toBeDefined()
     expect(screen.queryByRole('link', { name: /Slow Press/ })).toBeNull()
   })
 

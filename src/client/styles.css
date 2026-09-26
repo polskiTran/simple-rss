@@ -758,7 +758,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 64px;
+    /* A one-line item box's height, so taking its place moves nothing. */
+    min-height: 84px;
     padding: 12px 20px 12px 24px;
     background: var(--color-row-hover);
     color: var(--color-ink-2);

@@ -27,7 +27,7 @@ afterEach(() => {
 describe('a wait', () => {
   it.each([
     ['/digest', 'Loading the digest'],
-    ['/saved', 'loading the library'],
+    ['/saved', 'Loading your saves'],
     ['/feeds', 'Loading feeds'],
     ['/feeds/1', 'Loading the feed'],
     ['/reader/3', 'Opening the article'],
