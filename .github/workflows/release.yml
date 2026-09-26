@@ -17,13 +17,13 @@ permissions:
 jobs:
   release:
     name: Smoke-test and publish the versioned image
-    # ubuntu-latest is amd64, so the image built and tested here is the
+    # ubuntu-26.04 is amd64, so the image built and tested here is the
     # linux/amd64 image the release targets.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -56,7 +56,7 @@ jobs:
         run: |
           test "$(docker image inspect simple-rss:smoke --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
