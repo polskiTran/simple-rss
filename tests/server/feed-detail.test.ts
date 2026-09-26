@@ -46,10 +46,10 @@ describe('one opened Feed', () => {
     })
 
     expect(detail.items.map(({ title, date, displayDate }) => [title, date, displayDate])).toEqual([
-      ['First light', '2026-08-08', 'today, 07:15'],
-      ['Evening notes', '2026-08-07', 'yesterday, 09:31'],
-      ['A June letter', '2026-06-03', '3 june'],
-      ['A December letter', '2025-12-14', '14 december 2025'],
+      ['First light', '2026-08-08', 'Today, 07:15'],
+      ['Evening notes', '2026-08-07', 'Yesterday, 09:31'],
+      ['A June letter', '2026-06-03', '3 June'],
+      ['A December letter', '2025-12-14', '14 December 2025'],
     ])
 
     expect(detail.cadence).toHaveLength(181)
@@ -89,7 +89,7 @@ describe('one opened Feed', () => {
 
     const detail = feedDetailSchema.parse(await (await user.get('/api/feeds/1')).json())
 
-    expect(detail.items[0]).toMatchObject({ date: '2026-08-08', displayDate: 'today, 08:00' })
+    expect(detail.items[0]).toMatchObject({ date: '2026-08-08', displayDate: 'Today, 08:00' })
     expect(detail.cadence.at(-1)).toEqual({ date: '2026-08-08', count: 1 })
   })
 

@@ -426,7 +426,7 @@ export class SubscriptionService {
       counts.set(date, (counts.get(date) ?? 0) + 1)
       return {
         feedItemId: row.feedItemId,
-        title: row.title ?? 'untitled',
+        title: row.title ?? 'Untitled',
         link: row.link,
         publishedAt: row.publishedAt,
         firstSeenAt: row.firstSeenAt,

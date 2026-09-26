@@ -89,11 +89,11 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       {digest.groups.map((group) => (
         <section className="day-group" aria-labelledby={`day-${group.date}`} key={group.date}>
           <h2
-            className={group.label === 'today' ? 'day-heading' : 'day-heading day-heading-past'}
+            className={group.date === today.date ? 'day-heading' : 'day-heading day-heading-past'}
             id={`day-${group.date}`}
           >
             {group.label}
-            {group.label === 'today' ? (
+            {group.date === today.date ? (
               <span className="day-heading-count"> · {countLabel(digest.today.volume)}</span>
             ) : null}
           </h2>

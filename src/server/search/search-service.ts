@@ -132,7 +132,7 @@ export class SearchService {
       const displayInstant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
       return {
         feedItemId: row.feedItemId,
-        title: row.title ?? 'untitled',
+        title: row.title ?? 'Untitled',
         feedId: row.feedId,
         feedTitle: row.feedTitle,
         publishedAt: row.publishedAt,

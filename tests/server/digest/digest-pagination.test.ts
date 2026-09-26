@@ -49,8 +49,8 @@ describe('the Digest in pages', () => {
     )
 
     expect(rest.groups.map(({ date, label }) => [date, label])).toEqual([
-      ['2026-08-08', 'today'],
-      ['2026-08-07', 'yesterday'],
+      ['2026-08-08', 'Today'],
+      ['2026-08-07', 'Yesterday'],
     ])
     expect(flatTitles(rest)).toEqual([...titlesDown('today', 4, 0), ...titlesDown('past', 9, 0)])
     expect(rest.nextCursor).toBeNull()

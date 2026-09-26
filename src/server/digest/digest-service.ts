@@ -4,7 +4,16 @@ import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import { chronologyTime, dateKey, dayAfter, dayBefore, dayStartUtc, inDigestOrder, timeLabel } from './chronology.js'
+import {
+  chronologyTime,
+  dateKey,
+  dayAfter,
+  dayBefore,
+  dayStartUtc,
+  inDigestOrder,
+  longDate,
+  timeLabel,
+} from './chronology.js'
 import { beyondCursorSql, chronologySql, LIST_PAGE_SIZE, nextListCursor, type ListCursor } from './list-page.js'
 
 export class DigestService {
@@ -58,7 +67,7 @@ export class DigestService {
       if (!group) {
         group = {
           date,
-          label: date === today ? 'today' : date === yesterday ? 'yesterday' : calendarLabel(instant, timezone),
+          label: date === today ? 'Today' : date === yesterday ? 'Yesterday' : longDate(instant, today, timezone),
           items: [],
         }
         groups.set(date, group)
@@ -152,7 +161,7 @@ interface DigestRow {
 function digestItemOf(row: DigestRow, instant: Date, timezone: string): DigestItem {
   return {
     feedItemId: row.feedItemId,
-    title: row.title ?? 'untitled',
+    title: row.title ?? 'Untitled',
     feedId: row.feedId,
     feedTitle: row.feedTitle,
     link: row.link,
@@ -163,15 +172,4 @@ function digestItemOf(row: DigestRow, instant: Date, timezone: string): DigestIt
     firstSeenAt: row.firstSeenAt,
     saved: row.savedAt !== null,
   }
-}
-
-function calendarLabel(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
-    .format(date)
-    .toLowerCase()
 }

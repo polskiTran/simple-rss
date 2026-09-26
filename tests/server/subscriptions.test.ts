@@ -100,7 +100,7 @@ describe('Subscriptions', () => {
       groups: [
         {
           date: '2026-08-08',
-          label: 'today',
+          label: 'Today',
           items: [
             {
               feedItemId: 1,
@@ -422,7 +422,7 @@ describe('Subscriptions', () => {
 
     expect(digest.groups[0]).toMatchObject({
       date: '2026-08-07',
-      label: 'yesterday',
+      label: 'Yesterday',
       items: [
         {
           title: 'One letter',
