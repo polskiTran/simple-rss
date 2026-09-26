@@ -462,6 +462,12 @@
 
   /* Dialog */
 
+  /* Above the phone's fixed tab bar, which a dialog covers like everything else. */
+  .dialog-backdrop,
+  .dialog-viewport {
+    z-index: 10;
+  }
+
   .dialog-backdrop {
     position: fixed;
     inset: 0;
@@ -556,7 +562,7 @@
   }
 
   .group-count {
-    margin-left: 10px;
+    margin-left: 6px;
     font-weight: 400;
     color: var(--color-ink-3);
     font-variant-numeric: tabular-nums;

@@ -17,7 +17,13 @@ export function Group({ id, title, count, aside, className, children }: GroupPro
       <div className="group-header">
         <h2 className="group-heading" id={id}>
           {title}
-          {count === undefined ? null : <span className="group-count">{count.toLocaleString('en-GB')}</span>}
+          {/* A real space, so the heading is announced "Today 14", not "Today14". */}
+          {count === undefined ? null : (
+            <>
+              {' '}
+              <span className="group-count">{count.toLocaleString('en-GB')}</span>
+            </>
+          )}
         </h2>
         {aside ? <div className="group-aside">{aside}</div> : null}
       </div>
