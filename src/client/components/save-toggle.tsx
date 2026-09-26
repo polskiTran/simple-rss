@@ -7,7 +7,7 @@ export interface SaveToggleProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
-  /** The Reader's toolbar spells the state out beside the icon. */
+  /** The Reader's toolbar spells the state out beside the icon, where there is room. */
   readonly labelled?: boolean
   onSaved(saved: boolean): void
 }
@@ -36,7 +36,7 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
       onPressedChange={() => void toggle()}
     >
       <Icon name="bookmark" filled={saved} />
-      {labelled ? (saved ? 'Saved' : 'Save') : null}
+      {labelled ? <span className="wide-only">{saved ? 'Saved' : 'Save'}</span> : null}
     </Toggle>
   )
 }

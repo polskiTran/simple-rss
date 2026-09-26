@@ -115,34 +115,6 @@
     color: var(--color-quiet);
   }
 
-  .interval-options,
-  .reading-source-options {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 8px 12px;
-  }
-
-  .interval-caption,
-  .reading-source-caption {
-    font-size: 12.5px;
-    line-height: 1;
-    color: var(--color-quiet);
-    white-space: nowrap;
-  }
-
-  .interval-option,
-  .reading-source-option {
-    font-size: 12.5px;
-    color: var(--color-quiet);
-    white-space: nowrap;
-  }
-
-  .interval-option[data-pressed],
-  .reading-source-option[data-pressed] {
-    color: var(--color-ink-strong);
-  }
-
   .export-link {
     color: var(--color-ink-strong);
     text-decoration: none;
@@ -229,182 +201,11 @@
     line-height: 1.6;
   }
 
-  .reader-view {
-    padding-top: 40px;
-    padding-bottom: 64px;
-  }
-
-  .reader-topline {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 24px;
-    font-size: 12.5px;
-    line-height: 1;
-  }
-
-  .reader-topline .save-toggle {
-    text-align: right;
-  }
-
-  .reader-back {
-    color: var(--color-meta);
-  }
-
-  .reader-title {
-    margin: 64px 0 0;
-    font-weight: 200;
-    font-size: 38px;
-    line-height: 1.18;
-    letter-spacing: -0.024em;
-    text-wrap: balance;
-    overflow-wrap: break-word;
-    color: var(--color-ink-strong);
-  }
-
-  .reader-meta {
-    margin-top: 14px;
-  }
-
-  .reader-reading-source {
-    margin-top: 14px;
-  }
-
-  /* The departure arrow. U+FE0E holds it to its text form — asked for the
-     glyph alone, a phone answers with the colour emoji. */
-  .reader-original::after {
-    content: ' \2197\FE0E';
-  }
-
-  .reader-extracting,
-  .reader-waiting,
-  .reader-fallback,
-  .article-body {
-    margin-top: 48px;
-  }
-
-  .article-body,
-  .reader-waiting,
-  .reader-fallback {
-    transition: opacity 200ms ease-out;
-  }
-
-  @starting-style {
-    .article-body,
-    .reader-waiting,
-    .reader-fallback {
-      opacity: 0;
-    }
-  }
-
-  .article-body {
-    font-size: 18.5px;
-    line-height: 1.74;
-    color: var(--color-body);
-    overflow-wrap: break-word;
-  }
-
-  .article-body p {
-    margin: 0 0 28px;
-  }
-
-  .article-body li > p {
-    margin: 0;
-  }
-
-  /* KaTeX's own 1.21em step eased back, so an equation reads at the size of
-     the prose it sits in. */
-  .article-body .katex {
-    font-size: 1.05em;
-  }
-
-  /* The 2px keeps the scroller from clipping the pixels KaTeX hangs outside
-     its own box. */
-  .article-body .katex-display {
-    margin: 0 0 28px;
-    padding-block: 2px;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-
-  /* A numbered equation hangs its number at the box's right edge — on top of
-     any formula wider than the measure. Widening the box to the formula and
-     reserving the number's room on both sides moves it clear, centred. */
-  .article-body .katex-display > .katex > .katex-html:has(> .tag) {
-    min-width: 100%;
-    width: max-content;
-    padding-inline: 3.5em;
-  }
-
-  .article-body .article-image {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin: 0 auto;
-  }
-
-  .article-body .article-image-fallback {
-    font-style: italic;
-    color: var(--color-meta);
-  }
-
-  .article-link {
-    color: var(--color-primary);
-    text-decoration: underline;
-    text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
-    text-underline-offset: 3px;
-  }
-
-  .article-link::after {
-    content: '\2009\2197\FE0E';
-    font-size: 0.75em;
-  }
-
-  .article-body .article-link:has(.article-image) {
-    display: block;
-    text-decoration: none;
-  }
-
-  .article-body .article-link:has(.article-image)::after {
-    content: none;
-  }
-
-  .reader-summary {
-    margin: 0 0 24px;
-    font-size: 18.5px;
-    line-height: 1.74;
-    color: var(--color-body);
-    overflow-wrap: break-word;
-  }
-
-  .reader-fallback-actions {
-    display: flex;
-    align-items: baseline;
-    gap: 20px;
-    margin: 0 0 12px;
-    font-size: 12.5px;
-    line-height: 1;
-    color: var(--color-meta);
-  }
-
-  .reader-next {
-    margin-top: 72px;
-  }
-
-  .reader-next-label {
-    margin: 0 0 16px;
-    font-size: 12.5px;
-    line-height: 1;
-    color: var(--color-quiet);
-  }
-
   @media (hover: hover) and (pointer: fine) {
     .tab:hover,
     .feed-back:hover,
     .feed-title-link:hover,
     .search-everywhere:hover,
-    .reader-back:hover,
-    .reader-original:hover,
     .interval-option:hover,
     .appearance-option:hover {
       color: var(--color-ink-strong);
@@ -474,19 +275,4 @@
     gap: 16px;
   }
 
-  .reader-view {
-    padding-top: 32px;
-  }
-
-  .reader-title {
-    margin-top: 44px;
-    font-size: 29px;
-    line-height: 1.24;
-  }
-
-  .article-body,
-  .reader-summary {
-    font-size: 17px;
-    line-height: 1.7;
-  }
 }

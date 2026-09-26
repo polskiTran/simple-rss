@@ -1106,6 +1106,191 @@
     margin-right: 6px;
   }
 
+  /* Reader */
+
+  .reader-actions {
+    justify-content: flex-end;
+  }
+
+  .reader-source {
+    margin-right: 16px;
+  }
+
+  /* The Reader's Save is a grey button, not an item box's square. */
+  .save-toggle.save-toggle-labelled {
+    width: auto;
+    margin: 0;
+    padding: 0 14px;
+    background: var(--color-control);
+    color: var(--color-ink);
+    opacity: 1;
+  }
+
+  .save-toggle.save-toggle-labelled:hover {
+    background: var(--color-control-hover);
+  }
+
+  .save-toggle-labelled[data-pressed] .icon {
+    color: var(--color-saved);
+  }
+
+  .reader-column {
+    max-width: 680px;
+    margin-inline: auto;
+  }
+
+  .reader-header {
+    margin-top: 24px;
+  }
+
+  .reader-title {
+    margin: 0;
+    font: 400 44px/1.16 var(--font-read);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+
+  .reader-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 0;
+    margin: 20px 0 0;
+    font-size: 14px;
+    color: var(--color-ink-2);
+  }
+
+  .reader-facts {
+    display: inline-flex;
+    flex-wrap: wrap;
+  }
+
+  .reader-facts::before,
+  .reader-facts > * + *::before {
+    content: '·';
+    margin-inline: 10px;
+    color: var(--color-ink-3);
+  }
+
+  .reader-feed {
+    color: var(--color-ink);
+  }
+
+  .reader-truncated,
+  .reader-extracting {
+    margin-top: 32px;
+  }
+
+  .reader-waiting,
+  .reader-fallback,
+  .article-body {
+    margin-top: 48px;
+    transition: opacity 200ms ease-out;
+  }
+
+  @starting-style {
+    .reader-waiting,
+    .reader-fallback,
+    .article-body {
+      opacity: 0;
+    }
+  }
+
+  .reader-fallback {
+    display: grid;
+    gap: 16px;
+  }
+
+  .reader-fallback-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .article-body,
+  .reader-summary {
+    font: 400 19px/1.7 var(--font-read);
+    color: var(--color-reader-body);
+    overflow-wrap: break-word;
+  }
+
+  .reader-summary {
+    margin: 0 0 24px;
+  }
+
+  .article-body p {
+    margin: 0 0 1.4em;
+  }
+
+  .article-body li > p {
+    margin: 0;
+  }
+
+  /* KaTeX's own 1.21em step eased back, so an equation reads at the size of
+     the prose it sits in. */
+  .article-body .katex {
+    font-size: 1.05em;
+  }
+
+  /* The 2px keeps the scroller from clipping the pixels KaTeX hangs outside
+     its own box. */
+  .article-body .katex-display {
+    margin: 0 0 1.4em;
+    padding-block: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* A numbered equation hangs its number at the box's right edge — on top of
+     any formula wider than the column. Widening the box to the formula and
+     reserving the number's room on both sides moves it clear, centred. */
+  .article-body .katex-display > .katex > .katex-html:has(> .tag) {
+    min-width: 100%;
+    width: max-content;
+    padding-inline: 3.5em;
+  }
+
+  .article-body .article-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  .article-body .article-image-fallback {
+    font-style: italic;
+    color: var(--color-ink-2);
+  }
+
+  .article-link {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--color-edge-hover);
+    text-underline-offset: 3px;
+  }
+
+  .article-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .article-body .article-link:has(.article-image) {
+    display: block;
+    text-decoration: none;
+  }
+
+  .reader-next {
+    display: grid;
+    gap: 16px;
+    margin-top: 72px;
+  }
+
+  .item-plain {
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
+
   /* Chrome */
 
   .chrome {
@@ -1477,6 +1662,55 @@
     align-items: stretch;
     gap: 10px;
     padding-block: 12px;
+  }
+
+  /* Reader: the source switch takes its own row under the buttons. */
+
+  .reader-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .reader-source {
+    order: 1;
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+
+  /* Restated here: this block is unlayered, so the item box's phone rules
+     for .save-toggle would otherwise win. */
+  .reader-original,
+  .save-toggle.save-toggle-labelled {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    align-self: center;
+  }
+
+  .reader-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .reader-facts::before {
+    content: none;
+  }
+
+  .reader-title {
+    font-size: 30px;
+    line-height: 1.18;
+  }
+
+  .article-body,
+  .reader-summary {
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  .item-plain {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Dialog: a sheet from the bottom edge. */
