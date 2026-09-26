@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import type { ReadingSource } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { FeedDocumentError, parseFeedDocument, type ParsedFeedDocument } from '../ingestion/feed-document.js'
 import { persistFeedWindow } from '../ingestion/feed-window.js'
@@ -21,6 +22,7 @@ export type IngestFeedOutcome =
 /** A subscribed Feed and what one attempt at it needs: its validators, its cadence, its failure run. */
 interface PollableFeed extends PolledFeed {
   readonly enteredUrl: string
+  readonly readingSource: ReadingSource
   readonly etag: string | null
   readonly lastModified: string | null
 }
@@ -157,6 +159,7 @@ export class FeedPoll {
         lastModified: feeds.lastModified,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
         consecutiveFailures: subscriptions.consecutiveFailures,
+        readingSource: subscriptions.readingSource,
       })
       .from(feeds)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))

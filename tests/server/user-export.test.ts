@@ -67,6 +67,7 @@ describe('the JSON export', () => {
     const feeds = await (await user.get('/api/feeds')).json()
     const fieldNotes = feeds.subscriptions.find((entry: { title: string }) => entry.title === 'Field Notes')
     await user.put(`/api/feeds/${fieldNotes.feedId}/interval`, { pollingIntervalMinutes: 360 })
+    await user.put(`/api/feeds/${fieldNotes.feedId}/reading-source`, { readingSource: 'feed-content' })
     const detail = await (await user.get(`/api/feeds/${fieldNotes.feedId}`)).json()
     expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
 
@@ -82,7 +83,7 @@ describe('the JSON export', () => {
       enteredUrl: RSS_URL,
       resolvedUrl: RSS_URL,
       domain: 'journal.example',
-      subscription: { pollingIntervalMinutes: 360 },
+      subscription: { pollingIntervalMinutes: 360, readingSource: 'feed-content' },
     })
     expect(exportedRss.items).toEqual([
       {
@@ -103,6 +104,7 @@ describe('the JSON export', () => {
     if (!exportedAtom) throw new Error('the Atom Feed was absent from the export')
     expect(exportedAtom.subscription).toEqual({
       pollingIntervalMinutes: 120,
+      readingSource: 'original-webpage',
       customTitle: null,
       customDescription: null,
       createdAt: expect.any(String),
@@ -131,7 +133,7 @@ describe('the JSON export', () => {
 
     const document = await (await user.get('/api/export')).json()
 
-    expect(document.exportVersion).toBe(3)
+    expect(document.exportVersion).toBe(4)
     expect(document.feeds[0]).toMatchObject({
       title: 'Field Notes',
       description: 'From the field',

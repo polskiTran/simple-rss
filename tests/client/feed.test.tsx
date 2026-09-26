@@ -27,6 +27,7 @@ const DETAIL = {
   resolvedUrl: 'https://feeds.example/journal.xml',
   availability: AVAILABLE,
   schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
+  readingSource: 'original-webpage',
   cadence: cadence({ '2026-06-03': 2, '2026-08-08': 1 }),
   items: [
     {
@@ -60,6 +61,7 @@ const LIST_FEED = {
   homePageUrl: DETAIL.homePageUrl,
   enteredUrl: DETAIL.enteredUrl,
   resolvedUrl: DETAIL.resolvedUrl,
+  readingSource: 'original-webpage',
   cadence: Array.from({ length: 30 }, () => 0),
   availability: AVAILABLE,
 }

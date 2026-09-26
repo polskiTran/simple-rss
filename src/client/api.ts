@@ -10,6 +10,7 @@ import {
   librarySchema,
   opmlImportReportSchema,
   pollingScheduleSchema,
+  readingSourcePreferenceSchema,
   readerArticleSchema,
   readerItemSchema,
   refreshFeedResponseSchema,
@@ -28,6 +29,8 @@ import {
   type OpmlImportReport,
   type PollingIntervalMinutes,
   type PollingSchedule,
+  type ReadingSource,
+  type ReadingSourcePreference,
   type ReaderArticle,
   type ReaderDeadlineStage,
   type ReaderItem,
@@ -188,6 +191,18 @@ export async function updatePollingInterval(
     body: JSON.stringify({ pollingIntervalMinutes }),
   })
   return pollingScheduleSchema.parse(await response.json())
+}
+
+export async function updateReadingSource(
+  feedId: number,
+  readingSource: ReadingSource,
+): Promise<ReadingSourcePreference> {
+  const response = await request(`/api/feeds/${feedId}/reading-source`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ readingSource }),
+  })
+  return readingSourcePreferenceSchema.parse(await response.json())
 }
 
 /** Polling stops and the Feed's items leave the Digest; saved items stay in the Library. */

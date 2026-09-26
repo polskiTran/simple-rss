@@ -102,6 +102,18 @@ export const updatePollingIntervalRequestSchema = z.object({
 })
 export type UpdatePollingIntervalRequest = z.infer<typeof updatePollingIntervalRequestSchema>
 
+export const READING_SOURCES = ['original-webpage', 'feed-content'] as const
+export type ReadingSource = (typeof READING_SOURCES)[number]
+
+export const readingSourceSchema = z.enum(READING_SOURCES)
+
+export const DEFAULT_READING_SOURCE: ReadingSource = 'original-webpage'
+
+export const readingSourcePreferenceSchema = z.object({
+  readingSource: readingSourceSchema,
+})
+export type ReadingSourcePreference = z.infer<typeof readingSourcePreferenceSchema>
+
 export const pollingScheduleSchema = z.object({
   pollingIntervalMinutes: pollingIntervalMinutesSchema,
   nextPollAt: z.string(),
@@ -207,6 +219,7 @@ export const CADENCE_STRIP_DAYS = 30
 const cadenceStripSchema = z.array(z.number().int().nonnegative()).length(CADENCE_STRIP_DAYS)
 
 export const subscriptionSummarySchema = feedSummarySchema.extend({
+  readingSource: readingSourceSchema,
   cadence: cadenceStripSchema,
   availability: feedAvailabilitySchema,
 })
@@ -261,6 +274,7 @@ export const feedDetailSchema = feedSummarySchema.extend({
   customDescription: z.string().nullable(),
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
+  readingSource: readingSourceSchema,
   cadence: z.array(cadenceObservationSchema),
   items: z.array(feedItemRowSchema),
 })
@@ -329,8 +343,8 @@ export type Library = z.infer<typeof librarySchema>
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-/** Version 3 dropped migration bookkeeping; the document version names only its own shape. */
-export const USER_EXPORT_VERSION = 3
+/** Version 4 adds the per-Subscription Reading Source. */
+export const USER_EXPORT_VERSION = 4
 
 export const userExportItemSchema = z.object({
   dedupeKey: z.string(),
@@ -359,6 +373,7 @@ export const userExportFeedSchema = z.object({
   subscription: z
     .object({
       pollingIntervalMinutes: pollingIntervalMinutesSchema,
+      readingSource: readingSourceSchema,
       customTitle: z.string().nullable(),
       customDescription: z.string().nullable(),
       createdAt: z.string(),
@@ -477,6 +492,13 @@ export const readerNextSchema = z.object({
 })
 export type ReaderNext = z.infer<typeof readerNextSchema>
 
+export const feedContentSchema = z.object({
+  markdown: z.string().min(1),
+  truncated: z.boolean(),
+  readingTimeMinutes: z.number().int().positive(),
+})
+export type FeedContent = z.infer<typeof feedContentSchema>
+
 export const readerItemSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -488,7 +510,9 @@ export const readerItemSchema = z.object({
   displayDate: z.string(),
   summary: z.string().nullable(),
   saved: z.boolean(),
+  readingSource: readingSourceSchema,
   nextInDigest: readerNextSchema.nullable(),
+  feedContent: feedContentSchema.nullable(),
 })
 export type ReaderItem = z.infer<typeof readerItemSchema>
 

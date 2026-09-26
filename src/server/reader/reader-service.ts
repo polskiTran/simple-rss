@@ -1,11 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import type { ReaderArticle, ReaderDeadlineStage, ReaderItem } from '../../shared/api.js'
+import {
+  DEFAULT_READING_SOURCE,
+  type ReaderArticle,
+  type ReaderDeadlineStage,
+  type ReaderItem,
+} from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
+import type { SignImageUrl } from '../images/image-url-signature.js'
+import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
 import type { LogField, LogFields, Logger } from '../logger.js'
 import { elapsedMs } from '../monotonic.js'
+import { readingInformation } from '../markdown/reading-information.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -68,6 +76,7 @@ export class ReaderService {
   readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
   readonly #digest: DigestService
+  readonly #signImageUrl: SignImageUrl
   readonly #extractor: ReaderExtractor
   readonly #logger: Logger
   readonly #budgetMs: number
@@ -82,6 +91,7 @@ export class ReaderService {
     retrieval: Retrieval
     digest: DigestService
     extractor: ReaderExtractor
+    signImageUrl: SignImageUrl
     logger: Logger
     budgetMs?: number
   }) {
@@ -91,6 +101,7 @@ export class ReaderService {
     this.#retrieval = options.retrieval
     this.#digest = options.digest
     this.#extractor = options.extractor
+    this.#signImageUrl = options.signImageUrl
     this.#logger = options.logger
     this.#budgetMs = options.budgetMs ?? READER_BUDGET_MS
   }
@@ -105,8 +116,11 @@ export class ReaderService {
         link: feedItems.link,
         publishedAt: feedItems.publishedAt,
         summary: feedItems.summary,
+        feedContentMarkdown: feedItems.feedContentMarkdown,
+        feedContentTruncated: feedItems.feedContentTruncated,
         firstSeenAt: feedItems.firstSeenAt,
         savedAt: libraryItems.savedAt,
+        readingSource: subscriptions.readingSource,
       })
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
@@ -131,7 +145,16 @@ export class ReaderService {
       firstSeenAt: row.firstSeenAt,
       displayDate: readerDate(instant, dateKey(now, timezone), timezone),
       summary: row.summary,
+      feedContent: row.feedContentMarkdown
+        ? {
+            // Stored destinations are absolute; no original webpage is needed to refresh capabilities.
+            markdown: applyReaderMarkdownPolicy(row.feedContentMarkdown, { images: this.#signImageUrl }),
+            truncated: row.feedContentTruncated !== 0,
+            readingTimeMinutes: readingInformation(row.feedContentMarkdown).readingTimeMinutes,
+          }
+        : null,
       saved: row.savedAt !== null,
+      readingSource: row.readingSource ?? DEFAULT_READING_SOURCE,
       nextInDigest: this.#nextInDigest(feedItemId),
     }
   }

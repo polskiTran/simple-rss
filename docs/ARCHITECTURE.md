@@ -10,7 +10,7 @@ The canonical domain vocabulary is defined in [`CONTEXT.md`](../CONTEXT.md). Har
 
 - Let one User use the same reader from phone and laptop browsers.
 - Poll RSS and Atom Feeds reliably in the background.
-- Keep Subscriptions, Feed Item metadata, Library membership, and preferences authoritative on the server.
+- Keep Subscriptions, Feed Item metadata and Feed Content, Library membership, and preferences authoritative on the server.
 - Remain inexpensive and straightforward to self-host.
 - Prefer calm chronology over inbox and engagement mechanics.
 - Keep stored data portable.
@@ -128,8 +128,8 @@ The initial relational model contains:
 | `user_auth` | Singleton setup state and Argon2id password verifier |
 | `sessions` | Hashed opaque session tokens and expiry state |
 | `feeds` | External Feed identity, URL, metadata, and retrieval validators |
-| `subscriptions` | Active relationship, Polling Interval, due time, and availability state |
-| `feed_items` | Normalized metadata and observation timestamps |
+| `subscriptions` | Active relationship, Polling Interval, reading-source preference, due time, and availability state |
+| `feed_items` | Normalized metadata, durable Feed Content, and observation timestamps |
 | `library_items` | Saved membership and saved time |
 | FTS virtual tables | Rebuildable search indexes |
 | migration metadata | Applied schema versions |
@@ -192,9 +192,13 @@ Three consecutive failures surface calm Feed Availability information. Failures 
 
 Feed Items deduplicate only within their Feed using a unique `(feed_id, dedupe_key)` constraint. Identity prefers RSS GUID or Atom ID, falls back to a normalized link, and finally to a deterministic content fingerprint. The same link appearing in different Feeds remains separate.
 
-When an identified item reappears, title, link, plain-text summary, image URL, and corrected publication time may update. Identity, first-seen time, and Library membership remain stable.
+When an identified item reappears, title, link, plain-text summary, Feed Content, image URL, and corrected publication time may update. Identity, first-seen time, and Library membership remain stable.
 
-Feed-provided summaries are normalized to safe plain text before storage.
+Feed-provided summaries remain safe plain text for previews and search. Successful Feed document ingestion also stores separate sanitized Markdown as Feed Content, preferring usable RSS content:encoded or Atom content, then description/summary. A separate publisher summary stays distinct; when one field supplies both, normalization is shared. Atom text is literal, HTML entities are decoded at their own layer, and XHTML retains child structure. External Atom content references are not fetched. Links and inline image destinations resolve against declared XML bases and Feed Item/Feed context before that context is discarded. A safe image alone is renderable Feed Content, even without alternative text; rejected images alone do not make a preferred field usable.
+
+Feed Content shares the Reader Markdown policy in the acyclic server markdown/ boundary, which imports no other server domain. It contains text structure, HTTP(S) links, and durable HTTP(S) image destinations without URL credentials, never ingestion-time signed proxy paths. No image is retrieved during ingestion or to determine renderability; Retrieval validates the destination, DNS answers and every redirect when the User's browser later requests the signed proxy. Each stored body is at most 256 KiB of UTF-8, cut through the AST to a readable, structurally closed prefix, with a durable application-truncation flag. Image destinations remain whole while oversized alternative text and titles can be shortened. Per-body input, node, depth and table limits also bound conversion work; these limits set the same flag. The plain-text summary remains capped independently at 20,000 characters.
+
+The additive migration leaves existing metadata, identity, first-seen time and Library membership alone. Older records have no Feed Content until future successful Feed document ingestion: no migration fetch, forced backfill, validator reset or content invented from a 304. Feed Content follows its Feed Item through Retention, Library protection, restart and SQLite backup/restore; leaving the Feed Window alone does not delete it.
 
 ### Chronology
 
@@ -216,7 +220,11 @@ SQLite FTS5 indexes Feed titles, item titles, and normalized summaries. Search c
 
 ## Reader View
 
-Reader View is generated only when requested:
+Reader View requests stored metadata, the Subscription's reading-source preference, and Feed Content by Feed Item ID. Existing and new Subscriptions default to Original webpage. Feed Content mode displays any renderable stored Feed Content immediately and does not request the original webpage; short text, image-only bodies, read-more wording, and application truncation never imply incompleteness. When Feed Content is unavailable, it falls back once to Original webpage extraction if the Feed Item has a stored link. Original webpage mode displays available Feed Content while extraction is pending and after terminal failure. Neither fallback mutates the Subscription preference, and the User may override the source for the current view without persisting that choice.
+
+The header names the body actually displayed and estimates reading time from that body; application-shortened Feed Content carries a notice. Preparing the Feed Item response signs its stored inline image destinations with fresh two-day capabilities. These responses use `Cache-Control: no-store`, so reopening stored Feed Content after signature expiry or a service restart yields usable image paths without re-ingestion or an original-webpage request to refresh them. Signing adds delivery overhead beyond the durable 256 KiB bound; the shared response contract accepts that expansion.
+
+Original-webpage extraction is generated only when selected or used as the missing-content fallback:
 
 1. The client requests a Feed Item by ID, never an arbitrary URL.
 2. The server retrieves the stored original link through the hardened retrieval boundary.
@@ -230,9 +238,9 @@ Allowed output includes headings, paragraphs, emphasis, lists, block quotes, the
 
 The client renders that Markdown with Streamdown in static mode, with KaTeX and Shiki support. Streamdown's sanitize and link-hardening stages remain in place; its raw-HTML stage is explicitly excluded and stubbed out at the bundler. Reader-specific link and image components repeat destination validation, safe opener behavior, signed-image-route enforcement, lazy loading, and alternative-text fallback at the final DOM boundary.
 
-Article HTML and Markdown are never written to SQLite. Extraction failures preserve the Feed Item, show its stored summary and an **Open original** action, and expose a rate-limited **Retry parsing** action. Failed extraction responses are not cached.
+Original-webpage HTML and extracted Markdown are never written to SQLite; only Feed-derived Markdown is durable. Extraction failures preserve the Feed Item and its Feed Content, with stored summary/metadata when Feed Content is absent, an **Open original** action when linked, and a rate-limited **Retry parsing** action. When neither source is available, there is no fallback loop. Failed extraction responses are not cached.
 
-One 4.5-second server budget bounds the answer to each Reader request — steps 2–6, from before capacity queueing through the Markdown policy — keeping the interactive path inside the User's five-second boundary. It does not bound the work. At expiry the request is answered with an uncached `504 article_deadline_exceeded` naming the stage still underway — `publisher` while waiting on the original page, `parsing` once its bytes arrived — while the extraction detaches and keeps running inside Retrieval's own limits. A finished detached extraction is stashed in memory for sixty seconds; nothing article-shaped ever reaches SQLite. The client answers a deadline by quietly refetching — twice, two seconds apart, saying which stage it is waiting on — and typically renders the article by joining the still-running work or collecting the stash; the manual retry is the terminal fallback. A deadline answer never counts against the retry allowance; a detached retrieval that then fails terminally counts once. The client's longer request deadline is only a defensive ceiling above each response.
+One 4.5-second server budget bounds the answer to each Reader request — steps 2–6, from before capacity queueing through the Markdown policy — keeping the interactive path inside the User's five-second boundary. It does not bound the work. At expiry the request is answered with an uncached `504 article_deadline_exceeded` naming the stage still underway — `publisher` while waiting on the original page, `parsing` once its bytes arrived — while the extraction detaches and keeps running inside Retrieval's own limits. A finished detached extraction is stashed in memory for sixty seconds; no original-webpage extraction reaches SQLite. The client answers a deadline by quietly refetching — twice, two seconds apart, saying which stage it is waiting on — and typically renders the article by joining the still-running work or collecting the stash; the manual retry is the terminal fallback. A deadline answer never counts against the retry allowance; a detached retrieval that then fails terminally counts once. The client's longer request deadline is only a defensive ceiling above each response.
 
 The service owns the extraction queue and worker lifecycle. Callers for the same Feed Item share one task; the final caller leaving cancels active or queued work, unless a deadline answer has detached it, in which case it runs to completion for the stash. Cancellation or a worker crash fails only that Reader request. Shutdown stops the scheduler, drains in-flight requests so an extraction already running finishes inside its own budget, and only then terminates worker tasks and Reader retrievals. Work that outlives the grace period is cut off with the connection.
 
@@ -241,7 +249,8 @@ The service owns the extraction queue and worker lifecycle. Callers for the same
 The image proxy protects the User from direct publisher requests and allows a strict `img-src 'self'` content security policy.
 
 - Primary Feed Item images use an item-ID route.
-- Reader images use short-lived signed URLs generated during extraction.
+- Inline images from both reading sources use the authenticated signed Reader route: original-webpage images are signed during extraction, durable Feed Content images when preparing each Feed Item response.
+- Signatures expire after two days and use a per-process key. Feed Item responses are uncached; the one-day original-webpage response cache is shorter than signature lifetime. Cached image bytes are not a permanent capability to retrieve a target.
 - Arbitrary unsigned target URLs are never accepted.
 - The proxy reuses hardened URL and redirect validation.
 - Responses stream with a five MiB limit.
@@ -314,7 +323,7 @@ The client is a responsive web application, not a PWA. It has no service worker,
 
 OPML is the interoperability format for Subscriptions. A versioned JSON export includes:
 
-- Subscriptions and Polling Intervals
+- Subscriptions, Polling Intervals, and reading-source preferences
 - Feed metadata
 - Retained Feed Items
 - Library membership
@@ -351,7 +360,7 @@ The service emits structured logs to stdout and exposes Feed Availability in the
 
 - Restarted scheduler work catches up from persisted due times.
 - Feed failures back off and remain visible without automatic removal.
-- Reader failures fall back to summary and original link.
+- Reader failures keep Feed Content when available, otherwise summary/metadata and the original link.
 - Image failures show a stable visual fallback.
 - Migration failure keeps the deployment unready.
 - A full or unwritable volume makes readiness fail.

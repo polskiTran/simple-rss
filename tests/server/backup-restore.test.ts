@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { readerItemSchema } from '../../src/shared/api.js'
 import { runCli, type CliContext } from '../../src/server/cli.js'
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger, type Logger } from '../../src/server/logger.js'
@@ -17,7 +18,7 @@ const RSS = `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>Field Notes</title>
     <item>
       <guid>entry-1</guid><title>Morning chronology</title><link>https://journal.example/one</link>
-      <description>A morning note</description><pubDate>Fri, 07 Aug 2026 07:15:00 GMT</pubDate>
+      <description><![CDATA[<p>A <strong>morning</strong> note</p><img src="/morning.png" alt="A morning sky"/>]]></description><pubDate>Fri, 07 Aug 2026 07:15:00 GMT</pubDate>
     </item>
   </channel></rss>`
 
@@ -206,8 +207,12 @@ describe('backup and restore, round-tripped through the running application', ()
     const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId
     await user.put(`/api/feeds/${feedId}/interval`, { pollingIntervalMinutes: 360 })
+    await user.put(`/api/feeds/${feedId}/reading-source`, { readingSource: 'feed-content' })
     const detail = await (await user.get(`/api/feeds/${feedId}`)).json()
     expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
+    const reader = readerItemSchema.parse(await (await user.get(`/api/items/${detail.items[0].feedItemId}`)).json())
+    expect(reader.feedContent?.markdown).toContain('A **morning** note')
+    expect(reader.feedContent?.markdown).toContain('![A morning sky](/api/reader/image?')
     await service.stop()
 
     const live = openDatabase(databasePathOf(service))
@@ -244,7 +249,29 @@ describe('backup and restore, round-tripped through the running application', ()
 
     const restoredDetail = await (await device.get(`/api/feeds/${restoredFeeds.subscriptions[0].feedId}`)).json()
     expect(restoredDetail.schedule.pollingIntervalMinutes).toBe(360)
+    expect(restoredDetail.readingSource).toBe('feed-content')
     expect(restoredDetail.items).toHaveLength(1)
+
+    const restoredReader = readerItemSchema.parse(await (await device.get(`/api/items/${reader.feedItemId}`)).json())
+    expect(restoredReader.readingSource).toBe('feed-content')
+    expect(restoredReader.feedContent?.markdown).toContain('A **morning** note')
+    const restoredImage = restoredReader.feedContent?.markdown
+      .match(/!\[A morning sky\]\(([^)]+)\)/)?.[1]
+      ?.replaceAll('\\&', '&')
+    if (!restoredImage) throw new Error('No restored Feed Content image')
+    expect(restoredReader.feedContent?.markdown).not.toBe(reader.feedContent?.markdown)
+    expect(new URL(restoredImage, 'https://reader.test').searchParams.get('url')).toBe(
+      'https://journal.example/morning.png',
+    )
+    expect(restored.upstream.requests).toHaveLength(0)
+    restored.upstream.stub('https://journal.example/morning.png', {
+      headers: { 'content-type': 'image/png' },
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    })
+    expect((await device.get(restoredImage)).status).toBe(200)
 
     const library = await (await device.get('/api/library')).json()
     expect(library.items.map((item: { title: string }) => item.title)).toEqual(['Morning chronology'])

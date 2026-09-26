@@ -32,6 +32,7 @@ export function buildUserExport(options: {
         homePageUrl: feeds.homePageUrl,
         createdAt: feeds.createdAt,
         pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
+        readingSource: subscriptions.readingSource,
         customTitle: subscriptions.customTitle,
         customDescription: subscriptions.customDescription,
         subscribedAt: subscriptions.createdAt,
@@ -77,10 +78,11 @@ export function buildUserExport(options: {
         homePageUrl: feed.homePageUrl,
         createdAt: feed.createdAt,
         subscription:
-          feed.pollingIntervalMinutes === null || feed.subscribedAt === null
+          feed.pollingIntervalMinutes === null || feed.readingSource === null || feed.subscribedAt === null
             ? null
             : {
                 pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(feed.pollingIntervalMinutes),
+                readingSource: feed.readingSource,
                 customTitle: feed.customTitle,
                 customDescription: feed.customDescription,
                 createdAt: feed.subscribedAt,

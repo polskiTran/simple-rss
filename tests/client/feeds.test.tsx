@@ -30,6 +30,7 @@ const FEED = {
   homePageUrl: 'https://journal.example/',
   enteredUrl: 'https://journal.example/feed',
   resolvedUrl: 'https://feeds.example/journal.xml',
+  readingSource: 'original-webpage',
   cadence: Array.from({ length: 30 }, () => 0),
   availability: AVAILABLE,
 }
@@ -68,6 +69,7 @@ function feedDetail(availability: FeedAvailability, itemCount: number) {
     resolvedUrl: FEED.resolvedUrl,
     availability,
     schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
+    readingSource: 'original-webpage',
     cadence: [],
     items: Array.from({ length: itemCount }, (_, index) => ({
       feedItemId: index + 1,

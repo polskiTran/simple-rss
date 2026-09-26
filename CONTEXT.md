@@ -48,6 +48,10 @@ _Avoid_: Feed health, broken Feed, pending feed
 An entry published by a Feed, represented by its available title, link, summary, publication time, and image URL.
 _Avoid_: Post, article
 
+**Original webpage**:
+The webpage a Feed Item links to, distinct from the Feed Content supplied inside the Feed.
+_Avoid_: Full article, source page
+
 **Feed Home Page**:
 The site a Feed declares as its own, read from the Feed document and absent when the Feed names only its own URL. It supplies the host shown beside a Feed and the link behind it, so the Feeds list names the publisher rather than whichever host serves the XML.
 _Avoid_: Site URL, website, channel link
@@ -80,9 +84,17 @@ _Avoid_: Reading list, bookmarks
 The rule keeping ordinary history bounded: an unsaved Feed Item is removed 90 days after it was last observed in a Feed Window, and an unsubscribed Feed's unsaved items are removed at the next sweep. Library membership always survives Retention, and a Feed with saves keeps the metadata behind their attribution.
 _Avoid_: Expiry, archiving, garbage collection
 
-**Reader View**:
-A temporary, distraction-reduced rendering derived from a Feed Item's original webpage.
+**Feed Content**:
+The reading material a Feed supplies for a Feed Item, distinct from its preview summary and original webpage.
 _Avoid_: Stored article, cached content
+
+**Reader View**:
+A distraction-reduced rendering of a Feed Item's chosen Reading Source, with the other used as a fallback when needed.
+_Avoid_: Stored article, cached content
+
+**Reading Source**:
+Which of a Feed Item's readings Reader View renders: its Original webpage or its Feed Content. Each Subscription holds a preferred Reading Source, Original webpage by default; choosing the other inside a Reader View lasts only for that view and never changes the preference.
+_Avoid_: Source, reading mode, content mode
 
 **Search Scope**:
 The part of the User's reading a search answers from, taken from the screen the search line was invoked on: an opened Feed's items, the Library, the Subscriptions, or everywhere. It travels in the search address and changes what is searched, never how results are ordered.

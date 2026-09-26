@@ -281,6 +281,22 @@ export const migrations: readonly Migration[] = [
         CHECK (custom_description IS NULL OR length(custom_description) BETWEEN 1 AND 1024);
     `,
   },
+  {
+    version: 14,
+    name: 'feed-content',
+    sql: `
+      ALTER TABLE feed_items ADD COLUMN feed_content_markdown TEXT;
+      ALTER TABLE feed_items ADD COLUMN feed_content_truncated INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 15,
+    name: 'subscription-reading-source',
+    sql: `
+      ALTER TABLE subscriptions ADD COLUMN reading_source TEXT NOT NULL DEFAULT 'original-webpage'
+        CHECK (reading_source IN ('original-webpage', 'feed-content'));
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

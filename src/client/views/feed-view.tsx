@@ -11,6 +11,7 @@ import {
   type FeedDetail,
   type FeedDetailsUpdate,
   type PollingIntervalMinutes,
+  type ReadingSource,
 } from '../../shared/api.js'
 import {
   ApiError,
@@ -19,6 +20,7 @@ import {
   unsubscribeFromFeed,
   updateFeedDetails,
   updatePollingInterval,
+  updateReadingSource,
 } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
 import { BackLink } from '../components/back-link.js'
@@ -26,6 +28,7 @@ import { Field } from '../components/field.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
+import { READING_SOURCE_LABELS, ReadingSourceOptions } from '../components/reading-source-options.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
@@ -46,6 +49,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [changingInterval, setChangingInterval] = useState(false)
+  const [changingReadingSource, setChangingReadingSource] = useState(false)
   const [confirmingUnsubscribe, setConfirmingUnsubscribe] = useState(false)
   const [unsubscribing, setUnsubscribing] = useState(false)
 
@@ -85,6 +89,21 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       setNotice('the interval could not be changed')
     } finally {
       setChangingInterval(false)
+    }
+  }
+
+  async function changeReadingSource(readingSource: ReadingSource) {
+    if (changingReadingSource || state.kind !== 'loaded' || state.value.readingSource === readingSource) return
+    setChangingReadingSource(true)
+    setNotice('')
+    try {
+      const preference = await updateReadingSource(feedId, readingSource)
+      set((detail) => ({ ...detail, ...preference }))
+      setNotice(`items now open with ${READING_SOURCE_LABELS[readingSource]}`)
+    } catch {
+      setNotice('the reading source could not be changed')
+    } finally {
+      setChangingReadingSource(false)
     }
   }
 
@@ -149,6 +168,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
           refreshing={refreshing}
           onRefresh={refresh}
           onChangeInterval={changeInterval}
+          onChangeReadingSource={changeReadingSource}
           onShowDay={showDay}
           onSaved={setSaved}
           onOpenItem={onOpenItem}
@@ -169,6 +189,7 @@ function OpenFeed({
   refreshing,
   onRefresh,
   onChangeInterval,
+  onChangeReadingSource,
   onShowDay,
   onSaved,
   onOpenItem,
@@ -183,6 +204,7 @@ function OpenFeed({
   refreshing: boolean
   onRefresh: () => void
   onChangeInterval: (minutes: PollingIntervalMinutes) => void
+  onChangeReadingSource: (readingSource: ReadingSource) => void
   onShowDay: (date: string) => void
   onSaved: (feedItemId: number, saved: boolean) => void
   onOpenItem: (feedItemId: number, feedTitle: string) => void
@@ -199,29 +221,32 @@ function OpenFeed({
       <p className="cadence-stats">{grid.stats}</p>
       <UnavailableNote availability={detail.availability} />
       <div className="feed-controls">
-        <ToggleGroup
-          className="interval-options"
-          aria-label="checked every"
-          value={[String(detail.schedule.pollingIntervalMinutes)]}
-          onValueChange={(chosen) => {
-            // Pressing the pressed word would empty the group; a Feed is always
-            // checked on one of the six, so that press stays where it is.
-            const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen[0])
-            if (minutes !== undefined) onChangeInterval(minutes)
-          }}
-        >
-          <span className="interval-caption">checked every</span>
-          {POLLING_INTERVAL_MINUTES.map((minutes) => (
-            <Toggle
-              key={minutes}
-              className="text-button interval-option"
-              value={String(minutes)}
-              aria-label={`check ${intervalPhrase(minutes)}`}
-            >
-              {INTERVAL_WORDS[minutes]}
-            </Toggle>
-          ))}
-        </ToggleGroup>
+        <div className="feed-preferences">
+          <ToggleGroup
+            className="interval-options"
+            aria-label="checked every"
+            value={[String(detail.schedule.pollingIntervalMinutes)]}
+            onValueChange={(chosen) => {
+              // Pressing the pressed word would empty the group; a Feed is always
+              // checked on one of the six, so that press stays where it is.
+              const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen[0])
+              if (minutes !== undefined) onChangeInterval(minutes)
+            }}
+          >
+            <span className="interval-caption">checked every</span>
+            {POLLING_INTERVAL_MINUTES.map((minutes) => (
+              <Toggle
+                key={minutes}
+                className="text-button interval-option"
+                value={String(minutes)}
+                aria-label={`check ${intervalPhrase(minutes)}`}
+              >
+                {INTERVAL_WORDS[minutes]}
+              </Toggle>
+            ))}
+          </ToggleGroup>
+          <ReadingSourceOptions value={detail.readingSource} caption="open with" onChange={onChangeReadingSource} />
+        </div>
         <span className="feed-actions">
           <EditFeedDetails detail={detail} onSaved={onDetailsSaved} />
           <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>

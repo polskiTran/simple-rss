@@ -103,6 +103,10 @@ export const subscriptions = sqliteTable(
     /** The Custom Description; null means the Feed Description stands. */
     customDescription: text('custom_description'),
     pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
+    // Keep in step with READING_SOURCES (shared/api.ts).
+    readingSource: text('reading_source', { enum: ['original-webpage', 'feed-content'] })
+      .notNull()
+      .default('original-webpage'),
     /** The persisted due-time frontier the scheduler wakes to query. */
     nextPollAt: text('next_poll_at').notNull().default('1970-01-01T00:00:00.000Z'),
     lastPolledAt: text('last_polled_at'),
@@ -119,6 +123,7 @@ export const subscriptions = sqliteTable(
     index('subscriptions_next_poll_at').on(table.nextPollAt),
     // Keep in step with pollingIntervalMinutesSchema (shared/api.ts).
     check('subscriptions_polling_interval', sql`${table.pollingIntervalMinutes} IN (30, 60, 120, 360, 720, 1440)`),
+    check('subscriptions_reading_source', sql`${table.readingSource} IN ('original-webpage', 'feed-content')`),
     check('subscriptions_consecutive_failures', sql`${table.consecutiveFailures} >= 0`),
     check(
       'subscriptions_failure_category',
@@ -164,6 +169,8 @@ export const feedItems = sqliteTable(
     publishedAt: text('published_at'),
     imageUrl: text('image_url'),
     summary: text('summary'),
+    feedContentMarkdown: text('feed_content_markdown'),
+    feedContentTruncated: integer('feed_content_truncated').notNull().default(0),
     firstSeenAt: text('first_seen_at').notNull(),
     lastObservedAt: text('last_observed_at').notNull(),
   },

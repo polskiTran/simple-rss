@@ -2,9 +2,9 @@ import { Defuddle } from 'defuddle/node'
 import { parseHTML } from 'linkedom'
 import { elapsedMs } from '../monotonic.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
-import { applyReaderMarkdownPolicy } from './markdown-policy.js'
+import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
+import { readingInformation } from '../markdown/reading-information.js'
 
-const WORDS_PER_MINUTE = 225
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
 export const FULL_CLEANUP_MAX_BYTES = 512 * 1024
@@ -87,17 +87,15 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     const policyStartedAt = performance.now()
     const markdown = applyReaderMarkdownPolicy(result.contentMarkdown ?? '', {
       baseUrl: input.url,
-      ...(input.signImageUrl ? { signImageUrl: input.signImageUrl } : {}),
+      ...(input.signImageUrl ? { images: input.signImageUrl } : {}),
     })
     timings.markdownPolicyMs = elapsedMs(policyStartedAt)
     if (!markdown) return { article: undefined, timings }
 
-    const wordCount = countWords(markdown)
     return {
       article: {
         markdown,
-        wordCount,
-        readingTimeMinutes: Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE)),
+        ...readingInformation(markdown),
       },
       timings,
     }
@@ -152,8 +150,4 @@ function metaCharset(bytes: Uint8Array): string | undefined {
     /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i.exec(head)?.[1] ??
     /<meta[^>]+content\s*=\s*["'][^"']*charset=([\w-]+)/i.exec(head)?.[1]
   )
-}
-
-function countWords(markdown: string): number {
-  return markdown.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length
 }

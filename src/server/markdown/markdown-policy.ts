@@ -21,7 +21,6 @@ import { mathFromMarkdown, mathToMarkdown } from 'mdast-util-math'
 import { toMarkdown } from 'mdast-util-to-markdown'
 import { gfmTable } from 'micromark-extension-gfm-table'
 import { math } from 'micromark-extension-math'
-import type { SignImageUrl } from '../images/image-url-signature.js'
 
 const PARSER_OPTIONS = {
   extensions: [gfmTable(), math({ singleDollarTextMath: false })],
@@ -31,7 +30,8 @@ const PARSER_OPTIONS = {
 const SERIALIZER_OPTIONS = {
   bullet: '-' as const,
   emphasis: '*' as const,
-  extensions: [gfmTableToMarkdown(), mathToMarkdown({ singleDollarTextMath: false })],
+  // Alignment padding multiplies one oversized cell across every row.
+  extensions: [gfmTableToMarkdown({ tablePipeAlign: false }), mathToMarkdown({ singleDollarTextMath: false })],
   fence: '`' as const,
   fences: true,
   listItemIndent: 'one' as const,
@@ -43,22 +43,21 @@ const SERIALIZER_OPTIONS = {
 const CODE_LANGUAGE = /^[\w+#.-]+$/u
 
 export interface ReaderMarkdownPolicyOptions {
-  /** The final page address reported by Retrieval. */
-  readonly baseUrl: string
-  /** Images are omitted unless they can be replaced with a signed Reader path. */
-  readonly signImageUrl?: SignImageUrl
+  /** Relative destinations resolve here, after declared bases and Retrieval redirects; stored destinations are already absolute. */
+  readonly baseUrl?: string
+  /** Keep durable destinations for storage, or sign them for Reader delivery. Omitted means no images. */
+  readonly images?: 'preserve' | ((url: string) => string)
 }
 
 type PolicyContext = ReaderMarkdownPolicyOptions
 
 /**
- * Rebuilds Defuddle Markdown from the Reader dialect's maintained AST nodes.
+ * Rebuilds Markdown from the Reader dialect's maintained AST nodes.
  * Unknown syntax and raw HTML are omitted rather than passed through.
  */
 export function applyReaderMarkdownPolicy(markdown: string, options: ReaderMarkdownPolicyOptions): string {
   const parsed = fromMarkdown(markdown, PARSER_OPTIONS)
-  const root: Root = { type: 'root', children: policyBlocks(parsed.children, options) }
-  return toMarkdown(root, SERIALIZER_OPTIONS).trim()
+  return serializeReaderMarkdown(readerMarkdownTree(parsed, options))
 }
 
 function policyBlocks(nodes: readonly RootContent[], context: PolicyContext): BlockContent[] {
@@ -187,7 +186,7 @@ function policyLink(node: Link, context: PolicyContext): PhrasingContent[] {
 
   const link: Link = {
     type: 'link',
-    url,
+    url: url.href,
     children,
     ...(node.title ? { title: node.title } : {}),
   }
@@ -195,25 +194,34 @@ function policyLink(node: Link, context: PolicyContext): PhrasingContent[] {
 }
 
 function policyImage(node: Image, context: PolicyContext): PhrasingContent[] {
-  if (!context.signImageUrl) return []
+  if (!context.images) return []
   const alt = node.alt?.trim() ?? ''
   const url = absoluteHttpUrl(node.url, context.baseUrl)
-  if (!url) return []
+  if (!url || url.username || url.password) return []
 
   const image: Image = {
     type: 'image',
-    url: context.signImageUrl(url),
+    url: context.images === 'preserve' ? url.href : context.images(url.href),
     alt,
     ...(node.title ? { title: node.title } : {}),
   }
   return [image]
 }
 
-function absoluteHttpUrl(candidate: string, baseUrl: string): string | undefined {
+function absoluteHttpUrl(candidate: string, baseUrl: string | undefined): URL | undefined {
   try {
     const url = new URL(candidate, baseUrl)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : undefined
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : undefined
   } catch {
     return undefined
   }
+}
+
+/** Feed conversion and original-page extraction share this allowlist. */
+export function readerMarkdownTree(root: Root, options: ReaderMarkdownPolicyOptions): Root {
+  return { type: 'root', children: policyBlocks(root.children, options) }
+}
+
+export function serializeReaderMarkdown(root: Root): string {
+  return toMarkdown(root, SERIALIZER_OPTIONS).trim()
 }

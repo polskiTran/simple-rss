@@ -22,6 +22,7 @@ export interface Installation {
   readonly brokenArticleFeedUrl: string
   readonly slowArticleFeedUrl: string
   readonly longFeedUrl: string
+  readonly imageOnlyFeedUrl: string
 }
 
 const FIGURE_IMAGE_URL = 'https://cdn.publisher.example/image/fetch/$s_!9LbW!,w_424,c_limit,f_webp/valley.png'
@@ -103,6 +104,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
     const slowArticleFeedUrl = 'https://publisher.example/ridge.xml'
     const longFeedUrl = 'https://publisher.example/meadow.xml'
+    const imageOnlyFeedUrl = 'https://publisher.example/comic.xml'
     const publishedAt = new Date()
     publishedAt.setUTCHours(7, 15, 0, 0)
     const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
@@ -116,6 +118,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
               <link>https://publisher.example/first-light</link>
               <pubDate>${publishedAt.toUTCString()}</pubDate>
               <description>A clear morning.</description>
+              <content:encoded><![CDATA[<p>A clear morning.</p><h2>From the field</h2><p>Observe <em>carefully</em> and read <a href="/feed-notes">the feed notebook</a>.</p><ul><li>Keep a steady hand</li></ul><figure><img src="${FIGURE_IMAGE_URL}" alt="The valley in the Feed"/><figcaption>The first light from the Feed.</figcaption></figure>]]></content:encoded>
             </item>
           </channel></rss>`,
       })
@@ -136,6 +139,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
               <link>https://publisher.example/slow-water</link>
               <pubDate>${publishedEarlier.toUTCString()}</pubDate>
               <description>Tide notes from the shore.</description>
+              <content:encoded><![CDATA[<h2>Coastal notes</h2><p>Tide notes from the shore.</p><p>Read <a href="/coastal-notes">the coastal notebook</a> and <a href="javascript:alert(1)">unsafe link text</a>.</p><blockquote><p>The water moves slowly.</p></blockquote><pre><code>measure(tide)</code></pre><table><tr><th>Time</th><th>Tide</th></tr><tr><td>Morning</td><td>Low</td></tr></table><figure><img src="/coast.png" alt="Low tide on the coast"/><figcaption>A study of the shore.</figcaption></figure><img src="/missing.png" alt="Unavailable tide chart"/><img src="data:image/svg+xml,bad"/><script>document.body.innerHTML = 'hostile'</script><iframe src="https://tracker.example/frame"></iframe><p>Quoted address: ${QUOTED_LONG_URL}</p>${'<!-- padding -->'.repeat(40_000)}<p>Beyond the application limit.</p>]]></content:encoded>
             </item>
           </channel></rss>`,
       })
@@ -143,6 +147,20 @@ export const test = base.extend<InstallationOptions & { installation: Installati
         status: 500,
         headers: { 'content-type': 'text/html' },
         body: 'the shore is closed',
+      })
+      .stub('https://publisher.example/coast.png', {
+        headers: { 'content-type': 'image/png' },
+        body: PNG_PIXEL,
+      })
+      .stub('https://publisher.example/missing.png', { status: 404 })
+      .stub(imageOnlyFeedUrl, {
+        headers: { 'content-type': 'application/atom+xml' },
+        body: `<feed xmlns="http://www.w3.org/2005/Atom"><title>Night drawings</title><entry><id>moon</id><title>Moonrise</title><link href="https://publisher.example/moonrise"/><content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><img src="/moon.png" alt="The moon rises over a sleeping valley"/></div></content><summary>A separate preview, not the drawing.</summary></entry></feed>`,
+      })
+      .stub('https://publisher.example/moonrise', { status: 500 })
+      .stub('https://publisher.example/moon.png', {
+        headers: { 'content-type': 'image/png' },
+        body: PNG_PIXEL,
       })
       .stub(slowArticleFeedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
@@ -198,7 +216,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
         }),
         ...(readerBudgetMs === undefined ? {} : { readerBudgetMs }),
       })
-      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, slowArticleFeedUrl, longFeedUrl })
+      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, slowArticleFeedUrl, longFeedUrl, imageOnlyFeedUrl })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })
