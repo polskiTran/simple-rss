@@ -200,7 +200,8 @@ describe('Reader View', () => {
 
     healed = true
     await user.click(await screen.findByRole('button', { name: 'Retry parsing' }))
-    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+    // The first article loads the Markdown renderer lazily; a loaded suite can take over a second.
+    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' }, { timeout: 5_000 })).toBeDefined()
   })
 
   it('holds the summary through a deadline and refetches into the article by itself', async () => {

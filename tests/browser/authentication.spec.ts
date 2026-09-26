@@ -5,17 +5,17 @@ const SESSION_COOKIE = 'simple_rss_session'
 
 async function claim(page: Page, installation: Installation, password = USER_PASSWORD): Promise<void> {
   await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(password)
-  await page.getByLabel('confirm password').fill(password)
-  await page.getByRole('button', { name: 'claim' }).click()
+  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByLabel('Confirm password').fill(password)
+  await page.getByRole('button', { name: 'Claim installation' }).click()
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
 async function signIn(page: Page, installation: Installation, password = USER_PASSWORD): Promise<void> {
   await page.goto(installation.url)
-  await page.getByLabel('password').fill(password)
-  await page.getByRole('button', { name: 'sign in' }).click()
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
 test.describe('claiming an installation in a browser', () => {
@@ -25,7 +25,7 @@ test.describe('claiming an installation in a browser', () => {
     await expect(page.getByRole('form', { name: 'Claim this installation' })).toBeVisible()
     await claim(page, installation)
 
-    await expect(page.getByText('nothing yet — subscribe to a feed')).toBeVisible()
+    await expect(page.getByText('Nothing yet. Subscribe to a feed in Feeds to start your digest.')).toBeVisible()
   })
 
   test('never offers setup again, even to a browser that has never been here', async ({
@@ -40,7 +40,7 @@ test.describe('claiming an installation in a browser', () => {
     await strangerPage.goto(installation.url)
 
     await expect(strangerPage.getByRole('form', { name: 'Sign in' })).toBeVisible()
-    await expect(strangerPage.getByLabel('setup secret')).toHaveCount(0)
+    await expect(strangerPage.getByLabel('Setup secret')).toHaveCount(0)
   })
 })
 
@@ -78,7 +78,7 @@ test.describe('signing back in', () => {
 
     await signIn(stranger, installation, 'the-wrong-password')
 
-    await expect(stranger.getByText('that password is not right')).toBeVisible()
+    await expect(stranger.getByText('That password isn’t right. Passwords are case-sensitive.')).toBeVisible()
     await expect(stranger.getByRole('navigation', { name: 'Sections' })).toHaveCount(0)
   })
 })

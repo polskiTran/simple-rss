@@ -12,24 +12,30 @@ import {
 
 async function subscribe(page: Page, installation: Installation, feedUrl = installation.feedUrl): Promise<void> {
   await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
+  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
+  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
+  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
+  await page.getByRole('button', { name: 'Claim installation' }).click()
   await subscribeTo(page, feedUrl)
 }
 
 async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
-  await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'add a feed by url' }).fill(feedUrl)
+  await section(page, 'Feeds').click()
+  await page.getByRole('button', { name: 'Add feed' }).click()
+  await page.getByRole('textbox', { name: 'URL' }).fill(feedUrl)
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible()
+  await expect(page.getByText(/^Subscribed\. \d+ items? in the digest\.$/)).toBeVisible()
+}
+
+/** A section's link in the chrome; exact, since a back button names the same section. */
+function section(page: Page, name: 'Digest' | 'Feeds' | 'Saved') {
+  return page.getByRole('link', { name, exact: true })
 }
 
 async function preferFeedContent(page: Page, feedTitle: string): Promise<void> {
   await page.getByRole('link', { name: feedTitle }).click()
-  await page.getByRole('button', { name: 'feed content' }).click()
-  await expect(page.getByText('items now open with feed content')).toBeVisible()
+  await page.getByRole('button', { name: 'Feed content' }).click()
+  await expect(page.getByText('Items now open with the feed content.')).toBeVisible()
 }
 
 const rendererChunk = /article-renderer|article-markdown/
@@ -42,7 +48,7 @@ test.describe('Reader View', () => {
     installation,
   }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     const held = Promise.withResolvers<void>()
     await page.route('**/api/items/*/reader', async (route) => {
       await held.promise
@@ -51,9 +57,9 @@ test.describe('Reader View', () => {
     try {
       await page.getByRole('link', { name: 'First light' }).click()
       await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
-      await expect(page.locator('.reader-meta')).toContainText('feed content')
-      await expect(page.locator('.reader-meta')).toContainText('1 min')
-      await expect(page.getByText('parsing the original page')).toBeVisible()
+      await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
+      await expect(page.locator('.reader-meta')).toContainText('1 min read')
+      await expect(page.getByText('Parsing the original page')).toBeVisible()
       const link = page.getByRole('link', { name: 'the feed notebook' })
       await expect(link).toHaveAttribute('href', 'https://publisher.example/feed-notes')
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
@@ -69,8 +75,8 @@ test.describe('Reader View', () => {
     }
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'From the field' })).toHaveCount(0)
-    await expect(page.locator('.reader-meta')).toContainText('original webpage')
-    await expect(page.locator('.reader-meta')).not.toContainText('feed content')
+    await expect(page.locator('.reader-meta')).not.toContainText('for now')
+    await expect(page.getByRole('button', { name: 'Original webpage' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('uses the Subscription source and a view-only switch cannot be overwritten by an old response', async ({
@@ -79,7 +85,7 @@ test.describe('Reader View', () => {
   }) => {
     await subscribe(page, installation)
     await preferFeedContent(page, 'Field Notes')
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
 
     const held = Promise.withResolvers<void>()
     const articleRequests: string[] = []
@@ -95,40 +101,41 @@ test.describe('Reader View', () => {
 
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('feed content')
-    await expect(page.getByRole('button', { name: 'feed content' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Feed content' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('.reader-meta')).not.toContainText('for now')
     expect(articleRequests).toHaveLength(0)
 
-    await page.getByRole('button', { name: 'original webpage' }).click()
+    await page.getByRole('button', { name: 'Original webpage' }).click()
     await expect.poll(() => articleRequests.length).toBe(1)
-    await expect(page.getByText('parsing the original page')).toBeVisible()
-    await page.getByRole('button', { name: 'feed content' }).click()
+    await expect(page.getByText('Parsing the original page')).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
+    await page.getByRole('button', { name: 'Feed content' }).click()
     held.resolve()
 
     await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Field methods' })).toHaveCount(0)
-    await expect(page.locator('.reader-meta')).toContainText('feed content')
+    await expect(page.getByRole('button', { name: 'Feed content' })).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('link', { name: '← digest' }).click()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'feed content' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Feed content' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('opens from the Digest, reads clean structured content, and returns', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
 
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page).toHaveURL(/\/reader\/\d+$/)
 
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     await expect(page.getByText('A clear morning.')).toBeVisible()
-    await expect(page.getByText('parsing the original page')).toBeVisible()
+    await expect(page.getByText('Parsing the original page')).toBeVisible()
     const meta = page.locator('.reader-meta')
     await expect(meta).toContainText('Field Notes')
-    await expect(meta).toContainText(/\d+ min/)
-    const original = page.getByRole('link', { name: 'open original' })
+    await expect(meta).toContainText(/\d+ min read/)
+    const original = page.getByRole('link', { name: 'Open original' })
     await expect(original).toHaveAttribute('href', 'https://publisher.example/first-light')
     await expect(original).toHaveAttribute('rel', 'noopener noreferrer')
     await expect(original).toHaveAttribute('target', '_blank')
@@ -176,8 +183,8 @@ test.describe('Reader View', () => {
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
 
-    await page.getByRole('link', { name: '← digest' }).click()
-    await expect(page.getByRole('heading', { name: /today · 1 post/ })).toBeVisible()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+    await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
   })
 
   test('brings its Markdown renderer down with the first article, not with the app', async ({ page, installation }) => {
@@ -187,7 +194,7 @@ test.describe('Reader View', () => {
     })
 
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
     expect(renderer).toHaveLength(0)
 
@@ -199,7 +206,7 @@ test.describe('Reader View', () => {
 
   test('starts the renderer download before the Reader response settles', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
 
     const rendererRequested = page.waitForRequest(rendererChunk)
@@ -210,7 +217,7 @@ test.describe('Reader View', () => {
 
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page.getByText('A clear morning.')).toBeVisible()
-    await expect(page.getByText('parsing the original page')).toBeVisible()
+    await expect(page.getByText('Parsing the original page')).toBeVisible()
 
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('A clear morning.')).toHaveCount(0)
@@ -218,91 +225,92 @@ test.describe('Reader View', () => {
 
   test('saves from the Reader and the Library agrees', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'First light' }).click()
 
-    const toggle = page.getByRole('button', { name: 'save First light' })
-    await expect(toggle).toHaveText('save')
+    const toggle = page.getByRole('button', { name: 'Save First light' })
+    await expect(toggle).toHaveText('Save')
     await toggle.click()
-    await expect(toggle).toHaveText('saved')
+    await expect(toggle).toHaveText('Saved')
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('link', { name: 'saved' }).click()
+    await section(page, 'Saved').click()
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
   })
 
   test('keeps structured Feed Content and rate-limits repeated parsing failures', async ({ page, installation }) => {
     await subscribe(page, installation, installation.brokenArticleFeedUrl)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'Slow water' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Slow water' })).toBeVisible()
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('feed content')
-    await expect(page.getByText('shortened by simple — open original for more')).toBeVisible()
-    const originals = page.getByRole('link', { name: 'open original' })
+    await expect(page.locator('.reader-meta')).toContainText('Feed content')
+    await expect(page.getByText('Shortened by simple. Open the original for the rest.')).toBeVisible()
+    const originals = page.getByRole('link', { name: 'Open original' })
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    const retry = page.getByRole('button', { name: 'retry parsing' })
+    const retry = page.getByRole('button', { name: 'Retry parsing' })
     for (let attempt = 1; attempt < 5; attempt += 1) {
       const failed = page.waitForResponse((response) => response.url().endsWith('/reader'))
       await retry.click()
       expect((await failed).status()).toBe(502)
-      await expect(page.getByText(/wait \d+s, then retry/)).toHaveCount(0)
+      await expect(page.getByText(/Wait \d+ seconds, then retry/)).toHaveCount(0)
     }
 
     const limited = page.waitForResponse((response) => response.url().endsWith('/reader'))
     await retry.click()
     expect((await limited).status()).toBe(429)
-    await expect(page.getByText(/wait \d+s, then retry/)).toBeVisible()
+    await expect(page.getByText(/Wait \d+ seconds, then retry/)).toBeVisible()
 
-    await page.getByRole('link', { name: '← digest' }).click()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
     await expect(page.getByRole('link', { name: 'Slow water' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'save Slow water' })).toHaveText('save')
+    await expect(page.getByRole('button', { name: 'Save Slow water' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('never dead-ends: next in the digest walks to the following item', async ({ page, installation }) => {
     await subscribe(page, installation)
     await subscribeTo(page, installation.brokenArticleFeedUrl)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'First light' }).click()
 
-    await expect(page.getByText('next in the digest')).toBeVisible()
+    await expect(page.getByText('Next in the digest')).toBeVisible()
     await page.getByRole('link', { name: 'Slow water' }).click()
 
     await expect(page).toHaveURL(/\/reader\/\d+$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Slow water' })).toBeVisible()
-    await expect(page.getByText('next in the digest')).toHaveCount(0)
+    await expect(page.getByText('Next in the digest')).toHaveCount(0)
   })
 
   test('walks Digest, Feed and Reader by attribution, and back the same way', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
 
-    await page.locator('.content-meta').getByRole('link', { name: 'Field Notes' }).click()
+    await page.locator('.item-meta').getByRole('link', { name: 'Field Notes' }).click()
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
-    await expect(page.getByRole('link', { name: '← digest' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Back to Digest' })).toBeVisible()
 
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page).toHaveURL(/\/reader\/\d+$/)
-    await page.getByRole('link', { name: '← Field Notes' }).click()
+    await page.getByRole('link', { name: 'Back to Field Notes' }).click()
 
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
-    await page.getByRole('link', { name: '← digest' }).click()
-    await expect(page.getByRole('heading', { name: /today/ })).toBeVisible()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+    await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
   })
 
   test('returns a saved article to the library it was opened from', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
-    await page.getByRole('button', { name: 'save First light' }).click()
+    await section(page, 'Digest').click()
+    await page.getByRole('button', { name: 'Save First light' }).click()
 
-    await page.getByRole('link', { name: 'saved' }).click()
+    await section(page, 'Saved').click()
     await page.getByRole('link', { name: 'First light' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
-    await page.getByRole('link', { name: '← saved' }).click()
+    await page.getByRole('link', { name: 'Back to Saved' }).click()
     await expect(page).toHaveURL(/\/saved$/)
   })
 })
@@ -315,13 +323,13 @@ test.describe('Reader View at the server deadline', () => {
     installation,
   }) => {
     await subscribe(page, installation, installation.slowArticleFeedUrl)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
 
     const deadline = page.waitForResponse((response) => response.url().endsWith('/reader'))
     await page.getByRole('link', { name: 'Slow ridge' }).click()
 
     await expect(page.getByText('The ridge holds its light.')).toBeVisible()
-    await expect(page.getByText('parsing the original page')).toBeVisible()
+    await expect(page.getByText('Parsing the original page')).toBeVisible()
 
     const answered = await deadline
     expect(answered.status()).toBe(504)
@@ -331,8 +339,8 @@ test.describe('Reader View at the server deadline', () => {
     expect(answered.headers()['cache-control']).toBe('no-store')
 
     await expect(page.getByText('The ridge holds its light.')).toBeVisible()
-    await expect(page.getByText('waiting on the publisher')).toBeVisible()
-    await expect(page.getByText(/could not be parsed/)).toHaveCount(0)
+    await expect(page.getByText('Waiting on the publisher')).toBeVisible()
+    await expect(page.getByText(/couldn’t be read/)).toHaveCount(0)
 
     const refetched = page.waitForResponse((response) => response.url().endsWith('/reader'))
     expect((await refetched).status()).toBe(200)
@@ -351,12 +359,12 @@ test.describe('Reader View at phone width', () => {
       if (!request.url().startsWith(installation.url)) publisherRequests.push(request.url())
     })
     await subscribe(page, installation, installation.brokenArticleFeedUrl)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'Slow water' }).click()
-    await expect(page.getByRole('button', { name: 'retry parsing' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Retry parsing' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
-    await expect(page.getByText('shortened by simple — open original for more')).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('feed content')
+    await expect(page.getByText('Shortened by simple. Open the original for the rest.')).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('Feed content')
     await expect(page.getByRole('link', { name: 'the coastal notebook' })).toHaveAttribute(
       'href',
       'https://publisher.example/coastal-notes',
@@ -386,10 +394,10 @@ test.describe('Reader View at phone width', () => {
       if (!request.url().startsWith(installation.url)) publisherRequests.push(request.url())
     })
     await subscribe(page, installation, installation.imageOnlyFeedUrl)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'Moonrise' }).click()
-    await expect(page.getByRole('button', { name: 'retry parsing' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('feed content')
+    await expect(page.getByRole('button', { name: 'Retry parsing' })).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('Feed content')
     await expect(page.getByText('A separate preview, not the drawing.')).toHaveCount(0)
     const image = page.getByRole('img', { name: 'The moon rises over a sleeping valley' })
     await expect(image).toBeVisible()
@@ -402,20 +410,23 @@ test.describe('Reader View at phone width', () => {
     await page.reload()
     await expect(page.locator('.article-image-fallback')).toHaveText('The moon rises over a sleeping valley')
     await expect(page.getByRole('heading', { name: 'Moonrise' })).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('feed content')
+    await expect(page.locator('.reader-meta')).toContainText('Feed content')
     await expectNoHorizontalOverflow(page)
     expect(publisherRequests).toEqual([])
   })
 
   test('keeps the same structure and stays readable', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'First light' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Field Notes')
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
-    await expect(page.getByText('next in the digest')).toHaveCount(0)
+    const back = page.getByRole('link', { name: 'Back to Digest' })
+    await expect(back).toHaveCount(1)
+    await expect(back).toHaveClass(/chrome-back/)
+    await expect(page.getByText('Next in the digest')).toHaveCount(0)
 
     await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()
     await expectNoHorizontalOverflow(page)
