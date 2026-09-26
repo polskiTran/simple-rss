@@ -547,51 +547,6 @@
     color: var(--color-accent);
   }
 
-  .day-group + .day-group {
-    margin-top: 44px;
-  }
-
-  .day-heading {
-    margin: 0 0 24px;
-    font-size: 12.5px;
-    font-weight: 300;
-    line-height: 1;
-  }
-
-  .day-heading-past {
-    color: var(--color-quiet);
-    font-style: italic;
-  }
-
-  .day-heading-count {
-    color: var(--color-quiet);
-  }
-
-  .digest-retry {
-    margin: 12px 0 0;
-  }
-
-  .older-items {
-    margin: 44px 0 0;
-  }
-
-  .digest-view-today {
-    padding-top: 34px;
-  }
-
-  .daily-band {
-    height: var(--daily-band-height);
-    margin-bottom: 40px;
-    overflow: hidden;
-  }
-
-  .daily-band-field {
-    display: block;
-    width: calc(var(--daily-band-pitch) - 1px);
-    height: calc(var(--daily-band-pitch) - 1px);
-    background: var(--band-0);
-  }
-
   .reader-view {
     padding-top: 40px;
     padding-bottom: 64px;
@@ -822,10 +777,6 @@
     font-size: 12px;
   }
 
-  .digest-view-today {
-    padding-top: 26px;
-  }
-
   .empty-note {
     font-size: 12px;
   }
@@ -962,16 +913,4 @@
     margin-top: 32px;
   }
 
-  .day-group + .day-group {
-    margin-top: 32px;
-  }
-
-  .older-items {
-    margin-top: 32px;
-  }
-
-  .day-heading {
-    margin-bottom: 20px;
-    font-size: 12px;
-  }
 }

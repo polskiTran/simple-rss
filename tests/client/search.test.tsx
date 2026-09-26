@@ -9,7 +9,7 @@ const DIGEST = {
   groups: [
     {
       date: '2026-08-08',
-      label: 'today',
+      label: 'Today',
       items: [
         {
           feedItemId: 3,
@@ -70,10 +70,10 @@ describe('the search line in the chrome', () => {
     expect(results.textContent).toContain('Field Notes')
     expect(results.textContent).toContain('today, 07:15')
     expect(screen.getByRole('button', { name: 'Save Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.queryByRole('heading', { name: 'today · 1 post' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Today 1' })).toBeNull()
 
     await user.clear(field)
-    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
     expect(screen.queryByRole('region', { name: 'search results' })).toBeNull()
     expect(window.location.pathname).toBe('/digest')
   })

@@ -1,14 +1,14 @@
-import { Button } from '@base-ui/react/button'
 import { useState } from 'react'
-import type { Digest } from '../../shared/api.js'
+import type { Digest, DigestGroup } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
-import { DailyBand } from '../components/daily-band.js'
-import { FeedTitleLink } from '../components/feed-title-link.js'
-import { ItemTitleLink } from '../components/item-title-link.js'
+import { Group } from '../components/group.js'
+import { ItemBox } from '../components/item-box.js'
+import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
-import { SaveToggle } from '../components/save-toggle.js'
+import { dayBefore, longDay, shortDay } from '../day-names.js'
 import { useResource } from '../use-resource.js'
+
 export interface DigestViewProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
@@ -41,11 +41,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       .catch(() => setOlder('failed'))
   }
 
-  const tryAgain = () => {
-    setOlder('idle')
-    retry()
-  }
-
   const setSaved = (feedItemId: number, saved: boolean) => {
     set((digest) => ({
       ...digest,
@@ -56,73 +51,90 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
     }))
   }
 
+  const today = state.kind === 'loaded' ? state.value.today.date : undefined
+  const head = (
+    <header className="page-head">
+      <h1 className="page-title">
+        Digest
+        {today ? <span className="page-title-companion">{shortDay(today)}</span> : null}
+      </h1>
+    </header>
+  )
+
   if (state.kind === 'loading') {
-    return <LoadingNote className="view measure empty-note">loading the digest</LoadingNote>
+    return (
+      <div className="view">
+        {head}
+        <LoadingNote>Loading the digest</LoadingNote>
+      </div>
+    )
   }
   if (state.kind === 'unavailable' || state.kind === 'unreachable') {
     return (
-      <div className="view measure">
-        <p className="empty-note" role="status">
-          {state.kind === 'unreachable'
-            ? 'the digest is out of reach — check the connection, then try again'
-            : 'the digest is unavailable — try again in a moment'}
-        </p>
-        <p className="digest-retry">
-          <Button className="text-button" onClick={tryAgain}>
-            try again
-          </Button>
-        </p>
+      <div className="view">
+        {head}
+        <LoadFailure
+          subject="The digest"
+          kind={state.kind}
+          onRetry={() => {
+            setOlder('idle')
+            retry()
+          }}
+        />
       </div>
     )
   }
 
   const digest = state.value
-  if (digest.groups.length === 0) {
-    return <p className="view measure empty-note">nothing yet — subscribe to a Feed to start your digest</p>
-  }
-
-  const { today } = digest
-
   return (
-    <div className="view measure digest-view digest-view-today">
-      <DailyBand date={today.date} volume={today.volume} />
-      {digest.groups.map((group) => (
-        <section className="day-group" aria-labelledby={`day-${group.date}`} key={group.date}>
-          <h2
-            className={group.date === today.date ? 'day-heading' : 'day-heading day-heading-past'}
+    <div className="view digest-view">
+      {head}
+      {digest.groups.length === 0 ? (
+        <p className="note">Nothing yet. Subscribe to a feed in Feeds to start your digest.</p>
+      ) : (
+        digest.groups.map((group, index) => (
+          <Group
+            key={group.date}
             id={`day-${group.date}`}
+            title={group.label}
+            count={countOf(digest, group, index)}
+            aside={relativeDay(group.date, digest.today.date) ? longDay(group.date) : undefined}
+            className="item-group"
           >
-            {group.label}
-            {group.date === today.date ? (
-              <span className="day-heading-count"> · {countLabel(digest.today.volume)}</span>
-            ) : null}
-          </h2>
-          <div className="content-list">
-            {group.items.map((item) => (
-              <article className="content-item" key={item.feedItemId}>
-                <h3 className="content-item-title">
-                  <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
-                </h3>
-                <div className="content-meta">
-                  <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
-                  <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayTime}</time>
-                  <SaveToggle
-                    feedItemId={item.feedItemId}
-                    title={item.title}
-                    saved={item.saved}
-                    onSaved={(saved) => setSaved(item.feedItemId, saved)}
-                  />
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ))}
+            <div className="item-list">
+              {group.items.map((item) => (
+                <ItemBox
+                  key={item.feedItemId}
+                  feedItemId={item.feedItemId}
+                  title={item.title}
+                  saved={item.saved}
+                  feed={{ feedId: item.feedId, title: item.feedTitle, onOpen: onOpenFeed }}
+                  when={{ label: item.displayTime, dateTime: item.publishedAt ?? item.firstSeenAt }}
+                  onOpen={onOpenItem}
+                  onSaved={(saved) => setSaved(item.feedItemId, saved)}
+                />
+              ))}
+            </div>
+          </Group>
+        ))
+      )}
       <OlderItems nextCursor={digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
     </div>
   )
 }
 
-function countLabel(count: number): string {
-  return count === 1 ? '1 post' : `${count} posts`
+/**
+ * Today's count is the server's own; an older day's is known only once its
+ * whole group is loaded — any group but the last, or the last of a list that
+ * has ended.
+ */
+function countOf(digest: Digest, group: DigestGroup, index: number): number | undefined {
+  if (group.date === digest.today.date) return digest.today.volume
+  const complete = index < digest.groups.length - 1 || digest.nextCursor === null
+  return complete ? group.items.length : undefined
+}
+
+/** Today and Yesterday are labelled relatively, so the day they name follows them. */
+function relativeDay(date: string, today: string): boolean {
+  return date === today || date === dayBefore(today)
 }

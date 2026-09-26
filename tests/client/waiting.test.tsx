@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('a wait', () => {
   it.each([
-    ['/digest', 'loading the digest'],
+    ['/digest', 'Loading the digest'],
     ['/saved', 'loading the library'],
     ['/feeds', 'loading feeds'],
     ['/feeds/1', 'loading the feed'],
@@ -44,7 +44,7 @@ describe('a wait', () => {
   it('draws the wait with the masthead mark’s own tile, cell for cell', async () => {
     waiting()
     const { container } = renderAt('/digest')
-    await screen.findByText('loading the digest')
+    await screen.findByText('Loading the digest')
 
     const read = (scope: string) =>
       [...container.querySelectorAll<HTMLElement>(`${scope} .wordmark-cell`)].map(
@@ -58,7 +58,7 @@ describe('a wait', () => {
   it('keeps the masthead mark out of the wait', async () => {
     waiting()
     const { container } = renderAt('/digest')
-    await screen.findByText('loading the digest')
+    await screen.findByText('Loading the digest')
 
     const masthead = container.querySelector('.chrome')
     expect(masthead?.closest('.loading-note')).toBeNull()
@@ -73,7 +73,7 @@ describe('a wait', () => {
           groups: [
             {
               date: '2026-08-08',
-              label: 'today',
+              label: 'Today',
               items: [
                 {
                   feedItemId: 3,

@@ -217,6 +217,12 @@
     white-space: nowrap;
   }
 
+  .load-failure {
+    display: grid;
+    justify-items: start;
+    gap: 16px;
+  }
+
   /* Links — the only text that acts on its own */
 
   .link {
@@ -1119,6 +1125,8 @@
     gap: 2px;
     padding: 3px;
     background: var(--color-control);
+    /* Ground around the bar, so the list never shows through beside it. */
+    box-shadow: 0 0 0 12px var(--color-ground);
   }
 
   .sections-switch {

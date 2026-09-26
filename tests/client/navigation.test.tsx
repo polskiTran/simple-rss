@@ -10,7 +10,7 @@ const DIGEST = {
   groups: [
     {
       date: '2026-08-08',
-      label: 'today',
+      label: 'Today',
       items: [
         {
           feedItemId: 3,
@@ -157,7 +157,7 @@ describe('a Feed Item’s attribution', () => {
     expect(wayBack().textContent).toBe('Digest')
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
   })
 
@@ -383,7 +383,7 @@ describe('the section an open article reads under', () => {
 
     await user.click(screen.getByRole('link', { name: 'Digest' }))
 
-    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
     expect(activeTab()).toBe('Digest')
   })
 })

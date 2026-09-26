@@ -386,7 +386,7 @@ describe('Reader View', () => {
       groups: [
         {
           date: '2026-08-08',
-          label: 'today',
+          label: 'Today',
           items: [
             {
               feedItemId: 3,
