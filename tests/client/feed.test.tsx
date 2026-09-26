@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -83,7 +83,7 @@ describe('opening one Feed', () => {
 
     expect(await screen.findByRole('group', { name: /26 weeks of publishing cadence for Field Notes/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
-    expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Back to Feeds' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
     expect(container.querySelector('.feed-description')).toBeNull()
 
@@ -98,8 +98,8 @@ describe('opening one Feed', () => {
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByText('today, 07:15')).toBeDefined()
     expect(screen.getByText('3 june')).toBeDefined()
-    expect(screen.getByRole('button', { name: /save First light/i }).textContent).toBe('save')
-    expect(screen.getByRole('button', { name: /save A June letter/i }).textContent).toBe('saved')
+    expect(screen.getByRole('button', { name: /save First light/i }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: /save A June letter/i }).getAttribute('aria-pressed')).toBe('true')
     for (const meta of container.querySelectorAll('.feed-items .content-meta')) {
       expect(meta.textContent).not.toContain('Field Notes')
     }
@@ -128,13 +128,13 @@ describe('opening one Feed', () => {
     const toggle = await screen.findByRole('button', { name: /save First light/i })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(api.requestsTo('PUT /api/library/12')).toHaveLength(1)
 
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(api.requestsTo('DELETE /api/library/12')).toHaveLength(1)
   })
 
@@ -154,7 +154,7 @@ describe('opening one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('link', { name: /← feeds/i }))
+    await user.click(await within(screen.getByRole('main')).findByRole('link', { name: 'Back to Feeds' }))
 
     expect(await screen.findByRole('textbox', { name: /add a feed by url/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
@@ -336,7 +336,7 @@ describe('the quiet states of one Feed', () => {
     render(<App />)
 
     expect(await screen.findByText('that feed is not in your subscriptions')).toBeDefined()
-    expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Back to Feeds' })).toBeDefined()
   })
 
   it('says when the reader cannot answer for the Feed', async () => {

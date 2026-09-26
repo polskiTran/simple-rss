@@ -2,7 +2,7 @@ import { Button } from '@base-ui/react/button'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import type { FeedContent, ReaderArticle, ReaderDeadlineStage, ReaderItem, ReadingSource } from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
-import { BackLink } from '../components/back-link.js'
+import { BackButton } from '../components/back-button.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
 import { LoadingNote } from '../components/loading-note.js'
@@ -150,7 +150,7 @@ function OpenReader({
   return (
     <article className="view measure reader-view">
       <div className="reader-topline">
-        <BackLink className="reader-back" origin={origin} onBack={onBack} />
+        <BackButton className="view-back" origin={origin} onBack={onBack} />
         <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} onSaved={onSaved} />
       </div>
 

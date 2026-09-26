@@ -51,7 +51,7 @@ describe('a wait', () => {
         (cell) => `${cell.dataset.level}@${cell.style.getPropertyValue('--glint-step')}`,
       )
 
-    expect(read('.loading-note')).toEqual(read('.masthead'))
+    expect(read('.loading-note')).toEqual(read('.chrome'))
     expect(read('.loading-note')).toHaveLength(16)
   })
 
@@ -60,7 +60,7 @@ describe('a wait', () => {
     const { container } = renderAt('/digest')
     await screen.findByText('loading the digest')
 
-    const masthead = container.querySelector('.masthead')
+    const masthead = container.querySelector('.chrome')
     expect(masthead?.closest('.loading-note')).toBeNull()
     expect(masthead?.querySelector('.loading-note')).toBeNull()
   })
@@ -98,7 +98,7 @@ describe('a wait', () => {
     renderAt('/digest')
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('searchbox', { name: 'search your reading' }), 'driftwood')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search your reading' }), 'driftwood')
 
     const searching = await screen.findByRole('status')
     expect(searching.textContent).toBe('searching…')

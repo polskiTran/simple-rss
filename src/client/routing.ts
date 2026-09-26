@@ -7,6 +7,13 @@ export type Route = (typeof ROUTES)[number]
 
 export const DEFAULT_ROUTE: Route = 'digest'
 
+export const ROUTE_LABELS = {
+  digest: 'Digest',
+  feeds: 'Feeds',
+  saved: 'Saved',
+  settings: 'Settings',
+} as const satisfies Record<Route, string>
+
 export function pathOf(route: Route): string {
   return `/${route}`
 }
@@ -68,20 +75,20 @@ export interface Origin {
   readonly from: Origin | undefined
 }
 
-export const DIGEST_ORIGIN: Origin = { path: pathOf('digest'), label: 'digest', from: undefined }
-export const FEEDS_ORIGIN: Origin = { path: pathOf('feeds'), label: 'feeds', from: undefined }
-export const SAVED_ORIGIN: Origin = { path: pathOf('saved'), label: 'saved', from: undefined }
+export const DIGEST_ORIGIN: Origin = { path: pathOf('digest'), label: ROUTE_LABELS.digest, from: undefined }
+export const FEEDS_ORIGIN: Origin = { path: pathOf('feeds'), label: ROUTE_LABELS.feeds, from: undefined }
+export const SAVED_ORIGIN: Origin = { path: pathOf('saved'), label: ROUTE_LABELS.saved, from: undefined }
 
 export function feedOrigin(feedId: number, title: string, from: Origin | undefined): Origin {
   return { path: feedPathOf(feedId), label: title, from }
 }
 
 export function readerOrigin(feedItemId: number, from: Origin | undefined): Origin {
-  return { path: readerPathOf(feedItemId), label: 'article', from }
+  return { path: readerPathOf(feedItemId), label: 'Article', from }
 }
 
 export function searchOrigin(query: string, scope: SearchScope, from: Origin | undefined): Origin {
-  return { path: searchPathOf(query, scope), label: 'search', from }
+  return { path: searchPathOf(query, scope), label: 'Search', from }
 }
 
 /** One derivation of the scope, from the screen's address alone. */
@@ -230,8 +237,8 @@ function locationOf(path: string, origin: Origin | undefined): Location {
 /** The results surface shows no way-back link, so a search's origin label is never read. */
 function searchScreenOrigin(location: ScreenLocation): Origin {
   if (location.readerItemId !== undefined) return readerOrigin(location.readerItemId, location.origin)
-  if (location.feedId !== undefined) return { path: feedPathOf(location.feedId), label: 'feed', from: location.origin }
-  return { path: pathOf(location.route), label: location.route, from: undefined }
+  if (location.feedId !== undefined) return { path: feedPathOf(location.feedId), label: 'Feed', from: location.origin }
+  return { path: pathOf(location.route), label: ROUTE_LABELS[location.route], from: undefined }
 }
 
 function screenLocationOf(pathname: string, origin: Origin | undefined): ScreenLocation {

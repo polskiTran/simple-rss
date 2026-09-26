@@ -165,8 +165,8 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
     expect(screen.getByText(/turns from grey to/)).toBeDefined()
 
-    const toggle = screen.getByRole('button', { name: 'save First light' })
-    expect(toggle.textContent).toBe('save')
+    const toggle = screen.getByRole('button', { name: 'Save First light' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
 
     expect(screen.getByText('next in the digest')).toBeDefined()
     expect(screen.getByRole('link', { name: 'Evening notes' }).getAttribute('href')).toBe('/reader/4')
@@ -179,10 +179,10 @@ describe('Reader View', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
   })
 
@@ -324,7 +324,7 @@ describe('Reader View', () => {
     expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
     expect(screen.queryByText('the original page could not be parsed into an article')).toBeNull()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'save First light' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Save First light' })).toBeDefined()
     expect(screen.queryByRole('link', { name: 'open original' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'retry parsing' })).toBeNull()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)

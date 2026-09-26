@@ -23,7 +23,7 @@ import {
   updateReadingSource,
 } from '../api.js'
 import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
-import { BackLink } from '../components/back-link.js'
+import { BackButton } from '../components/back-button.js'
 import { Field } from '../components/field.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
@@ -141,7 +141,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   return (
     <div className="view measure feed-view">
       <p className="feed-header">
-        <BackLink className="feed-back" origin={origin} onBack={onBack} />
+        <BackButton className="view-back" origin={origin} onBack={onBack} />
         {state.kind === 'loaded' ? (
           <>
             <span className="feed-header-title">{state.value.title}</span>

@@ -61,7 +61,7 @@ describe('the search line in the chrome', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const field = await screen.findByRole('searchbox', { name: 'search your reading' })
+    const field = await screen.findByRole('searchbox', { name: 'Search your reading' })
     await user.type(field, 'chronology')
 
     const results = await screen.findByRole('region', { name: 'search results' })
@@ -69,7 +69,7 @@ describe('the search line in the chrome', () => {
     expect(results.textContent).toContain('Morning chronology')
     expect(results.textContent).toContain('Field Notes')
     expect(results.textContent).toContain('today, 07:15')
-    expect(screen.getByRole('button', { name: 'save Tide chronology' }).textContent).toBe('saved')
+    expect(screen.getByRole('button', { name: 'Save Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.queryByRole('heading', { name: 'today · 1 post' })).toBeNull()
 
     await user.clear(field)
@@ -90,7 +90,7 @@ describe('the search line in the chrome', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('searchbox', { name: 'search your reading' }), 'driftwood')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search your reading' }), 'driftwood')
 
     expect((await screen.findByRole('status')).textContent).toBe('searching…')
     answer.resolve()
@@ -112,7 +112,7 @@ describe('the search line in the chrome', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const field = await screen.findByRole('searchbox', { name: 'search your reading' })
+    const field = await screen.findByRole('searchbox', { name: 'Search your reading' })
     await user.type(field, 'drift')
     const results = await screen.findByRole('region', { name: 'search results' })
 
@@ -136,7 +136,7 @@ describe('the search line in the chrome', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const field = await screen.findByRole('searchbox', { name: 'search your reading' })
+    const field = await screen.findByRole('searchbox', { name: 'Search your reading' })
     await user.type(field, 'drift')
     expect(await screen.findByText('search is out of reach — check the connection, then try again')).toBeDefined()
 
@@ -159,7 +159,7 @@ describe('the search line in the chrome', () => {
 
     const results = await screen.findByRole('region', { name: 'search results' })
     expect(results.textContent).toContain('Morning chronology')
-    const field = await screen.findByRole<HTMLInputElement>('searchbox', { name: 'search your reading' })
+    const field = await screen.findByRole<HTMLInputElement>('searchbox', { name: 'Search your reading' })
     expect(field.value).toBe('chronology')
   })
 })

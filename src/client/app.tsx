@@ -1,6 +1,7 @@
 import { useAccess, type Gate } from './authentication.js'
+import { BackButton } from './components/back-button.js'
 import { GlobalSearch } from './components/global-search.js'
-import { TabBar } from './components/tab-bar.js'
+import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
 import {
   DIGEST_ORIGIN,
@@ -11,6 +12,7 @@ import {
   searchOrigin,
   useNavigation,
   type Navigation,
+  type Origin,
   type ScreenNavigation,
 } from './routing.js'
 import { DigestView } from './views/digest-view.js'
@@ -27,25 +29,44 @@ import { SetupView } from './views/setup-view.js'
 export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
+  const open = gate.access.kind === 'open'
+  const back = open ? nestedOrigin(navigation) : undefined
 
   return (
-    <div className="paper">
-      <header className="masthead">
-        <Wordmark onNavigate={gate.access.kind === 'open' ? () => navigation.navigate('digest') : undefined} />
-        {gate.access.kind === 'open' ? (
+    <div className="app" data-screen={open ? screenOf(navigation) : 'gate'}>
+      <header className="chrome">
+        {back ? <BackButton className="chrome-back" origin={back} onBack={navigation.returnTo} /> : null}
+        <Wordmark onNavigate={open ? () => navigation.navigate('digest') : undefined} />
+        {open ? (
           <>
             <GlobalSearch
               query={navigation.kind === 'search' ? navigation.query : ''}
               scope={navigation.searchScope}
               onQueryChange={navigation.updateSearch}
             />
-            <TabBar active={navigation.route} onNavigate={navigation.navigate} />
+            <SectionNav active={navigation.route} onNavigate={navigation.navigate} />
           </>
         ) : null}
       </header>
-      <main>{viewFor(gate, navigation)}</main>
+      <main className="page">{viewFor(gate, navigation)}</main>
     </div>
   )
+}
+
+/** Which chrome a screen takes: a phone hides the tab bar in the Reader and a search, and leads with a back square on nested screens. */
+function screenOf(navigation: Navigation): 'search' | 'reader' | 'feed' | 'section' {
+  if (navigation.kind === 'search') return 'search'
+  if (navigation.readerItemId !== undefined) return 'reader'
+  if (navigation.feedId !== undefined) return 'feed'
+  return 'section'
+}
+
+/** The way back from a nested screen — the one its view and the phone bar both offer. */
+function nestedOrigin(navigation: Navigation): Origin | undefined {
+  if (navigation.kind === 'search') return undefined
+  if (navigation.readerItemId !== undefined) return navigation.origin ?? DIGEST_ORIGIN
+  if (navigation.feedId !== undefined) return navigation.origin ?? FEEDS_ORIGIN
+  return undefined
 }
 
 function viewFor(gate: Gate, navigation: Navigation) {

@@ -418,7 +418,7 @@ describe('Digest', () => {
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.daily-band-field')).toHaveLength(1)
     expect(screen.getByText('07:15')).toBeDefined()
-    expect(screen.getByRole('button', { name: /save first light/i }).textContent).toBe('save')
+    expect(screen.getByRole('button', { name: /save first light/i }).getAttribute('aria-pressed')).toBe('false')
     await waitFor(() => expect(container.textContent).not.toMatch(/unread/i))
   })
 

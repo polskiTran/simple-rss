@@ -52,8 +52,8 @@ describe('the Saved tab', () => {
     expect(screen.getByText('3 june')).toBeDefined()
 
     for (const title of ['First light', 'A June letter']) {
-      const toggle = screen.getByRole('button', { name: `save ${title}` })
-      expect(toggle.textContent).toBe('saved')
+      const toggle = screen.getByRole('button', { name: `Save ${title}` })
+      expect(toggle.getAttribute('aria-pressed')).toBe('true')
       expect(toggle.getAttribute('aria-pressed')).toBe('true')
     }
 
@@ -69,16 +69,16 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(api.requestsTo('DELETE /api/library/3')).toHaveLength(1)
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
 
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
   })
 

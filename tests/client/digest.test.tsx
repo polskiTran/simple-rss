@@ -51,8 +51,8 @@ describe('the chronological Digest', () => {
     const field = container.querySelector<HTMLElement>('.daily-band-field')
     expect(field?.style.boxShadow).toContain('var(--band-')
 
-    const save = screen.getByRole('button', { name: 'save First light' })
-    expect(save.textContent).toBe('save')
+    const save = screen.getByRole('button', { name: 'Save First light' })
+    expect(save.getAttribute('aria-pressed')).toBe('false')
     expect(save.getAttribute('aria-pressed')).toBe('false')
     expect(container.textContent).not.toMatch(/unread|mark|archive/i)
   })
@@ -66,16 +66,16 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
 
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
     expect(api.requestsTo('DELETE /api/library/3')).toHaveLength(1)
   })
@@ -88,10 +88,10 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
 
