@@ -69,8 +69,12 @@ A Feed a web page names in its own markup, so that pasting the page finds the Fe
 _Avoid_: Alternative feed, autodiscovered feed, link-rel
 
 **Cadence**:
-A Feed's publishing rhythm, drawn from retained Feed Items as per-day counts in the installation timezone and rendered at four ink levels — a strip on the Feeds list, a 26-week grid on an opened Feed. The stat line's "posts" is display copy fixed by the design system; the domain term remains Feed Item.
+A Feed's publishing record, drawn from retained Feed Items as per-day counts in the installation timezone — a 30-day strip on the Feeds list, a 26-week grid on an opened Feed.
 _Avoid_: Activity graph, contribution graph, frequency chart
+
+**Rhythm**:
+How often a Feed publishes, read from the last 30 days of its Cadence by counting the days with at least one Feed Item: Daily from 15 days, Weekly from 4, Monthly from 1, and Inactive with none. It describes the Feed's publishing, not its retrieval — an Inactive Feed may be perfectly available.
+_Avoid_: Frequency, tier, activity level
 
 **Digest**:
 The time-grouped collection of Feed Items from the User's Subscriptions.

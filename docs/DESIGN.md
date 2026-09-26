@@ -1,337 +1,234 @@
 # simple — design system
 
-Interactive behavior — focus, keyboard, trapping, dismissal — comes from Base UI
-(`docs/adr/0008-interactive-behavior-from-base-ui.md`). This document describes
-appearance and motion, not interaction.
+Screens are drawn in `docs/design/v2/`: `desktop/`, `phone/`, `dialogs/` and
+`dark/`. This document is what the stylesheet follows when a drawing and the
+text disagree. Interactive behavior — focus, keyboard, trapping, dismissal —
+comes from Base UI (ADR 0008); why this system replaced the first one is ADR
+0010.
 
 ## 1. Principles
 
-1. **One shape, repeated.** A content item is a 21px line with a 12.5px grey line under it. Posts, feeds, saved items are all that shape. Filters differ; the object does not.
-2. **Settings is not that shape.** It drops to a 13/14px two-column sheet so preferences can never be mistaken for reading.
-3. **No dividers, no cards, no boxes.** Separation is whitespace only. The one rule in the system is the search field's underline.
-4. **Colour is reserved.** Accent appears on saved state, the text cursor, and links inside an article. Danger accent on destructive action.
-5. **Cadence is the unfair advantage.** Publishing rhythm — the thing only an RSS reader knows — is drawn as dot matrices at four ink levels. No charts, no curves, no colour.
+1. **Colour comes from the content.** The interface is greyscale. Colour
+   appears only in data: Cadence, saved state and search matches. It is blue in
+   light mode and yellow in dark.
+2. **One shape means you can press it.** Every control is a hard-edged block of
+   the same height. Grey fill is an ordinary action, ink fill is the single
+   primary action on a screen. Counts and status are plain grey text with no
+   box. The only text that acts on its own is a link, and links are underlined.
+3. **Hierarchy from size and weight.** No cards, shadows, tinted bars or
+   coloured headers. Hairlines separate groups; thin-edged boxes hold items.
+4. **Say what happens.** Labels are sentence case and name the result: Add
+   feed, Export OPML, Show 16 more, Retry, Unsubscribe.
+5. **Type split by job.** Literata for what you read, Instrument Sans for what
+   you operate.
+
+Never: rounded corners, coloured menu bars, cream paper, mono small caps, ALL
+CAPS, decoration without a source in the data.
 
 ## 2. Colour
 
-### Light (paper)
+Tokens are OKLCH. Ink rules are the ink at an alpha, so they sit correctly on
+any ground.
 
-| Role | Value |
+### Light
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `ground` | `oklch(100% 0 0)` | page, dialog panel, selected segment |
+| `ink` | `oklch(17.8% 0 0)` | text, primary button fill |
+| `ink-2` | `oklch(53.8% 0 0)` | meta, secondary text |
+| `ink-3` | `oklch(71.5% 0 0)` | counts, companion values |
+| `ink-off` | `oklch(47.5% 0 0)` | unselected segment text |
+| `disabled` | `oklch(81.4% 0 0)` | disabled control text |
+| `control` | `oklch(95.2% 0 0)` | grey buttons, fields, switch tracks |
+| `control-hover` | `oklch(91.9% 0 0)` | |
+| `row-hover` | `oklch(97.6% 0 0)` | list rows, undo line |
+| `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off |
+| `rule` | ink at `.14` | under group headings |
+| `rule-soft` | ink at `.07` | between rows |
+| `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
+| `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
+| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(84.5% 0.058 278.5)` · `oklch(70% 0.118 276.9)` · `oklch(55.5% 0.184 273.5)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
+| `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
+| `match` | `oklch(91.4% 0.032 277.9)` | search highlight |
+| `scrim` | ink at `.24` | behind a dialog |
+
+### Dark
+
+| Token | Value |
 | --- | --- |
-| Paper | `#F7F7F5` |
-| Ink — titles, active tab | `#12110F` |
-| Ink — body prose | `#26251F` |
-| Grey — metadata, inactive tabs, source | `#8C8B86` |
-| Grey — quietest (save affordance, counts, month labels) | `#A3A29D` |
-| Grey — muted prose / pull quote | `#6B6A66` |
-| Accent (saved, cursor) | `#2438D8` |
-| Danger (destructive action) | `#B02B27` |
-| Hairline (search underline) | `rgba(18,17,15,.15)` |
-| Dim (overlay backdrop) | `rgba(18,17,15,.28)` |
+| `ground` | `oklch(18.2% 0 0)` |
+| `ink` | `oklch(94.6% 0 0)`; a primary button's text is `ground` |
+| `ink-2` / `ink-3` | `oklch(68.6% 0 0)` / `oklch(54.5% 0 0)` |
+| `control` / `control-hover` | `oklch(26.9% 0 0)` / `oklch(30.9% 0 0)` |
+| selected segment | `oklch(34.8% 0 0)` |
+| `row-hover` | `oklch(22.6% 0 0)` |
+| rules and edges | `ink` at the light alphas |
+| reader body | `oklch(88.8% 0 0)` |
+| `danger` | `oklch(73.2% 0.164 27.1)` |
+| `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(37.5% 0.063 97.7)` · `oklch(53% 0.098 95.7)` · `oklch(73.1% 0.138 94.5)` · `oklch(85.8% 0.158 94.4)` |
+| `saved` / `saved-edge` | `ramp-5` / `ramp-3` |
+| `match` | `ramp-2` |
 
-**Departure — one surface, not two.** No canvas is drawn behind the paper; the
-paper is the whole field, edge to edge, in both schemes — a second tone shows
-against a real viewport only as two vertical bands beside the column, a box by
-another name, which §1 forbids.
-
-### Dark (dark paper)
-
-| Role | Value |
-| --- | --- |
-| Paper | `#12110F` |
-| Ink — titles | `#F0EEE9` |
-| Ink — wordmark, active tab | `#F7F7F5` |
-| Grey — metadata | `#8C8B86` |
-| Grey — quietest | `#6B6A66` |
-| Accent (saved) | `#E3B341` |
-| Danger (destructive action) | `#B02B27` |
-| Dim (overlay backdrop) | `rgba(0,0,0,.52)` |
-
-**Selection.** Selected text is the text cursor's range, so it shares the
-caret's accent rather than the platform's blue: the accent at `.12` over light
-paper, `.2` over dark. This is the cursor role §1 already grants the accent,
-not a third use.
+Appearance follows the system unless the User picks Light or Dark in Settings;
+the choice is per device.
 
 ## 3. Type
 
-Literata only. Weights 200 / 300 (default) / 500. Italic used for the wordmark, the secondary date heading, and pull quotes.
+| Role | Face | Size / line-height | Weight |
+| --- | --- | --- | --- |
+| Page title | Instrument Sans | 40/1 desktop, 32/1 phone, −0.015em | 500; companion value in `ink-3` at 400 |
+| Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-3` at 400 |
+| Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
+| Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
+| Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
+| Feed name | Literata | 19/1.2 | 400 |
+| Feed Description | Literata | 17/1.5 | 400 |
+| Reader title | Literata | 44/1.16 desktop, 30/1.18 phone | 400, `text-wrap: balance` |
+| Reader body | Literata | 19/1.7 desktop, 17/1.65 phone | 400, reader-body colour |
+| Wordmark | Literata italic | 21 desktop, 19 phone | 400 |
 
-| Element | Desktop | 390px |
-| --- | --- | --- |
-| Wordmark | `italic 300 21px/1` | `italic 300 19px/1` |
-| Tabs | `300 12.5px/1`, gap 24 | `300 12px/1`, gap 18 |
-| Item title | `300 21px/1.42`, `text-wrap:pretty` | `300 19px/1.44` |
-| Item meta row | `300 12.5px/1`, gap 20 | `300 12px/1`, gap 16 |
-| Search field | `300 14px/1.4` | same |
-| Section date (today) | `300 12.5px/1` | `300 12px/1` |
-| Section date (past) | `italic 300 12.5px/1`, `#A3A29D` | same |
-| Article title | `200 38px/1.18`, `letter-spacing:-.024em`, `text-wrap:balance` | — |
-| Article body | `300 18.5px/1.74`, `#26251F` | — |
-| Pull quote | `italic 300 18.5px/1.72`, `#6B6A66` | — |
-| Stat line | `300 12.5px/1.6` | — |
-| Axis labels | `300 11.5px/1`, `#A3A29D` | — |
+Numbers in counts and meta use tabular figures.
 
-## 4. Layout
+## 4. Space and size
 
-The paper is 820px wide with 56px of side padding; the stylesheet carries the
-rest of the rhythm. What follows is where the built layout departs from the
-drawn one.
-
-Dark paper takes 36px above the masthead where light takes 32px, at the desktop
-width only. The four pixels are an optical correction and not a value that
-escaped normalising: the masthead closes on a dark edge more tightly than on a
-pale one.
-
-**Departure — the measure.** Content — lists, the Reader, the daily band — is not
-held to a measure narrower than the masthead, but runs the paper's own content
-width (820 − 2×56 = 708px on desktop), because a narrower column leaves every
-screen ragged against its own header on the right edge. The `.gate` forms keep
-their own 310px; a password is not prose.
-
-**Departure — the Reader's paper.** The Reader sits on the same paper and the
-same measure as every other screen rather than the narrower one it was drawn on,
-because swapping papers resized the masthead between screens and §5 holds that
-the tabs never move. It keeps only its own inner rhythm — title scale, the 40px
-header gap, no fixed height. Metadata sits *under* the title, not above. It ends
-in "next in the digest" — never a dead stop.
-
-**Departure — the global search line.** The line lives in the masthead on every
-signed-in screen, including the Reader. Its DOM order is wordmark, search, tabs,
-and the masthead is one row: the mark leads, the search line follows at a capped
-340px, and the tabs keep the trailing edge — no control sits on a row of its
-own. On the narrow paper one row cannot hold all three, so the tabs stay beside
-the mark and the search line takes the full row below. The whole masthead
-scrolls with the page rather than sticking, so it needs no occluding background.
-The line uses the search underline `1px solid rgba(18,17,15,.15)` and a
-1px × 14px accent caret.
-
-The Feeds screen keeps its full-width line as the first control in the content
-measure, `padding:8px 0 32px`, but its one job is adding: "add a feed by url"
-accepts a Feed URL and nothing else — finding a Feed is the masthead line's job,
-answered by the jump-to group. The two widths state that scope: the short
-masthead line searches retained reading; the full-width Feeds line takes an
-address. They repeat the same underline rather than inventing a second field
-style.
-
-**Departure — the line takes its scope from its screen.** Invoked from an
-opened Feed, the line answers with that Feed's items alone; from the Library,
-with saved items; from the Feeds screen, with matching Subscriptions and no
-items. The Digest, the Reader and settings search everywhere. The placeholder
-says which before the first keystroke — `search this feed`, `search your
-saves`, `search your feeds`, `search your reading` — and once the words have
-taken its place, a scoped results surface opens with one meta-grey line, `in
-Field Notes · everywhere`. The `everywhere` word takes §5's grey-to-ink
-treatment and re-asks the same words everywhere; clearing the line still lands
-on the screen the search left. The empty state keeps that line above it, so the
-way out is never further than the miss. A scoped search reads under its
-section's tab — feeds, saved — and one everywhere under the Digest, so the
-active tab and the scope line never disagree. There is no chip and no toggle:
-the scope is read off the screen the search left and travels in the address,
-`/search?q=notes&feed=2`, so a reloaded or shared search answers the same.
+- Desktop pages are 40px from the sides with content no wider than 1280px;
+  content starts 56px below the header (32px on the Reader and an opened Feed,
+  which lead with a back button).
+- Control height is 36px on desktop and 44px on a phone (48px for fields and
+  sheet buttons). Small inline controls are 30px.
+- Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
+- The reading column is 680px, centred.
+- One breakpoint: `max-width: 640px` is the phone layout.
 
 ## 5. Components
 
-### Wordmark
-A 4×4 tile of 3px squares, `gap:2px`, then `simple` in italic at 10px gap.
+**Header (desktop, 68px).** Mark and wordmark; Digest / Feeds / Saved as a
+switch of links; on the right, the search field (340px) and a Settings button.
+Settings shows it is the current screen with a 1px ink ring instead of a fill.
+The header scrolls with the page.
 
-The tile is drawn in the cadence ramp's five ink levels — `.06 / .20 / .38 / .60 / peak ink` — not in a second set of greys, so the mark is the cadence figure at mark size and §6's four-levels rule holds. Levels by row, `0`–`4` as the cadence grid numbers them:
+**Phone chrome.** A 60px top bar: the mark on the left, a 44px search square
+on the right. A nested screen — an opened Feed, the Reader — swaps the mark for
+a back square. Pressing the search square turns the bar into the search field
+with a back square. A bottom tab bar carries Digest, Feeds, Saved and Settings
+as a 48px grey track whose current tab is a ground segment; the Reader, search
+and dialogs hide it.
 
-```
-4 1 3 0
-2 4 0 2
-3 0 4 1
-0 2 1 3
-```
+**Section.** Exactly one section is current, including in the Reader: it
+borrows the section it was opened from — Saved for a save, Feeds for an item of
+an opened Feed, the Digest otherwise and when opened by address. An opened Feed
+is always Feeds. A search reads under its scope's section.
 
-The peak runs down the leading diagonal and then steps back to `.60` in the last cell, so the tile reads as a matrix with a direction rather than a rule drawn corner to corner. Peak ink here is the wordmark's own ink (§2: `#12110F`, dark `#F7F7F5`), the tone the name beside it is set in; the four tints are the ramp's.
+**Back button.** A grey button with a leading arrow, named after the screen it
+returns to: Digest, Feeds, Saved, Article, Search, or the Feed's name. A screen
+opened by address falls back to its own section.
 
-The tile sits centred on the name's line box, which is what puts its bottom edge on the baseline at both type sizes.
+**Search field.** Grey, a magnifier before the words and a `/` key hint after
+them; `/` anywhere outside a field focuses it. The placeholder names the Search
+Scope taken from the screen: "Search your reading", "Search your saves",
+"Search your feeds", "Search this feed". With words in it, the field turns
+ground-coloured with a 1px ink ring and a clear button.
 
-### Tab bar
-Four words, always in order: `digest · feeds · saved · settings`. Active is ink, rest are grey. The tabs never move or change between screens or breakpoints.
+**Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
+before the label (after it for chevrons and the ↗ of a link that leaves).
+Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
+text. Disabled: `control` fill with `disabled` text. A control that is busy
+keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,
+Saving…. Icon-only: square, same height, with an accessible name.
 
-Exactly one word is active at a time, including while the Reader is open. The Reader has no tab of its own, so it borrows the section it was opened from: `saved` for a save, `feeds` for an item of an opened Feed, `digest` otherwise and when opened by address. That is the same section its way back names. An opened Feed always keeps `feeds`, however it was reached.
+**Switch.** A grey track with 3px padding and 2px gaps; the selected segment
+is `ground` with a hairline ring, the rest are `ink-off` and darken on hover.
+Used for sections, views and settings with two or three values. Arrow keys
+move within it.
 
-### Item
-```
-title       300 21px/1.42  #12110F
-meta row    300 12.5px/1   #8C8B86, gap 20, margin-top 8
-```
-Meta contents by context: digest = source · time · save; single feed = date · save (source drops out, it's redundant); feeds list = domain.
+**Toggle.** 40×22 track with a 16px square knob; ink when on, `toggle-off`
+when off.
 
-Search results alone may add a line: when the match lives in the summary, its
-plain-text fragment sits between the title and the meta row in the meta line's
-own grey and size, `line-height:1.6` because it wraps. No markup and no accent —
-the fragment itself is the evidence. A match the shape already shows — title or
-source — draws nothing extra, and the item stays two lines.
+**Checkbox.** 14px square (16px on a phone), 1px border; checked is ink with a
+ground tick. The whole row is the hit target.
 
-Results scoped to one Feed are a single-Feed list and take its meta row: the
-source drops out, `date · save`.
+**Field.** Grey fill, no border, 40px (48px phone), label above in 14/500,
+note below in meta. Focus: ground fill and a 1px ink ring. Error: ground fill,
+a 1px danger ring, and the reason under it in danger.
 
-A search everywhere, or one scoped to the Feeds screen, may also open with a
-jump-to group: matching Subscriptions as condensed feeds-list rows — a handful
-everywhere, every match on the Feeds screen, where the group is the whole
-answer. Each row is name at 16px, domain in meta grey beside it, and the
-30-day cadence strip pinned to the row's trailing edge, so the strips form one
-aligned column as they do on the Feeds list. The strip is what marks the
-row as a Feed rather than an item at a glance. The name is the way in, the
-domain the way out, and whitespace alone separates the group from the item
-results below.
+**Item box.** A thin-edged box with 20px vertical padding. Desktop is a grid:
+a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
+the title, then a 36px save square. The save square shows on hover and focus;
+a saved item shows it always, filled in `saved`, and keeps a `saved-edge`
+border. On a phone the Feed name and time share one line above the title and
+the save square is always visible at 44px. The whole box opens the Reader; the
+Feed name inside it opens the Feed. In search results a snippet sits under the
+title with the matched words marked in `match`.
 
-The source is the way into its Feed: in the Digest, in search results, in the Library, and in the Reader's meta row. It looks no different from the plain text it replaced — meta grey, no underline at rest — and on hover it steps to ink like §5's other grey words.
+**Feed row.** Feed name in Literata 19, its Feed Home Page host under it as an
+underlined link in meta, and a Cadence strip on the right. Rows are two
+columns on desktop with `rule-soft` between them, one on a phone.
 
-A save that outlived its Subscription is the exception. `The Slow Press · no longer subscribed` stays plain text, because there is no Feed left to open. Where the source does open, the link is the name alone, never the trailing clause.
+**Label and value rows.** Label left in `ink-2`, value right in ink, 40px
+minimum height, `rule-soft` between. Used for a Feed's Info and Settings panels
+and the Settings screen.
 
-The domain is the way out to the publisher's site, on the feeds list and in the opened Feed's header. It takes the source's grey-to-ink treatment, and because it leaves the installation it also takes §5's departure ↗ and `noopener noreferrer` — the mark is what tells the two apart, one row to the next. A Feed that declares no site of its own, or has not been retrieved yet, keeps the same words as plain text, unmarked.
+**Cadence strip.** 30 days of 5px squares with 2px gaps on desktop, 14 on a
+phone. A day with no items is `ramp-1`; items step up the ramp.
 
-### Save
-Text affordance, never an icon. `save` in `#A3A29D` (dark: `#6B6A66`); `saved` in accent. Toggle in place, same width class, no animation.
+**Cadence grid.** 26 weeks as columns of seven 13px cells with 4px gaps (9px
+and 2px on a phone), month labels under it and a Fewer → More legend. A day
+with items is a button that scrolls to that day's items.
 
-### Cadence strip (feeds list)
-30 days, one 6px square per day, `gap:2px`, aligned baseline-right of the feed name (`padding-bottom:4px`). At 390px it sits under the name, 14 days, beside the domain.
+**Group.** A group heading with its count in `ink-3`, a `rule` under it on
+panels, then its content. A count appears only when the whole group is loaded.
 
-Four ink levels — never more:
-`rgba(18,17,15,.06)` silent · `.20` one post · `.38` a few · `.60` busy · `#12110F` peak.
+**Dialog.** A 560px ground panel with a hairline ring and a soft shadow over
+the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
+is right-aligned Cancel and the primary action, which stays disabled until
+there is something to submit. On a phone it is a hard-edged sheet rising from
+the bottom edge with Cancel and the primary action side by side at 48px. In at
+150ms, out at 120ms, opacity only.
 
-### Cadence grid (feed opened)
-26 weeks as columns: 7 rows of 11px squares, `gap:3px` both axes, columns run left (oldest) to right (newest). A column is a day you can jump to. Month labels below at 11.5px, then a one-line stat: `167 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 9 days`.
+**Undo line.** Removing something from a list leaves a `row-hover` line in
+its place saying what happened, with an outlined Undo button, so the list does
+not jump.
 
-**Implementation notes.** Values the sections above do not state, fixed here so
-the stylesheet has a source:
+**Notices.** A result the User waits on — a first check, an import, a
+refresh — is one line of meta text in an `aria-live` region under the control
+that started it. Errors give a reason, in danger text, never an apology.
 
-- At the narrow breakpoint the grid keeps all 26 × 7 cells — nothing hides —
-  and the cell steps down one size: 9px squares, `gap:2px`, so the columns fit
-  the 390px paper.
-- A represented day is a button. Its keyboard focus is a 2px **accent** rule
-  beneath the square: a square cannot take a text underline, and this is the
-  text cursor's role — the mark of where the keyboard is — not a third accent
-  use. The stat line's "posts" is likewise this design's display copy; the
-  domain vocabulary keeps saying Feed Item.
-- The opened Feed's header line (the way back, name in ink, domain) sits at 14px
-  (13px narrow) with 40px to the content below.
-  The way back is named after the screen it returns to: `← feeds` from the
-  list, `← digest` from an item's source, `← article` from the Reader. The
-  Reader's topline carries the same link in the same style. A screen opened by
-  address falls back to the section it lives under.
-  Retained items begin below the stat block on the same gap that opens a day
-  group.
-- Month labels are announced where a column opens a month, but never within
-  six columns of the previous label; that spacing is what produces
-  `february · april · june · august`.
+**Mark.** A 4×4 tile of 4px squares with 2px gaps drawn in the Cadence ramp,
+then the wordmark. The same tile, glinting, stands before every waiting line.
 
-### Daily band (digest)
-A dithered field of 4px dots on a 5px pitch, drawn as one element with a long `box-shadow` list. It runs the full 708px content width (§4's measure departure) and is 114px tall — 23 rows of dots on the pitch. The height holds at every width: the container clips the field, so a narrow viewport shortens the band's length while its height never changes. It sits 34px below the header with the date line 40px under it.
+## 6. Words
 
-Generation: value noise → ordered (Bayer) dither → four ink levels. Seeded by the date, so no two mornings repeat. Light levels `.07 / .16 / .30`; dark levels `.07 / .17 / .32 / .56`. It is decoration with a source — the day's own volume — not ornament.
+Screen copy uses the terms in `CONTEXT.md`. Where the drawings say otherwise,
+the shipped words are:
 
-**Implementation notes.** What the recipe above does not state:
+| Drawn | Shipped |
+| --- | --- |
+| Sources | Feeds |
+| post, posts | item, items |
+| Full article / Feed text | Original webpage / Feed content |
+| Open posts as | Open items with |
+| Activity | Cadence |
+| Edit source | Edit feed |
+| Sources that day | Feeds that day |
+| Search saved posts | Search your saves |
 
-- The day's volume sets *coverage*, not brightness. It lowers the bar the
-  noise must clear to ink a cell, and the bar never drops so far that the
-  paper stops showing through: the band is currents of ink in open
-  paper, and adding volume to every cell instead fills it into a slab.
-- The noise is two octaves — a long drift whose horizontal wavelength is far
-  longer than its vertical one, which is what makes the field flow along the
-  band, and a short grain that frays the currents' edges. Both are sampled
-  skew to the pixel grid, so the noise lattice never lines up with a row of
-  cells and prints it as a stripe.
+Rhythm is shown as **Daily**, **Weekly**, **Monthly** and **Inactive** (no
+items in 30 days). Say what happened and what stays: "Not responding since
+7 Sep. Its items stay in your digest." Errors give a reason: "That password
+isn't right. Passwords are case-sensitive."
 
-In the reader it thins to a four-row strip above the article.
+## 7. Motion
 
-### Reader body
+A pressed control answers instantly; motion belongs to arrivals. A screen fades
+in over 150ms, an article arriving from extraction over 200ms, opacity only. A
+dialog is the one thing with an exit. Under `prefers-reduced-motion` the dialog
+fades and scrolling go instant, and the waiting tile holds still.
 
-**Implementation notes.** Two values fixed against the prose above:
+## 8. Not yet designed
 
-- The article opens straight from the metadata line into the first
-  paragraph, so the daily band's four-row reader strip is deferred until a
-  design pass actually draws it above an article.
-- **The article's blocks are the Markdown renderer's, not this document's.**
-  Streamdown draws the headings, lists, quotes, tables, and code, with its own
-  classes and its own opinions: a fenced block is a framed card with its
-  language, copy, download, and line numbers, and inline code is a filled
-  pill. That is a deliberate departure from §1's "no dividers, no cards, no
-  boxes", which still governs every other screen — following one renderer's
-  standard beats maintaining a second design system against it. What this
-  system supplies is the palette those classes resolve against, bound in both
-  schemes, plus the measure and the prose type they inherit. A design pass may
-  reclaim any of it later; until then the renderer leads and this section
-  follows. Code is coloured by Shiki in Vitesse light and dark; a language the
-  reader does not carry simply stays uncoloured. Interface chrome still never
-  uses monospace.
-- Article links take the accent, underlined, which is what the renderer's own
-  link does and a third use of the accent beyond §1's two. `open original`
-  stays interface chrome and keeps the ink. Both mark their departure with ↗
-  and leave with `noopener noreferrer`; math is set with KaTeX at the size of the prose
-  around it, never executed. A display equation wider than the measure scrolls
-  in place, as the renderer's code and tables do, rather than widening the
-  paper — and a
-  numbered one keeps its number clear of the formula instead of hanging it at
-  an edge the formula has already passed.
-
-### Overlay
-
-The same `var(--color-paper)` drawn again, with no border, no radius and no
-shadow: the dimmed backdrop is the whole of its edge, so separation-by-whitespace
-becomes separation-by-dim rather than an exception to it. One component at every
-width — anchored to the bottom edge below 640px rather than swapped for a drawer,
-because two interaction models for one question is where one design becomes two.
-
-In at 150ms, out at 120ms, opacity only, both zero under
-`prefers-reduced-motion`. An overlay is the one exception to the entrance-only
-rule below; no other dismissal acquires an exit. *When* an overlay is permitted
-is ADR 0008's rule, not this document's.
-
-### Motion
-
-The word the User presses answers instantly — the flip is the feedback: word
-hovers, the active tab, the save word, and every dismissal but an overlay's
-never ease. The mark is the exception, and the only one: it is not a word and
-has no flip to give, so it answers in the vocabulary it is drawn in (see the
-glint below). Otherwise motion belongs to arrivals. What a press summons, and
-what the machine answers on its own clock, enters on a breath — opacity,
-ease-out, never a show:
-
-- A summoned view — a tab's screen, an opened Feed, the Reader — fades in
-  over 150ms, opacity only: brief enough that the hundredth tab change
-  still feels instant, present enough that the page never teleports.
-  Entrance-only; nothing the User does ever waits on an exit.
-- An article arriving from extraction (or its fallback) fades in over
-  200ms, opacity only. The paper and the prose hold still.
-- An overlay fades in over 150ms and out over 120ms, opacity only — the one
-  motion in the system that runs on an exit (see Overlay above).
-- A selected cadence day scrolls its items into view smoothly, so the jump
-  reads as travel down the same list.
-- **The mark's glint.** Hovered, the mark's sixteen cells step to another
-  level of the same ramp and back — one pass along the anti-diagonal, 60ms
-  between cells, 500ms for a cell's own rise and fall, `cubic-bezier(.23,1,
-  .32,1)` — and the tile settles at its canonical levels while the pointer is
-  still on it. Only where the mark is a link: on setup and login it holds
-  still.
-- **The wait.** Every waiting line — the digest, the library, a feed, the
-  feeds list, an opening article, a running search — puts the same tile in
-  front of its words, glinting on a loop: the same shape in the front 30% of
-  a 1200ms turn, 60ms between cells, `linear`, still for the rest. The words
-  say what is being waited on; the tile says it is still happening. The
-  masthead mark stays out of it — two marks moving at once is the product
-  fidgeting.
-
-Under `prefers-reduced-motion` the overlay's fades and the scroll go instant and
-the view fades remain — gentler, not zero. The glint on hover does not run at all; a
-flicker has no gentler version. The wait is the one thing that cannot stop,
-since "is anything still happening" is the only question it exists to answer,
-so its cells hold still and the tile breathes on opacity instead.
-
-## 6. Density rules
-
-- Never more than four ink levels in a matrix.
-- Never a border where whitespace will do.
-- Never a second typeface.
-- Never all caps mono font.
-- No hairline design.
-- Numbers appear only where they answer "is there something to read": post counts, quiet stretches. No engagement stats, no read time in lists (only in the reader header).
-
-## 7. Breakpoints
-
-Single breakpoint at 390px. Changes: type down one step, padding 56 → 24, cadence 30 days → 14, measure becomes full width. The daily band keeps its 114px height and only its clipped length follows the viewport. Structure is identical — nothing reflows, reorders, or hides.
-
-**Implementation note.** 390px is the width the narrow layout is *drawn at*, not the width the media query fires at. A phone at 430px needs the narrow scale too, and the 820px paper stops being comfortable well above 390px, so the stylesheet switches at `max-width: 640px`. Every value inside the query is still the literal 390px column of the tables above.
+Drawn but waiting on the API: Digest by day and by source, the Digest's Rhythm
+filter and day list, Show in digest, sorting Saved and search results, a
+Feed's subscribed date and editable URL. Not drawn: first-run and empty states,
+confirmations after adding or importing, the reader fallback, offline, and the
+dark versions of most screens — these follow the components above.
