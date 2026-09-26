@@ -39,8 +39,8 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
       }
       setNotice(
         describeFailure(error, {
-          401: 'that setup secret is not right',
-          503: 'this installation has no setup secret configured',
+          401: 'That setup secret isn’t right.',
+          503: 'This installation has no setup secret configured.',
         }),
       )
     } finally {
@@ -48,31 +48,39 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
     }
   }
 
+  const ready = setupSecret !== '' && password !== '' && confirmation !== ''
   return (
-    <form className="view measure gate" aria-label="Claim this installation" onSubmit={submit}>
-      <p className="empty-note">this installation has no user yet — claim it with its setup secret</p>
+    <form className="view gate" aria-label="Claim this installation" onSubmit={submit}>
+      <header className="gate-head">
+        <h1 className="page-title">Set up simple</h1>
+        <p className="gate-tagline">Subscribe. Read. Save.</p>
+        <p className="note">This installation has no user yet. Claim it with the setup secret it was deployed with.</p>
+      </header>
       <Field
-        label="setup secret"
+        label="Setup secret"
         type="password"
         value={setupSecret}
         autoComplete="off"
         autoFocus
         onChange={setSetupSecret}
       />
-      <Field label="password" type="password" value={password} autoComplete="new-password" onChange={setPassword} />
+      <Field label="Password" type="password" value={password} autoComplete="new-password" onChange={setPassword} />
       <Field
-        label="confirm password"
+        label="Confirm password"
         type="password"
         value={confirmation}
         autoComplete="new-password"
         onChange={setConfirmation}
       />
-      <p className="gate-actions">
-        <Button className="text-button" type="submit" focusableWhenDisabled disabled={claiming}>
-          claim
-        </Button>
-      </p>
-      <p className="notice" role="status">
+      <Button
+        className="button button-primary gate-submit"
+        type="submit"
+        focusableWhenDisabled
+        disabled={claiming || !ready}
+      >
+        {claiming ? 'Claiming…' : 'Claim installation'}
+      </Button>
+      <p className="note note-error" role="status">
         {notice}
       </p>
     </form>

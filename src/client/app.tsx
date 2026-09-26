@@ -75,7 +75,7 @@ function viewFor(gate: Gate, navigation: Navigation) {
     case 'checking':
       return null
     case 'unavailable':
-      return <EmptyView note="the reader is unavailable" />
+      return <EmptyView note="The reader is unavailable. Try again in a moment." />
     case 'unclaimed':
       return <SetupView onClaimed={gate.adopt} onAlreadyClaimed={gate.recheck} />
     case 'locked':

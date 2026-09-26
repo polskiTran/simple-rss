@@ -100,7 +100,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const groups = subscriptions ? rhythmGroups(subscriptions) : []
 
   return (
-    <div className="view feeds-view">
+    <div className="view">
       <header className="page-head">
         <div className="toolbar">
           <h1 className="page-title">
@@ -223,7 +223,7 @@ function RhythmGroup({
       title={RHYTHM_LABELS[rhythm]}
       count={subscriptions.length}
       aside={rhythm === 'inactive' ? 'No items in 30 days' : undefined}
-      className="panel rhythm-group"
+      className="panel"
     >
       <FeedRows subscriptions={shown} retryingFeedId={retryingFeedId} onRetry={onRetry} onOpen={onOpen} />
       {hidden.length > 0 ? (

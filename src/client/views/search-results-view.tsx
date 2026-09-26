@@ -70,7 +70,7 @@ export function SearchResultsView({
   const place = answer?.scope === 'feed' ? answer.feed.title : SEARCH_SCOPE_COPY[scope.kind].place
 
   return (
-    <div className="view search-view">
+    <div className="view">
       <header className="page-head">
         <h1 className="page-title">
           “{line}”
@@ -102,7 +102,7 @@ export function SearchResultsView({
         </p>
       ) : (
         <div className="search-answer" role="region" aria-label="search results" aria-busy={found.kind === 'loading'}>
-          <div className="search-main">
+          <div>
             <MatchingFeeds subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
             {filtered.length > 0 ? (
               <div className="item-list">

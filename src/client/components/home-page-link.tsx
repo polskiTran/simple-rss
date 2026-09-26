@@ -10,7 +10,7 @@ export function HomePageLink({ className, domain, homePageUrl }: HomePageLinkPro
   if (!homePageUrl) return <span className={className}>{domain}</span>
   return (
     <a
-      className={className ? `link home-page-link ${className}` : 'link home-page-link'}
+      className={className ? `link ${className}` : 'link'}
       href={homePageUrl}
       target="_blank"
       rel="noopener noreferrer"

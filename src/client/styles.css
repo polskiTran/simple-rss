@@ -4,8 +4,6 @@
 @import '@fontsource-variable/literata/opsz-italic.css';
 @import '@fontsource-variable/instrument-sans/wght.css';
 
-@import './legacy.css';
-
 @source "../../node_modules/streamdown/dist/*.js";
 
 /* Streamdown's classes ask for `dark:`; it follows the same appearance the
@@ -67,23 +65,6 @@
   --color-muted: var(--color-row-hover);
   --color-muted-foreground: var(--color-ink-2);
   --color-sidebar: var(--color-row-hover);
-}
-
-/* The first system's names, read by legacy.css until its last screen moves. */
-:root {
-  --font-serif: var(--font-read);
-  --color-paper: var(--color-ground);
-  --color-ink-strong: var(--color-ink);
-  --color-body: var(--color-reader-body);
-  --color-meta: var(--color-ink-2);
-  --color-quiet: var(--color-ink-3);
-  --color-accent: var(--color-saved);
-  --color-hairline: var(--color-rule);
-  --color-dim: var(--color-scrim);
-  --cadence-0: var(--color-ramp-1);
-  --cadence-1: var(--color-ramp-2);
-  --cadence-2: var(--color-ramp-3);
-  --cadence-3: var(--color-ramp-4);
 }
 
 @layer base {
@@ -1395,6 +1376,31 @@
     color: var(--color-ink-3);
   }
 
+  /* Sign in and setup */
+
+  .gate {
+    display: grid;
+    gap: 24px;
+    max-width: 360px;
+  }
+
+  .gate-head {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .gate-tagline {
+    margin: 0;
+    font: 400 19px/1.4 var(--font-read);
+    color: var(--color-reader-body);
+  }
+
+  .gate-submit {
+    width: 100%;
+    height: 44px;
+  }
+
   /* Chrome */
 
   .chrome {
@@ -1878,6 +1884,14 @@
 
   .setting-control .switch {
     display: flex;
+  }
+
+  .gate {
+    max-width: none;
+  }
+
+  .gate-submit {
+    height: 48px;
   }
 
   /* Dialog: a sheet from the bottom edge. */

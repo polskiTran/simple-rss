@@ -12,7 +12,7 @@ export interface ItemTitleLinkProps {
 
 export function ItemTitleLink({ feedItemId, title, children, onOpen }: ItemTitleLinkProps) {
   return (
-    <a className="content-item-link" href={readerPathOf(feedItemId)} onClick={routedClick(() => onOpen(feedItemId))}>
+    <a href={readerPathOf(feedItemId)} onClick={routedClick(() => onOpen(feedItemId))}>
       {children ?? title}
     </a>
   )

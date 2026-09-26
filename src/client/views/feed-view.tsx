@@ -106,7 +106,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
 
   if (state.kind === 'loading') {
     return (
-      <div className="view feed-view">
+      <div className="view">
         <div className="view-topline">{back}</div>
         <LoadingNote>Loading the feed</LoadingNote>
       </div>
@@ -115,7 +115,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   if (state.kind === 'unavailable' || state.kind === 'unreachable') {
     const missing = state.error instanceof ApiError && state.error.status === 404
     return (
-      <div className="view feed-view">
+      <div className="view">
         <div className="view-topline">{back}</div>
         {missing ? (
           <p className="note">That feed isn’t among your subscriptions.</p>
@@ -129,7 +129,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   const detail = state.value
   const grid = cadenceGrid(detail.cadence)
   return (
-    <div className="view feed-view">
+    <div className="view">
       <div className="view-topline">{back}</div>
       <header className="feed-head">
         <div className="feed-identity">
@@ -256,7 +256,6 @@ function Items({
           id={dayAnchor(detail.feedId, date)}
           title={today ? dayTitle(date, today) : longDay(date)}
           count={items.length}
-          className="item-group"
         >
           <div className="item-list">
             {items.map((item) => (

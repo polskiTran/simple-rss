@@ -87,7 +87,7 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
 
   const digest = state.value
   return (
-    <div className="view digest-view">
+    <div className="view">
       {head}
       {digest.groups.length === 0 ? (
         <p className="note">Nothing yet. Subscribe to a feed in Feeds to start your digest.</p>
@@ -99,7 +99,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
             title={group.label}
             count={countOf(digest, group, index)}
             aside={relativeDay(group.date, digest.today.date) ? longDay(group.date) : undefined}
-            className="item-group"
           >
             <div className="item-list">
               {group.items.map((item) => (
