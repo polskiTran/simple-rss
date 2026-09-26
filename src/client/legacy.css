@@ -20,65 +20,6 @@
     line-height: 1.5;
   }
 
-  .sheet-label {
-    color: var(--color-meta);
-  }
-
-  .sheet-value {
-    font-size: 14px;
-    color: var(--color-body);
-  }
-
-  .sheet-select {
-    appearance: none;
-    max-width: 100%;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    padding: 0;
-    font: inherit;
-    font-size: 14px;
-    color: var(--color-body);
-    cursor: pointer;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .sheet-select:hover {
-      border-bottom: 2px solid var(--color-hairline);
-    }
-  }
-
-  .sheet-select:focus-visible {
-    outline: none;
-    border-bottom: 2px solid var(--color-ink);
-  }
-
-  .appearance-options {
-    display: inline-flex;
-    gap: 12px;
-  }
-
-  .export-links {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 8px 24px;
-  }
-
-  .appearance-option {
-    background: none;
-    border: 0;
-    padding: 0;
-    font: inherit;
-    font-size: 13px;
-    line-height: 1;
-    color: var(--color-quiet);
-    cursor: pointer;
-  }
-
-  .appearance-option[data-pressed] {
-    color: var(--color-ink-strong);
-  }
-
   .text-button {
     background: none;
     border: 0;
@@ -113,11 +54,6 @@
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
-  }
-
-  .export-link {
-    color: var(--color-ink-strong);
-    text-decoration: none;
   }
 
   .content-list {

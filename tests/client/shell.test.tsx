@@ -187,20 +187,20 @@ describe('settings', () => {
   it('reports the running version from the API', async () => {
     await renderAt('/settings')
 
-    await waitFor(() => expect(screen.getByText('0.1.0')).toBeDefined())
+    await waitFor(() => expect(screen.getByText('simple 0.1.0')).toBeDefined())
   })
 
   it('says so plainly when the server cannot be reached', async () => {
     stubApi().on('GET /api/meta', { status: 503 })
     await renderAt('/settings')
 
-    await waitFor(() => expect(screen.getByText('unavailable')).toBeDefined())
+    await waitFor(() => expect(screen.getByText('simple unavailable')).toBeDefined())
   })
 
   it('rejects a response that does not match the agreed shape', async () => {
     stubApi().on('GET /api/meta', { body: { name: 'something-else' } })
     await renderAt('/settings')
 
-    await waitFor(() => expect(screen.getByText('unavailable')).toBeDefined())
+    await waitFor(() => expect(screen.getByText('simple unavailable')).toBeDefined())
   })
 })

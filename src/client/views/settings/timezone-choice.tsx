@@ -1,5 +1,6 @@
-import { useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { fetchInstallationPreferences, updateInstallationTimezone } from '../../api.js'
+import { NativeSelect } from '../../components/native-select.js'
 import { useResource } from '../../use-resource.js'
 import { describeFailure } from '../failure.js'
 
@@ -8,15 +9,13 @@ export function TimezoneChoice() {
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
 
-  if (preferences.kind === 'loading') return <span>—</span>
-  if (preferences.kind !== 'loaded') return <span>unavailable</span>
+  if (preferences.kind === 'loading') return <span className="note">Loading…</span>
+  if (preferences.kind !== 'loaded') return <span className="note">Unavailable</span>
 
   const held = preferences.value.timezone
 
-  async function change(event: ChangeEvent<HTMLSelectElement>) {
+  async function change(chosen: string) {
     if (saving) return
-    const chosen = event.target.value
-
     setSaving(true)
     setNotice('')
     set((current) => ({ ...current, timezone: chosen }))
@@ -25,33 +24,25 @@ export function TimezoneChoice() {
       set(() => updated)
     } catch (error) {
       set((current) => ({ ...current, timezone: held }))
-      setNotice(describeFailure(error, { 400: 'that timezone is not recognized' }))
+      setNotice(describeFailure(error, { 400: 'That timezone isn’t recognized.' }))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <>
-      <select
-        className="sheet-select"
-        aria-label="installation timezone"
+    <div className="setting-stack">
+      <NativeSelect
+        label="Installation timezone"
         value={held}
+        options={timezoneOptions(held).map((zone) => ({ value: zone, label: zone }))}
         disabled={saving}
-        onChange={change}
-      >
-        {timezoneOptions(held).map((zone) => (
-          <option key={zone} value={zone}>
-            {zone}
-          </option>
-        ))}
-      </select>
-      {notice ? (
-        <p className="notice" role="status">
-          {notice}
-        </p>
-      ) : null}
-    </>
+        onChange={(zone) => void change(zone)}
+      />
+      <p className="note note-error" role="status">
+        {notice}
+      </p>
+    </div>
   )
 }
 

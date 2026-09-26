@@ -2,7 +2,7 @@ import { MIN_PASSWORD_LENGTH, newPasswordSchema } from '../../shared/api.js'
 import { ApiError } from '../api.js'
 
 export function describeFailure(cause: unknown, overrides: Record<number, string> = {}): string {
-  if (!(cause instanceof ApiError)) return 'the reader is unavailable'
+  if (!(cause instanceof ApiError)) return 'The reader is unavailable. Try again in a moment.'
 
   const override = overrides[cause.status]
   if (override) return override
@@ -11,22 +11,22 @@ export function describeFailure(cause: unknown, overrides: Record<number, string
     case 400:
       return tooShort()
     case 401:
-      return 'that password is not right'
+      return 'That password isn’t right. Passwords are case-sensitive.'
     case 429:
-      return `too many attempts — try again in ${describeWait(cause.retryAfterSeconds)}`
+      return `Too many attempts. Try again in ${describeWait(cause.retryAfterSeconds)}.`
     default:
-      return 'that did not work'
+      return 'That didn’t work. Try again.'
   }
 }
 
 export function tooShort(): string {
-  return `a password needs at least ${MIN_PASSWORD_LENGTH} characters`
+  return `A password needs at least ${MIN_PASSWORD_LENGTH} characters.`
 }
 
 export function reasonToHold(password: string, confirmation: string): string | undefined {
-  if (password !== confirmation) return 'those two passwords are not the same'
+  if (password !== confirmation) return 'Those two passwords aren’t the same.'
   if (password.length < MIN_PASSWORD_LENGTH) return tooShort()
-  if (!newPasswordSchema.safeParse(password).success) return 'that password is too long'
+  if (!newPasswordSchema.safeParse(password).success) return 'That password is too long.'
   return undefined
 }
 

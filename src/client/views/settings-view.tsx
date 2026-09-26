@@ -1,7 +1,9 @@
 import { Button } from '@base-ui/react/button'
-import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { AuthStatus } from '../../shared/api.js'
 import { signOut } from '../api.js'
+import { Group } from '../components/group.js'
+import { Icon } from '../components/icon.js'
 import { AppearanceChoice } from './settings/appearance-choice.js'
 import { PasswordChange } from './settings/password-change.js'
 import { TimezoneChoice } from './settings/timezone-choice.js'
@@ -12,8 +14,6 @@ export interface SettingsViewProps {
 }
 
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
-  const [changing, setChanging] = useState(false)
-
   async function leave() {
     try {
       await signOut()
@@ -23,51 +23,62 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   }
 
   return (
-    <div className="view measure">
-      <dl className="sheet">
-        <dt className="sheet-label">timezone</dt>
-        <dd className="sheet-value">
+    <div className="view settings-view">
+      <header className="page-head">
+        <h1 className="page-title">Settings</h1>
+      </header>
+
+      <Group id="settings-reading" title="Reading" className="panel">
+        <Setting label="Timezone" note="Decides where one day ends in the digest.">
           <TimezoneChoice />
-        </dd>
-
-        <dt className="sheet-label">appearance</dt>
-        <dd className="sheet-value">
+        </Setting>
+        <Setting label="Appearance" note="On this device only.">
           <AppearanceChoice />
-        </dd>
+        </Setting>
+      </Group>
 
-        <dt className="sheet-label">version</dt>
-        <dd className="sheet-value">
-          <VersionNote />
-        </dd>
-
-        <dt className="sheet-label">export</dt>
-        <dd className="sheet-value">
-          <span className="export-links">
-            <a className="export-link" href="/api/subscriptions/export" download="subscriptions.opml">
-              subscriptions (OPML)
+      <Group id="settings-data" title="Your data" className="panel">
+        <Setting label="Export" note="OPML moves your feeds to another reader. JSON includes your saved items.">
+          <div className="toolbar-group">
+            <a className="button" href="/api/subscriptions/export" download="subscriptions.opml">
+              <Icon name="download" />
+              Subscriptions (OPML)
             </a>
-            <a className="export-link" href="/api/export" download="simple-rss-export.json">
-              everything (JSON)
+            <a className="button" href="/api/export" download="simple-rss-export.json">
+              <Icon name="download" />
+              Everything (JSON)
             </a>
-          </span>
-        </dd>
+          </div>
+        </Setting>
+      </Group>
 
-        <dt className="sheet-label">password</dt>
-        <dd className="sheet-value">
-          <Button className="text-button" onClick={() => setChanging(!changing)}>
-            {changing ? 'cancel' : 'change'}
+      <Group id="settings-account" title="Account" className="panel">
+        <Setting label="Password">
+          <PasswordChange onChanged={onAccessChanged} />
+        </Setting>
+        <Setting label="Session">
+          <Button className="button" onClick={leave}>
+            Sign out
           </Button>
-        </dd>
+        </Setting>
+      </Group>
 
-        <dt className="sheet-label">session</dt>
-        <dd className="sheet-value">
-          <Button className="text-button" onClick={leave}>
-            sign out
-          </Button>
-        </dd>
-      </dl>
+      <p className="note settings-version">
+        simple <VersionNote />
+      </p>
+    </div>
+  )
+}
 
-      {changing ? <PasswordChange onChanged={onAccessChanged} /> : null}
+/** One preference: what it is and does on the left, its control on the right. */
+function Setting({ label, note, children }: { label: string; note?: string; children: ReactNode }) {
+  return (
+    <div className="setting">
+      <div className="setting-label">
+        <p className="setting-name">{label}</p>
+        {note ? <p className="note">{note}</p> : null}
+      </div>
+      <div className="setting-control">{children}</div>
     </div>
   )
 }

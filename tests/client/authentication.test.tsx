@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -70,7 +70,7 @@ describe('an installation nobody has claimed', () => {
     await fill('confirm password', 'a-clam-reading-password')
     await press('claim')
 
-    expect(await screen.findByText(/not the same/i)).toBeDefined()
+    expect(await screen.findByText(/aren’t the same/)).toBeDefined()
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
   })
 
@@ -184,7 +184,7 @@ describe('coming back to a claimed installation', () => {
     await fill('password', 'the-wrong-password')
     await press('sign in')
 
-    const notice = await screen.findByText(/that password is not right/i)
+    const notice = await screen.findByText(/That password isn’t right/)
     expect(notice.textContent).not.toMatch(/user|claimed|attempt/i)
   })
 
@@ -199,7 +199,7 @@ describe('coming back to a claimed installation', () => {
     await fill('password', 'the-wrong-password')
     await press('sign in')
 
-    await screen.findByText(/not right/i)
+    await screen.findByText(/isn’t right/)
     expect(screen.getByLabelText('password')).toHaveProperty('value', '')
   })
 
@@ -215,7 +215,7 @@ describe('coming back to a claimed installation', () => {
     await fill('password', 'a-calm-reading-password')
     await press('sign in')
 
-    expect(await screen.findByText(/too many attempts — try again in 10 minutes/i)).toBeDefined()
+    expect(await screen.findByText(/Too many attempts\. Try again in 10 minutes\./)).toBeDefined()
   })
 
   it('says the reader is unavailable when the server cannot be reached at all', async () => {
@@ -238,7 +238,7 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('sign out')
+    await press('Sign out')
 
     expect(api.requestsTo('DELETE /api/auth/session')).toHaveLength(1)
     expect(await screen.findByRole('button', { name: 'sign in' })).toBeDefined()
@@ -249,11 +249,11 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('change')
-    await fill('current password', 'a-calm-reading-password')
-    await fill('new password', 'a-replacement-password')
-    await fill('confirm new password', 'a-replacement-password')
-    await press('change password')
+    await press('Change password')
+    await fill('Current password', 'a-calm-reading-password')
+    await fill('New password', 'a-replacement-password')
+    await fill('Confirm new password', 'a-replacement-password')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change password' }))
 
     expect(api.requestsTo('POST /api/auth/password')[0]?.body).toEqual({
       currentPassword: 'a-calm-reading-password',
@@ -267,7 +267,7 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('change')
+    await press('Change password')
 
     expect(screen.getByText(/signs out every device/i)).toBeDefined()
   })
@@ -280,14 +280,15 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('change')
-    await fill('current password', 'not-the-current-one')
-    await fill('new password', 'a-replacement-password')
-    await fill('confirm new password', 'a-replacement-password')
-    await press('change password')
+    await press('Change password')
+    await fill('Current password', 'not-the-current-one')
+    await fill('New password', 'a-replacement-password')
+    await fill('Confirm new password', 'a-replacement-password')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change password' }))
 
-    expect(await screen.findByText(/that password is not right/i)).toBeDefined()
-    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeDefined()
+    expect(await screen.findByText(/That password isn’t right/)).toBeDefined()
+    expect(screen.getByRole('dialog', { name: 'Change password' })).toBeDefined()
+    expect(window.location.pathname).toBe('/settings')
   })
 
   it('returns to the sign-in screen when a session ends between requests', async () => {
