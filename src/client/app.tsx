@@ -10,6 +10,7 @@ import {
   feedOrigin,
   readerOrigin,
   searchOrigin,
+  searchScopeOfScreen,
   useNavigation,
   type Navigation,
   type Origin,
@@ -91,7 +92,8 @@ function signedInView(navigation: Navigation, gate: Gate) {
       <SearchResultsView
         settledQuery={navigation.query}
         scope={navigation.searchScope}
-        onEverywhere={navigation.searchEverywhere}
+        originScope={searchScopeOfScreen(navigation.origin?.path ?? '')}
+        onScope={navigation.searchIn}
         onOpenItem={(feedItemId) => navigation.openReader(feedItemId, origin)}
         onOpenFeed={(feedId) => navigation.openFeed(feedId, origin)}
       />

@@ -92,9 +92,11 @@ describe('the search line in the chrome', () => {
 
     await user.type(await screen.findByRole('searchbox', { name: 'Search your reading' }), 'driftwood')
 
-    expect((await screen.findByRole('status')).textContent).toBe('searching…')
+    expect((await screen.findByRole('status')).textContent).toBe('Searching…')
     answer.resolve()
-    expect((await screen.findByText('nothing in your reading matches “driftwood”')).getAttribute('role')).toBe('status')
+    expect((await screen.findByText('Nothing in your reading matches “driftwood”.')).getAttribute('role')).toBe(
+      'status',
+    )
   })
 
   it('keeps the last results in view while the next search is answered', async () => {
@@ -120,10 +122,10 @@ describe('the search line in the chrome', () => {
     await waitFor(() => expect(api.requestsTo('GET /api/search?q=driftwood')).toHaveLength(1))
     expect(results.getAttribute('aria-busy')).toBe('true')
     expect(within(results).getByRole('link', { name: 'Driftwood morning' })).toBeDefined()
-    expect(screen.queryByText('searching…')).toBeNull()
+    expect(screen.queryByText('Searching…')).toBeNull()
 
     answer.resolve()
-    expect(await screen.findByText('nothing in your reading matches “driftwood”')).toBeDefined()
+    expect(await screen.findByText('Nothing in your reading matches “driftwood”.')).toBeDefined()
   })
 
   it('tells a silent network apart from a refusing server for a search too', async () => {
@@ -138,14 +140,14 @@ describe('the search line in the chrome', () => {
 
     const field = await screen.findByRole('searchbox', { name: 'Search your reading' })
     await user.type(field, 'drift')
-    expect(await screen.findByText('search is out of reach — check the connection, then try again')).toBeDefined()
+    expect(await screen.findByText('Search can’t be reached. Check the connection, then try again.')).toBeDefined()
 
     api.on('GET /api/search?q=driftless', {
       status: 503,
       body: { error: { code: 'unavailable', message: 'Unavailable' } },
     })
     await user.type(field, 'less')
-    expect(await screen.findByText('search is unavailable — try again in a moment')).toBeDefined()
+    expect(await screen.findByText('Search didn’t load. Try again in a moment.')).toBeDefined()
   })
 
   it('answers a shared search address with the results it names', async () => {
@@ -161,5 +163,55 @@ describe('the search line in the chrome', () => {
     expect(results.textContent).toContain('Morning chronology')
     const field = await screen.findByRole<HTMLInputElement>('searchbox', { name: 'Search your reading' })
     expect(field.value).toBe('chronology')
+  })
+
+  it('marks the words that matched, in the title and the snippet alike', async () => {
+    stubApi().on('GET /api/search?q=Tide', {
+      body: {
+        scope: 'everywhere',
+        subscriptions: [],
+        results: [{ ...result(9, 'Tide chronology', 'Today, 07:15'), snippet: 'Low tide came early.' }],
+      },
+    })
+    window.history.replaceState(null, '', '/search?q=Tide')
+    const { container } = render(<App />)
+
+    await screen.findByRole('region', { name: 'search results' })
+    const marks = [...container.querySelectorAll('mark.match')].map((mark) => mark.textContent)
+    expect(marks).toEqual(['Tide', 'tide'])
+    expect(screen.getByRole('link', { name: 'Tide chronology' })).toBeDefined()
+  })
+
+  it('narrows the results to the ticked Feeds, and clears back to all of them', async () => {
+    stubApi().on('GET /api/search?q=light', {
+      body: {
+        scope: 'everywhere',
+        subscriptions: [],
+        results: [
+          result(9, 'Morning light', 'Today, 07:15'),
+          result(8, 'Evening light', 'Today, 06:00'),
+          { ...result(7, 'Coast light', '3 June'), feedId: 2, feedTitle: 'The Slow Press' },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/search?q=light')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const filter = await screen.findByRole('complementary', { name: 'Narrow by feed' })
+    expect(within(filter).getByRole('checkbox', { name: 'Field Notes 2' })).toBeDefined()
+
+    await user.click(within(filter).getByRole('checkbox', { name: 'The Slow Press 1' }))
+
+    const results = screen.getByRole('region', { name: 'search results' })
+    expect(
+      within(results)
+        .getAllByRole('article')
+        .map((item) => item.querySelector('h3')?.textContent),
+    ).toEqual(['Coast light'])
+
+    await user.click(within(filter).getByRole('button', { name: 'Clear' }))
+
+    expect(within(results).getAllByRole('article')).toHaveLength(3)
   })
 })

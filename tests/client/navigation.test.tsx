@@ -131,6 +131,14 @@ function wayBack() {
   return within(screen.getByRole('main')).getByRole('link', { name: /^Back to / })
 }
 
+/** The scope the results' switch holds. */
+function pressedScope() {
+  const scopes = screen.getByRole('group', { name: 'Search in' })
+  return within(scopes)
+    .getAllByRole('button')
+    .find((scope) => scope.getAttribute('aria-pressed') === 'true')?.textContent
+}
+
 function activeTab() {
   return screen.getByRole('link', { current: 'page' }).textContent
 }
@@ -417,15 +425,21 @@ describe('the scope a search takes from its screen', () => {
     expect(window.location.pathname + window.location.search).toBe('/search?q=light&feed=1')
     expect(within(results).getByRole('link', { name: 'First light' })).toBeDefined()
     expect(within(results).queryByRole('link', { name: 'Field Notes' })).toBeNull()
-    expect(screen.getByText(/^in Field Notes ·/)).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1, name: '“light” 1 result in Field Notes' })).toBeDefined()
+    expect(pressedScope()).toBe('This feed')
     expect(activeTab()).toBe('Feeds')
 
-    await user.click(screen.getByRole('link', { name: 'everywhere' }))
+    await user.click(screen.getByRole('button', { name: 'Everywhere' }))
     expect(await screen.findByRole('link', { name: 'Coast light' })).toBeDefined()
     expect(window.location.pathname + window.location.search).toBe('/search?q=light')
     expect(api.requestsTo('GET /api/search?q=light')).toHaveLength(1)
-    expect(screen.queryByText(/^in Field Notes/)).toBeNull()
+    expect(pressedScope()).toBe('Everywhere')
     expect(activeTab()).toBe('Digest')
+    await user.click(screen.getByRole('button', { name: 'This feed' }))
+    expect(window.location.pathname + window.location.search).toBe('/search?q=light&feed=1')
+    expect(pressedScope()).toBe('This feed')
+    await user.click(screen.getByRole('button', { name: 'Everywhere' }))
+
     const field = screen.getByRole<HTMLInputElement>('searchbox', { name: 'Search your reading' })
     expect(field.value).toBe('light')
 
@@ -440,7 +454,7 @@ describe('the scope a search takes from its screen', () => {
 
     const results = await screen.findByRole('region', { name: 'search results' })
     expect(within(results).getByRole('link', { name: 'First light' })).toBeDefined()
-    expect(screen.getByText(/^in Field Notes ·/)).toBeDefined()
+    expect(pressedScope()).toBe('This feed')
     expect(screen.getByRole<HTMLInputElement>('searchbox', { name: 'Search this feed' }).value).toBe('light')
     expect(activeTab()).toBe('Feeds')
   })
@@ -453,8 +467,8 @@ describe('the scope a search takes from its screen', () => {
 
     await user.type(screen.getByRole('searchbox', { name: 'Search your saves' }), 'light')
 
-    expect((await screen.findByText('nothing in your saves matches “light”')).getAttribute('role')).toBe('status')
-    expect(screen.getByText(/^in your saves ·/)).toBeDefined()
+    expect((await screen.findByText('Nothing in your saves matches “light”.')).getAttribute('role')).toBe('status')
+    expect(pressedScope()).toBe('Saved')
   })
 
   it('from the Feeds screen, answers with Subscriptions alone', async () => {
@@ -480,7 +494,7 @@ describe('the scope a search takes from its screen', () => {
 
     const jumpTo = await screen.findByRole('navigation', { name: 'matching subscriptions' })
     expect(within(jumpTo).getByRole('link', { name: 'Field Notes' })).toBeDefined()
-    expect(screen.getByText(/^in your feeds ·/)).toBeDefined()
+    expect(pressedScope()).toBe('Feeds')
   })
 
   it('from the Reader, answers everywhere', async () => {
@@ -492,6 +506,6 @@ describe('the scope a search takes from its screen', () => {
     await user.type(screen.getByRole('searchbox', { name: 'Search your reading' }), 'light')
 
     await screen.findByRole('region', { name: 'search results' })
-    expect(screen.queryByRole('link', { name: 'everywhere' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Search in' })).toBeNull()
   })
 })

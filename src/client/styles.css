@@ -1292,6 +1292,69 @@
     grid-template-columns: 140px minmax(0, 1fr);
   }
 
+  /* Search */
+
+  .search-answer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: 64px;
+  }
+
+  .search-answer:not(:has(.search-filter)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .search-feeds {
+    margin-bottom: 48px;
+  }
+
+  .filter-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 36px;
+    cursor: pointer;
+  }
+
+  .filter-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .filter-count {
+    color: var(--color-ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Checked is a filled inner square: hard-edged, and no image to fetch. */
+  .checkbox {
+    appearance: none;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    border: 1px solid var(--color-ink-2);
+    border-radius: 0;
+    background: var(--color-ground);
+    cursor: pointer;
+  }
+
+  .checkbox:checked {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    box-shadow: inset 0 0 0 2px var(--color-ground);
+  }
+
   /* Chrome */
 
   .chrome {
@@ -1712,6 +1775,59 @@
 
   .item-plain {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Search: the Feed filter as a row of chips above the results. */
+
+  .search-answer {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .search-filter {
+    order: -1;
+  }
+
+  .search-filter .group-header {
+    display: none;
+  }
+
+  .filter-list {
+    display: flex;
+    gap: 8px;
+    margin: 0 -20px;
+    padding-inline: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .filter-row {
+    gap: 8px;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--color-control);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .filter-row:has(.checkbox:checked) {
+    background: var(--color-ink);
+    color: var(--color-ground);
+  }
+
+  .filter-row:has(.checkbox:focus-visible) {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  .filter-row .checkbox {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .filter-row:has(.checkbox:checked) .filter-count {
+    color: var(--color-ink-3);
   }
 
   /* Dialog: a sheet from the bottom edge. */

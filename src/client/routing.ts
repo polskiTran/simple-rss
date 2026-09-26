@@ -92,7 +92,7 @@ export function searchOrigin(query: string, scope: SearchScope, from: Origin | u
 }
 
 /** One derivation of the scope, from the screen's address alone. */
-function searchScopeOfScreen(pathname: string): SearchScope {
+export function searchScopeOfScreen(pathname: string): SearchScope {
   const feedId = feedIdOf(pathname)
   if (feedId !== undefined) return { kind: 'feed', feedId }
   if (pathname === pathOf('saved')) return { kind: 'saved' }
@@ -150,8 +150,8 @@ interface NavigationActions {
   openReader(feedItemId: number, from: Origin): void
   returnTo(origin: Origin): void
   updateSearch(query: string): void
-  /** Re-asks the same words everywhere; the origin stays, so clearing still lands there. */
-  searchEverywhere(): void
+  /** Re-asks the same words in another scope; the origin stays, so clearing still lands there. */
+  searchIn(scope: SearchScope): void
 }
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
@@ -205,12 +205,15 @@ export function useNavigation(): Navigation {
     [location, go, place],
   )
 
-  const searchEverywhere = useCallback(() => {
-    if (location.kind !== 'search') return
-    place(searchPathOf(location.query, { kind: 'everywhere' }), location.origin, 'replace')
-  }, [location, place])
+  const searchIn = useCallback(
+    (scope: SearchScope) => {
+      if (location.kind !== 'search') return
+      place(searchPathOf(location.query, scope), location.origin, 'replace')
+    },
+    [location, place],
+  )
 
-  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch, searchEverywhere }
+  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch, searchIn }
 }
 
 function currentLocation(): Location {

@@ -101,7 +101,7 @@ describe('a wait', () => {
     await user.type(await screen.findByRole('searchbox', { name: 'Search your reading' }), 'driftwood')
 
     const searching = await screen.findByRole('status')
-    expect(searching.textContent).toBe('searching…')
+    expect(searching.textContent).toBe('Searching…')
     expect(searching.querySelectorAll('.wordmark-cell')).toHaveLength(16)
   })
 
