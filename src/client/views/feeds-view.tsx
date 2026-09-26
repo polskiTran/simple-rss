@@ -1,21 +1,31 @@
 import { Button } from '@base-ui/react/button'
-import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
-import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed, subscribeToFeed } from '../api.js'
+import { RHYTHM_LABELS, RHYTHMS, rhythmOf, type Rhythm } from '../../shared/rhythm.js'
+import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
+import { Choice } from '../components/choice.js'
+import { Group } from '../components/group.js'
 import { HomePageLink } from '../components/home-page-link.js'
+import { Icon } from '../components/icon.js'
+import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
-import { type Resource, useResource } from '../use-resource.js'
-import { firstCheckFailure, retryFailure, subscriptionFailure, unavailableNote } from './feed-language.js'
-import { ImportReport, OpmlControls, type OpmlImportOutcome } from './opml-controls.js'
+import { useResource } from '../use-resource.js'
+import { AddFeedDialog } from './add-feed-dialog.js'
+import { firstCheckFailure, retryFailure, unavailableNote } from './feed-language.js'
 
 const FIRST_CHECK_ATTEMPTS = 8
 const FIRST_CHECK_INTERVAL_MS = 2_000
 
 const UNCHECKED_REFRESH_MS = 3_000
 const UNCHECKED_REFRESH_ROUNDS = 20
+
+/** Rows a Rhythm group shows before Show N more. */
+const GROUP_PREVIEW = 6
+
+type Order = 'rhythm' | 'name'
 
 export interface FeedsViewProps {
   onOpenFeed(feedId: number): void
@@ -26,12 +36,11 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     async (signal) => (await fetchSubscriptions(signal)).subscriptions,
     [],
   )
-  const [address, setAddress] = useState('')
   const [notice, setNotice] = useState('')
-  const [subscribing, setSubscribing] = useState(false)
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
   const [refreshRound, setRefreshRound] = useState(0)
+  const [order, setOrder] = useState<Order>('rhythm')
 
   async function refreshList(): Promise<void> {
     if (state.kind !== 'loaded') {
@@ -56,47 +65,20 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     return () => window.clearTimeout(timer)
   }, [state, refreshRound])
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (subscribing) return
-    const url = feedUrlOf(address)
-    if (!url) {
-      if (address.trim()) setNotice('a feed is added by its url — paste the full https:// address')
-      return
-    }
-
-    setSubscribing(true)
-    setNotice('subscribing…')
-    try {
-      const created = await subscribeToFeed(url)
-      await refreshList()
-      setAddress('')
-      setNotice('subscribed — checking the feed…')
-      setRefreshRound(0)
-      setNotice(await watchFirstCheck(created.subscription.feedId))
-      await refreshList()
-    } catch (error) {
-      setNotice(subscriptionFailure(error))
-    } finally {
-      setSubscribing(false)
-    }
+  async function subscribed(feedId: number) {
+    setReport(undefined)
+    setNotice('Subscribed. Checking the feed…')
+    setRefreshRound(0)
+    await refreshList()
+    setNotice(await watchFirstCheck(feedId))
+    await refreshList()
   }
 
-  function imported(outcome: OpmlImportOutcome) {
-    switch (outcome.kind) {
-      case 'started':
-        setNotice('')
-        setReport(undefined)
-        return
-      case 'failed':
-        setNotice(outcome.notice)
-        return
-      case 'imported':
-        setReport(outcome.report)
-        setRefreshRound(0)
-        void refreshList()
-        return
-    }
+  function imported(next: OpmlImportReport) {
+    setNotice('')
+    setReport(next)
+    setRefreshRound(0)
+    void refreshList()
   }
 
   async function retry(feedId: number) {
@@ -105,7 +87,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     setNotice('')
     try {
       await refreshFeed(feedId)
-      setNotice('the feed answered — availability restored')
+      setNotice('The feed answered. Checking works again.')
     } catch (error) {
       setNotice(retryFailure(error))
     } finally {
@@ -114,98 +96,178 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     await refreshList()
   }
 
+  const subscriptions = state.kind === 'loaded' ? state.value : undefined
+  const groups = subscriptions ? rhythmGroups(subscriptions) : []
+
   return (
-    <div className="view measure feeds-view">
-      <form className="add-feed-form" onSubmit={submit}>
-        <input
-          className="field-input search-input"
-          type="text"
-          inputMode="url"
-          autoComplete="off"
-          spellCheck={false}
-          aria-label="add a feed by url"
-          placeholder="add a feed by url"
-          value={address}
-          onChange={(event) => setAddress(event.target.value)}
-        />
-      </form>
-      <OpmlControls onOutcome={imported} />
-      <p className="notice feed-notice" aria-live="polite">
-        {notice}
-      </p>
-      <ImportReport report={report} />
-      <SubscriptionList state={state} retryingFeedId={retryingFeedId} onRetry={retry} onOpen={onOpenFeed} />
+    <div className="view feeds-view">
+      <header className="page-head">
+        <div className="toolbar">
+          <h1 className="page-title">
+            Feeds
+            {subscriptions ? <span className="page-title-companion">{subscriptions.length}</span> : null}
+          </h1>
+          <div className="toolbar-group feeds-actions">
+            <a className="button" href="/api/subscriptions/export" download="subscriptions.opml">
+              <Icon name="download" />
+              Export<span className="wide-only"> OPML</span>
+            </a>
+            <AddFeedDialog
+              onSubscribed={(created) => void subscribed(created.subscription.feedId)}
+              onImported={imported}
+            />
+          </div>
+        </div>
+        {groups.length > 0 ? (
+          <div className="toolbar">
+            <div className="toolbar-group rhythm-jumps">
+              {order === 'rhythm'
+                ? groups.map(({ rhythm, members }) => (
+                    <Button key={rhythm} className="button" onClick={() => showGroup(rhythm)}>
+                      {RHYTHM_LABELS[rhythm]}
+                      <span className="button-count">{members.length}</span>
+                    </Button>
+                  ))
+                : null}
+            </div>
+            <Choice
+              label="Order"
+              options={[
+                { value: 'rhythm', label: 'By rhythm' },
+                { value: 'name', label: 'By name' },
+              ]}
+              value={order}
+              onChange={setOrder}
+            />
+          </div>
+        ) : null}
+      </header>
+
+      <div className="feeds-notices" aria-live="polite">
+        <p className="note">{notice}</p>
+        <ImportReport report={report} />
+      </div>
+
+      {state.kind === 'loading' ? <LoadingNote>Loading feeds</LoadingNote> : null}
+      {state.kind === 'unavailable' || state.kind === 'unreachable' ? (
+        <LoadFailure subject="Your feeds" kind={state.kind} onRetry={reload} />
+      ) : null}
+      {subscriptions && subscriptions.length === 0 ? (
+        <p className="note">No feeds yet. Add one by its site or feed address, or import an OPML file.</p>
+      ) : null}
+
+      {subscriptions && subscriptions.length > 0 ? (
+        order === 'rhythm' ? (
+          groups.map(({ rhythm, members }) => (
+            <RhythmGroup
+              key={rhythm}
+              rhythm={rhythm}
+              subscriptions={members}
+              retryingFeedId={retryingFeedId}
+              onRetry={retry}
+              onOpen={onOpenFeed}
+            />
+          ))
+        ) : (
+          <FeedRows
+            subscriptions={[...subscriptions].sort((left, right) => left.title.localeCompare(right.title))}
+            retryingFeedId={retryingFeedId}
+            onRetry={retry}
+            onOpen={onOpenFeed}
+          />
+        )
+      ) : null}
     </div>
   )
 }
 
-function feedUrlOf(address: string): string | undefined {
-  const line = address.trim()
-  return /^https?:\/\/\S+$/i.test(line) ? line : undefined
+/** The Rhythms that have Subscriptions, in Rhythm order. */
+function rhythmGroups(subscriptions: readonly SubscriptionSummary[]) {
+  const byRhythm = Object.groupBy(subscriptions, (subscription) => rhythmOf(subscription.cadence))
+  return RHYTHMS.flatMap((rhythm) => {
+    const members = byRhythm[rhythm]
+    return members ? [{ rhythm, members }] : []
+  })
 }
 
-async function watchFirstCheck(feedId: number): Promise<string> {
-  for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
-    let detail: FeedDetail
-    try {
-      detail = await fetchFeedDetail(feedId)
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) return 'already subscribed'
-      continue
-    }
-    if (detail.availability.lastSuccessAt) {
-      return detail.items.length === 1
-        ? 'subscribed — 1 item in the digest'
-        : `subscribed — ${detail.items.length} items in the digest`
-    }
-    if (detail.availability.consecutiveFailures > 0) {
-      return firstCheckFailure(detail.availability.category)
-    }
-  }
-  return 'still checking — the feed will appear in the list'
+function rhythmAnchor(rhythm: Rhythm): string {
+  return `rhythm-${rhythm}`
 }
 
-function wait(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+function showGroup(rhythm: Rhythm) {
+  const group = document.getElementById(rhythmAnchor(rhythm))
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  group?.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
 }
 
-function SubscriptionList({
-  state,
+function RhythmGroup({
+  rhythm,
+  subscriptions,
   retryingFeedId,
   onRetry,
   onOpen,
 }: {
-  state: Resource<readonly SubscriptionSummary[]>
+  rhythm: Rhythm
+  subscriptions: readonly SubscriptionSummary[]
   retryingFeedId: number | undefined
   onRetry: (feedId: number) => void
   onOpen: (feedId: number) => void
 }) {
-  if (state.kind === 'loading')
-    return <LoadingNote className="empty-note subscription-list-state">loading feeds</LoadingNote>
-  if (state.kind !== 'loaded') return <p className="empty-note subscription-list-state">feeds are unavailable</p>
-  if (state.value.length === 0) return <p className="empty-note subscription-list-state">no subscriptions yet</p>
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? subscriptions : subscriptions.slice(0, GROUP_PREVIEW)
+  const hidden = subscriptions.slice(shown.length)
 
   return (
-    <div className="content-list subscription-list" role="region" aria-label="Subscriptions">
-      {state.value.map((subscription) => (
-        <article className="content-item feed-row" key={subscription.feedId}>
-          <div className="feed-row-main">
-            <h2 className="content-item-title">
-              <a
-                className="feed-open"
-                href={feedPathOf(subscription.feedId)}
-                onClick={routedClick(() => onOpen(subscription.feedId))}
-              >
+    <Group
+      id={rhythmAnchor(rhythm)}
+      title={RHYTHM_LABELS[rhythm]}
+      count={subscriptions.length}
+      aside={rhythm === 'inactive' ? 'No items in 30 days' : undefined}
+      className="panel rhythm-group"
+    >
+      <FeedRows subscriptions={shown} retryingFeedId={retryingFeedId} onRetry={onRetry} onOpen={onOpen} />
+      {hidden.length > 0 ? (
+        <div className="more">
+          <Button className="button" onClick={() => setExpanded(true)}>
+            Show {hidden.length} more
+            <Icon name="chevron-down" />
+          </Button>
+          <p className="note more-names">{hidden.map((subscription) => subscription.title).join(', ')}</p>
+        </div>
+      ) : null}
+    </Group>
+  )
+}
+
+function FeedRows({
+  subscriptions,
+  retryingFeedId,
+  onRetry,
+  onOpen,
+}: {
+  subscriptions: readonly SubscriptionSummary[]
+  retryingFeedId: number | undefined
+  onRetry: (feedId: number) => void
+  onOpen: (feedId: number) => void
+}) {
+  return (
+    <div className="feed-rows">
+      {subscriptions.map((subscription) => (
+        <article className="feed-row" key={subscription.feedId}>
+          <div className="feed-row-head">
+            <h3 className="feed-row-name">
+              <a href={feedPathOf(subscription.feedId)} onClick={routedClick(() => onOpen(subscription.feedId))}>
                 {subscription.title}
               </a>
-            </h2>
+            </h3>
             <CadenceStrip counts={subscription.cadence} title={subscription.title} />
           </div>
-          <div className="content-meta">
-            <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
-          </div>
-          <SubscriptionAvailability
+          <HomePageLink
+            className="feed-row-domain"
+            domain={subscription.domain}
+            homePageUrl={subscription.homePageUrl}
+          />
+          <Availability
             subscription={subscription}
             retrying={retryingFeedId === subscription.feedId}
             onRetry={onRetry}
@@ -216,8 +278,8 @@ function SubscriptionList({
   )
 }
 
-/** A row in the list also says when a Feed has never been checked, and offers the retry. */
-function SubscriptionAvailability({
+/** A row also says when a Feed has never been checked, or why checking fails, and offers the retry. */
+function Availability({
   subscription,
   retrying,
   onRetry,
@@ -227,22 +289,67 @@ function SubscriptionAvailability({
   onRetry: (feedId: number) => void
 }) {
   const { availability } = subscription
-  if (availability.state === 'unchecked') {
-    return <p className="availability-note">waiting for first check</p>
-  }
+  if (availability.state === 'unchecked') return <p className="note feed-row-note">Waiting for first check</p>
   if (availability.state !== 'unavailable') return null
 
   return (
-    <p className="availability-note">
-      <span>{unavailableNote(availability)}</span>
+    <div className="feed-row-note">
+      <p className="note">{unavailableNote(availability)}</p>
       <Button
-        className="text-button availability-retry"
+        className="button button-small"
         focusableWhenDisabled
         disabled={retrying}
         onClick={() => onRetry(subscription.feedId)}
       >
-        {retrying ? 'retrying…' : 'retry now'}
+        <Icon name="refresh" />
+        {retrying ? 'Retrying…' : 'Retry'}
       </Button>
-    </p>
+    </div>
   )
+}
+
+function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
+  if (!report) return null
+  if (report.added === 0 && report.alreadySubscribed === 0 && report.unusable.length === 0) {
+    return <p className="note">That OPML file lists no feeds.</p>
+  }
+
+  return (
+    <div className="import-report">
+      <p className="note">{`Imported: ${report.added} added, ${report.alreadySubscribed} already subscribed.`}</p>
+      {report.unusable.length > 0 ? (
+        <ul className="import-report-details">
+          {report.unusable.map((url) => (
+            <li key={url}>{url}: not a usable feed address</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+async function watchFirstCheck(feedId: number): Promise<string> {
+  for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
+    let detail: FeedDetail
+    try {
+      detail = await fetchFeedDetail(feedId)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return 'Already subscribed.'
+      continue
+    }
+    if (detail.availability.lastSuccessAt) {
+      return detail.items.length === 1
+        ? 'Subscribed. 1 item in the digest.'
+        : `Subscribed. ${detail.items.length} items in the digest.`
+    }
+    if (detail.availability.consecutiveFailures > 0) {
+      return firstCheckFailure(detail.availability.category)
+    }
+  }
+  return 'Still checking. The feed will appear in the list.'
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }

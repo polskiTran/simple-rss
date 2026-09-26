@@ -2,10 +2,10 @@ import { Icon } from './icon.js'
 
 export interface NativeSelectProps<Value extends string> {
   readonly label: string
-  readonly value: Value
+  readonly value: NoInfer<Value>
   readonly options: readonly { readonly value: Value; readonly label: string }[]
   readonly disabled?: boolean
-  onChange(value: Value): void
+  onChange(value: NoInfer<Value>): void
 }
 
 /**

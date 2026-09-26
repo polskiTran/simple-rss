@@ -3,29 +3,29 @@ import { hasOwn } from '../../shared/record.js'
 import { ApiError } from '../api.js'
 
 export const AVAILABILITY_COPY = {
-  unreachable: 'the feed cannot be reached',
-  timeout: 'the feed is taking too long to respond',
-  too_large: `the feed has grown past the ${MAX_FEED_SIZE_MIB} MiB limit`,
-  unsupported_content: 'the URL no longer returns feed content',
-  http_error: 'the publisher is answering with an error',
-  invalid_feed: 'the feed is returning unusable XML',
+  unreachable: 'The feed can’t be reached',
+  timeout: 'The feed is taking too long to respond',
+  too_large: `The feed has grown past the ${MAX_FEED_SIZE_MIB} MiB limit`,
+  unsupported_content: 'The address no longer returns a feed',
+  http_error: 'The publisher is answering with an error',
+  invalid_feed: 'The feed is returning unusable XML',
 } satisfies Readonly<Record<FeedAvailabilityCategory, string>>
 
 export const SUBSCRIPTION_FAILURE_COPY = {
-  duplicate_subscription: 'already subscribed',
-  invalid_feed_url: 'enter an exact RSS or Atom URL',
-  feed_too_large: `that Feed is larger than ${MAX_FEED_SIZE_MIB} MiB`,
-  unsupported_feed: 'that URL does not return supported RSS or Atom',
-  malformed_feed: 'that Feed contains malformed XML',
-  feed_timeout: 'that Feed took too long to respond',
-  feed_body_timeout: 'that Feed took too long to download',
-  feed_unreachable: 'that Feed could not be reached',
+  duplicate_subscription: 'Already subscribed.',
+  invalid_feed_url: 'Enter a site or feed address, like lowtechmagazine.com.',
+  feed_too_large: `That feed is larger than ${MAX_FEED_SIZE_MIB} MiB.`,
+  unsupported_feed: 'That address doesn’t return RSS or Atom.',
+  malformed_feed: 'That feed contains malformed XML.',
+  feed_timeout: 'That feed took too long to respond.',
+  feed_body_timeout: 'That feed took too long to download.',
+  feed_unreachable: 'That feed couldn’t be reached.',
 } as const satisfies Readonly<Record<string, string>>
 
 export function subscriptionFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'the Feed could not be reached'
+  if (!(cause instanceof ApiError)) return 'That feed couldn’t be reached.'
   const code = cause.code
-  return hasOwn(SUBSCRIPTION_FAILURE_COPY, code) ? SUBSCRIPTION_FAILURE_COPY[code] : 'that Feed could not be added'
+  return hasOwn(SUBSCRIPTION_FAILURE_COPY, code) ? SUBSCRIPTION_FAILURE_COPY[code] : 'That feed couldn’t be added.'
 }
 
 const FIRST_CHECK_FAILURE_CODE = {
@@ -41,27 +41,40 @@ export function firstCheckFailure(category: FeedAvailabilityCategory | null): st
   const code = category ? FIRST_CHECK_FAILURE_CODE[category] : undefined
   return code && hasOwn(SUBSCRIPTION_FAILURE_COPY, code)
     ? SUBSCRIPTION_FAILURE_COPY[code]
-    : 'that Feed could not be added'
+    : 'That feed couldn’t be added.'
 }
 
 export function retryFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'still unavailable — the feed could not be retrieved'
-  if (cause.code === 'refresh_rate_limited') return 'checked a moment ago — wait a little before retrying'
+  if (!(cause instanceof ApiError)) return 'Still unavailable. The feed couldn’t be retrieved.'
+  if (cause.code === 'refresh_rate_limited') return 'Checked a moment ago. Wait a little before retrying.'
 
   const code = cause.code
   const reason = hasOwn(SUBSCRIPTION_FAILURE_COPY, code) ? SUBSCRIPTION_FAILURE_COPY[code] : undefined
-  return reason ? `still unavailable — ${reason}` : 'still unavailable — the feed could not be retrieved'
+  return reason ? `Still unavailable. ${reason}` : 'Still unavailable. The feed couldn’t be retrieved.'
 }
 
+/** Why checking fails, when it last worked, and what stays: `… Last reached 5 Aug. Its items stay in your digest.` */
 export function unavailableNote(availability: FeedAvailability): string {
-  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'checking is not working'
+  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'Checking isn’t working'
   const lastSuccess = availability.lastSuccessAt
-    ? `last reached ${noteDate(availability.lastSuccessAt)}`
-    : 'not reached since subscribing'
+    ? `Last reached ${noteDate(availability.lastSuccessAt)}.`
+    : 'Not reached since subscribing.'
 
-  return `${reason} — ${lastSuccess}. its items stay in your digest.`
+  return `${reason}. ${lastSuccess} Its items stay in your digest.`
 }
 
 export function noteDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+/**
+ * What the Add feed field sends: the address as typed, or a bare host given
+ * `https://` — the server finds a site's Declared Feed. Anything else is no
+ * address at all, and is refused before any request.
+ */
+export function feedAddressOf(line: string): string | undefined {
+  const address = line.trim()
+  if (/^https?:\/\/\S+$/i.test(address)) return address
+  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(address)) return `https://${address}`
+  return undefined
 }

@@ -338,7 +338,7 @@ describe('the way back out of an opened screen', () => {
     await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
     await user.click(screen.getByRole('button', { name: 'confirm' }))
 
-    expect(await screen.findByRole('textbox', { name: /add a feed by url/i })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Feeds/ })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
   })
 })
@@ -474,7 +474,7 @@ describe('the scope a search takes from its screen', () => {
     })
     render(<App />)
     const user = userEvent.setup()
-    await screen.findByRole('textbox', { name: 'add a feed by url' })
+    await screen.findByRole('heading', { level: 1, name: /^Feeds/ })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search your feeds' }), 'field')
 

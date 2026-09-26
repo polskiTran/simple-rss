@@ -208,6 +208,11 @@
     color: var(--color-danger);
   }
 
+  /* Words a phone's narrower control can go without. */
+  .wide-only {
+    white-space: pre;
+  }
+
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -860,6 +865,107 @@
     animation: mark-glint-loop 1200ms linear infinite calc(var(--glint-step) * 60ms);
   }
 
+  /* Feeds */
+
+  .feeds-notices > * {
+    margin-bottom: 24px;
+  }
+
+  .import-report-details {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--color-ink-2);
+  }
+
+  .button-count {
+    font-weight: 400;
+    color: var(--color-ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .feed-rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 48px;
+  }
+
+  .feed-row {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    padding: 18px 0 16px;
+    border-bottom: 1px solid var(--color-rule-soft);
+  }
+
+  .feed-row-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .feed-row-head .cadence-strip {
+    flex: none;
+    margin-top: 7px;
+  }
+
+  .feed-row-name {
+    margin: 0;
+    font: 400 19px/1.2 var(--font-read);
+    overflow-wrap: anywhere;
+  }
+
+  .feed-row-name a:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .feed-row-domain {
+    justify-self: start;
+    font-size: 13px;
+    color: var(--color-ink-2);
+  }
+
+  .feed-row-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 6px 0 0;
+  }
+
+  .more-names {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .add-feed-ways {
+    display: flex;
+  }
+
+  .add-feed-ways .switch-segment {
+    flex: 1;
+  }
+
+  .file-choice {
+    position: relative;
+    justify-self: start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-choice:focus-within {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
   /* Chrome */
 
   .chrome {
@@ -1011,6 +1117,10 @@
     font-size: 32px;
   }
 
+  .wide-only {
+    display: none;
+  }
+
   .page-head {
     gap: 20px;
     margin-bottom: 32px;
@@ -1153,6 +1263,48 @@
 
   .app:is([data-screen='reader'], [data-screen='search']) .sections,
   .chrome:has(.search[data-open]) .sections {
+    display: none;
+  }
+
+  /* Feeds: one column, the last 14 days of Cadence, Add feed leading. */
+
+  .feed-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cadence-day:nth-child(-n + 16) {
+    display: none;
+  }
+
+  .feeds-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .feeds-actions > .button-primary {
+    flex: 1;
+    order: -1;
+  }
+
+  .rhythm-jumps {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    scrollbar-width: none;
+  }
+
+  .toolbar:has(.rhythm-jumps) {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .more {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .more-names {
     display: none;
   }
 

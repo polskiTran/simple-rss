@@ -10,9 +10,9 @@ export interface ChoiceProps<Value extends string> {
   /** Names the group for assistive technology; the segments name the values. */
   readonly label: string
   readonly options: readonly ChoiceOption<Value>[]
-  readonly value: Value
+  readonly value: NoInfer<Value>
   readonly className?: string
-  onChange(value: Value): void
+  onChange(value: NoInfer<Value>): void
 }
 
 /**

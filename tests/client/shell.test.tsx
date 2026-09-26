@@ -168,7 +168,7 @@ describe('the application shell', () => {
 describe('the resting state', () => {
   it.each([
     ['/digest', /nothing yet/i],
-    ['/feeds', /no subscriptions yet/i],
+    ['/feeds', /No feeds yet/i],
     ['/saved', /nothing saved yet/i],
   ])('gives %s a single calm line', async (path, note) => {
     await renderAt(path)

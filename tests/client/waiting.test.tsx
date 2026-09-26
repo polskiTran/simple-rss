@@ -28,7 +28,7 @@ describe('a wait', () => {
   it.each([
     ['/digest', 'Loading the digest'],
     ['/saved', 'loading the library'],
-    ['/feeds', 'loading feeds'],
+    ['/feeds', 'Loading feeds'],
     ['/feeds/1', 'loading the feed'],
     ['/reader/3', 'opening the article'],
   ])('puts the mark beside the words at %s', async (path, words) => {

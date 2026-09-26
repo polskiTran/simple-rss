@@ -97,13 +97,10 @@
   }
 
   .text-button:focus-visible,
-  .save-toggle:focus-visible,
-  .tab:focus-visible,
   .appearance-option:focus-visible,
   .export-link:focus-visible,
   .feed-open:focus-visible,
   .feed-title-link:focus-visible,
-  .home-page-link:focus-visible,
   .search-everywhere:focus-visible,
   .feed-back:focus-visible {
     outline: none;
@@ -117,10 +114,6 @@
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
-  }
-
-  .feed-notice {
-    margin-top: 8px;
   }
 
   .feed-header {
@@ -354,58 +347,12 @@
     color: var(--color-danger);
   }
 
-  .opml-controls {
-    display: flex;
-    gap: 24px;
-    margin-top: 14px;
-    font-size: 13px;
-    line-height: 1;
-  }
-
-  .opml-import {
-    color: var(--color-ink-strong);
-    cursor: pointer;
-  }
-
-  .opml-file-input {
-    @apply sr-only;
-  }
-
-  .opml-import:focus-within {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
   .export-link {
     color: var(--color-ink-strong);
     text-decoration: none;
   }
 
-  .import-report-summary {
-    margin-top: 4px;
-  }
-
-  .import-report-details {
-    margin: 4px 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: var(--color-quiet);
-  }
-
   .subscription-list,
-  .subscription-list-state {
-    margin-top: 32px;
-  }
-
-  .feed-row-main {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 24px;
-  }
-
   .availability-note {
     display: flex;
     align-items: baseline;
@@ -415,40 +362,6 @@
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
-  }
-
-  .availability-retry {
-    flex: none;
-  }
-
-  .cadence-strip {
-    display: grid;
-    flex: none;
-    grid-template-columns: repeat(30, 6px);
-    gap: 2px;
-    padding-bottom: 4px;
-  }
-
-  .cadence-day {
-    width: 6px;
-    height: 6px;
-    background: var(--cadence-0);
-  }
-
-  .cadence-day[data-level='1'] {
-    background: var(--cadence-1);
-  }
-
-  .cadence-day[data-level='2'] {
-    background: var(--cadence-2);
-  }
-
-  .cadence-day[data-level='3'] {
-    background: var(--cadence-3);
-  }
-
-  .cadence-day[data-level='4'] {
-    background: var(--color-ink);
   }
 
   .content-list {
@@ -532,21 +445,6 @@
     line-height: 1.6;
   }
 
-  .save-toggle {
-    min-width: 3.5em;
-    border: 0;
-    background: none;
-    padding: 0;
-    color: var(--color-quiet);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .save-toggle[data-pressed] {
-    color: var(--color-accent);
-  }
-
   .reader-view {
     padding-top: 40px;
     padding-bottom: 64px;
@@ -590,8 +488,7 @@
 
   /* The departure arrow. U+FE0E holds it to its text form — asked for the
      glyph alone, a phone answers with the colour emoji. */
-  .reader-original::after,
-  .home-page-link::after {
+  .reader-original::after {
     content: ' \2197\FE0E';
   }
 
@@ -721,7 +618,6 @@
     .tab:hover,
     .feed-back:hover,
     .feed-title-link:hover,
-    .home-page-link:hover,
     .search-everywhere:hover,
     .reader-back:hover,
     .reader-original:hover,
@@ -730,22 +626,12 @@
       color: var(--color-ink-strong);
     }
 
-    .save-toggle:not([data-pressed]):hover {
-      color: var(--color-muted-foreground);
-    }
-
     .text-button:not(.interval-option):not(:disabled):not([aria-disabled='true']):hover,
     .export-link:hover,
-    .opml-import:hover,
-    .content-item-link:hover,
     .feed-open:hover {
       text-decoration: underline;
       text-decoration-color: var(--color-hairline);
       text-underline-offset: 4px;
-    }
-
-    a.wordmark:hover .wordmark-cell {
-      animation: wordmark-glint 500ms cubic-bezier(0.23, 1, 0.32, 1) calc(var(--glint-step) * 60ms);
     }
   }
 }
@@ -785,15 +671,6 @@
     font-size: 12px;
   }
 
-  .opml-controls {
-    gap: 18px;
-    font-size: 12px;
-  }
-
-  .import-report-details {
-    font-size: 12px;
-  }
-
   .content-list {
     gap: 26px;
   }
@@ -827,38 +704,6 @@
   .reader-summary {
     font-size: 17px;
     line-height: 1.7;
-  }
-
-  .feed-row {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    column-gap: 24px;
-    align-items: end;
-  }
-
-  .feed-row-main {
-    display: contents;
-  }
-
-  .feed-row .content-item-title {
-    grid-column: 1 / -1;
-  }
-
-  .feed-row .content-meta {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  .cadence-strip {
-    grid-column: 1;
-    grid-row: 2;
-    grid-template-columns: repeat(14, 6px);
-    justify-self: start;
-    padding-bottom: 0;
-  }
-
-  .cadence-day:nth-child(-n + 16) {
-    display: none;
   }
 
   .availability-note {
