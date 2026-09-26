@@ -608,6 +608,7 @@
 
   .row-label {
     color: var(--color-ink-2);
+    white-space: nowrap;
   }
 
   .row-value {
@@ -966,6 +967,145 @@
     outline-offset: 2px;
   }
 
+  /* One Feed */
+
+  .view-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .feed-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px 40px;
+    margin-bottom: 48px;
+  }
+
+  .feed-identity {
+    display: grid;
+    justify-items: start;
+    gap: 14px;
+    min-width: 0;
+    max-width: 720px;
+  }
+
+  .feed-description {
+    margin: 0;
+    font: 400 17px/1.5 var(--font-read);
+    color: var(--color-reader-body);
+  }
+
+  .feed-domain {
+    font-size: 13px;
+    color: var(--color-ink-2);
+  }
+
+  .feed-actions {
+    flex-wrap: nowrap;
+  }
+
+  .feed-notices > .note {
+    margin: -24px 0 40px;
+  }
+
+  .feed-notices > .note-error {
+    color: var(--color-danger);
+  }
+
+  .feed-panels {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(max-content, 1fr);
+    gap: 48px 56px;
+    margin-bottom: 72px;
+  }
+
+  .feed-panels .group + .group {
+    margin-top: 0;
+  }
+
+  .feed-panels .row .switch {
+    flex: none;
+  }
+
+  .feed-items-state {
+    margin: 0;
+  }
+
+  .cadence-figure {
+    --cell: 13px;
+    --gap: 4px;
+    display: grid;
+    margin-top: 20px;
+    gap: 10px;
+    justify-content: start;
+  }
+
+  .cadence-grid {
+    display: grid;
+    grid-template-rows: repeat(7, var(--cell));
+    grid-auto-flow: column;
+    grid-auto-columns: var(--cell);
+    gap: var(--gap);
+  }
+
+  .cadence-cell {
+    width: var(--cell, 13px);
+    height: var(--cell, 13px);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  button.cadence-cell {
+    cursor: pointer;
+  }
+
+  button.cadence-cell:hover {
+    box-shadow: 0 0 0 1px var(--color-ink);
+  }
+
+  button.cadence-cell:focus-visible {
+    outline-offset: 1px;
+  }
+
+  .cadence-months {
+    position: relative;
+    height: 16px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--color-ink-2);
+  }
+
+  .cadence-month {
+    position: absolute;
+    left: calc(var(--column) * (var(--cell) + var(--gap)));
+  }
+
+  .cadence-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--color-ink-2);
+  }
+
+  .cadence-legend .cadence-cell {
+    --cell: 10px;
+  }
+
+  .cadence-legend .cadence-cell:first-of-type {
+    margin-left: 6px;
+  }
+
+  .cadence-legend .cadence-cell:last-of-type {
+    margin-right: 6px;
+  }
+
   /* Chrome */
 
   .chrome {
@@ -1306,6 +1446,37 @@
 
   .more-names {
     display: none;
+  }
+
+  /* One Feed: identity, then the actions as one row, the panels stacked. */
+
+  .feed-head {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 32px;
+  }
+
+  .feed-actions > .button {
+    flex: 1;
+    padding-inline: 8px;
+  }
+
+  .feed-panels {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+    margin-bottom: 48px;
+  }
+
+  .cadence-figure {
+    --cell: 11px;
+    --gap: 2px;
+  }
+
+  .row:has(.switch) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-block: 12px;
   }
 
   /* Dialog: a sheet from the bottom edge. */

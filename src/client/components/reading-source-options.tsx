@@ -3,8 +3,8 @@ import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { READING_SOURCES, type ReadingSource } from '../../shared/api.js'
 
 export const READING_SOURCE_LABELS = {
-  'original-webpage': 'original webpage',
-  'feed-content': 'feed content',
+  'original-webpage': 'Original webpage',
+  'feed-content': 'Feed content',
 } satisfies Readonly<Record<ReadingSource, string>>
 
 export function ReadingSourceOptions({

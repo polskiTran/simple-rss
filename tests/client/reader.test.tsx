@@ -70,7 +70,7 @@ describe('Reader View', () => {
     render(<App />)
     const user = userEvent.setup()
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Feed content', { selector: 'span' })).toBeDefined()
     expect(screen.getByText('2 min')).toBeDefined()
     expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
     expect(screen.getByText('parsing the original page')).toBeDefined()
@@ -81,17 +81,17 @@ describe('Reader View', () => {
     healed = true
     await user.click(screen.getByRole('button', { name: 'retry parsing' }))
     await screen.findByRole('heading', { name: 'Dawn' })
-    expect(screen.getByText('original webpage', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Original webpage', { selector: 'span' })).toBeDefined()
     expect(screen.getByText('4 min')).toBeDefined()
-    expect(screen.queryByText('feed content', { selector: 'span' })).toBeNull()
+    expect(screen.queryByText('Feed content', { selector: 'span' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Feed methods' })).toBeNull()
     expect(screen.queryByText('shortened by simple — open original for more')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'feed content' }))
+    await user.click(screen.getByRole('button', { name: 'Feed content' }))
     expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(screen.queryByRole('heading', { name: 'Dawn' })).toBeNull()
     expect(screen.getByText('2 min')).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Feed content', { selector: 'span' })).toBeDefined()
   })
 
   it('uses the Subscription preference without requesting the original and ignores a held old source', async () => {
@@ -108,20 +108,20 @@ describe('Reader View', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Feed content', { selector: 'span' })).toBeDefined()
     expect(screen.getByText('1 min')).toBeDefined()
     expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: 'original webpage' }))
+    await user.click(screen.getByRole('button', { name: 'Original webpage' }))
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
     expect(screen.getByText('parsing the original page')).toBeDefined()
-    await user.click(screen.getByRole('button', { name: 'feed content' }))
+    await user.click(screen.getByRole('button', { name: 'Feed content' }))
     original.resolve({ body: ARTICLE })
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined())
     expect(screen.queryByRole('heading', { name: 'Dawn' })).toBeNull()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Feed content', { selector: 'span' })).toBeDefined()
   })
 
   it('uses the Original webpage when Feed Content is preferred but unavailable', async () => {
@@ -129,7 +129,7 @@ describe('Reader View', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
-    expect(screen.getByText('original webpage', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Original webpage', { selector: 'span' })).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
@@ -143,7 +143,7 @@ describe('Reader View', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Feed content', { selector: 'span' })).toBeDefined()
     expect(screen.queryByText('the original page could not be parsed into an article')).toBeNull()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
   })

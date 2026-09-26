@@ -1,13 +1,10 @@
 import { Button } from '@base-ui/react/button'
-import { Dialog } from '@base-ui/react/dialog'
-import { Toggle } from '@base-ui/react/toggle'
-import { ToggleGroup } from '@base-ui/react/toggle-group'
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import {
   MAX_FEED_DESCRIPTION_LENGTH,
   MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
-  type FeedAvailability,
+  READING_SOURCES,
   type FeedDetail,
   type FeedDetailsUpdate,
   type PollingIntervalMinutes,
@@ -22,14 +19,21 @@ import {
   updatePollingInterval,
   updateReadingSource,
 } from '../api.js'
-import { cadenceDayLabel, cadenceGrid, type CadenceGrid } from '../cadence.js'
+import { cadenceGrid, counted } from '../cadence.js'
+import { ActionDialog, DialogCancel } from '../components/action-dialog.js'
 import { BackButton } from '../components/back-button.js'
+import { CadenceGrid } from '../components/cadence-grid.js'
+import { Choice } from '../components/choice.js'
 import { Field } from '../components/field.js'
+import { Group } from '../components/group.js'
 import { HomePageLink } from '../components/home-page-link.js'
-import { ItemTitleLink } from '../components/item-title-link.js'
+import { Icon } from '../components/icon.js'
+import { ItemBox } from '../components/item-box.js'
+import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { READING_SOURCE_LABELS, ReadingSourceOptions } from '../components/reading-source-options.js'
-import { SaveToggle } from '../components/save-toggle.js'
+import { NativeSelect } from '../components/native-select.js'
+import { READING_SOURCE_LABELS } from '../components/reading-source-options.js'
+import { dayBefore, longDay } from '../day-names.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
@@ -45,16 +49,10 @@ export interface FeedViewProps {
 }
 
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
-  const [state, { set }] = useResource((signal) => fetchFeedDetail(feedId, signal), [feedId])
+  const [state, { retry, set }] = useResource((signal) => fetchFeedDetail(feedId, signal), [feedId])
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-  const [changingInterval, setChangingInterval] = useState(false)
-  const [changingReadingSource, setChangingReadingSource] = useState(false)
-  const [confirmingUnsubscribe, setConfirmingUnsubscribe] = useState(false)
-  const [unsubscribing, setUnsubscribing] = useState(false)
-
-  const missing = state.kind === 'unavailable' && state.error instanceof ApiError && state.error.status === 404
-  const failed = state.kind === 'unavailable' || state.kind === 'unreachable'
+  const [changing, setChanging] = useState(false)
 
   async function refresh() {
     if (refreshing) return
@@ -62,9 +60,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     setNotice('')
     try {
       const { observedItems } = await refreshFeed(feedId)
-      setNotice(
-        observedItems === 1 ? 'refreshed — the feed shows 1 item' : `refreshed — the feed shows ${observedItems} items`,
-      )
+      setNotice(`Refreshed. The feed shows ${counted(observedItems, 'item')}.`)
     } catch (error) {
       setNotice(retryFailure(error))
     } finally {
@@ -77,373 +73,161 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   }
 
   async function changeInterval(pollingIntervalMinutes: PollingIntervalMinutes) {
-    if (changingInterval || state.kind !== 'loaded') return
-    if (state.value.schedule.pollingIntervalMinutes === pollingIntervalMinutes) return
-    setChangingInterval(true)
+    if (changing) return
+    setChanging(true)
     setNotice('')
     try {
       const schedule = await updatePollingInterval(feedId, pollingIntervalMinutes)
       set((detail) => ({ ...detail, schedule }))
-      setNotice(`now checked ${intervalPhrase(pollingIntervalMinutes)}`)
+      setNotice(`Now checked ${INTERVAL_PHRASES[pollingIntervalMinutes]}.`)
     } catch {
-      setNotice('the interval could not be changed')
+      setNotice('The interval couldn’t be changed.')
     } finally {
-      setChangingInterval(false)
+      setChanging(false)
     }
   }
 
   async function changeReadingSource(readingSource: ReadingSource) {
-    if (changingReadingSource || state.kind !== 'loaded' || state.value.readingSource === readingSource) return
-    setChangingReadingSource(true)
+    if (changing) return
+    setChanging(true)
     setNotice('')
     try {
       const preference = await updateReadingSource(feedId, readingSource)
       set((detail) => ({ ...detail, ...preference }))
-      setNotice(`items now open with ${READING_SOURCE_LABELS[readingSource]}`)
+      setNotice(`Items now open with the ${READING_SOURCE_LABELS[readingSource].toLowerCase()}.`)
     } catch {
-      setNotice('the reading source could not be changed')
+      setNotice('The reading source couldn’t be changed.')
     } finally {
-      setChangingReadingSource(false)
+      setChanging(false)
     }
   }
 
-  async function unsubscribe() {
-    if (unsubscribing) return
-    setUnsubscribing(true)
-    setNotice('')
-    try {
-      await unsubscribeFromFeed(feedId)
-      onUnsubscribed()
-    } catch {
-      setNotice('the feed could not be unsubscribed')
-      setUnsubscribing(false)
-      setConfirmingUnsubscribe(false)
-    }
-  }
+  const back = <BackButton className="view-back" origin={origin} onBack={onBack} />
 
-  function setSaved(feedItemId: number, saved: boolean) {
-    set((detail) => ({
-      ...detail,
-      items: detail.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
-    }))
-  }
-
-  function showDay(date: string) {
-    const day = document.getElementById(dayAnchor(feedId, date))
-    if (!day) return
-    day.focus({ preventScroll: true })
-    // Quieted by hand: browsers do not quiet their own smooth scrolling under
-    // `prefers-reduced-motion`.
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-    day.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
-  }
-
-  return (
-    <div className="view measure feed-view">
-      <p className="feed-header">
-        <BackButton className="view-back" origin={origin} onBack={onBack} />
-        {state.kind === 'loaded' ? (
-          <>
-            <span className="feed-header-title">{state.value.title}</span>
-            <HomePageLink
-              className="feed-header-domain"
-              domain={state.value.domain}
-              homePageUrl={state.value.homePageUrl}
-            />
-          </>
-        ) : null}
-      </p>
-      {state.kind === 'loaded' && state.value.description ? (
-        <p className="feed-description">{state.value.description}</p>
-      ) : null}
-      {state.kind === 'loading' ? (
-        <LoadingNote className="empty-note feed-detail-state">loading the feed</LoadingNote>
-      ) : null}
-      {missing ? <p className="empty-note feed-detail-state">that feed is not in your subscriptions</p> : null}
-      {failed && !missing ? <p className="empty-note feed-detail-state">the feed is unavailable</p> : null}
-      {state.kind === 'loaded' ? (
-        <OpenFeed
-          detail={state.value}
-          notice={notice}
-          refreshing={refreshing}
-          onRefresh={refresh}
-          onChangeInterval={changeInterval}
-          onChangeReadingSource={changeReadingSource}
-          onShowDay={showDay}
-          onSaved={setSaved}
-          onOpenItem={onOpenItem}
-          onDetailsSaved={(details) => set((detail) => ({ ...detail, ...details }))}
-          confirmingUnsubscribe={confirmingUnsubscribe}
-          unsubscribing={unsubscribing}
-          onConfirmUnsubscribe={setConfirmingUnsubscribe}
-          onUnsubscribe={unsubscribe}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-function OpenFeed({
-  detail,
-  notice,
-  refreshing,
-  onRefresh,
-  onChangeInterval,
-  onChangeReadingSource,
-  onShowDay,
-  onSaved,
-  onOpenItem,
-  onDetailsSaved,
-  confirmingUnsubscribe,
-  unsubscribing,
-  onConfirmUnsubscribe,
-  onUnsubscribe,
-}: {
-  detail: FeedDetail
-  notice: string
-  refreshing: boolean
-  onRefresh: () => void
-  onChangeInterval: (minutes: PollingIntervalMinutes) => void
-  onChangeReadingSource: (readingSource: ReadingSource) => void
-  onShowDay: (date: string) => void
-  onSaved: (feedItemId: number, saved: boolean) => void
-  onOpenItem: (feedItemId: number, feedTitle: string) => void
-  onDetailsSaved: (details: FeedDetailsUpdate) => void
-  confirmingUnsubscribe: boolean
-  unsubscribing: boolean
-  onConfirmUnsubscribe: (confirming: boolean) => void
-  onUnsubscribe: () => void
-}) {
-  const grid = cadenceGrid(detail.cadence)
-  return (
-    <>
-      <Grid grid={grid} title={detail.title} onShowDay={onShowDay} />
-      <p className="cadence-stats">{grid.stats}</p>
-      <UnavailableNote availability={detail.availability} />
-      <div className="feed-controls">
-        <div className="feed-preferences">
-          <ToggleGroup
-            className="interval-options"
-            aria-label="checked every"
-            value={[String(detail.schedule.pollingIntervalMinutes)]}
-            onValueChange={(chosen) => {
-              // Pressing the pressed word would empty the group; a Feed is always
-              // checked on one of the six, so that press stays where it is.
-              const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen[0])
-              if (minutes !== undefined) onChangeInterval(minutes)
-            }}
-          >
-            <span className="interval-caption">checked every</span>
-            {POLLING_INTERVAL_MINUTES.map((minutes) => (
-              <Toggle
-                key={minutes}
-                className="text-button interval-option"
-                value={String(minutes)}
-                aria-label={`check ${intervalPhrase(minutes)}`}
-              >
-                {INTERVAL_WORDS[minutes]}
-              </Toggle>
-            ))}
-          </ToggleGroup>
-          <ReadingSourceOptions value={detail.readingSource} caption="open with" onChange={onChangeReadingSource} />
-        </div>
-        <span className="feed-actions">
-          <EditFeedDetails detail={detail} onSaved={onDetailsSaved} />
-          <Button className="text-button feed-refresh" focusableWhenDisabled disabled={refreshing} onClick={onRefresh}>
-            {refreshing ? 'refreshing…' : 'refresh now'}
-          </Button>
-          <Unsubscribe
-            feedTitle={detail.title}
-            confirming={confirmingUnsubscribe}
-            working={unsubscribing}
-            onConfirm={onConfirmUnsubscribe}
-            onUnsubscribe={onUnsubscribe}
-          />
-        </span>
+  if (state.kind === 'loading') {
+    return (
+      <div className="view feed-view">
+        <div className="view-topline">{back}</div>
+        <LoadingNote>Loading the feed</LoadingNote>
       </div>
-      <p className="notice feed-notice" aria-live="polite">
-        {notice}
-      </p>
-      <Items detail={detail} onSaved={onSaved} onOpenItem={onOpenItem} />
-    </>
-  )
-}
-
-function EditFeedDetails({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: FeedDetailsUpdate) => void }) {
-  const [open, setOpen] = useState(false)
-  const [titleDraft, setTitleDraft] = useState('')
-  const [descriptionDraft, setDescriptionDraft] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
-
-  function openChanged(next: boolean) {
-    setOpen(next)
-    if (next) {
-      setTitleDraft(detail.customTitle ?? '')
-      setDescriptionDraft(detail.customDescription ?? '')
-      setNotice('')
-    }
+    )
   }
-
-  async function save() {
-    if (saving) return
-    setSaving(true)
-    try {
-      const details = await updateFeedDetails(detail.feedId, {
-        customTitle: overrideOf(titleDraft),
-        customDescription: overrideOf(descriptionDraft),
-      })
-      onSaved(details)
-      setOpen(false)
-    } catch {
-      setNotice('the details could not be changed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog.Root open={open} onOpenChange={openChanged}>
-      <Dialog.Trigger className="text-button">edit</Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="overlay-backdrop" />
-        <Dialog.Viewport className="overlay-viewport">
-          <Dialog.Popup className="overlay-popup">
-            <Dialog.Title className="overlay-title">edit {detail.title}</Dialog.Title>
-            <Dialog.Description className="overlay-description">
-              Your title names the feed everywhere, your description shows on its page; a blank field returns to the
-              feed's own.
-            </Dialog.Description>
-            <form
-              className="edit-details-form"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void save()
-              }}
-            >
-              <Field
-                label="title"
-                value={titleDraft}
-                placeholder={detail.reportedTitle}
-                maxLength={MAX_FEED_TITLE_LENGTH}
-                onChange={setTitleDraft}
-              />
-              <Field
-                label="description"
-                value={descriptionDraft}
-                placeholder={detail.reportedDescription ?? undefined}
-                maxLength={MAX_FEED_DESCRIPTION_LENGTH}
-                multiline
-                onChange={setDescriptionDraft}
-              />
-              <p className="overlay-choice">
-                <Button className="text-button" type="submit" focusableWhenDisabled disabled={saving}>
-                  {saving ? 'saving…' : 'save'}
-                </Button>
-                <Dialog.Close className="text-button" disabled={saving} render={<Button focusableWhenDisabled />}>
-                  cancel
-                </Dialog.Close>
-              </p>
-              <p className="notice" aria-live="polite">
-                {notice}
-              </p>
-            </form>
-          </Dialog.Popup>
-        </Dialog.Viewport>
-      </Dialog.Portal>
-    </Dialog.Root>
-  )
-}
-
-function Unsubscribe({
-  feedTitle,
-  confirming,
-  working,
-  onConfirm,
-  onUnsubscribe,
-}: {
-  feedTitle: string
-  confirming: boolean
-  working: boolean
-  onConfirm: (confirming: boolean) => void
-  onUnsubscribe: () => void
-}) {
-  return (
-    <Dialog.Root open={confirming} onOpenChange={onConfirm}>
-      <Dialog.Trigger className="text-button unsubscribe-open">unsubscribe</Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="overlay-backdrop" />
-        <Dialog.Viewport className="overlay-viewport">
-          <Dialog.Popup className="overlay-popup">
-            <Dialog.Title className="overlay-title">unsubscribe from {feedTitle}</Dialog.Title>
-            <Dialog.Description className="overlay-description">
-              Removes the feed and its items except saved items.
-            </Dialog.Description>
-            <p className="overlay-choice">
-              <Button
-                className="text-button unsubscribe-confirm"
-                focusableWhenDisabled
-                disabled={working}
-                onClick={onUnsubscribe}
-              >
-                {working ? 'unsubscribing…' : 'confirm'}
-              </Button>
-              <Dialog.Close className="text-button" disabled={working} render={<Button focusableWhenDisabled />}>
-                cancel
-              </Dialog.Close>
-            </p>
-          </Dialog.Popup>
-        </Dialog.Viewport>
-      </Dialog.Portal>
-    </Dialog.Root>
-  )
-}
-
-function Grid({ grid, title, onShowDay }: { grid: CadenceGrid; title: string; onShowDay: (date: string) => void }) {
-  return (
-    <div className="cadence-figure">
-      <div className="cadence-grid" role="group" aria-label={`26 weeks of publishing cadence for ${title}`}>
-        {grid.columns.flatMap((column) =>
-          column.cells.map((cell) =>
-            cell.count > 0 ? (
-              <button
-                key={cell.date}
-                type="button"
-                className="cadence-cell"
-                data-level={cell.level}
-                aria-label={`${cadenceDayLabel(cell)} — show that day`}
-                onClick={() => onShowDay(cell.date)}
-              />
-            ) : (
-              <span key={cell.date} className="cadence-cell" data-level={0} aria-hidden="true" />
-            ),
-          ),
+  if (state.kind === 'unavailable' || state.kind === 'unreachable') {
+    const missing = state.error instanceof ApiError && state.error.status === 404
+    return (
+      <div className="view feed-view">
+        <div className="view-topline">{back}</div>
+        {missing ? (
+          <p className="note">That feed isn’t among your subscriptions.</p>
+        ) : (
+          <LoadFailure subject="The feed" kind={state.kind} onRetry={retry} />
         )}
       </div>
-      <div className="cadence-months" aria-hidden="true">
-        {grid.columns.map((column, index) => {
-          if (!column.monthLabel) return null
-          // SAFETY: React forwards CSS custom properties even though `CSSProperties`
-          // only declares standard CSS names.
-          const style = { '--column': index } as CSSProperties
-          return (
-            <span key={column.cells[0]?.date ?? index} className="cadence-month" style={style}>
-              {column.monthLabel}
-            </span>
-          )
-        })}
+    )
+  }
+
+  const detail = state.value
+  const grid = cadenceGrid(detail.cadence)
+  return (
+    <div className="view feed-view">
+      <div className="view-topline">{back}</div>
+      <header className="feed-head">
+        <div className="feed-identity">
+          <h1 className="page-title">{detail.title}</h1>
+          {detail.description ? <p className="feed-description">{detail.description}</p> : null}
+          <HomePageLink className="feed-domain" domain={detail.domain} homePageUrl={detail.homePageUrl} />
+        </div>
+        <div className="toolbar-group feed-actions">
+          <EditFeed detail={detail} onSaved={(details) => set((current) => ({ ...current, ...details }))} />
+          <Button className="button" focusableWhenDisabled disabled={refreshing} onClick={refresh}>
+            <Icon name="refresh" />
+            {refreshing ? 'Refreshing…' : 'Refresh now'}
+          </Button>
+          <Unsubscribe
+            feedId={feedId}
+            feedTitle={detail.title}
+            onUnsubscribed={onUnsubscribed}
+            onFailed={() => setNotice('The feed couldn’t be unsubscribed.')}
+          />
+        </div>
+      </header>
+
+      <div className="feed-notices" aria-live="polite">
+        {detail.availability.state === 'unavailable' ? (
+          <p className="note">{unavailableNote(detail.availability)}</p>
+        ) : null}
+        <p className="note">{notice}</p>
       </div>
+
+      <div className="feed-panels">
+        <Group id="feed-cadence" title="Cadence" className="panel">
+          <CadenceGrid grid={grid} title={detail.title} onShowDay={(date) => showDay(feedId, date)} />
+        </Group>
+        <Group id="feed-info" title="Info" className="panel">
+          <dl className="rows">
+            <Row label="Items, last 26 weeks" value={grid.stats.total.toLocaleString('en-GB')} />
+            <Row label="Busiest day" value={grid.stats.busiestWeekday ?? 'None yet'} />
+            <Row
+              label="Longest quiet stretch"
+              value={grid.stats.longestQuiet === 0 ? 'None' : counted(grid.stats.longestQuiet, 'day')}
+            />
+            <Row
+              label="Last checked"
+              value={detail.availability.lastCheckedAt ? ago(detail.availability.lastCheckedAt) : 'Not yet'}
+            />
+          </dl>
+        </Group>
+        <Group id="feed-settings" title="Settings" className="panel">
+          <div className="rows">
+            <div className="row">
+              <span className="row-label">Check every</span>
+              <NativeSelect
+                label="Check every"
+                value={String(detail.schedule.pollingIntervalMinutes)}
+                options={POLLING_INTERVAL_MINUTES.map((minutes) => ({
+                  value: String(minutes),
+                  label: INTERVAL_LABELS[minutes],
+                }))}
+                disabled={changing}
+                onChange={(chosen) => {
+                  const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen)
+                  if (minutes !== undefined) void changeInterval(minutes)
+                }}
+              />
+            </div>
+            <div className="row">
+              <span className="row-label">Open items with</span>
+              <Choice
+                label="Open items with"
+                options={READING_SOURCES.map((source) => ({ value: source, label: READING_SOURCE_LABELS[source] }))}
+                value={detail.readingSource}
+                onChange={(source) => void changeReadingSource(source)}
+              />
+            </div>
+          </div>
+        </Group>
+      </div>
+
+      <Items
+        detail={detail}
+        onSaved={(feedItemId, saved) =>
+          set((current) => ({
+            ...current,
+            items: current.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
+          }))
+        }
+        onOpenItem={onOpenItem}
+      />
     </div>
   )
 }
 
-function UnavailableNote({ availability }: { availability: FeedAvailability }) {
-  if (availability.state !== 'unavailable') return null
-
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <p className="availability-note">
-      <span>{unavailableNote(availability)}</span>
-    </p>
+    <div className="row">
+      <dt className="row-label">{label}</dt>
+      <dd className="row-value">{value}</dd>
+    </div>
   )
 }
 
@@ -457,42 +241,195 @@ function Items({
   onOpenItem: (feedItemId: number, feedTitle: string) => void
 }) {
   if (detail.items.length === 0) {
-    return <p className="empty-note feed-items-state">nothing retained from this feed yet</p>
+    return <p className="note feed-items-state">Nothing retained from this feed yet.</p>
   }
 
-  const anchored = new Set<string>()
+  // The Cadence runs through today; every retained item arrives at once, so
+  // each day's count is whole.
+  const today = detail.cadence.at(-1)?.date
+  const days = Map.groupBy(detail.items, (item) => item.date)
   return (
-    <div className="content-list feed-items">
-      {detail.items.map((item) => {
-        const anchors = !anchored.has(item.date)
-        anchored.add(item.date)
-        return (
-          <article
-            className="content-item"
-            key={item.feedItemId}
-            {...(anchors ? { id: dayAnchor(detail.feedId, item.date), tabIndex: -1 } : {})}
-          >
-            <h2 className="content-item-title">
-              <ItemTitleLink
-                feedItemId={item.feedItemId}
-                title={item.title}
-                onOpen={(feedItemId) => onOpenItem(feedItemId, detail.title)}
-              />
-            </h2>
-            <div className="content-meta">
-              <time dateTime={item.publishedAt ?? item.firstSeenAt}>{item.displayDate}</time>
-              <SaveToggle
+    <div className="feed-items">
+      {[...days].map(([date, items]) => (
+        <Group
+          key={date}
+          id={dayAnchor(detail.feedId, date)}
+          title={today ? dayTitle(date, today) : longDay(date)}
+          count={items.length}
+          className="item-group"
+        >
+          <div className="item-list">
+            {items.map((item) => (
+              <ItemBox
+                key={item.feedItemId}
                 feedItemId={item.feedItemId}
                 title={item.title}
                 saved={item.saved}
+                when={{ label: item.displayTime, dateTime: item.publishedAt ?? item.firstSeenAt }}
+                onOpen={(feedItemId) => onOpenItem(feedItemId, detail.title)}
                 onSaved={(saved) => onSaved(item.feedItemId, saved)}
               />
-            </div>
-          </article>
-        )
-      })}
+            ))}
+          </div>
+        </Group>
+      ))}
     </div>
   )
+}
+
+function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: FeedDetailsUpdate) => void }) {
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function openChanged(next: boolean) {
+    if (saving) return
+    setOpen(next)
+    if (next) {
+      setTitle(detail.customTitle ?? '')
+      setDescription(detail.customDescription ?? '')
+      setError('')
+    }
+  }
+
+  async function save() {
+    if (saving) return
+    setSaving(true)
+    setError('')
+    try {
+      onSaved(
+        await updateFeedDetails(detail.feedId, {
+          customTitle: overrideOf(title),
+          customDescription: overrideOf(description),
+        }),
+      )
+      setOpen(false)
+    } catch {
+      setError('The changes couldn’t be saved.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const changed = overrideOf(title) !== detail.customTitle || overrideOf(description) !== detail.customDescription
+  return (
+    <ActionDialog
+      open={open}
+      title="Edit feed"
+      trigger={
+        <Button className="button">
+          <Icon name="pencil" />
+          Edit
+        </Button>
+      }
+      onOpenChange={openChanged}
+    >
+      <form
+        className="dialog-body"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void save()
+        }}
+      >
+        <Field
+          label="Name"
+          value={title}
+          placeholder={detail.reportedTitle}
+          maxLength={MAX_FEED_TITLE_LENGTH}
+          note={`Shown in your digest and feeds. The feed calls itself ${detail.reportedTitle}.`}
+          onChange={setTitle}
+        />
+        <Field
+          label="Description"
+          value={description}
+          placeholder={detail.reportedDescription ?? undefined}
+          maxLength={MAX_FEED_DESCRIPTION_LENGTH}
+          multiline
+          note="Shown on this page. Left blank, the feed’s own description stands."
+          onChange={setDescription}
+        />
+        <p className="note note-error" role="status">
+          {error}
+        </p>
+        <div className="dialog-footer">
+          <DialogCancel disabled={saving} />
+          <Button className="button button-primary" type="submit" focusableWhenDisabled disabled={!changed || saving}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </form>
+    </ActionDialog>
+  )
+}
+
+function Unsubscribe({
+  feedId,
+  feedTitle,
+  onUnsubscribed,
+  onFailed,
+}: {
+  feedId: number
+  feedTitle: string
+  onUnsubscribed: () => void
+  onFailed: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [working, setWorking] = useState(false)
+
+  async function unsubscribe() {
+    if (working) return
+    setWorking(true)
+    try {
+      await unsubscribeFromFeed(feedId)
+      onUnsubscribed()
+    } catch {
+      setWorking(false)
+      setOpen(false)
+      onFailed()
+    }
+  }
+
+  return (
+    <ActionDialog
+      open={open}
+      title={`Unsubscribe from ${feedTitle}?`}
+      description="Its items leave your digest. Saved items stay in Saved."
+      trigger={<Button className="button button-danger">Unsubscribe</Button>}
+      onOpenChange={(next) => {
+        if (!working) setOpen(next)
+      }}
+    >
+      <div className="dialog-footer">
+        <DialogCancel disabled={working} />
+        <Button className="button button-danger" focusableWhenDisabled disabled={working} onClick={unsubscribe}>
+          {working ? 'Unsubscribing…' : 'Unsubscribe'}
+        </Button>
+      </div>
+    </ActionDialog>
+  )
+}
+
+function showDay(feedId: number, date: string) {
+  const day = document.getElementById(dayAnchor(feedId, date))?.closest('section')
+  if (!day) return
+  day.tabIndex = -1
+  day.focus({ preventScroll: true })
+  // Quieted by hand: browsers do not quiet their own smooth scrolling under
+  // `prefers-reduced-motion`.
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  day.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
+}
+
+function dayAnchor(feedId: number, date: string): string {
+  return `feed-${feedId}-day-${date}`
+}
+
+function dayTitle(date: string, today: string): string {
+  if (date === today) return 'Today'
+  if (date === dayBefore(today)) return 'Yesterday'
+  return date.slice(0, 4) === today.slice(0, 4) ? longDay(date) : `${longDay(date)} ${date.slice(0, 4)}`
 }
 
 function overrideOf(draft: string): string | null {
@@ -500,19 +437,36 @@ function overrideOf(draft: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-function dayAnchor(feedId: number, date: string): string {
-  return `feed-${feedId}-day-${date}`
+/** `12 minutes ago`, `Yesterday` — how long since an instant, in its largest whole unit. */
+function ago(iso: string): string {
+  const seconds = (Date.parse(iso) - Date.now()) / 1000
+  const format = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' })
+  const [unit, size] = AGO_UNITS.find(([, span]) => Math.abs(seconds) >= span) ?? ['second', 1]
+  const phrase = format.format(Math.round(seconds / size), unit)
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1)
 }
 
-function intervalPhrase(minutes: PollingIntervalMinutes): string {
-  return minutes === 1440 ? 'daily' : `every ${INTERVAL_WORDS[minutes]}`
-}
+const AGO_UNITS = [
+  ['day', 86_400],
+  ['hour', 3_600],
+  ['minute', 60],
+  ['second', 1],
+] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]
 
-const INTERVAL_WORDS = {
-  30: '30 min',
-  60: 'hour',
+const INTERVAL_PHRASES = {
+  30: 'every 30 minutes',
+  60: 'every hour',
+  120: 'every 2 hours',
+  360: 'every 6 hours',
+  720: 'every 12 hours',
+  1440: 'once a day',
+} satisfies Readonly<Record<PollingIntervalMinutes, string>>
+
+const INTERVAL_LABELS = {
+  30: '30 minutes',
+  60: '1 hour',
   120: '2 hours',
   360: '6 hours',
   720: '12 hours',
-  1440: 'daily',
+  1440: '1 day',
 } satisfies Readonly<Record<PollingIntervalMinutes, string>>

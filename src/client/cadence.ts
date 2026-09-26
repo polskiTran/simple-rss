@@ -1,4 +1,4 @@
-import { CADENCE_GRID_WEEKS, type CadenceObservation } from '../shared/api.js'
+import type { CadenceObservation } from '../shared/api.js'
 
 export interface CadenceCell {
   readonly date: string
@@ -12,9 +12,18 @@ export interface CadenceColumn {
   readonly monthLabel: string | undefined
 }
 
+/** What a Feed's Info panel says about its 26 weeks. */
+export interface CadenceStats {
+  readonly total: number
+  /** Undefined when nothing was published. */
+  readonly busiestWeekday: string | undefined
+  /** The longest run of days without a Feed Item, 0 when there was none. */
+  readonly longestQuiet: number
+}
+
 export interface CadenceGrid {
   readonly columns: readonly CadenceColumn[]
-  readonly stats: string
+  readonly stats: CadenceStats
 }
 
 export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
@@ -34,6 +43,7 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
     })
   }
 
+  // A label where a column opens a month, never within six columns of the last.
   let lastLabelled: number | undefined
   for (const [index, column] of columns.entries()) {
     const month = monthOf(column.cells[0]?.date)
@@ -47,23 +57,23 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   return { columns, stats: statsOf(days) }
 }
 
-/** Screen-reader label: `3 posts on 3 june 2026`. */
+/** Screen-reader label: `3 items on 3 June 2026`. */
 export function cadenceDayLabel(cell: CadenceCell): string {
   const [year, month, day] = cell.date.split('-')
-  const monthName = MONTHS[Number(month) - 1] ?? ''
-  return `${counted(cell.count, 'post')} on ${Number(day)} ${monthName} ${year}`
+  const monthName = MONTH_NAMES[Number(month) - 1] ?? ''
+  return `${counted(cell.count, 'item')} on ${Number(day)} ${monthName} ${year}`
 }
 
-function statsOf(days: readonly CadenceObservation[]): string {
+function statsOf(days: readonly CadenceObservation[]): CadenceStats {
   const total = days.reduce((sum, { count }) => sum + count, 0)
-  if (total === 0) return `no posts in ${CADENCE_GRID_WEEKS} weeks`
-
-  const clauses = [`${counted(total, 'post')} in ${CADENCE_GRID_WEEKS} weeks`]
 
   const byWeekday = Array.from({ length: 7 }, () => 0)
-  for (const [index, { count }] of days.entries()) byWeekday[index % 7] = (byWeekday[index % 7] ?? 0) + count
+  for (const { date, count } of days) {
+    // Monday first, so a tie goes to the earlier day of the week.
+    const weekday = (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7
+    byWeekday[weekday] = (byWeekday[weekday] ?? 0) + count
+  }
   const busiest = byWeekday.indexOf(Math.max(...byWeekday))
-  clauses.push(`busiest on ${WEEKDAYS[busiest]}s`)
 
   let quiet = 0
   let longestQuiet = 0
@@ -71,9 +81,8 @@ function statsOf(days: readonly CadenceObservation[]): string {
     quiet = count === 0 ? quiet + 1 : 0
     longestQuiet = Math.max(longestQuiet, quiet)
   }
-  if (longestQuiet > 0) clauses.push(`longest quiet stretch ${counted(longestQuiet, 'day')}`)
 
-  return clauses.join(' · ')
+  return { total, busiestWeekday: total === 0 ? undefined : WEEKDAYS[busiest], longestQuiet }
 }
 
 function monthOf(date: string | undefined): number | undefined {
@@ -81,23 +90,25 @@ function monthOf(date: string | undefined): number | undefined {
   return Number(date.slice(5, 7)) - 1
 }
 
-function counted(count: number, noun: string): string {
-  return count === 1 ? `1 ${noun}` : `${count} ${noun}s`
+export function counted(count: number, noun: string): string {
+  return count === 1 ? `1 ${noun}` : `${count.toLocaleString('en-GB')} ${noun}s`
 }
 
-const MONTHS = [
-  'january',
-  'february',
-  'march',
-  'april',
-  'may',
-  'june',
-  'july',
-  'august',
-  'september',
-  'october',
-  'november',
-  'december',
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ] as const
 
-const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+const MONTHS = MONTH_NAMES.map((name) => name.slice(0, 3))
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const

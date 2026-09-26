@@ -61,7 +61,7 @@ const DETAIL = {
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       date: '2026-08-08',
-      displayDate: 'today, 07:15',
+      displayTime: '07:15',
       saved: false,
     },
   ],
@@ -335,8 +335,8 @@ describe('the way back out of an opened screen', () => {
     await user.click(await screen.findByRole('link', { name: 'Field Notes' }))
     await openedFeed()
 
-    await user.click(screen.getByRole('button', { name: 'unsubscribe' }))
-    await user.click(screen.getByRole('button', { name: 'confirm' }))
+    await user.click(screen.getByRole('button', { name: 'Unsubscribe' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Unsubscribe' }))
 
     expect(await screen.findByRole('heading', { level: 1, name: /^Feeds/ })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')

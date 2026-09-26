@@ -249,8 +249,8 @@ export const cadenceObservationSchema = z.object({
 })
 export type CadenceObservation = z.infer<typeof cadenceObservationSchema>
 
-// `date` is the installation-timezone day the cadence grid jumps to;
-// `displayDate` is the same day in the meta row's format.
+// `date` is the installation-timezone day the item is grouped under and the
+// cadence grid jumps to; `displayTime` is its time on that day.
 export const feedItemRowSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -258,7 +258,7 @@ export const feedItemRowSchema = z.object({
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   date: z.string(),
-  displayDate: z.string(),
+  displayTime: z.string(),
   saved: z.boolean(),
 })
 export type FeedItemRow = z.infer<typeof feedItemRowSchema>

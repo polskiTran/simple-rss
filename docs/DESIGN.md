@@ -172,7 +172,7 @@ and the Settings screen.
 **Cadence strip.** 30 days of 5px squares with 2px gaps on desktop, 14 on a
 phone. A day with no items is `ramp-1`; items step up the ramp.
 
-**Cadence grid.** 26 weeks as columns of seven 13px cells with 4px gaps (9px
+**Cadence grid.** 26 weeks as columns of seven 13px cells with 4px gaps (11px
 and 2px on a phone), month labels under it and a Fewer → More legend. A day
 with items is a button that scrolls to that day's items.
 

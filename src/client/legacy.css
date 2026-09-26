@@ -101,8 +101,7 @@
   .export-link:focus-visible,
   .feed-open:focus-visible,
   .feed-title-link:focus-visible,
-  .search-everywhere:focus-visible,
-  .feed-back:focus-visible {
+  .search-everywhere:focus-visible {
     outline: none;
     text-decoration: underline;
     text-underline-offset: 4px;
@@ -114,119 +113,6 @@
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--color-quiet);
-  }
-
-  .feed-header {
-    display: flex;
-    align-items: baseline;
-    gap: 20px;
-    margin: 0 0 40px;
-    font-size: 14px;
-    line-height: 1.4;
-    color: var(--color-meta);
-  }
-
-  .feed-back {
-    flex: none;
-  }
-
-  .feed-header-title {
-    color: var(--color-ink-strong);
-  }
-
-  .feed-header:has(+ .feed-description) {
-    margin-bottom: 10px;
-  }
-
-  .feed-description {
-    margin: 0 0 40px;
-    font-size: 14px;
-    line-height: 1.5;
-    color: var(--color-meta);
-  }
-
-  .cadence-figure {
-    --cadence-cell: 11px;
-    --cadence-gap: 3px;
-    --cadence-pitch: calc(var(--cadence-cell) + var(--cadence-gap));
-  }
-
-  .cadence-grid {
-    display: grid;
-    grid-template-rows: repeat(7, var(--cadence-cell));
-    grid-auto-flow: column;
-    grid-auto-columns: var(--cadence-cell);
-    gap: var(--cadence-gap);
-  }
-
-  .cadence-cell {
-    width: var(--cadence-cell);
-    height: var(--cadence-cell);
-    border: 0;
-    padding: 0;
-    background: var(--cadence-0);
-  }
-
-  .cadence-cell[data-level='1'] {
-    background: var(--cadence-1);
-  }
-
-  .cadence-cell[data-level='2'] {
-    background: var(--cadence-2);
-  }
-
-  .cadence-cell[data-level='3'] {
-    background: var(--cadence-3);
-  }
-
-  .cadence-cell[data-level='4'] {
-    background: var(--color-ink);
-  }
-
-  button.cadence-cell {
-    cursor: pointer;
-  }
-
-  .cadence-cell:focus-visible {
-    outline: none;
-    height: calc(var(--cadence-cell) - 2px);
-    border-bottom: 2px solid var(--color-accent);
-  }
-
-  .cadence-months {
-    position: relative;
-    height: 12px;
-    margin-top: 10px;
-  }
-
-  .cadence-month {
-    position: absolute;
-    top: 0;
-    left: calc(var(--column) * var(--cadence-pitch));
-    font-size: 11.5px;
-    line-height: 1;
-    color: var(--color-quiet);
-    white-space: nowrap;
-  }
-
-  .cadence-stats {
-    margin: 18px 0 0;
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: var(--color-muted-foreground);
-  }
-
-  .feed-controls {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 24px;
-    margin-top: 18px;
-  }
-
-  .feed-preferences {
-    display: grid;
-    gap: 12px;
   }
 
   .interval-options,
@@ -257,111 +143,9 @@
     color: var(--color-ink-strong);
   }
 
-  .feed-actions {
-    display: flex;
-    flex: none;
-    align-items: baseline;
-    gap: 20px;
-  }
-
-  .feed-items,
-  .feed-items-state {
-    margin-top: 44px;
-  }
-
-  .overlay-backdrop,
-  .overlay-viewport {
-    position: fixed;
-    inset: 0;
-  }
-
-  .overlay-backdrop {
-    background: var(--color-dim);
-  }
-
-  .overlay-viewport {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    overflow-y: auto;
-  }
-
-  .overlay-popup {
-    width: 100%;
-    max-width: 390px;
-    background: var(--color-paper);
-    padding: 28px 24px;
-  }
-
-  .overlay-backdrop,
-  .overlay-popup {
-    transition: opacity 150ms ease-out;
-  }
-
-  .overlay-backdrop[data-ending-style],
-  .overlay-popup[data-ending-style] {
-    transition-duration: 120ms;
-  }
-
-  .overlay-backdrop[data-starting-style],
-  .overlay-backdrop[data-ending-style],
-  .overlay-popup[data-starting-style],
-  .overlay-popup[data-ending-style] {
-    opacity: 0;
-  }
-
-  .overlay-title {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 300;
-    line-height: 1.4;
-    color: var(--color-ink-strong);
-  }
-
-  .overlay-description {
-    margin: 8px 0 0;
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: var(--color-quiet);
-  }
-
-  .overlay-choice {
-    display: flex;
-    gap: 24px;
-    margin: 20px 0 0;
-  }
-
-  .edit-details-form {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    margin: 20px 0 0;
-  }
-
-  .edit-details-form .overlay-choice {
-    margin: 0;
-  }
-
-  .unsubscribe-confirm {
-    color: var(--color-danger);
-  }
-
   .export-link {
     color: var(--color-ink-strong);
     text-decoration: none;
-  }
-
-  .subscription-list,
-  .availability-note {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 24px;
-    margin: 6px 0 0;
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: var(--color-quiet);
   }
 
   .content-list {
@@ -705,57 +489,4 @@
     font-size: 17px;
     line-height: 1.7;
   }
-
-  .availability-note {
-    grid-column: 1 / -1;
-    flex-wrap: wrap;
-    font-size: 12px;
-  }
-
-  .feed-header {
-    gap: 16px;
-    font-size: 13px;
-  }
-
-  .feed-description {
-    font-size: 13px;
-  }
-
-  .cadence-figure {
-    --cadence-cell: 9px;
-    --cadence-gap: 2px;
-  }
-
-  .cadence-month {
-    font-size: 11px;
-  }
-
-  .cadence-stats {
-    font-size: 12px;
-  }
-
-  .interval-option,
-  .interval-caption {
-    font-size: 12px;
-  }
-
-  .feed-controls {
-    flex-wrap: wrap;
-  }
-
-  .overlay-viewport {
-    align-items: end;
-    padding: 0;
-  }
-
-  .overlay-popup {
-    max-width: none;
-    padding: 24px 24px 32px;
-  }
-
-  .feed-items,
-  .feed-items-state {
-    margin-top: 32px;
-  }
-
 }

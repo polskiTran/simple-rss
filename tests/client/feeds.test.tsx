@@ -77,7 +77,7 @@ function feedDetail(availability: FeedAvailability, itemCount: number) {
       publishedAt: null,
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       date: '2026-08-08',
-      displayDate: 'today',
+      displayTime: '09:00',
       saved: false,
     })),
   }
