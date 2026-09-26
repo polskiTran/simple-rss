@@ -39,9 +39,9 @@ any ground.
 | `ink-2` | `oklch(53.8% 0 0)` | meta, secondary text |
 | `ink-3` | `oklch(71.5% 0 0)` | counts, companion values |
 | `ink-off` | `oklch(47.5% 0 0)` | unselected segment text |
-| `disabled` | `oklch(81.4% 0 0)` | disabled control text |
 | `control` | `oklch(95.2% 0 0)` | grey buttons, fields, switch tracks |
 | `control-hover` | `oklch(91.9% 0 0)` | |
+| `primary-hover` | `oklch(32% 0 0)` | primary button under the pointer |
 | `row-hover` | `oklch(97.6% 0 0)` | list rows, undo line |
 | `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off |
 | `rule` | ink at `.14` | under group headings |
@@ -63,6 +63,8 @@ any ground.
 | `control` / `control-hover` | `oklch(26.9% 0 0)` / `oklch(30.9% 0 0)` |
 | selected segment | `oklch(34.8% 0 0)` |
 | `row-hover` | `oklch(22.6% 0 0)` |
+| `primary-hover` | `oklch(84% 0 0)` |
+| `scrim` | black at `.5` |
 | rules and edges | `ink` at the light alphas |
 | reader body | `oklch(88.8% 0 0)` |
 | `danger` | `oklch(73.2% 0.164 27.1)` |
@@ -133,7 +135,7 @@ ground-coloured with a 1px ink ring and a clear button.
 **Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
 before the label (after it for chevrons and the ↗ of a link that leaves).
 Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
-text. Disabled: `control` fill with `disabled` text. A control that is busy
+text. Disabled: `control` fill with `ink-3` text. A control that is busy
 keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,
 Saving…. Icon-only: square, same height, with an accessible name.
 
@@ -190,6 +192,35 @@ the bottom edge with Cancel and the primary action side by side at 48px. In at
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
 
+**Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
+rows to a group, then Show N more with the rest named beside it. Jump buttons
+with each Rhythm's count reach the groups; By name lists everything
+alphabetically instead. A row says when a Feed awaits its first check, or why
+checking fails, what it last reached and that its items stay, with Retry.
+
+**One Feed.** The way back, then the Feed's name, description and host with
+Edit, Refresh now and Unsubscribe beside them, then three panels: Cadence (the
+grid), Info (items in 26 weeks, busiest day, longest quiet stretch, last
+checked) and Settings (Check every, Open items with). Items follow, grouped by
+day with whole counts.
+
+**Reader.** A toolbar — the way back on the left; the Reading Source switch,
+Open original ↗ and Save on the right — over a 680px column: the title, a meta
+line of the Feed (a link), the day and the minutes to read, then the article.
+The meta line names the reading only when it is not the one chosen: "Feed
+content for now" while the Original webpage loads or fails, or the one reading
+an item has when the chosen one is missing. Article links are ink and
+underlined; they all leave, so none carries ↗. Next in the digest closes the
+article as an item box. On a phone the switch takes its own row under the Open
+original and Save squares.
+
+**Search results.** The words as the title, the count as its companion — and
+the Feed's name when scoped to one. A search begun in a scope (a Feed, Saved,
+Feeds) shows a switch of that scope and Everywhere, moving both ways. Matching
+Subscriptions lead as Feed rows; items follow with the query's words marked in
+`match`. Beside them, the Feeds the results came from, with counts, narrow the
+list when ticked — a checkbox list on desktop, a row of chips on a phone.
+
 **Notices.** A result the User waits on — a first check, an import, a
 refresh — is one line of meta text in an `aria-live` region under the control
 that started it. Errors give a reason, in danger text, never an apology.
@@ -228,7 +259,8 @@ fades and scrolling go instant, and the waiting tile holds still.
 ## 8. Not yet designed
 
 Drawn but waiting on the API: Digest by day and by source, the Digest's Rhythm
-filter and day list, Show in digest, sorting Saved and search results, a
-Feed's subscribed date and editable URL. Not drawn: first-run and empty states,
+filter and day list, Show in digest, grouping Saved by month and sorting it,
+sorting search results, a Feed's subscribed date and editable URL, and
+Recently added on the Feeds list. Not drawn: first-run and empty states,
 confirmations after adding or importing, the reader fallback, offline, and the
 dark versions of most screens — these follow the components above.
