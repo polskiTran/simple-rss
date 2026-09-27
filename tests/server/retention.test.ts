@@ -257,10 +257,13 @@ describe('history retention', () => {
     await service.wakeScheduler()
     expect(storedItems(service).map((entry) => entry.title)).toEqual(['Saved essay'])
 
+    service.clock.advance(DAY_MS)
     const revived = await user.post('/api/subscriptions', { url: FEED_URL })
     expect(revived.status).toBe(201)
-    const body = (await revived.json()) as { subscription: { feedId: number } }
+    const body = (await revived.json()) as { subscription: { feedId: number; subscribedAt: string } }
     expect(body.subscription.feedId).toBe(1)
+    // The revived Subscription begins again: Recently added and the Feed page date it from today.
+    expect(body.subscription.subscribedAt).toBe(service.clock.now().toISOString())
     service.clock.advance(60_000)
     await service.wakeScheduler()
 

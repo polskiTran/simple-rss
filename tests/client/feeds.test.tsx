@@ -30,6 +30,7 @@ const FEED = {
   enteredUrl: 'https://journal.example/feed',
   resolvedUrl: 'https://feeds.example/journal.xml',
   readingSource: 'original-webpage',
+  subscribedAt: '2026-08-01T09:00:00.000Z',
   cadence: Array.from({ length: 30 }, () => 0),
   availability: AVAILABLE,
 }
@@ -69,6 +70,7 @@ function feedDetail(availability: FeedAvailability, itemCount: number) {
     availability,
     schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
     readingSource: 'original-webpage',
+    subscribedDate: '2026-08-01',
     cadence: [],
     items: Array.from({ length: itemCount }, (_, index) => ({
       feedItemId: index + 1,
@@ -315,6 +317,25 @@ describe('the Feeds list', () => {
     const names = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
     expect(names).toEqual(['Almanac', 'Wire'])
     expect(screen.queryByRole('heading', { name: /^Daily/ })).toBeNull()
+  })
+
+  it('lists the newest Subscription first under Recently added', async () => {
+    stubApi().on('GET /api/feeds', {
+      body: {
+        subscriptions: [
+          { ...FEED, feedId: 1, title: 'Almanac', subscribedAt: '2026-03-01T09:00:00.000Z' },
+          { ...FEED, feedId: 2, title: 'Wire', subscribedAt: '2026-08-07T09:00:00.000Z' },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Recently added' }))
+
+    const names = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    expect(names).toEqual(['Wire', 'Almanac'])
   })
 })
 

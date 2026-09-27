@@ -25,7 +25,7 @@ const UNCHECKED_REFRESH_ROUNDS = 20
 /** Rows a Rhythm group shows before Show N more. */
 const GROUP_PREVIEW = 6
 
-type Order = 'rhythm' | 'name'
+type Order = 'rhythm' | 'name' | 'recent'
 
 export interface FeedsViewProps {
   onOpenFeed(feedId: number): void
@@ -135,6 +135,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
               options={[
                 { value: 'rhythm', label: 'By rhythm' },
                 { value: 'name', label: 'By name' },
+                { value: 'recent', label: 'Recently added' },
               ]}
               value={order}
               onChange={setOrder}
@@ -170,7 +171,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
           ))
         ) : (
           <FeedRows
-            subscriptions={[...subscriptions].sort((left, right) => left.title.localeCompare(right.title))}
+            subscriptions={ordered(subscriptions, order)}
             retryingFeedId={retryingFeedId}
             onRetry={retry}
             onOpen={onOpenFeed}
@@ -178,6 +179,15 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         )
       ) : null}
     </div>
+  )
+}
+
+/** The flat orders: by effective title, or newest Subscription first. */
+function ordered(subscriptions: readonly SubscriptionSummary[], order: 'name' | 'recent') {
+  return subscriptions.toSorted((left, right) =>
+    order === 'recent'
+      ? right.subscribedAt.localeCompare(left.subscribedAt) || left.title.localeCompare(right.title)
+      : left.title.localeCompare(right.title),
   )
 }
 

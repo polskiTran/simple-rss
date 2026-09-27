@@ -220,6 +220,8 @@ const cadenceStripSchema = z.array(z.number().int().nonnegative()).length(CADENC
 
 export const subscriptionSummarySchema = feedSummarySchema.extend({
   readingSource: readingSourceSchema,
+  /** When this Subscription began; a revived one starts again. */
+  subscribedAt: z.string(),
   cadence: cadenceStripSchema,
   availability: feedAvailabilitySchema,
 })
@@ -275,6 +277,8 @@ export const feedDetailSchema = feedSummarySchema.extend({
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
   readingSource: readingSourceSchema,
+  /** The installation-timezone day this Subscription began. */
+  subscribedDate: z.string(),
   cadence: z.array(cadenceObservationSchema),
   items: z.array(feedItemRowSchema),
 })

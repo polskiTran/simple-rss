@@ -33,7 +33,7 @@ import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { NativeSelect } from '../components/native-select.js'
 import { READING_SOURCE_LABELS } from '../reading-source.js'
-import { dayBefore, longDay } from '../day-names.js'
+import { dayBefore, dayOfYear, longDay } from '../day-names.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
@@ -128,6 +128,8 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
 
   const detail = state.value
   const grid = cadenceGrid(detail.cadence)
+  // The Cadence runs through today.
+  const today = detail.cadence.at(-1)?.date ?? detail.subscribedDate
   return (
     <div className="view">
       <div className="view-topline">{back}</div>
@@ -165,6 +167,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         </Group>
         <Group id="feed-info" title="Info" className="panel">
           <dl className="rows">
+            <Row label="Subscribed" value={dayOfYear(detail.subscribedDate, today)} />
             <Row label="Items, last 26 weeks" value={grid.stats.total.toLocaleString('en-GB')} />
             <Row label="Busiest day" value={grid.stats.busiestWeekday ?? 'None yet'} />
             <Row
