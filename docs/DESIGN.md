@@ -220,11 +220,17 @@ recently published first: a Feed row with the last 14 days of Cadence, then
 under a `rule-soft` line its three newest items, each dated as briefly as the
 distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
 scroll as chips, the day list and the facts give way, the stepper names the
-day, and the cards stack.
+day, and the cards stack. A long list ends in Show more, which loads the next
+page wherever it falls — the rest of a day or days beyond it — so it names no
+number; Saved ends the same way. Before the first Subscription, All items is a
+note and Add feed as the primary action, with no Rhythms and no days beside
+it; with Subscriptions but nothing yet, the note says items arrive as the
+Feeds publish.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,
-Show fewer folds it back. Jump buttons
+Show fewer folds it back. With no Subscriptions there is nothing to export,
+so Export OPML gives way to Add feed alone. Jump buttons
 with each Rhythm's count reach the groups; By name lists everything
 alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
@@ -297,6 +303,6 @@ fades and scrolling go instant, and the waiting tile holds still.
 
 ## 8. Not yet designed
 
-Drawn but waiting on the API: Show in digest and a Feed's editable URL. Not drawn: first-run and empty states,
-confirmations after adding or importing, the reader fallback, offline, and the
+Drawn but waiting on the API: Show in digest and a Feed's editable URL. Not drawn: empty states beyond the Digest's
+first run, confirmations after adding or importing, the reader fallback, offline, and the
 dark versions of most screens — these follow the components above.

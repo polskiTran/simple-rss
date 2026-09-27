@@ -1316,6 +1316,13 @@
 
   /* Digest */
 
+  /* Before any Subscription: the note, then Add feed under it. */
+  .first-run {
+    display: grid;
+    justify-items: start;
+    gap: 20px;
+  }
+
   .day-stepper {
     flex-wrap: nowrap;
   }
