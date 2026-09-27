@@ -409,6 +409,28 @@ describe('searching retained reading metadata', () => {
     expect(results[0]?.title).toBe('Estuary crossings')
   })
 
+  it("sorted newest, answers the newest fifty matches in the Digest's chronology, however strong an older one", async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    const weakMatches = Array.from({ length: SEARCH_RESULT_LIMIT + 5 }, (_, index) =>
+      item(`n${index}`, `Numbered entry ${index}`, {
+        pubDate: new Date(Date.UTC(2026, 7, 7, 12, index)).toISOString(),
+        summary: 'A stray mention of the estuary among other things',
+      }),
+    )
+    await subscribed(
+      user,
+      service,
+      rss('Field Notes', item('old', 'Estuary crossings', { pubDate: '2026-07-18T08:00:00.000Z' }), ...weakMatches),
+    )
+
+    const response = await user.get(`/api/search?${searchParamsOf('estuary', { kind: 'everywhere' }, 'newest')}`)
+    const answer = searchResultsSchema.parse(await response.json())
+    expect('results' in answer ? answer.results.map((result) => result.title) : []).toEqual(
+      Array.from({ length: SEARCH_RESULT_LIMIT }, (_, index) => `Numbered entry ${SEARCH_RESULT_LIMIT + 4 - index}`),
+    )
+  })
+
   it('does not let a broken publisher clock crowd the bound from the future', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
@@ -574,6 +596,7 @@ describe('searching retained reading metadata', () => {
     expect((await user.get('/api/search?q=slow&feed=1e0')).status).toBe(400)
     expect((await user.get('/api/search?q=slow&feed=1&in=saved')).status).toBe(400)
     expect((await user.get('/api/search?q=slow&in=digest')).status).toBe(400)
+    expect((await user.get('/api/search?q=slow&sort=oldest')).status).toBe(400)
 
     // A Feed kept only by its saves has no screen to search from: its scope is refused as the Feed screen is.
     expect((await user.put('/api/library/1')).status).toBe(200)

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { useCallback, useEffect, useState } from 'react'
-import { searchParamsOf, searchRequestSchema, type SearchScope } from '../shared/api.js'
+import { searchParamsOf, searchRequestSchema, type SearchScope, type SearchSort } from '../shared/api.js'
 
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
 export type Route = (typeof ROUTES)[number]
@@ -47,11 +47,14 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
 }
 
 /** The search address is the API request: `/search?` followed by the same parameters. */
-export function searchPathOf(query: string, scope: SearchScope): string {
-  return `/search?${searchParamsOf(query, scope)}`
+export function searchPathOf(query: string, scope: SearchScope, sort: SearchSort = 'best'): string {
+  return `/search?${searchParamsOf(query, scope, sort)}`
 }
 
-function searchOf(pathname: string, search: string): { query: string; scope: SearchScope } | undefined {
+function searchOf(
+  pathname: string,
+  search: string,
+): { query: string; scope: SearchScope; sort: SearchSort } | undefined {
   if (pathname !== '/search') return undefined
   const parsed = searchRequestSchema.safeParse(Object.fromEntries(new URLSearchParams(search)))
   return parsed.success && parsed.data.query.trim() !== '' ? parsed.data : undefined
@@ -87,8 +90,8 @@ export function readerOrigin(feedItemId: number, from: Origin | undefined): Orig
   return { path: readerPathOf(feedItemId), label: 'Article', from }
 }
 
-export function searchOrigin(query: string, scope: SearchScope, from: Origin | undefined): Origin {
-  return { path: searchPathOf(query, scope), label: 'Search', from }
+export function searchOrigin(query: string, scope: SearchScope, sort: SearchSort, from: Origin | undefined): Origin {
+  return { path: searchPathOf(query, scope, sort), label: 'Search', from }
 }
 
 /** One derivation of the scope, from the screen's address alone. */
@@ -142,6 +145,7 @@ interface SearchLocation {
   /** The screen the search left; clearing the line lands there. */
   readonly origin: Origin | undefined
   readonly searchScope: SearchScope
+  readonly searchSort: SearchSort
 }
 
 interface NavigationActions {
@@ -152,6 +156,8 @@ interface NavigationActions {
   updateSearch(query: string): void
   /** Re-asks the same words in another scope; the origin stays, so clearing still lands there. */
   searchIn(scope: SearchScope): void
+  /** Re-asks the same words ranked another way, in place like `searchIn`. */
+  sortSearch(sort: SearchSort): void
 }
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
@@ -196,7 +202,7 @@ export function useNavigation(): Navigation {
 
       // Refining a search rewrites its entry rather than stacking one per pause.
       if (location.kind === 'search') {
-        place(searchPathOf(query, location.searchScope), location.origin, 'replace')
+        place(searchPathOf(query, location.searchScope, location.searchSort), location.origin, 'replace')
         return
       }
 
@@ -208,12 +214,20 @@ export function useNavigation(): Navigation {
   const searchIn = useCallback(
     (scope: SearchScope) => {
       if (location.kind !== 'search') return
-      place(searchPathOf(location.query, scope), location.origin, 'replace')
+      place(searchPathOf(location.query, scope, location.searchSort), location.origin, 'replace')
     },
     [location, place],
   )
 
-  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch, searchIn }
+  const sortSearch = useCallback(
+    (sort: SearchSort) => {
+      if (location.kind !== 'search') return
+      place(searchPathOf(location.query, location.searchScope, sort), location.origin, 'replace')
+    },
+    [location, place],
+  )
+
+  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch, searchIn, sortSearch }
 }
 
 function currentLocation(): Location {
@@ -234,6 +248,7 @@ function locationOf(path: string, origin: Origin | undefined): Location {
     query: found.query,
     origin,
     searchScope: found.scope,
+    searchSort: found.sort,
   }
 }
 

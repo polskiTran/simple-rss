@@ -195,13 +195,13 @@ not jump.
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it. Jump buttons
 with each Rhythm's count reach the groups; By name lists everything
-alphabetically instead. A row says when a Feed awaits its first check, or why
+alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
 
 **One Feed.** The way back, then the Feed's name, description and host with
 Edit, Refresh now and Unsubscribe beside them, then three panels: Cadence (the
-grid), Info (items in 26 weeks, busiest day, longest quiet stretch, last
-checked) and Settings (Check every, Open items with). Items follow, grouped by
+grid), Info (subscribed, items in 26 weeks, busiest day, longest quiet
+stretch, last checked) and Settings (Check every, Open items with). Items follow, grouped by
 day with whole counts.
 
 **Reader.** A toolbar — the way back on the left; the Reading Source switch,
@@ -214,9 +214,16 @@ underlined; they all leave, so none carries ↗. Next in the digest closes the
 article as an item box. On a phone the switch takes its own row under the Open
 original and Save squares.
 
+**Saved.** The count of saves as the title's companion, then a switch of
+Newest saved, Oldest saved and By feed. The save orders group by the month
+of the save; By feed groups the same list under each Feed's name. Each item's
+meta says when it was saved — Saved today, Saved yesterday, Saved 27 August —
+and, for a save that outlived its Subscription, No longer subscribed.
+
 **Search results.** The words as the title, the count as its companion — and
 the Feed's name when scoped to one. A search begun in a scope (a Feed, Saved,
-Feeds) shows a switch of that scope and Everywhere, moving both ways. Matching
+Feeds) shows a switch of that scope and Everywhere, moving both ways; Best
+match and Newest sit at the other end wherever items answer. Matching
 Subscriptions lead as Feed rows; items follow with the query's words marked in
 `match`. Beside them, the Feeds the results came from, with counts, narrow the
 list when ticked — a checkbox list on desktop, a row of chips on a phone.
@@ -243,6 +250,7 @@ the shipped words are:
 | Edit source | Edit feed |
 | Sources that day | Feeds that day |
 | Search saved posts | Search your saves |
+| By source | By feed |
 
 Rhythm is shown as **Daily**, **Weekly**, **Monthly** and **Inactive** (no
 items in 30 days). Say what happened and what stays: "Not responding since
@@ -259,8 +267,6 @@ fades and scrolling go instant, and the waiting tile holds still.
 ## 8. Not yet designed
 
 Drawn but waiting on the API: Digest by day and by source, the Digest's Rhythm
-filter and day list, Show in digest, grouping Saved by month and sorting it,
-sorting search results, a Feed's subscribed date and editable URL, and
-Recently added on the Feeds list. Not drawn: first-run and empty states,
+filter and day list, Show in digest, and a Feed's editable URL. Not drawn: first-run and empty states,
 confirmations after adding or importing, the reader fallback, offline, and the
 dark versions of most screens — these follow the components above.

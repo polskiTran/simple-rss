@@ -138,8 +138,10 @@
     }
   }
 
+  /* One column held to the page: a scrolling row inside must not widen it. */
   .page-head {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 28px;
     margin-bottom: 48px;
   }
@@ -165,6 +167,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+  }
+
+  /* Holds its end of the toolbar even when nothing stands at the start. */
+  .toolbar-end {
+    margin-inline-start: auto;
   }
 
   .toolbar-group {
@@ -1735,9 +1742,16 @@
     scrollbar-width: none;
   }
 
+  /* One line, so it spans the page rather than the scrolling jumps' content. */
   .toolbar:has(.rhythm-jumps) {
     flex-direction: column-reverse;
+    flex-wrap: nowrap;
     align-items: stretch;
+  }
+
+  /* Wrapped under the scope switch, the sort starts its own row. */
+  .toolbar-end {
+    margin-inline-start: 0;
   }
 
   .more {

@@ -38,6 +38,7 @@ import {
   type RefreshFeedResponse,
   type SearchResults,
   type SearchScope,
+  type SearchSort,
   type SubscriptionList,
   type ServiceMeta,
   type UpdateFeedDetailsRequest,
@@ -220,9 +221,10 @@ export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promis
 export async function fetchSearchResults(
   query: string,
   scope: SearchScope,
+  sort: SearchSort,
   signal?: AbortSignal,
 ): Promise<SearchResults> {
-  const response = await read(`/api/search?${searchParamsOf(query, scope)}`, signal)
+  const response = await read(`/api/search?${searchParamsOf(query, scope, sort)}`, signal)
   return searchResultsSchema.parse(await response.json())
 }
 

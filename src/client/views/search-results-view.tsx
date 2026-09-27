@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from 'react'
-import { searchParamsOf, type SearchResult, type SearchScope, type SearchSubscriptionMatch } from '../../shared/api.js'
+import {
+  searchParamsOf,
+  type SearchResult,
+  type SearchScope,
+  type SearchSort,
+  type SearchSubscriptionMatch,
+} from '../../shared/api.js'
 import { ApiError, fetchSearchResults } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { Choice } from '../components/choice.js'
@@ -16,9 +22,11 @@ import { useResource, valueInView } from '../use-resource.js'
 export interface SearchResultsViewProps {
   settledQuery: string
   scope: SearchScope
+  sort: SearchSort
   /** The scope of the screen the search left; the switch offers it beside everywhere. */
   originScope: SearchScope
   onScope(scope: SearchScope): void
+  onSort(sort: SearchSort): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
@@ -26,14 +34,16 @@ export interface SearchResultsViewProps {
 export function SearchResultsView({
   settledQuery,
   scope,
+  sort,
   originScope,
   onScope,
+  onSort,
   onOpenItem,
   onOpenFeed,
 }: SearchResultsViewProps) {
   const line = settledQuery.trim()
-  const request = searchParamsOf(line, scope).toString()
-  const [found, { retry, set }] = useResource((signal) => fetchSearchResults(line, scope, signal), [request])
+  const request = searchParamsOf(line, scope, sort).toString()
+  const [found, { retry, set }] = useResource((signal) => fetchSearchResults(line, scope, sort, signal), [request])
   const [shownFeeds, setShownFeeds] = useState<ReadonlySet<number>>(new Set())
   const answer = valueInView(found)
 
@@ -61,6 +71,20 @@ export function SearchResultsView({
       onChange={(chosen) => onScope(chosen === 'everywhere' ? { kind: 'everywhere' } : scoped)}
     />
   ) : null
+  // The Feeds screen's answer is Subscriptions alone, in list order: nothing to rank.
+  const sortSwitch =
+    scope.kind === 'subscriptions' ? null : (
+      <Choice
+        label="Sort results"
+        className="toolbar-end"
+        options={[
+          { value: 'best', label: 'Best match' },
+          { value: 'newest', label: 'Newest' },
+        ]}
+        value={sort}
+        onChange={onSort}
+      />
+    )
 
   const words = wordsOf(line)
   const results = answer && 'results' in answer ? answer.results : []
@@ -83,7 +107,12 @@ export function SearchResultsView({
             </span>
           ) : null}
         </h1>
-        {scopeSwitch ? <div className="toolbar">{scopeSwitch}</div> : null}
+        {scopeSwitch || sortSwitch ? (
+          <div className="toolbar">
+            {scopeSwitch}
+            {sortSwitch}
+          </div>
+        ) : null}
       </header>
 
       {found.kind === 'unreachable' || found.kind === 'unavailable' ? (

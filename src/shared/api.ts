@@ -427,15 +427,25 @@ export type SearchScope =
   | { readonly kind: 'feed'; readonly feedId: number }
 
 /**
+ * How a search ranks what it found: best match (ADR 0009) or newest first.
+ * Either way it answers at most fifty — the newest fifty matches, not the best
+ * fifty re-sorted.
+ */
+export const SEARCH_SORTS = ['best', 'newest'] as const
+export type SearchSort = (typeof SEARCH_SORTS)[number]
+
+/**
  * How a search travels, in the client address and the API request alike: `q`
  * for the words, then at most one scope parameter beside it — `feed=<id>` or
- * `in=saved|subscriptions`. Everywhere needs none. `searchParamsOf` and
- * `searchRequestSchema` are the two directions of one encoding.
+ * `in=saved|subscriptions` — and `sort=newest` when not ranked by best match.
+ * Everywhere needs no scope. `searchParamsOf` and `searchRequestSchema` are the
+ * two directions of one encoding.
  */
-export function searchParamsOf(query: string, scope: SearchScope): URLSearchParams {
+export function searchParamsOf(query: string, scope: SearchScope, sort: SearchSort = 'best'): URLSearchParams {
   const params = new URLSearchParams({ q: query })
   if (scope.kind === 'feed') params.set('feed', String(scope.feedId))
   else if (scope.kind !== 'everywhere') params.set('in', scope.kind)
+  if (sort !== 'best') params.set('sort', sort)
   return params
 }
 
@@ -444,15 +454,17 @@ export const searchRequestSchema = z
     q: searchQuerySchema,
     feed: feedIdParameterSchema.optional(),
     in: z.enum(['saved', 'subscriptions']).optional(),
+    sort: z.enum(SEARCH_SORTS).default('best'),
   })
   .refine((request) => request.feed === undefined || request.in === undefined, 'A search takes one scope at most')
-  .transform(({ q, feed, in: within }) => ({
+  .transform(({ q, feed, in: within, sort }) => ({
     query: q,
     scope: (feed !== undefined
       ? { kind: 'feed', feedId: feed }
       : within !== undefined
         ? { kind: within }
         : { kind: 'everywhere' }) satisfies SearchScope,
+    sort,
   }))
 
 export const searchResultSchema = z.object({
