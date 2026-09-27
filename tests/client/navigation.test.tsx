@@ -175,7 +175,7 @@ describe('a Feed Item’s attribution', () => {
 
   it('returns an article opened from one day of the Digest to that same day', async () => {
     reading('/digest?by=day&day=2026-08-07')
-      .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow() } })
+      .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 1 } })
       .on('GET /api/digest/days/2026-08-07', { body: { date: '2026-08-07', feeds: [] } })
       .on('GET /api/digest?day=2026-08-07', { body: DIGEST })
     render(<App />)

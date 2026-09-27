@@ -16,7 +16,7 @@ async function glintFrame(page: Page, scope = '.chrome'): Promise<string[]> {
 }
 
 async function hangTheDigest(page: Page): Promise<void> {
-  await page.route('**/api/digest*', () => {})
+  await page.route('**/api/digest**', () => {})
 }
 
 async function section(page: Page, name: string): Promise<void> {

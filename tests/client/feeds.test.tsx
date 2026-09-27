@@ -452,12 +452,21 @@ describe('OPML portability', () => {
   })
 
   it('offers the export as a plain same-origin download link', async () => {
-    stubApi()
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
 
     const link = (await screen.findByRole('link', { name: /export/i })) as HTMLAnchorElement
     expect(link.getAttribute('href')).toBe('/api/subscriptions/export')
     expect(link.getAttribute('download')).toBe('subscriptions.opml')
+  })
+
+  it('offers no export before there is a Subscription to export', async () => {
+    stubApi()
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    expect(await screen.findByText(/^No feeds yet\./)).toBeDefined()
+    expect(screen.queryByRole('link', { name: /export/i })).toBeNull()
   })
 })

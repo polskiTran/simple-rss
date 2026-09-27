@@ -139,7 +139,7 @@ describe('the Saved tab', () => {
 
     const headings = await screen.findAllByRole('heading', { level: 3 })
     expect(headings.map((heading) => heading.textContent)).toEqual(['A June letter', 'First light'])
-    await user.click(screen.getByRole('button', { name: 'Show newer saves' }))
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
     expect(api.requestsTo('GET /api/library?order=oldest&cursor=next')).toHaveLength(1)
   })
 

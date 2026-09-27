@@ -9,6 +9,7 @@ import { dayAfter, dayBefore, longDay, recentDayName, shortDay } from '../day-na
 import { routedClick } from '../routed-link.js'
 import { ALL_POSTS, digestPathOf, type DigestMode } from '../routing.js'
 import { useResource, valueInView, type Resource } from '../use-resource.js'
+import { AddFeedDialog } from './add-feed-dialog.js'
 import { DigestByDay } from './digest-by-day.js'
 import { DigestByFeed } from './digest-by-feed.js'
 import { DigestList } from './digest-list.js'
@@ -38,11 +39,13 @@ const RECENT_DAYS = 7
  * The Digest read three ways. The calendar — the whole Digest's count for each
  * day — names today in the title, lists recent days beside All items, and draws
  * By day. Its counts are never narrowed: each day it names opens By day, which
- * shows all of that day.
+ * shows all of that day. With no Subscriptions, All items offers only the way to
+ * the first; until the calendar answers, the Digest is drawn as begun.
  */
 export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewProps) {
   const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
   const today = valueInView(calendar)?.today
+  const firstRun = valueInView(calendar)?.subscriptions === 0
   const day = mode.by === 'day' ? (mode.day ?? today) : undefined
   const showDay = (date: string) => onMode({ by: 'day', day: date === today ? undefined : date })
 
@@ -60,7 +63,7 @@ export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewP
             value={mode.by}
             onChange={(by) => onMode(by === 'all' ? ALL_POSTS : by === 'day' ? { by, day: undefined } : { by })}
           />
-          {mode.by === 'all' ? (
+          {mode.by === 'all' && !firstRun ? (
             <Choice
               label="Rhythm"
               className="toolbar-end rhythm-choice"
@@ -74,7 +77,13 @@ export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewP
         </div>
       </header>
 
-      {mode.by === 'all' ? (
+      {mode.by === 'all' && firstRun ? (
+        <div className="first-run">
+          <p className="note">Nothing yet. Subscribe to a feed to start your digest.</p>
+          <AddFeedDialog onSubscribed={retryCalendar} onImported={retryCalendar} />
+        </div>
+      ) : null}
+      {mode.by === 'all' && !firstRun ? (
         <div className="with-aside">
           <DigestList
             filter={{ rhythm: mode.rhythm }}
@@ -82,7 +91,7 @@ export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewP
             empty={
               mode.rhythm
                 ? `Nothing from ${RHYTHM_LABELS[mode.rhythm].toLowerCase()} feeds.`
-                : 'Nothing yet. Subscribe to a feed in Feeds to start your digest.'
+                : 'Nothing yet. Items arrive here as your feeds publish.'
             }
             onOpenItem={onOpenItem}
             onOpenFeed={onOpenFeed}
