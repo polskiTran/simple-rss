@@ -591,8 +591,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 50px;
-    padding-block: 8px;
+    min-height: 40px;
+    padding-block: 6px;
     border-bottom: 1px solid var(--color-rule-soft);
   }
 
@@ -622,6 +622,11 @@
     padding: 20px 20px 20px 24px;
     border: 1px solid var(--color-edge);
     background: var(--color-ground);
+  }
+
+  /* A Feed's own list names no Feed, so the meta column holds only the time. */
+  .app[data-screen='feed'] .item {
+    grid-template-columns: 56px minmax(0, 1fr) 36px;
   }
 
   .item:hover {
@@ -1301,10 +1306,6 @@
     margin-top: 72px;
   }
 
-  .item-plain {
-    grid-template-columns: 140px minmax(0, 1fr);
-  }
-
   /* Digest */
 
   .day-stepper {
@@ -1327,13 +1328,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 44px;
+    min-height: 36px;
     margin-inline: -12px;
     padding-inline: 12px;
   }
 
   .day-row:hover {
-    background: var(--color-control);
+    background: var(--color-row-hover);
   }
 
   .day-row-count {
@@ -1575,7 +1576,7 @@
 
   .gate-submit {
     width: 100%;
-    height: 44px;
+    height: 40px;
   }
 
   /* Chrome */
