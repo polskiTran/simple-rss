@@ -26,10 +26,10 @@ describe('the cadence grid', () => {
       .map((column, index) => (column.monthLabel ? [index, column.monthLabel] : undefined))
       .filter((entry) => entry !== undefined)
     expect(labelled).toEqual([
-      [0, 'february'],
-      [8, 'april'],
-      [16, 'june'],
-      [25, 'august'],
+      [0, 'Feb'],
+      [8, 'Apr'],
+      [16, 'Jun'],
+      [25, 'Aug'],
     ])
   })
 
@@ -39,36 +39,31 @@ describe('the cadence grid', () => {
   })
 })
 
-describe('the one-line statistics', () => {
-  it('derives the post count, busiest weekday, and longest quiet stretch from the observations', () => {
+describe('the statistics', () => {
+  it('derives the item count, busiest weekday, and longest quiet stretch from the observations', () => {
     const { stats } = cadenceGrid(cadenceWindow({ '2026-06-03': 2, '2026-08-06': 1, '2026-08-07': 1, '2026-08-08': 1 }))
 
-    expect(stats).toBe('5 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days')
+    expect(stats).toEqual({ total: 5, busiestWeekday: 'Wednesday', longestQuiet: 114 })
   })
 
-  it('says a quiet Feed has no posts, without a chart or an alarm', () => {
-    expect(cadenceGrid(cadenceWindow()).stats).toBe('no posts in 26 weeks')
+  it('names no busiest day for a Feed that published nothing', () => {
+    expect(cadenceGrid(cadenceWindow()).stats).toEqual({ total: 0, busiestWeekday: undefined, longestQuiet: 181 })
   })
 
-  it('speaks in singulars when there is one post or one quiet day', () => {
-    const { stats } = cadenceGrid(cadenceWindow({ '2026-02-09': 1 }, 2))
-    expect(stats).toBe('1 post in 26 weeks · busiest on mondays · longest quiet stretch 1 day')
+  it('breaks a busiest-weekday tie toward the earlier weekday, Monday first', () => {
+    expect(cadenceGrid(cadenceWindow({ '2026-02-12': 2, '2026-02-11': 2 }, 14)).stats.busiestWeekday).toBe('Wednesday')
+    expect(cadenceGrid(cadenceWindow({ '2026-02-15': 2, '2026-02-09': 2 }, 14)).stats.busiestWeekday).toBe('Monday')
   })
 
-  it('breaks a busiest-weekday tie toward the earlier weekday, deterministically', () => {
-    const { stats } = cadenceGrid(cadenceWindow({ '2026-02-12': 2, '2026-02-11': 2 }, 14))
-    expect(stats).toContain('busiest on wednesdays')
-  })
-
-  it('drops the quiet stretch once every day has a post', () => {
+  it('has no quiet stretch once every day has an item', () => {
     const counts = Object.fromEntries(cadenceWindow({}, 14).map(({ date }) => [date, 1]))
-    expect(cadenceGrid(cadenceWindow(counts, 14)).stats).toBe('14 posts in 26 weeks · busiest on mondays')
+    expect(cadenceGrid(cadenceWindow(counts, 14)).stats.longestQuiet).toBe(0)
   })
 })
 
 describe('a represented day', () => {
   it('is described for a screen reader with its count and calendar day', () => {
-    expect(cadenceDayLabel({ date: '2026-06-03', count: 2, level: 2 })).toBe('2 posts on 3 june 2026')
-    expect(cadenceDayLabel({ date: '2026-08-08', count: 1, level: 1 })).toBe('1 post on 8 august 2026')
+    expect(cadenceDayLabel({ date: '2026-06-03', count: 2, level: 2 })).toBe('2 items on 3 June 2026')
+    expect(cadenceDayLabel({ date: '2026-08-08', count: 1, level: 1 })).toBe('1 item on 8 August 2026')
   })
 })

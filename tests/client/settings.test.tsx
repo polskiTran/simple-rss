@@ -20,7 +20,7 @@ describe('the Settings timezone', () => {
     stubApi().on('GET /api/settings', { body: { timezone: 'Pacific/Auckland' } })
     openSettings()
 
-    expect(await screen.findByLabelText('installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
+    expect(await screen.findByLabelText('Installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
   })
 
   it('lets the User change it, sending the choice to the installation', async () => {
@@ -30,7 +30,7 @@ describe('the Settings timezone', () => {
     openSettings()
     const user = userEvent.setup()
 
-    const select = await screen.findByLabelText('installation timezone')
+    const select = await screen.findByLabelText('Installation timezone')
     await user.selectOptions(select, 'Pacific/Auckland')
 
     await waitFor(() => expect(select).toHaveProperty('value', 'Pacific/Auckland'))
@@ -45,10 +45,10 @@ describe('the Settings timezone', () => {
     openSettings()
     const user = userEvent.setup()
 
-    const select = await screen.findByLabelText('installation timezone')
+    const select = await screen.findByLabelText('Installation timezone')
     await user.selectOptions(select, 'Pacific/Auckland')
 
-    expect(await screen.findByText('that timezone is not recognized')).toBeDefined()
+    expect(await screen.findByText('That timezone isn’t recognized.')).toBeDefined()
     expect(select).toHaveProperty('value', 'UTC')
   })
 })
@@ -58,11 +58,11 @@ describe('the Settings export actions', () => {
     stubApi()
     openSettings()
 
-    const opml = await screen.findByRole('link', { name: 'subscriptions (OPML)' })
+    const opml = await screen.findByRole('link', { name: /Subscriptions \(OPML\)/ })
     expect(opml.getAttribute('href')).toBe('/api/subscriptions/export')
     expect(opml.getAttribute('download')).toBe('subscriptions.opml')
 
-    const json = screen.getByRole('link', { name: 'everything (JSON)' })
+    const json = screen.getByRole('link', { name: /Everything \(JSON\)/ })
     expect(json.getAttribute('href')).toBe('/api/export')
     expect(json.getAttribute('download')).toBe('simple-rss-export.json')
   })
@@ -73,10 +73,10 @@ describe('the Settings appearance', () => {
     stubApi()
     openSettings()
 
-    expect(await screen.findByRole('button', { name: 'system' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'system' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'light' }).getAttribute('aria-pressed')).toBe('false')
-    expect(screen.getByRole('button', { name: 'dark' }).getAttribute('aria-pressed')).toBe('false')
+    expect(await screen.findByRole('button', { name: 'System' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'System' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Light' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Dark' }).getAttribute('aria-pressed')).toBe('false')
   })
 
   it('pins a chosen scheme on this device without asking the server', async () => {
@@ -84,9 +84,9 @@ describe('the Settings appearance', () => {
     openSettings()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'dark' }))
+    await user.click(await screen.findByRole('button', { name: 'Dark' }))
 
-    expect(screen.getByRole('button', { name: 'dark' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Dark' }).getAttribute('aria-pressed')).toBe('true')
     expect(document.documentElement.dataset.appearance).toBe('dark')
     expect(localStorage.getItem('appearance')).toBe('dark')
     expect(api.requests.filter(({ method }) => method !== 'GET')).toEqual([])
@@ -97,8 +97,8 @@ describe('the Settings appearance', () => {
     openSettings()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'dark' }))
-    await user.click(screen.getByRole('button', { name: 'system' }))
+    await user.click(await screen.findByRole('button', { name: 'Dark' }))
+    await user.click(screen.getByRole('button', { name: 'System' }))
 
     expect(document.documentElement.dataset.appearance).toBeUndefined()
     expect(localStorage.getItem('appearance')).toBeNull()

@@ -1,12 +1,22 @@
 import { Button } from '@base-ui/react/button'
 import { Suspense, lazy, useEffect, useState } from 'react'
-import type { FeedContent, ReaderArticle, ReaderDeadlineStage, ReaderItem, ReadingSource } from '../../shared/api.js'
+import {
+  READING_SOURCES,
+  type FeedContent,
+  type ReaderArticle,
+  type ReaderDeadlineStage,
+  type ReaderItem,
+  type ReadingSource,
+} from '../../shared/api.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
-import { BackLink } from '../components/back-link.js'
+import { BackButton } from '../components/back-button.js'
+import { Choice } from '../components/choice.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
+import { Icon } from '../components/icon.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
+import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { READING_SOURCE_LABELS, ReadingSourceOptions } from '../components/reading-source-options.js'
+import { READING_SOURCE_LABELS } from '../reading-source.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import type { Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
@@ -34,8 +44,8 @@ const DEADLINE_REFETCH_DELAY_MS = 2_000
 const DEADLINE_REFETCH_ATTEMPTS = 2
 
 const STAGE_NOTES = {
-  publisher: 'waiting on the publisher',
-  parsing: 'parsing the article',
+  publisher: 'Waiting on the publisher',
+  parsing: 'Parsing the article',
 } as const satisfies Record<ReaderDeadlineStage, string>
 
 export interface ReaderViewProps {
@@ -47,7 +57,10 @@ export interface ReaderViewProps {
 }
 
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
-  const [itemState, { set: setItem }] = useResource((signal) => fetchReaderItem(feedItemId, signal), [feedItemId])
+  const [itemState, { retry, set: setItem }] = useResource(
+    (signal) => fetchReaderItem(feedItemId, signal),
+    [feedItemId],
+  )
 
   useEffect(() => {
     performance.mark(READER_MARKS.entry)
@@ -57,16 +70,20 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
     void preloadArticleMarkdown().then(() => performance.mark(READER_MARKS.rendererReady))
   }, [])
 
-  if (itemState.kind === 'loading') {
-    return <LoadingNote className="view measure empty-note">opening the article</LoadingNote>
-  }
-  if (itemState.kind === 'unavailable' || itemState.kind === 'unreachable') {
+  if (itemState.kind === 'loading' || itemState.kind === 'unavailable' || itemState.kind === 'unreachable') {
     return (
-      <p className="view measure empty-note" role="status">
-        {itemState.kind === 'unreachable'
-          ? 'the article is out of reach — check the connection, then try again'
-          : 'the article is unavailable — try again in a moment'}
-      </p>
+      <div className="view reader">
+        <div className="view-topline">
+          <BackButton className="view-back" origin={origin} onBack={onBack} />
+        </div>
+        <div className="reader-column">
+          {itemState.kind === 'loading' ? (
+            <LoadingNote>Opening the article</LoadingNote>
+          ) : (
+            <LoadFailure subject="The article" kind={itemState.kind} onRetry={retry} />
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -136,82 +153,136 @@ function OpenReader({
   const displayed: SourceResult | undefined =
     selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
   const next = item.nextInDigest
-  const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'parsing the original page'
+  const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'Parsing the original page'
   const waitingContent = item.summary ? (
     <div className="reader-waiting">
       <p className="reader-summary">{item.summary}</p>
-      <LoadingNote className="empty-note">{waitingNote}</LoadingNote>
+      <LoadingNote>{waitingNote}</LoadingNote>
     </div>
   ) : (
-    <LoadingNote className="empty-note reader-extracting">{waitingNote}</LoadingNote>
+    <LoadingNote className="reader-extracting">{waitingNote}</LoadingNote>
   )
   const canSwitchSource = item.link !== null && item.feedContent !== null
 
   return (
-    <article className="view measure reader-view">
-      <div className="reader-topline">
-        <BackLink className="reader-back" origin={origin} onBack={onBack} />
-        <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} onSaved={onSaved} />
+    <article className="view reader">
+      <div className="view-topline">
+        <BackButton className="view-back" origin={origin} onBack={onBack} />
+        <div className="toolbar-group reader-actions">
+          {canSwitchSource ? (
+            <Choice
+              label="Reading source"
+              className="reader-source"
+              options={READING_SOURCES.map((option) => ({ value: option, label: READING_SOURCE_LABELS[option] }))}
+              value={viewSource}
+              onChange={setViewSource}
+            />
+          ) : null}
+          {item.link ? <OpenOriginal link={item.link} /> : null}
+          <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} labelled onSaved={onSaved} />
+        </div>
       </div>
 
-      <header className="reader-header">
-        <h1 className="reader-title">{item.title}</h1>
-        <p className="content-meta reader-meta">
-          <FeedTitleLink feedId={item.feedId} title={item.feedTitle} onOpen={onOpenFeed} />
-          <span>{item.displayDate}</span>
-          {displayed ? <span>{displayed.content.readingTimeMinutes} min</span> : null}
-          {displayed ? <span>{READING_SOURCE_LABELS[displayed.source]}</span> : null}
-          {item.link ? (
-            <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
-              open original
-            </a>
-          ) : null}
-        </p>
-        {canSwitchSource ? (
-          <ReadingSourceOptions value={viewSource} className="reader-reading-source" onChange={setViewSource} />
-        ) : null}
-      </header>
-
-      {displayed?.source === 'feed-content' && displayed.content.truncated ? (
-        <p className="empty-note" role="status">
-          {item.link ? 'shortened by simple — open original for more' : 'shortened by simple'}
-        </p>
-      ) : null}
-      {displayed ? (
-        <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
-          <ArticleMarkdown markdown={displayed.content.markdown} />
-          {selectedLoaded ? <MarkdownCommitted /> : null}
-        </Suspense>
-      ) : null}
-      {sourceState.kind === 'loading' && source === 'original-webpage' ? (
-        displayed ? (
-          <LoadingNote className="empty-note">{waitingNote}</LoadingNote>
-        ) : (
-          waitingContent
-        )
-      ) : null}
-      {sourceState.kind === 'unavailable' || sourceState.kind === 'unreachable' ? (
-        <Fallback
-          item={item}
-          waitSeconds={waitSecondsOf(sourceState.error)}
-          stage={deadlineStage(sourceState.error)}
-          onRetry={item.link ? retryParsing : undefined}
-        />
-      ) : null}
-
-      {next ? (
-        <footer className="reader-next">
-          <p className="reader-next-label">next in the digest</p>
-          <h2 className="content-item-title">
-            <ItemTitleLink feedItemId={next.feedItemId} title={next.title} onOpen={onOpenItem} />
-          </h2>
-          <p className="content-meta">
-            <span>{next.feedTitle}</span>
-            <span>{next.displayTime}</span>
+      <div className="reader-column">
+        <header className="reader-header">
+          <h1 className="reader-title">{item.title}</h1>
+          <p className="reader-meta">
+            <FeedTitleLink
+              className="link reader-feed"
+              feedId={item.feedId}
+              title={item.feedTitle}
+              onOpen={onOpenFeed}
+            />
+            <span className="reader-facts">
+              <span>{item.displayDate}</span>
+              {displayed ? <span>{displayed.content.readingTimeMinutes} min read</span> : null}
+              {displayed ? <ReadingNote shown={displayed.source} resolved={source} chosen={viewSource} /> : null}
+            </span>
           </p>
-        </footer>
-      ) : null}
+        </header>
+
+        {displayed?.source === 'feed-content' && displayed.content.truncated ? (
+          <p className="note reader-truncated" role="status">
+            {item.link ? 'Shortened by simple. Open the original for the rest.' : 'Shortened by simple.'}
+          </p>
+        ) : null}
+        {displayed ? (
+          <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
+            <ArticleMarkdown markdown={displayed.content.markdown} />
+            {selectedLoaded ? <MarkdownCommitted /> : null}
+          </Suspense>
+        ) : null}
+        {sourceState.kind === 'loading' && source === 'original-webpage' ? (
+          displayed ? (
+            <LoadingNote className="reader-extracting">{waitingNote}</LoadingNote>
+          ) : (
+            waitingContent
+          )
+        ) : null}
+        {sourceState.kind === 'unavailable' || sourceState.kind === 'unreachable' ? (
+          <Fallback
+            item={item}
+            waitSeconds={waitSecondsOf(sourceState.error)}
+            stage={deadlineStage(sourceState.error)}
+            onRetry={item.link ? retryParsing : undefined}
+          />
+        ) : null}
+
+        {next ? (
+          <section className="reader-next" aria-labelledby="reader-next">
+            <h2 className="group-heading" id="reader-next">
+              Next in the digest
+            </h2>
+            <article className="item item-plain">
+              <div className="item-meta">
+                <span className="item-feed">{next.feedTitle}</span>
+                <span className="item-when">{next.displayTime}</span>
+              </div>
+              <div className="item-body">
+                <h3 className="item-title">
+                  <ItemTitleLink feedItemId={next.feedItemId} title={next.title} onOpen={onOpenItem} />
+                </h3>
+              </div>
+            </article>
+          </section>
+        ) : null}
+      </div>
     </article>
+  )
+}
+
+/**
+ * Names the reading on screen only when it is not the one chosen: Feed Content
+ * standing in while the Original webpage loads or fails, or the one reading a
+ * Feed Item has when the chosen one is missing.
+ */
+function ReadingNote({
+  shown,
+  resolved,
+  chosen,
+}: {
+  shown: ReadingSource
+  resolved: ReadingSource
+  chosen: ReadingSource
+}) {
+  if (shown !== resolved) return <span>{`${READING_SOURCE_LABELS[shown]} for now`}</span>
+  if (resolved !== chosen) return <span>{READING_SOURCE_LABELS[shown]}</span>
+  return null
+}
+
+/** The Original webpage, in a new tab: it leaves the installation, and says so with ↗. */
+function OpenOriginal({ link }: { link: string }) {
+  return (
+    <a
+      className="button reader-original"
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open original"
+    >
+      <span className="wide-only">Open original</span>
+      <Icon name="external" />
+    </a>
   )
 }
 
@@ -259,8 +330,8 @@ function pause(milliseconds: number, signal: AbortSignal): Promise<void> {
 }
 
 const STAGE_FALLBACKS = {
-  publisher: 'the publisher did not answer in time',
-  parsing: 'parsing the article took too long',
+  publisher: 'The publisher didn’t answer in time.',
+  parsing: 'Parsing the article took too long.',
 } as const satisfies Record<ReaderDeadlineStage, string>
 
 interface FallbackProps {
@@ -284,26 +355,21 @@ function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
       {!item.feedContent && item.summary ? (
         <p className="reader-summary">{item.summary}</p>
       ) : (
-        <p className="empty-note">
-          {stage ? STAGE_FALLBACKS[stage] : 'the original page could not be parsed into an article'}
-        </p>
+        <p className="note">{stage ? STAGE_FALLBACKS[stage] : 'The original page couldn’t be read as an article.'}</p>
       )}
       {item.link || onRetry ? (
         <p className="reader-fallback-actions">
-          {item.link ? (
-            <a className="reader-original" href={item.link} target="_blank" rel="noopener noreferrer">
-              open original
-            </a>
-          ) : null}
           {onRetry ? (
-            <Button className="text-button" onClick={onRetry}>
-              retry parsing
+            <Button className="button" onClick={onRetry}>
+              <Icon name="refresh" />
+              Retry parsing
             </Button>
           ) : null}
+          {item.link ? <OpenOriginal link={item.link} /> : null}
         </p>
       ) : null}
       {waitSeconds !== undefined ? (
-        <p className="empty-note">the last try was a moment ago — wait {waitSeconds}s, then retry</p>
+        <p className="note">The last try was a moment ago. Wait {waitSeconds} seconds, then retry.</p>
       ) : null}
     </div>
   )

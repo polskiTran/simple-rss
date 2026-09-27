@@ -70,28 +70,27 @@ describe('Reader View', () => {
     render(<App />)
     const user = userEvent.setup()
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
-    expect(screen.getByText('2 min')).toBeDefined()
-    expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
-    expect(screen.getByText('parsing the original page')).toBeDefined()
+    expect(screen.getByText('Feed content for now')).toBeDefined()
+    expect(screen.getByText('2 min read')).toBeDefined()
+    expect(screen.getByText('Shortened by simple. Open the original for the rest.')).toBeDefined()
+    expect(screen.getByText('Parsing the original page')).toBeDefined()
     pending.resolve()
-    await screen.findByRole('button', { name: 'retry parsing' })
+    await screen.findByRole('button', { name: 'Retry parsing' })
     expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
     healed = true
-    await user.click(screen.getByRole('button', { name: 'retry parsing' }))
+    await user.click(screen.getByRole('button', { name: 'Retry parsing' }))
     await screen.findByRole('heading', { name: 'Dawn' })
-    expect(screen.getByText('original webpage', { selector: 'span' })).toBeDefined()
-    expect(screen.getByText('4 min')).toBeDefined()
-    expect(screen.queryByText('feed content', { selector: 'span' })).toBeNull()
+    expect(screen.getByText('4 min read')).toBeDefined()
+    expect(screen.queryByText(/for now/)).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Feed methods' })).toBeNull()
-    expect(screen.queryByText('shortened by simple — open original for more')).toBeNull()
+    expect(screen.queryByText(/Shortened by simple/)).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'feed content' }))
+    await user.click(screen.getByRole('button', { name: 'Feed content' }))
     expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(screen.queryByRole('heading', { name: 'Dawn' })).toBeNull()
-    expect(screen.getByText('2 min')).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('2 min read')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Feed content' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('uses the Subscription preference without requesting the original and ignores a held old source', async () => {
@@ -108,20 +107,20 @@ describe('Reader View', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
-    expect(screen.getByText('1 min')).toBeDefined()
-    expect(screen.getByText('shortened by simple — open original for more')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Feed content' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('1 min read')).toBeDefined()
+    expect(screen.getByText('Shortened by simple. Open the original for the rest.')).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: 'original webpage' }))
+    await user.click(screen.getByRole('button', { name: 'Original webpage' }))
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
-    expect(screen.getByText('parsing the original page')).toBeDefined()
-    await user.click(screen.getByRole('button', { name: 'feed content' }))
+    expect(screen.getByText('Parsing the original page')).toBeDefined()
+    await user.click(screen.getByRole('button', { name: 'Feed content' }))
     original.resolve({ body: ARTICLE })
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined())
     expect(screen.queryByRole('heading', { name: 'Dawn' })).toBeNull()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.queryByText(/for now/)).toBeNull()
   })
 
   it('uses the Original webpage when Feed Content is preferred but unavailable', async () => {
@@ -129,7 +128,7 @@ describe('Reader View', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
-    expect(screen.getByText('original webpage', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Original webpage', { selector: 'span' })).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
@@ -143,7 +142,7 @@ describe('Reader View', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
-    expect(screen.getByText('feed content', { selector: 'span' })).toBeDefined()
+    expect(screen.getByText('Feed content', { selector: 'span' })).toBeDefined()
     expect(screen.queryByText('the original page could not be parsed into an article')).toBeNull()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
   })
@@ -155,9 +154,9 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'First light' })).toBeDefined()
     expect(screen.getAllByText('Field Notes').length).toBeGreaterThan(0)
     expect(screen.getByText('saturday, 8 august')).toBeDefined()
-    await screen.findByText('4 min')
+    await screen.findByText('4 min read')
 
-    const original = screen.getByRole('link', { name: 'open original' })
+    const original = screen.getByRole('link', { name: 'Open original' })
     expect(original.getAttribute('href')).toBe('https://journal.example/first-light')
     expect(original.getAttribute('target')).toBe('_blank')
     expect(original.getAttribute('rel')).toBe('noopener noreferrer')
@@ -165,10 +164,10 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
     expect(screen.getByText(/turns from grey to/)).toBeDefined()
 
-    const toggle = screen.getByRole('button', { name: 'save First light' })
-    expect(toggle.textContent).toBe('save')
+    const toggle = screen.getByRole('button', { name: 'Save First light' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
 
-    expect(screen.getByText('next in the digest')).toBeDefined()
+    expect(screen.getByText('Next in the digest')).toBeDefined()
     expect(screen.getByRole('link', { name: 'Evening notes' }).getAttribute('href')).toBe('/reader/4')
   })
 
@@ -179,10 +178,10 @@ describe('Reader View', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
   })
 
@@ -197,11 +196,12 @@ describe('Reader View', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
-    expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Open original' }).length).toBeGreaterThan(0)
 
     healed = true
-    await user.click(await screen.findByRole('button', { name: 'retry parsing' }))
-    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
+    await user.click(await screen.findByRole('button', { name: 'Retry parsing' }))
+    // The first article loads the Markdown renderer lazily; a loaded suite can take over a second.
+    expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' }, { timeout: 5_000 })).toBeDefined()
   })
 
   it('holds the summary through a deadline and refetches into the article by itself', async () => {
@@ -221,8 +221,8 @@ describe('Reader View', () => {
 
       await act(() => vi.advanceTimersByTimeAsync(0))
       expect(screen.getByText('A clear morning over the valley.')).toBeDefined()
-      expect(screen.getByText('waiting on the publisher')).toBeDefined()
-      expect(screen.queryByRole('button', { name: 'retry parsing' })).toBeNull()
+      expect(screen.getByText('Waiting on the publisher')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'Retry parsing' })).toBeNull()
       expect(screen.queryByText(/could not be parsed/)).toBeNull()
 
       await act(() => vi.advanceTimersByTimeAsync(2_000))
@@ -246,13 +246,13 @@ describe('Reader View', () => {
       render(<App />)
 
       await act(() => vi.advanceTimersByTimeAsync(0))
-      expect(screen.getByText('waiting on the publisher')).toBeDefined()
+      expect(screen.getByText('Waiting on the publisher')).toBeDefined()
 
       await act(() => vi.advanceTimersByTimeAsync(2_000))
       await act(() => vi.advanceTimersByTimeAsync(2_000))
-      expect(screen.getByText('the publisher did not answer in time')).toBeDefined()
-      expect(screen.getAllByRole('link', { name: 'open original' }).length).toBeGreaterThan(0)
-      expect(screen.getByRole('button', { name: 'retry parsing' })).toBeDefined()
+      expect(screen.getByText('The publisher didn’t answer in time.')).toBeDefined()
+      expect(screen.getAllByRole('link', { name: 'Open original' }).length).toBeGreaterThan(0)
+      expect(screen.getByRole('button', { name: 'Retry parsing' })).toBeDefined()
       expect(screen.queryByText(/could not be parsed/)).toBeNull()
       expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(3)
     } finally {
@@ -273,11 +273,11 @@ describe('Reader View', () => {
       render(<App />)
 
       await act(() => vi.advanceTimersByTimeAsync(0))
-      expect(screen.getByText('parsing the article')).toBeDefined()
+      expect(screen.getByText('Parsing the article')).toBeDefined()
 
       await act(() => vi.advanceTimersByTimeAsync(2_000))
       await act(() => vi.advanceTimersByTimeAsync(2_000))
-      expect(screen.getByText('parsing the article took too long')).toBeDefined()
+      expect(screen.getByText('Parsing the article took too long.')).toBeDefined()
     } finally {
       vi.useRealTimers()
     }
@@ -304,7 +304,7 @@ describe('Reader View', () => {
       expect(screen.getByText('A clear morning over the valley.')).toBeDefined()
 
       await act(() => vi.advanceTimersByTimeAsync(30_001))
-      expect(screen.getByText('parsing the original page')).toBeDefined()
+      expect(screen.getByText('Parsing the original page')).toBeDefined()
 
       await act(() => vi.advanceTimersByTimeAsync(5_000))
       expect(screen.getByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
@@ -324,9 +324,9 @@ describe('Reader View', () => {
     expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
     expect(screen.queryByText('the original page could not be parsed into an article')).toBeNull()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'save First light' })).toBeDefined()
-    expect(screen.queryByRole('link', { name: 'open original' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'retry parsing' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Save First light' })).toBeDefined()
+    expect(screen.queryByRole('link', { name: 'Open original' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Retry parsing' })).toBeNull()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
   })
 
@@ -338,7 +338,7 @@ describe('Reader View', () => {
     })
     render(<App />)
 
-    expect(await screen.findByText(/wait 21s, then retry/)).toBeDefined()
+    expect(await screen.findByText(/Wait 21 seconds, then retry/)).toBeDefined()
   })
 
   it('marks the Reader critical path locally without telling any service', async () => {
@@ -386,7 +386,7 @@ describe('Reader View', () => {
       groups: [
         {
           date: '2026-08-08',
-          label: 'today',
+          label: 'Today',
           items: [
             {
               feedItemId: 3,
@@ -427,6 +427,6 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Evening notes' })).toBeDefined()
     expect(window.location.pathname).toBe('/reader/4')
 
-    expect(screen.queryByText('next in the digest')).toBeNull()
+    expect(screen.queryByText('Next in the digest')).toBeNull()
   })
 })

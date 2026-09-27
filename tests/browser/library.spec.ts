@@ -8,17 +8,19 @@ import {
   type Installation,
 } from './installation.js'
 
-const LIGHT_ACCENT = 'rgb(36, 56, 216)'
-const QUIET_GREY = 'rgb(163, 162, 157)'
+async function section(page: Page, name: string): Promise<void> {
+  await page.getByRole('link', { name, exact: true }).click()
+}
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
-  await page.getByLabel('setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'claim' }).click()
-  await page.getByRole('link', { name: 'feeds' }).click()
-  await page.getByRole('textbox', { name: 'add a feed by url' }).fill(installation.feedUrl)
+  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
+  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
+  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
+  await page.getByRole('button', { name: 'Claim installation' }).click()
+  await section(page, 'Feeds')
+  await page.getByRole('button', { name: 'Add feed' }).click()
+  await page.getByRole('textbox', { name: 'URL' }).fill(installation.feedUrl)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
@@ -26,47 +28,59 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
 test.describe('the Library', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('saves from the Digest, keeps it across contexts and a reload, and unsaves', async ({ page, installation }) => {
+  test('saves from the Digest, keeps it across a reload, and unsaves from the Feed', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest')
 
-    const toggle = page.getByRole('button', { name: 'save First light' })
-    await expect(toggle).toHaveText('save')
-    await expect(toggle).toHaveCSS('color', QUIET_GREY)
+    const toggle = page.getByRole('button', { name: 'Save First light' })
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false')
     await toggle.click()
-    await expect(toggle).toHaveText('saved')
-    await expect(toggle).toHaveCSS('color', LIGHT_ACCENT)
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('link', { name: 'saved' }).click()
+    await section(page, 'Saved')
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
-    await expect(page.locator('.content-meta')).toContainText('Field Notes')
-    await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('saved')
+    await expect(page.locator('.item-meta')).toContainText('Field Notes')
+    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
 
     await page.reload()
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('saved')
+    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('link', { name: 'feeds' }).click()
-    await page.getByRole('link', { name: 'Field Notes' }).click()
-    const feedToggle = page.getByRole('button', { name: 'save First light' })
-    await expect(feedToggle).toHaveText('saved')
+    await section(page, 'Feeds')
+    await page.getByRole('link', { name: 'Field Notes', exact: true }).click()
+    const feedToggle = page.getByRole('button', { name: 'Save First light' })
+    await expect(feedToggle).toHaveAttribute('aria-pressed', 'true')
     await feedToggle.click()
-    await expect(feedToggle).toHaveText('save')
+    await expect(feedToggle).toHaveAttribute('aria-pressed', 'false')
 
-    await page.getByRole('link', { name: 'digest' }).click()
-    await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('save')
-    await page.getByRole('link', { name: 'saved' }).click()
-    await expect(page.getByText(/nothing saved yet/)).toBeVisible()
+    await section(page, 'Digest')
+    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
+    await section(page, 'Saved')
+    await expect(page.getByText(/Nothing saved yet/)).toBeVisible()
+  })
+
+  test('unsaving in Saved leaves an undo line, and Undo keeps the save', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await section(page, 'Digest')
+    await page.getByRole('button', { name: 'Save First light' }).click()
+    await section(page, 'Saved')
+
+    await page.getByRole('button', { name: 'Save First light' }).click()
+    await expect(page.getByText('“First light” is no longer saved.')).toBeVisible()
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
+
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
   })
 
   test('save is keyboard-operable and repeated saves stay one membership', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
+    await section(page, 'Digest')
 
-    const toggle = page.getByRole('button', { name: 'save First light' })
+    const toggle = page.getByRole('button', { name: 'Save First light' })
     await toggle.focus()
     await page.keyboard.press('Enter')
-    await expect(toggle).toHaveText('saved')
     await expect(toggle).toHaveAttribute('aria-pressed', 'true')
 
     const membership = await page.evaluate(async () => {
@@ -80,44 +94,44 @@ test.describe('the Library', () => {
     })
     expect(membership.saved).toBe(true)
 
-    await page.getByRole('link', { name: 'saved' }).click()
+    await section(page, 'Saved')
     await expect(page.getByRole('heading', { name: 'First light' })).toHaveCount(1)
   })
 
   test('opens the Feed a save names, until the save outlives its Subscription', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
-    await page.getByRole('button', { name: 'save First light' }).click()
-    await page.getByRole('link', { name: 'saved' }).click()
+    await section(page, 'Digest')
+    await page.getByRole('button', { name: 'Save First light' }).click()
+    await section(page, 'Saved')
 
-    await page.locator('.content-meta').getByRole('link', { name: 'Field Notes' }).click()
+    await page.locator('.item-meta').getByRole('link', { name: 'Field Notes' }).click()
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
-    await expect(page.getByRole('link', { name: '← saved' })).toBeVisible()
+    await expect(page.locator('main').getByRole('link', { name: 'Back to Saved' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'unsubscribe' }).click()
-    await page.getByRole('button', { name: 'confirm' }).click()
-    await expect(page.getByRole('textbox', { name: 'add a feed by url' })).toBeVisible()
+    await page.getByRole('button', { name: 'Unsubscribe' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Unsubscribe' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: /^Feeds/ })).toBeVisible()
 
-    await page.getByRole('link', { name: 'saved' }).click()
-    await expect(page.getByText('Field Notes · no longer subscribed')).toBeVisible()
-    await expect(page.getByRole('link', { name: /Field Notes/ })).toHaveCount(0)
+    await section(page, 'Saved')
+    await expect(page.getByText(/No longer subscribed/)).toBeVisible()
+    await expect(page.locator('main').getByRole('link', { name: /Field Notes/ })).toHaveCount(0)
   })
 })
 
-test.describe('the Library inside the narrow paper', () => {
+test.describe('the Library at phone width', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
-  test('keeps the shared shape and spacing without horizontal overflow', async ({ page, installation }) => {
+  test('keeps the item shape at the phone scale without horizontal overflow', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'digest' }).click()
-    await page.getByRole('button', { name: 'save First light' }).click()
-    await expect(page.getByRole('button', { name: 'save First light' })).toHaveText('saved')
+    await section(page, 'Digest')
+    await page.getByRole('button', { name: 'Save First light' }).click()
+    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('link', { name: 'saved' }).click()
+    await section(page, 'Saved')
     const title = page.getByRole('heading', { name: 'First light' })
     await expect(title).toBeVisible()
-    await expect(title).toHaveCSS('font-size', '19px')
-    await expect(page.locator('.content-meta')).toHaveCSS('font-size', '12px')
+    await expect(title).toHaveCSS('font-size', '17px')
+    await expect(page.locator('.item-meta').first()).toHaveCSS('font-size', '13px')
     await expectNoHorizontalOverflow(page)
   })
 })

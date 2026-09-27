@@ -102,7 +102,7 @@ describe('searching retained reading metadata', () => {
       feedTitle: 'Field Notes',
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
-      displayDate: 'today, 07:15',
+      displayDate: 'Today, 07:15',
       saved: false,
       snippet: null,
     })

@@ -108,9 +108,9 @@ describe('saving Feed Items to the Library', () => {
 
     const saved = await library(user)
     expect(saved.items.map((entry) => [entry.title, entry.feedTitle, entry.displayDate])).toEqual([
-      ['First light', 'Field Notes', 'today, 07:15'],
-      ['Evening notes', 'Field Notes', 'yesterday, 09:31'],
-      ['A June letter', 'Field Notes', '3 june'],
+      ['First light', 'Field Notes', 'Today, 07:15'],
+      ['Evening notes', 'Field Notes', 'Yesterday, 09:31'],
+      ['A June letter', 'Field Notes', '3 June'],
     ])
     expect(saved.items.map((entry) => entry.savedAt)).toEqual([
       '2026-08-08T09:00:00.000Z',

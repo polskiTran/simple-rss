@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -23,11 +23,11 @@ const DIGEST = {
   groups: [
     {
       date: '2026-08-08',
-      label: 'today',
+      label: 'Today',
       items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')],
     },
-    { date: '2026-08-07', label: 'yesterday', items: [item(1, 'Evening notes', '09:31')] },
-    { date: '2026-06-03', label: 'june 3, 2026', items: [item(4, 'A June letter', '12:00')] },
+    { date: '2026-08-07', label: 'Yesterday', items: [item(1, 'Evening notes', '09:31')] },
+    { date: '2026-06-03', label: 'Wednesday 3 June', items: [item(4, 'A June letter', '12:00')] },
   ],
   nextCursor: null,
 }
@@ -37,24 +37,37 @@ afterEach(() => {
 })
 
 describe('the chronological Digest', () => {
-  it('renders the band, the counted today heading, and the quiet past headings', async () => {
+  it('titles the page with today and heads each day with its count', async () => {
     stubApi().on('GET /api/digest', { body: DIGEST })
     window.history.replaceState(null, '', '/')
     const { container } = render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'today · 2 posts' })).toBeDefined()
-    const yesterday = screen.getByRole('heading', { name: 'yesterday' })
-    expect(yesterday.className).toContain('day-heading-past')
-    expect(yesterday.textContent).toBe('yesterday')
-    expect(screen.getByRole('heading', { name: 'june 3, 2026' }).className).toContain('day-heading-past')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Digest Sat 8 Aug' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
+    expect(screen.getByText('Saturday 8 August')).toBeDefined()
+    expect(screen.getByText('Friday 7 August')).toBeDefined()
 
-    const field = container.querySelector<HTMLElement>('.daily-band-field')
-    expect(field?.style.boxShadow).toContain('var(--band-')
-
-    const save = screen.getByRole('button', { name: 'save First light' })
-    expect(save.textContent).toBe('save')
-    expect(save.getAttribute('aria-pressed')).toBe('false')
+    const [first] = screen.getAllByRole('article')
+    expect(
+      within(first as HTMLElement)
+        .getByRole('link', { name: 'Field Notes' })
+        .getAttribute('href'),
+    ).toBe('/feeds/1')
+    expect(within(first as HTMLElement).getByText('07:15')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Save First light' }).getAttribute('aria-pressed')).toBe('false')
     expect(container.textContent).not.toMatch(/unread|mark|archive/i)
+  })
+
+  it('withholds the count of a day the next page may continue', async () => {
+    stubApi().on('GET /api/digest', { body: { ...DIGEST, nextCursor: 'more' } })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Wednesday 3 June' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Show older items' })).toBeDefined()
   })
 
   it('flips save to saved in place once the server confirms, and back', async () => {
@@ -66,16 +79,16 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
 
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
     expect(api.requestsTo('DELETE /api/library/3')).toHaveLength(1)
   })
@@ -88,28 +101,14 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const toggle = await screen.findByRole('button', { name: 'save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('says today · 1 post, in the singular, when one post is all there is', async () => {
-    stubApi().on('GET /api/digest', {
-      body: {
-        today: { date: '2026-08-08', volume: 1 },
-        groups: [{ ...DIGEST.groups[0], items: [item(3, 'First light', '07:15')] }],
-        nextCursor: null,
-      },
-    })
-    window.history.replaceState(null, '', '/')
-    render(<App />)
-
-    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
-  })
-
-  it('counts nothing on a day when nothing has landed yet', async () => {
+  it('counts today from the server even when nothing has landed yet', async () => {
     stubApi().on('GET /api/digest', {
       body: {
         today: { date: '2026-08-08', volume: 0 },
@@ -120,8 +119,8 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'yesterday' })).toBeDefined()
-    expect(screen.queryByText(/\d+ posts?/)).toBeNull()
+    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+    expect(screen.queryByRole('heading', { name: /^Today/ })).toBeNull()
   })
 
   it('offers direction rather than mechanics when there is nothing yet', async () => {
@@ -129,7 +128,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('nothing yet — subscribe to a Feed to start your digest')).toBeDefined()
+    expect(await screen.findByText('Nothing yet. Subscribe to a feed in Feeds to start your digest.')).toBeDefined()
   })
 
   it('tells a silent network apart from a refusing server, and offers the way back', async () => {
@@ -140,12 +139,12 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByText('the digest is out of reach — check the connection, then try again')).toBeDefined()
+    expect(await screen.findByText('The digest can’t be reached. Check the connection, then try again.')).toBeDefined()
 
     api.on('GET /api/digest', { body: DIGEST })
-    await user.click(screen.getByRole('button', { name: 'try again' }))
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-    expect(await screen.findByRole('heading', { name: 'today · 2 posts' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
   })
 
   it('blames the reader, not the connection, when the answer fails its schema', async () => {
@@ -153,7 +152,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('the digest is unavailable — try again in a moment')).toBeDefined()
+    expect(await screen.findByText('The digest didn’t load. Try again in a moment.')).toBeDefined()
   })
 
   it('names a server failure without dressing it up', async () => {
@@ -164,7 +163,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('the digest is unavailable — try again in a moment')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'try again' })).toBeDefined()
+    expect(await screen.findByText('The digest didn’t load. Try again in a moment.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
   })
 })

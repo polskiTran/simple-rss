@@ -14,7 +14,7 @@ import {
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
+import { chronologyTime, dateKey, timeLabel } from '../digest/chronology.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
@@ -426,12 +426,12 @@ export class SubscriptionService {
       counts.set(date, (counts.get(date) ?? 0) + 1)
       return {
         feedItemId: row.feedItemId,
-        title: row.title ?? 'untitled',
+        title: row.title ?? 'Untitled',
         link: row.link,
         publishedAt: row.publishedAt,
         firstSeenAt: row.firstSeenAt,
         date,
-        displayDate: metaRowDate(instant, date, today, timezone),
+        displayTime: timeLabel(instant, timezone),
         saved: row.savedAt !== null,
       }
     })

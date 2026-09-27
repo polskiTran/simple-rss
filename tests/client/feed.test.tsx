@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -37,7 +37,7 @@ const DETAIL = {
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       date: '2026-08-08',
-      displayDate: 'today, 07:15',
+      displayTime: '07:15',
       saved: false,
     },
     {
@@ -47,7 +47,7 @@ const DETAIL = {
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       date: '2026-06-03',
-      displayDate: '3 june',
+      displayTime: '12:00',
       saved: true,
     },
   ],
@@ -70,6 +70,11 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/** The value beside a label in the Feed's Info panel. */
+function infoValue(label: string): string | null | undefined {
+  return screen.getByText(label).nextElementSibling?.textContent
+}
+
 describe('opening one Feed', () => {
   it('opens from its list row into the accepted header, grid, statistics, and retained items', async () => {
     stubApi()
@@ -81,26 +86,27 @@ describe('opening one Feed', () => {
 
     await user.click(await screen.findByRole('link', { name: 'Field Notes' }))
 
-    expect(await screen.findByRole('group', { name: /26 weeks of publishing cadence for Field Notes/i })).toBeDefined()
+    expect(await screen.findByRole('group', { name: /26 weeks of Cadence for Field Notes/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
-    expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Back to Feeds' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
     expect(container.querySelector('.feed-description')).toBeNull()
 
-    expect(container.querySelectorAll('.cadence-cell')).toHaveLength(181)
-    expect(container.querySelectorAll('.cadence-cell[data-level="2"]')).toHaveLength(1)
+    expect(container.querySelectorAll('.cadence-grid .cadence-cell')).toHaveLength(181)
+    expect(container.querySelectorAll('.cadence-grid .cadence-cell[data-level="2"]')).toHaveLength(1)
     const months = [...container.querySelectorAll('.cadence-month')].map((label) => label.textContent)
-    expect(months).toEqual(['february', 'april', 'june', 'august'])
-    expect(
-      screen.getByText('3 posts in 26 weeks · busiest on wednesdays · longest quiet stretch 114 days'),
-    ).toBeDefined()
+    expect(months).toEqual(['Feb', 'Apr', 'Jun', 'Aug'])
+    expect(infoValue('Items, last 26 weeks')).toBe('3')
+    expect(infoValue('Busiest day')).toBe('Wednesday')
+    expect(infoValue('Longest quiet stretch')).toBe('114 days')
 
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
-    expect(screen.getByText('today, 07:15')).toBeDefined()
-    expect(screen.getByText('3 june')).toBeDefined()
-    expect(screen.getByRole('button', { name: /save First light/i }).textContent).toBe('save')
-    expect(screen.getByRole('button', { name: /save A June letter/i }).textContent).toBe('saved')
-    for (const meta of container.querySelectorAll('.feed-items .content-meta')) {
+    expect(screen.getByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
+    expect(screen.getByText('07:15')).toBeDefined()
+    expect(screen.getByRole('button', { name: /save First light/i }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: /save A June letter/i }).getAttribute('aria-pressed')).toBe('true')
+    for (const meta of container.querySelectorAll('.feed-items .item-meta')) {
       expect(meta.textContent).not.toContain('Field Notes')
     }
   })
@@ -110,10 +116,10 @@ describe('opening one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     const { container } = render(<App />)
 
-    await screen.findByRole('group', { name: /26 weeks of publishing cadence/i })
+    await screen.findByRole('group', { name: /26 weeks of Cadence/i })
     const description = container.querySelector('.feed-description')
     expect(description?.textContent).toBe('Notes from the field')
-    expect(description?.previousElementSibling?.className).toContain('feed-header')
+    expect(description?.previousElementSibling?.className).toContain('page-title')
   })
 
   it('saves and unsaves a retained item in place, from this Feed', async () => {
@@ -128,13 +134,13 @@ describe('opening one Feed', () => {
     const toggle = await screen.findByRole('button', { name: /save First light/i })
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('saved'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(api.requestsTo('PUT /api/library/12')).toHaveLength(1)
 
     await user.click(toggle)
 
-    await waitFor(() => expect(toggle.textContent).toBe('save'))
+    await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(api.requestsTo('DELETE /api/library/12')).toHaveLength(1)
   })
 
@@ -143,7 +149,7 @@ describe('opening one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
 
-    expect(await screen.findByText(/3 posts in 26 weeks/)).toBeDefined()
+    expect(await screen.findByRole('group', { name: /26 weeks of Cadence/i })).toBeDefined()
   })
 
   it('goes back to the list without losing the tab', async () => {
@@ -154,9 +160,9 @@ describe('opening one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('link', { name: /← feeds/i }))
+    await user.click(await within(screen.getByRole('main')).findByRole('link', { name: 'Back to Feeds' }))
 
-    expect(await screen.findByRole('textbox', { name: /add a feed by url/i })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Feeds/ })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
   })
 
@@ -166,11 +172,11 @@ describe('opening one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const day = await screen.findByRole('button', { name: /2 posts on 3 june 2026 — show that day/i })
+    const day = await screen.findByRole('button', { name: /2 items on 3 June 2026, show that day/i })
     day.focus()
     await user.keyboard('{Enter}')
 
-    const anchored = document.getElementById('feed-1-day-2026-06-03')
+    const anchored = document.getElementById('feed-1-day-2026-06-03')?.closest('section')
     expect(anchored?.textContent).toContain('A June letter')
     expect(document.activeElement).toBe(anchored)
   })
@@ -180,7 +186,7 @@ describe('opening one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     const { container } = render(<App />)
 
-    await screen.findByText(/3 posts in 26 weeks/)
+    await screen.findByRole('group', { name: /26 weeks of Cadence/i })
     expect(container.querySelectorAll('button.cadence-cell')).toHaveLength(2)
   })
 })
@@ -196,13 +202,12 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    const chosen = await screen.findByRole('button', { name: /check every 2 hours/i })
-    expect(chosen.getAttribute('aria-pressed')).toBe('true')
-    await user.click(screen.getByRole('button', { name: /check every 6 hours/i }))
+    const select = await screen.findByRole<HTMLSelectElement>('combobox', { name: 'Check every' })
+    expect(select.value).toBe('120')
+    await user.selectOptions(select, '6 hours')
 
-    expect(await screen.findByText('now checked every 6 hours')).toBeDefined()
-    expect(screen.getByRole('button', { name: /check every 6 hours/i }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: /check every 2 hours/i }).getAttribute('aria-pressed')).toBe('false')
+    expect(await screen.findByText('Now checked every 6 hours.')).toBeDefined()
+    expect(select.value).toBe('360')
     expect(api.requestsTo('PUT /api/feeds/1/interval')).toMatchObject([{ body: { pollingIntervalMinutes: 360 } }])
   })
 
@@ -218,10 +223,10 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'refresh now' }))
+    await user.click(await screen.findByRole('button', { name: 'Refresh now' }))
 
-    expect(await screen.findByText('refreshed — the feed shows 2 items')).toBeDefined()
-    expect(await screen.findByText(/4 posts in 26 weeks/)).toBeDefined()
+    expect(await screen.findByText('Refreshed. The feed shows 2 items.')).toBeDefined()
+    await waitFor(() => expect(infoValue('Items, last 26 weeks')).toBe('4'))
     expect(api.requestsTo('POST /api/feeds/1/refresh')).toHaveLength(1)
   })
 
@@ -237,9 +242,9 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'refresh now' }))
+    await user.click(await screen.findByRole('button', { name: 'Refresh now' }))
 
-    expect(await screen.findByText('checked a moment ago — wait a little before retrying')).toBeDefined()
+    expect(await screen.findByText('Checked a moment ago. Wait a little before retrying.')).toBeDefined()
   })
 
   it('shows calm Feed Availability while keeping the retained items readable', async () => {
@@ -261,7 +266,7 @@ describe('managing one Feed', () => {
     expect(await screen.findByText(/the publisher is answering with an error/i)).toBeDefined()
     expect(screen.getByText(/items stay in your digest/i)).toBeDefined()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'refresh now' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Refresh now' })).toBeDefined()
   })
 
   it('says what unsubscribing means before doing it, and lets the User keep the Feed', async () => {
@@ -270,14 +275,14 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
+    await user.click(await screen.findByRole('button', { name: 'Unsubscribe' }))
 
-    expect(screen.getByText('Removes the feed and its items except saved items.')).toBeDefined()
+    expect(screen.getByText('Its items leave your digest. Saved items stay in Saved.')).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: 'cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(screen.getByRole('button', { name: 'unsubscribe' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Unsubscribe' })).toBeDefined()
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(0)
   })
 
@@ -287,10 +292,10 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
-    await user.click(screen.getByRole('button', { name: 'confirm' }))
+    await user.click(await screen.findByRole('button', { name: 'Unsubscribe' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Unsubscribe' }))
 
-    expect(await screen.findByRole('textbox', { name: /add a feed by url/i })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Feeds/ })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds')
     expect(api.requestsTo('DELETE /api/feeds/1')).toHaveLength(1)
   })
@@ -306,12 +311,12 @@ describe('managing one Feed', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'unsubscribe' }))
-    await user.click(screen.getByRole('button', { name: 'confirm' }))
+    await user.click(await screen.findByRole('button', { name: 'Unsubscribe' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Unsubscribe' }))
 
-    expect(await screen.findByText('the feed could not be unsubscribed')).toBeDefined()
+    expect(await screen.findByText('The feed couldn’t be unsubscribed.')).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
-    expect(screen.getByRole('button', { name: 'unsubscribe' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Unsubscribe' })).toBeDefined()
   })
 })
 
@@ -321,8 +326,9 @@ describe('the quiet states of one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     const { container } = render(<App />)
 
-    expect(await screen.findByText('no posts in 26 weeks')).toBeDefined()
-    expect(screen.getByText('nothing retained from this feed yet')).toBeDefined()
+    expect(await screen.findByText('Nothing retained from this feed yet.')).toBeDefined()
+    expect(infoValue('Items, last 26 weeks')).toBe('0')
+    expect(infoValue('Busiest day')).toBe('None yet')
     expect(container.querySelectorAll('button.cadence-cell')).toHaveLength(0)
     await waitFor(() => expect(container.textContent).not.toMatch(/unread/i))
   })
@@ -335,8 +341,8 @@ describe('the quiet states of one Feed', () => {
     window.history.replaceState(null, '', '/feeds/9')
     render(<App />)
 
-    expect(await screen.findByText('that feed is not in your subscriptions')).toBeDefined()
-    expect(screen.getByRole('link', { name: /← feeds/i })).toBeDefined()
+    expect(await screen.findByText('That feed isn’t among your subscriptions.')).toBeDefined()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Back to Feeds' })).toBeDefined()
   })
 
   it('says when the reader cannot answer for the Feed', async () => {
@@ -347,6 +353,6 @@ describe('the quiet states of one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
 
-    expect(await screen.findByText('the feed is unavailable')).toBeDefined()
+    expect(await screen.findByText('The feed didn’t load. Try again in a moment.')).toBeDefined()
   })
 })

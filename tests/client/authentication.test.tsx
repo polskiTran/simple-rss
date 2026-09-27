@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -27,7 +27,7 @@ describe('an installation nobody has claimed', () => {
 
     renderApp()
 
-    expect(await screen.findByLabelText('setup secret')).toBeDefined()
+    expect(await screen.findByLabelText('Setup secret')).toBeDefined()
     expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
   })
 
@@ -45,12 +45,12 @@ describe('an installation nobody has claimed', () => {
       body: { claimed: true, authenticated: true },
     })
     renderApp()
-    await screen.findByLabelText('setup secret')
+    await screen.findByLabelText('Setup secret')
 
-    await fill('setup secret', 'a-deployment-setup-secret')
-    await fill('password', 'a-calm-reading-password')
-    await fill('confirm password', 'a-calm-reading-password')
-    await press('claim')
+    await fill('Setup secret', 'a-deployment-setup-secret')
+    await fill('Password', 'a-calm-reading-password')
+    await fill('Confirm password', 'a-calm-reading-password')
+    await press('Claim installation')
 
     expect(api.requestsTo('POST /api/auth/setup')[0]?.body).toEqual({
       setupSecret: 'a-deployment-setup-secret',
@@ -63,26 +63,26 @@ describe('an installation nobody has claimed', () => {
   it('refuses to send two passwords that do not match', async () => {
     const api = stubApi({ claimed: false, authenticated: false })
     renderApp()
-    await screen.findByLabelText('setup secret')
+    await screen.findByLabelText('Setup secret')
 
-    await fill('setup secret', 'a-deployment-setup-secret')
-    await fill('password', 'a-calm-reading-password')
-    await fill('confirm password', 'a-clam-reading-password')
-    await press('claim')
+    await fill('Setup secret', 'a-deployment-setup-secret')
+    await fill('Password', 'a-calm-reading-password')
+    await fill('Confirm password', 'a-clam-reading-password')
+    await press('Claim installation')
 
-    expect(await screen.findByText(/not the same/i)).toBeDefined()
+    expect(await screen.findByText(/aren’t the same/)).toBeDefined()
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
   })
 
   it('says a password is too short before spending a request on it', async () => {
     const api = stubApi({ claimed: false, authenticated: false })
     renderApp()
-    await screen.findByLabelText('setup secret')
+    await screen.findByLabelText('Setup secret')
 
-    await fill('setup secret', 'a-deployment-setup-secret')
-    await fill('password', 'short')
-    await fill('confirm password', 'short')
-    await press('claim')
+    await fill('Setup secret', 'a-deployment-setup-secret')
+    await fill('Password', 'short')
+    await fill('Confirm password', 'short')
+    await press('Claim installation')
 
     expect(await screen.findByText(/at least 12 characters/i)).toBeDefined()
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
@@ -91,13 +91,13 @@ describe('an installation nobody has claimed', () => {
   it('rejects a password beyond the UTF-8 hashing limit before sending it', async () => {
     const api = stubApi({ claimed: false, authenticated: false })
     renderApp()
-    await screen.findByLabelText('setup secret')
+    await screen.findByLabelText('Setup secret')
     const password = '界'.repeat(400)
 
-    await fill('setup secret', 'a-deployment-setup-secret')
-    await fill('password', password)
-    await fill('confirm password', password)
-    await press('claim')
+    await fill('Setup secret', 'a-deployment-setup-secret')
+    await fill('Password', password)
+    await fill('Confirm password', password)
+    await press('Claim installation')
 
     expect(await screen.findByText(/password is too long/i)).toBeDefined()
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
@@ -109,14 +109,14 @@ describe('an installation nobody has claimed', () => {
       body: { error: { code: 'invalid_credentials', message: 'Invalid credentials' } },
     })
     renderApp()
-    await screen.findByLabelText('setup secret')
+    await screen.findByLabelText('Setup secret')
 
-    await fill('setup secret', 'not-the-setup-secret')
-    await fill('password', 'a-calm-reading-password')
-    await fill('confirm password', 'a-calm-reading-password')
-    await press('claim')
+    await fill('Setup secret', 'not-the-setup-secret')
+    await fill('Password', 'a-calm-reading-password')
+    await fill('Confirm password', 'a-calm-reading-password')
+    await press('Claim installation')
 
-    expect(await screen.findByText(/setup secret is not right/i)).toBeDefined()
+    expect(await screen.findByText(/setup secret isn’t right/i)).toBeDefined()
   })
 
   it('moves to the sign-in screen when someone else claimed it first', async () => {
@@ -126,16 +126,16 @@ describe('an installation nobody has claimed', () => {
     })
     api.install()
     renderApp()
-    await screen.findByLabelText('setup secret')
+    await screen.findByLabelText('Setup secret')
     api.authStatus({ claimed: true, authenticated: false })
 
-    await fill('setup secret', 'a-deployment-setup-secret')
-    await fill('password', 'a-calm-reading-password')
-    await fill('confirm password', 'a-calm-reading-password')
-    await press('claim')
+    await fill('Setup secret', 'a-deployment-setup-secret')
+    await fill('Password', 'a-calm-reading-password')
+    await fill('Confirm password', 'a-calm-reading-password')
+    await press('Claim installation')
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'sign in' })).toBeDefined())
-    expect(screen.queryByLabelText('setup secret')).toBeNull()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeDefined())
+    expect(screen.queryByLabelText('Setup secret')).toBeNull()
   })
 })
 
@@ -145,8 +145,8 @@ describe('coming back to a claimed installation', () => {
 
     renderApp()
 
-    expect(await screen.findByLabelText('password')).toBeDefined()
-    expect(screen.queryByLabelText('setup secret')).toBeNull()
+    expect(await screen.findByLabelText('Password')).toBeDefined()
+    expect(screen.queryByLabelText('Setup secret')).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
   })
 
@@ -155,9 +155,23 @@ describe('coming back to a claimed installation', () => {
 
     renderApp()
 
-    await screen.findByLabelText('password')
+    await screen.findByLabelText('Password')
     expect(screen.getByText('simple')).toBeDefined()
     expect(screen.queryByRole('link', { name: 'simple' })).toBeNull()
+  })
+
+  it('offers Sign in only once there is a password to send', async () => {
+    const api = stubApi({ claimed: true, authenticated: false })
+    renderApp()
+    await screen.findByLabelText('Password')
+
+    const signIn = screen.getByRole('button', { name: 'Sign in' })
+    expect(signIn.getAttribute('aria-disabled')).toBe('true')
+    await userEvent.click(signIn)
+    expect(api.requestsTo('POST /api/auth/session')).toHaveLength(0)
+
+    await fill('Password', 'a')
+    expect(signIn.getAttribute('aria-disabled')).toBe('false')
   })
 
   it('opens the reader once the password is accepted', async () => {
@@ -165,10 +179,10 @@ describe('coming back to a claimed installation', () => {
       body: { claimed: true, authenticated: true },
     })
     renderApp()
-    await screen.findByLabelText('password')
+    await screen.findByLabelText('Password')
 
-    await fill('password', 'a-calm-reading-password')
-    await press('sign in')
+    await fill('Password', 'a-calm-reading-password')
+    await press('Sign in')
 
     expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeDefined()
   })
@@ -179,12 +193,12 @@ describe('coming back to a claimed installation', () => {
       body: { error: { code: 'invalid_credentials', message: 'Invalid credentials' } },
     })
     renderApp()
-    await screen.findByLabelText('password')
+    await screen.findByLabelText('Password')
 
-    await fill('password', 'the-wrong-password')
-    await press('sign in')
+    await fill('Password', 'the-wrong-password')
+    await press('Sign in')
 
-    const notice = await screen.findByText(/that password is not right/i)
+    const notice = await screen.findByText(/That password isn’t right/)
     expect(notice.textContent).not.toMatch(/user|claimed|attempt/i)
   })
 
@@ -194,13 +208,13 @@ describe('coming back to a claimed installation', () => {
       body: { error: { code: 'invalid_credentials', message: 'Invalid credentials' } },
     })
     renderApp()
-    await screen.findByLabelText('password')
+    await screen.findByLabelText('Password')
 
-    await fill('password', 'the-wrong-password')
-    await press('sign in')
+    await fill('Password', 'the-wrong-password')
+    await press('Sign in')
 
-    await screen.findByText(/not right/i)
-    expect(screen.getByLabelText('password')).toHaveProperty('value', '')
+    await screen.findByText(/isn’t right/)
+    expect(screen.getByLabelText('Password')).toHaveProperty('value', '')
   })
 
   it('passes on how long to wait when the installation is refusing attempts', async () => {
@@ -210,12 +224,12 @@ describe('coming back to a claimed installation', () => {
       body: { error: { code: 'too_many_attempts', message: 'Too many attempts' } },
     })
     renderApp()
-    await screen.findByLabelText('password')
+    await screen.findByLabelText('Password')
 
-    await fill('password', 'a-calm-reading-password')
-    await press('sign in')
+    await fill('Password', 'a-calm-reading-password')
+    await press('Sign in')
 
-    expect(await screen.findByText(/too many attempts — try again in 10 minutes/i)).toBeDefined()
+    expect(await screen.findByText(/Too many attempts\. Try again in 10 minutes\./)).toBeDefined()
   })
 
   it('says the reader is unavailable when the server cannot be reached at all', async () => {
@@ -238,10 +252,10 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('sign out')
+    await press('Sign out')
 
     expect(api.requestsTo('DELETE /api/auth/session')).toHaveLength(1)
-    expect(await screen.findByRole('button', { name: 'sign in' })).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeDefined()
   })
 
   it('changes the password and says every device must sign in again', async () => {
@@ -249,17 +263,17 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('change')
-    await fill('current password', 'a-calm-reading-password')
-    await fill('new password', 'a-replacement-password')
-    await fill('confirm new password', 'a-replacement-password')
-    await press('change password')
+    await press('Change password')
+    await fill('Current password', 'a-calm-reading-password')
+    await fill('New password', 'a-replacement-password')
+    await fill('Confirm new password', 'a-replacement-password')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change password' }))
 
     expect(api.requestsTo('POST /api/auth/password')[0]?.body).toEqual({
       currentPassword: 'a-calm-reading-password',
       newPassword: 'a-replacement-password',
     })
-    expect(await screen.findByRole('button', { name: 'sign in' })).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeDefined()
   })
 
   it('warns before the change that it signs out every device', async () => {
@@ -267,7 +281,7 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('change')
+    await press('Change password')
 
     expect(screen.getByText(/signs out every device/i)).toBeDefined()
   })
@@ -280,14 +294,15 @@ describe('leaving the reader', () => {
     renderApp('/settings')
     await screen.findByRole('navigation', { name: 'Sections' })
 
-    await press('change')
-    await fill('current password', 'not-the-current-one')
-    await fill('new password', 'a-replacement-password')
-    await fill('confirm new password', 'a-replacement-password')
-    await press('change password')
+    await press('Change password')
+    await fill('Current password', 'not-the-current-one')
+    await fill('New password', 'a-replacement-password')
+    await fill('Confirm new password', 'a-replacement-password')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change password' }))
 
-    expect(await screen.findByText(/that password is not right/i)).toBeDefined()
-    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeDefined()
+    expect(await screen.findByText(/That password isn’t right/)).toBeDefined()
+    expect(screen.getByRole('dialog', { name: 'Change password' })).toBeDefined()
+    expect(window.location.pathname).toBe('/settings')
   })
 
   it('returns to the sign-in screen when a session ends between requests', async () => {
@@ -298,6 +313,6 @@ describe('leaving the reader', () => {
 
     renderApp('/settings')
 
-    expect(await screen.findByRole('button', { name: 'sign in' })).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeDefined()
   })
 })

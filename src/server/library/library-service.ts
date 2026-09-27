@@ -75,7 +75,7 @@ export class LibraryService {
       const instant = new Date(chronology)
       return {
         feedItemId: row.feedItemId,
-        title: row.title ?? 'untitled',
+        title: row.title ?? 'Untitled',
         feedId: row.feedId,
         feedTitle: row.feedTitle,
         subscribed: row.subscribedFeedId !== null,

@@ -68,7 +68,7 @@ Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CON
 
 <important if="you are building or restyling UI">
 
-`docs/DESIGN.md` is the design system — one repeated content shape, whitespace-only separation, accent reserved for saved state.
+`docs/DESIGN.md` is the design system, with the drawn screens in `docs/design/v2/` — greyscale interface with colour only in data, one hard-edged shape for every control, Literata to read and Instrument Sans to operate.
 </important>
 
 <important if="you are writing comments, docstrings, or docs/ prose">

@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
-import { ROUTES } from '../../src/client/routing.js'
+import { ROUTE_LABELS, ROUTES } from '../../src/client/routing.js'
 import { stubApi } from './stub-api.js'
 
 async function renderAt(path: string) {
@@ -35,16 +35,16 @@ describe('the application shell', () => {
   it('shows the four sections in their fixed order', async () => {
     await renderAt('/digest')
 
-    expect(tabNames()).toEqual([...ROUTES])
+    expect(tabNames()).toEqual(ROUTES.map((route) => ROUTE_LABELS[route]))
   })
 
   it('shows the same four sections on every screen', async () => {
     await renderAt('/digest')
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('link', { name: 'settings' }))
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
 
-    expect(tabNames()).toEqual([...ROUTES])
+    expect(tabNames()).toEqual(ROUTES.map((route) => ROUTE_LABELS[route]))
   })
 
   it('shows the wordmark', async () => {
@@ -59,31 +59,31 @@ describe('the application shell', () => {
 
     await user.click(screen.getByRole('link', { name: 'simple' }))
 
-    expect(activeTab()).toBe('digest')
+    expect(activeTab()).toBe('Digest')
     expect(window.location.pathname).toBe('/digest')
   })
 
   it('leaves the digest tab the only current one when the mark is a link', async () => {
     await renderAt('/saved')
 
-    expect(activeTab()).toBe('saved')
+    expect(activeTab()).toBe('Saved')
   })
 
   it('draws the mark as the 4x4 cadence tile of DESIGN.md §5', async () => {
     const { container } = await renderAt('/digest')
 
-    const levels = [...container.querySelectorAll('.masthead .wordmark-cell')].map((cell) =>
+    const levels = [...container.querySelectorAll('.chrome .wordmark-cell')].map((cell) =>
       cell.getAttribute('data-level'),
     )
 
     expect(levels).toEqual(['4', '1', '3', '0', '2', '4', '0', '2', '3', '0', '4', '1', '0', '2', '1', '3'])
-    expect(container.querySelector('.masthead .wordmark-grid')?.getAttribute('aria-hidden')).toBe('true')
+    expect(container.querySelector('.chrome .wordmark-grid')?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('orders the hover glint along the tile’s anti-diagonal', async () => {
     const { container } = await renderAt('/digest')
 
-    const steps = [...container.querySelectorAll<HTMLElement>('.masthead .wordmark-cell')].map((cell) =>
+    const steps = [...container.querySelectorAll<HTMLElement>('.chrome .wordmark-cell')].map((cell) =>
       cell.style.getPropertyValue('--glint-step'),
     )
 
@@ -93,39 +93,39 @@ describe('the application shell', () => {
   it.each([...ROUTES])('marks %s as the current section when its path is open', async (route) => {
     await renderAt(`/${route}`)
 
-    expect(activeTab()).toBe(route)
+    expect(activeTab()).toBe(ROUTE_LABELS[route])
   })
 
   it('opens the digest at the root', async () => {
     await renderAt('/')
 
-    expect(activeTab()).toBe('digest')
+    expect(activeTab()).toBe('Digest')
   })
 
   it('opens the digest for a path it does not recognise', async () => {
     await renderAt('/something-else')
 
-    expect(activeTab()).toBe('digest')
+    expect(activeTab()).toBe('Digest')
   })
 
   it('changes section without a page load and updates the address', async () => {
     await renderAt('/digest')
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('link', { name: 'saved' }))
+    await user.click(screen.getByRole('link', { name: 'Saved' }))
 
-    expect(activeTab()).toBe('saved')
+    expect(activeTab()).toBe('Saved')
     expect(window.location.pathname).toBe('/saved')
   })
 
   it('follows the browser back button', async () => {
     await renderAt('/digest')
     const user = userEvent.setup()
-    await user.click(screen.getByRole('link', { name: 'feeds' }))
+    await user.click(screen.getByRole('link', { name: 'Feeds' }))
 
     window.history.back()
 
-    await waitFor(() => expect(activeTab()).toBe('digest'))
+    await waitFor(() => expect(activeTab()).toBe('Digest'))
   })
 
   it('leaves modified clicks to the browser so a tab can be opened', async () => {
@@ -142,7 +142,7 @@ describe('the application shell', () => {
       { once: true },
     )
 
-    screen.getByRole('link', { name: 'feeds' }).dispatchEvent(event)
+    screen.getByRole('link', { name: 'Feeds' }).dispatchEvent(event)
 
     expect(handledByBrowser).toBe(true)
     expect(window.location.pathname).toBe('/digest')
@@ -152,7 +152,7 @@ describe('the application shell', () => {
     await renderAt('/digest')
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
 
-    screen.getByRole('link', { name: 'feeds' }).dispatchEvent(event)
+    screen.getByRole('link', { name: 'Feeds' }).dispatchEvent(event)
 
     expect(event.defaultPrevented).toBe(true)
   })
@@ -168,7 +168,7 @@ describe('the application shell', () => {
 describe('the resting state', () => {
   it.each([
     ['/digest', /nothing yet/i],
-    ['/feeds', /no subscriptions yet/i],
+    ['/feeds', /No feeds yet/i],
     ['/saved', /nothing saved yet/i],
   ])('gives %s a single calm line', async (path, note) => {
     await renderAt(path)
@@ -187,20 +187,20 @@ describe('settings', () => {
   it('reports the running version from the API', async () => {
     await renderAt('/settings')
 
-    await waitFor(() => expect(screen.getByText('0.1.0')).toBeDefined())
+    await waitFor(() => expect(screen.getByText('simple 0.1.0')).toBeDefined())
   })
 
   it('says so plainly when the server cannot be reached', async () => {
     stubApi().on('GET /api/meta', { status: 503 })
     await renderAt('/settings')
 
-    await waitFor(() => expect(screen.getByText('unavailable')).toBeDefined())
+    await waitFor(() => expect(screen.getByText('simple unavailable')).toBeDefined())
   })
 
   it('rejects a response that does not match the agreed shape', async () => {
     stubApi().on('GET /api/meta', { body: { name: 'something-else' } })
     await renderAt('/settings')
 
-    await waitFor(() => expect(screen.getByText('unavailable')).toBeDefined())
+    await waitFor(() => expect(screen.getByText('simple unavailable')).toBeDefined())
   })
 })

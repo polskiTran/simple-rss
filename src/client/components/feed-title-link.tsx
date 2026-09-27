@@ -4,12 +4,13 @@ import { feedPathOf } from '../routing.js'
 export interface FeedTitleLinkProps {
   readonly feedId: number
   readonly title: string
+  readonly className: string
   onOpen(feedId: number): void
 }
 
-export function FeedTitleLink({ feedId, title, onOpen }: FeedTitleLinkProps) {
+export function FeedTitleLink({ feedId, title, className, onOpen }: FeedTitleLinkProps) {
   return (
-    <a className="feed-title-link" href={feedPathOf(feedId)} onClick={routedClick(() => onOpen(feedId))}>
+    <a className={className} href={feedPathOf(feedId)} onClick={routedClick(() => onOpen(feedId))}>
       {title}
     </a>
   )

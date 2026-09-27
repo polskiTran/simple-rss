@@ -7,7 +7,7 @@ import {
   type ReaderItem,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, readerDate } from '../digest/chronology.js'
+import { chronologyTime, dateKey, longDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
@@ -137,13 +137,13 @@ export class ReaderService {
 
     return {
       feedItemId: row.feedItemId,
-      title: row.title ?? 'untitled',
+      title: row.title ?? 'Untitled',
       feedId: row.feedId,
       feedTitle: row.feedTitle,
       link: row.link,
       publishedAt: row.publishedAt,
       firstSeenAt: row.firstSeenAt,
-      displayDate: readerDate(instant, dateKey(now, timezone), timezone),
+      displayDate: longDate(instant, dateKey(now, timezone), timezone),
       summary: row.summary,
       feedContent: row.feedContentMarkdown
         ? {

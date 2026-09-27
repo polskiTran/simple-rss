@@ -26,11 +26,11 @@ afterEach(() => {
 
 describe('a wait', () => {
   it.each([
-    ['/digest', 'loading the digest'],
-    ['/saved', 'loading the library'],
-    ['/feeds', 'loading feeds'],
-    ['/feeds/1', 'loading the feed'],
-    ['/reader/3', 'opening the article'],
+    ['/digest', 'Loading the digest'],
+    ['/saved', 'Loading your saves'],
+    ['/feeds', 'Loading feeds'],
+    ['/feeds/1', 'Loading the feed'],
+    ['/reader/3', 'Opening the article'],
   ])('puts the mark beside the words at %s', async (path, words) => {
     waiting()
     renderAt(path)
@@ -44,23 +44,23 @@ describe('a wait', () => {
   it('draws the wait with the masthead mark’s own tile, cell for cell', async () => {
     waiting()
     const { container } = renderAt('/digest')
-    await screen.findByText('loading the digest')
+    await screen.findByText('Loading the digest')
 
     const read = (scope: string) =>
       [...container.querySelectorAll<HTMLElement>(`${scope} .wordmark-cell`)].map(
         (cell) => `${cell.dataset.level}@${cell.style.getPropertyValue('--glint-step')}`,
       )
 
-    expect(read('.loading-note')).toEqual(read('.masthead'))
+    expect(read('.loading-note')).toEqual(read('.chrome'))
     expect(read('.loading-note')).toHaveLength(16)
   })
 
   it('keeps the masthead mark out of the wait', async () => {
     waiting()
     const { container } = renderAt('/digest')
-    await screen.findByText('loading the digest')
+    await screen.findByText('Loading the digest')
 
-    const masthead = container.querySelector('.masthead')
+    const masthead = container.querySelector('.chrome')
     expect(masthead?.closest('.loading-note')).toBeNull()
     expect(masthead?.querySelector('.loading-note')).toBeNull()
   })
@@ -73,7 +73,7 @@ describe('a wait', () => {
           groups: [
             {
               date: '2026-08-08',
-              label: 'today',
+              label: 'Today',
               items: [
                 {
                   feedItemId: 3,
@@ -98,10 +98,10 @@ describe('a wait', () => {
     renderAt('/digest')
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('searchbox', { name: 'search your reading' }), 'driftwood')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search your reading' }), 'driftwood')
 
     const searching = await screen.findByRole('status')
-    expect(searching.textContent).toBe('searching…')
+    expect(searching.textContent).toBe('Searching…')
     expect(searching.querySelectorAll('.wordmark-cell')).toHaveLength(16)
   })
 

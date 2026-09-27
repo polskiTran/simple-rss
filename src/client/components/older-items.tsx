@@ -2,6 +2,7 @@ import { Button } from '@base-ui/react/button'
 
 export type OlderState = 'idle' | 'loading' | 'failed'
 
+/** The way further back through a paged list; absent once the list has ended. */
 export function OlderItems({
   nextCursor,
   older,
@@ -15,16 +16,20 @@ export function OlderItems({
 }) {
   if (nextCursor === null) return null
   return (
-    <p className="older-items">
-      {older === 'failed' ? <span role="status">older {noun} are out of reach — </span> : null}
+    <div className="more">
       <Button
-        className="text-button"
+        className="button"
         focusableWhenDisabled
         disabled={older === 'loading'}
         onClick={() => onLoadOlder(nextCursor)}
       >
-        {older === 'loading' ? `loading older ${noun}…` : older === 'failed' ? 'try again' : `older ${noun}`}
+        {older === 'loading' ? `Loading older ${noun}…` : older === 'failed' ? 'Retry' : `Show older ${noun}`}
       </Button>
-    </p>
+      {older === 'failed' ? (
+        <p className="note note-error" role="status">
+          Older {noun} are out of reach.
+        </p>
+      ) : null}
+    </div>
   )
 }

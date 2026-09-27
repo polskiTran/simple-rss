@@ -118,7 +118,7 @@ describe('the Reader item', () => {
     expect(reader.title).toBe('First light')
     expect(reader.feedTitle).toBe('Field Notes')
     expect(reader.link).toBe(ARTICLE_URL)
-    expect(reader.displayDate).toBe('saturday, 8 august')
+    expect(reader.displayDate).toBe('Saturday 8 August')
     expect(reader.summary).toBe('A clear morning over the valley.')
     expect(reader.saved).toBe(false)
     expect(reader.nextInDigest).toMatchObject({ title: 'Evening notes', feedTitle: 'Field Notes' })

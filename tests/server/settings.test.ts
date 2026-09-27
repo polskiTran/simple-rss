@@ -78,7 +78,7 @@ describe('the Settings preferences API', () => {
     await service.wakeScheduler()
 
     const before = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(before.groups.map(({ label }) => label)).toEqual(['yesterday'])
+    expect(before.groups.map(({ label }) => label)).toEqual(['Yesterday'])
 
     const changed = await user.put('/api/settings/timezone', { timezone: 'Pacific/Auckland' })
     expect(changed.status).toBe(200)
@@ -87,7 +87,7 @@ describe('the Settings preferences API', () => {
     })
 
     const after = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(after.groups.map(({ label }) => label)).toEqual(['today'])
+    expect(after.groups.map(({ label }) => label)).toEqual(['Today'])
     expect(after.today).toEqual({ date: '2026-08-08', volume: 1 })
   })
 

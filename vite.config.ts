@@ -22,6 +22,9 @@ export default defineConfig({
     outDir: fileURLToPath(new URL('./dist/client', import.meta.url)),
     emptyOutDir: true,
     sourcemap: true,
+    // Never a font as a data: URL — the server's CSP loads fonts from 'self'
+    // only, and the variable faces' smallest subsets fall under Vite's 4 KB limit.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
     rollupOptions: {
       output: {
         // Rename only — a manual chunk group would be preloaded by the entry, defeating the

@@ -48,12 +48,12 @@ export function timeLabel(date: Date, timezone: string): string {
 }
 
 /**
- * Meta-row date outside the Digest's day grouping: `today, 07:15`,
- * `yesterday, 09:31`, then `3 august` — the year only once it is not this one.
+ * Meta-row date outside the Digest's day grouping: `Today, 07:15`,
+ * `Yesterday, 09:31`, then `3 August` — the year only once it is not this one.
  */
 export function metaRowDate(instant: Date, itemDate: string, today: string, timezone: string): string {
-  if (itemDate === today) return `today, ${timeLabel(instant, timezone)}`
-  if (itemDate === dayBefore(today)) return `yesterday, ${timeLabel(instant, timezone)}`
+  if (itemDate === today) return `Today, ${timeLabel(instant, timezone)}`
+  if (itemDate === dayBefore(today)) return `Yesterday, ${timeLabel(instant, timezone)}`
 
   const sameYear = itemDate.slice(0, 4) === today.slice(0, 4)
   return new Intl.DateTimeFormat('en-GB', {
@@ -61,13 +61,14 @@ export function metaRowDate(instant: Date, itemDate: string, today: string, time
     day: 'numeric',
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
-  })
-    .format(instant)
-    .toLowerCase()
+  }).format(instant)
 }
 
-/** The Reader header's date — `saturday, 8 august` — the year only once it is not this one. */
-export function readerDate(instant: Date, today: string, timezone: string): string {
+/**
+ * A day named in full — `Saturday 8 August`, the year only once it is not this
+ * one — for the Reader header and the Digest's older day headings.
+ */
+export function longDate(instant: Date, today: string, timezone: string): string {
   const sameYear = dateKey(instant, timezone).slice(0, 4) === today.slice(0, 4)
   const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'long' }).format(instant)
   const day = new Intl.DateTimeFormat('en-GB', {
@@ -76,7 +77,7 @@ export function readerDate(instant: Date, today: string, timezone: string): stri
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
   }).format(instant)
-  return `${weekday}, ${day}`.toLowerCase()
+  return `${weekday} ${day}`
 }
 
 export function dayBefore(dayKey: string): string {

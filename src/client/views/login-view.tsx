@@ -16,7 +16,7 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (signingIn) return
+    if (signingIn || password === '') return
 
     setSigningIn(true)
     setNotice('')
@@ -31,21 +31,28 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
   }
 
   return (
-    <form className="view measure gate" aria-label="Sign in" onSubmit={submit}>
+    <form className="view gate" aria-label="Sign in" onSubmit={submit}>
+      <header className="gate-head">
+        <h1 className="page-title">Sign in</h1>
+        <p className="gate-tagline">Subscribe. Read. Save.</p>
+      </header>
       <Field
-        label="password"
+        label="Password"
         type="password"
         value={password}
         autoComplete="current-password"
         autoFocus
         onChange={setPassword}
       />
-      <p className="gate-actions">
-        <Button className="text-button" type="submit" focusableWhenDisabled disabled={signingIn}>
-          sign in
-        </Button>
-      </p>
-      <p className="notice" role="status">
+      <Button
+        className="button button-primary gate-submit"
+        type="submit"
+        focusableWhenDisabled
+        disabled={signingIn || password === ''}
+      >
+        {signingIn ? 'Signing in…' : 'Sign in'}
+      </Button>
+      <p className="note note-error" role="status">
         {notice}
       </p>
     </form>

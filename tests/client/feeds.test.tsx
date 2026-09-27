@@ -3,7 +3,6 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FeedAvailability } from '../../src/shared/api.js'
 import { App } from '../../src/client/app.js'
-import { dailyShadows } from '../../src/client/components/daily-band.js'
 import { stubApi, type Reply } from './stub-api.js'
 
 const AVAILABLE = {
@@ -78,7 +77,7 @@ function feedDetail(availability: FeedAvailability, itemCount: number) {
       publishedAt: null,
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       date: '2026-08-08',
-      displayDate: 'today',
+      displayTime: '09:00',
       saved: false,
     })),
   }
@@ -87,6 +86,26 @@ function feedDetail(availability: FeedAvailability, itemCount: number) {
 afterEach(() => {
   vi.unstubAllGlobals()
 })
+
+type User = ReturnType<typeof userEvent.setup>
+
+async function addByAddress(user: User, address: string) {
+  await user.click(await screen.findByRole('button', { name: 'Add feed' }))
+  await user.type(await screen.findByRole('textbox', { name: 'URL' }), address)
+  await user.keyboard('{Enter}')
+}
+
+async function importFile(user: User, file: File) {
+  await user.click(await screen.findByRole('button', { name: 'Add feed' }))
+  await user.click(await screen.findByRole('button', { name: 'Import OPML' }))
+  await user.upload(screen.getByLabelText(/choose a file/i), file)
+  await user.click(screen.getByRole('button', { name: 'Import' }))
+}
+
+/** Thirty days of Cadence with items on the first `active` of them. */
+function activeOn(active: number): number[] {
+  return Array.from({ length: 30 }, (_, index) => (index < active ? 1 : 0))
+}
 
 describe('Feeds', () => {
   it('shows the recorded Subscription immediately and the first check outcome as it lands', async () => {
@@ -104,16 +123,15 @@ describe('Feeds', () => {
     const { container } = render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    await addByAddress(user, FEED.enteredUrl)
 
     expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
-    expect(screen.getByText('subscribed — checking the feed…')).toBeDefined()
-    expect(screen.getByText('waiting for first check')).toBeDefined()
+    expect(screen.getByText('Subscribed. Checking the feed…')).toBeDefined()
+    expect(screen.getByText('Waiting for first check')).toBeDefined()
 
     api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     releaseDetail?.({ body: feedDetail(AVAILABLE, 1) })
-    expect(await screen.findByText('subscribed — 1 item in the digest')).toBeDefined()
+    expect(await screen.findByText('Subscribed. 1 item in the digest.')).toBeDefined()
     expect(await screen.findByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
@@ -154,10 +172,9 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    await addByAddress(user, FEED.enteredUrl)
 
-    expect(await screen.findByText('that Feed could not be reached')).toBeDefined()
+    expect(await screen.findByText('That feed couldn’t be reached.')).toBeDefined()
   })
 
   it('reads a Subscription that merged away during its first check as already subscribed', async () => {
@@ -173,28 +190,39 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), 'https://alias.example/feed')
-    await user.keyboard('{Enter}')
+    await addByAddress(user, 'https://alias.example/feed')
 
-    expect(await screen.findByText('already subscribed')).toBeDefined()
+    expect(await screen.findByText('Already subscribed.')).toBeDefined()
     await waitFor(() => expect(screen.getAllByText('Field Notes')).toHaveLength(1))
   })
 
-  it('answers a line that is not a URL with a gentle notice, never a request', async () => {
-    const api = stubApi().on('GET /api/feeds', {
-      body: { subscriptions: [FEED, { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example' }] },
-    })
+  it('refuses a line that is no address in the dialog, never with a request', async () => {
+    const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByText('Other Wire')).toBeDefined()
-    await user.type(screen.getByRole('textbox', { name: /add a feed by url/i }), 'field{Enter}')
+    await addByAddress(user, 'field notes')
 
-    expect(await screen.findByText('a feed is added by its url — paste the full https:// address')).toBeDefined()
-    expect(screen.getByText('Field Notes')).toBeDefined()
-    expect(screen.getByText('Other Wire')).toBeDefined()
+    expect(await screen.findByText('Enter a site or feed address, like lowtechmagazine.com.')).toBeDefined()
+    expect(screen.getByRole('dialog', { name: 'Add feed' })).toBeDefined()
     expect(api.requestsTo('POST /api/subscriptions')).toHaveLength(0)
+  })
+
+  it('gives a bare site address https://, since the server finds a site’s feed', async () => {
+    const api = stubApi()
+      .on('GET /api/feeds', { body: { subscriptions: [] } })
+      .on('POST /api/subscriptions', { status: 201, body: { subscription: FEED } })
+      .on('GET /api/feeds/1', { body: feedDetail(AVAILABLE, 0) })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await addByAddress(user, 'journal.example')
+
+    await waitFor(() =>
+      expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: 'https://journal.example' } }]),
+    )
   })
 
   it('does not let a stale initial list replace a Subscription that just completed', async () => {
@@ -216,8 +244,7 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    await addByAddress(user, FEED.enteredUrl)
     expect(await screen.findByText('Field Notes')).toBeDefined()
 
     release?.({ body: { subscriptions: [] } })
@@ -235,11 +262,59 @@ describe('Feeds', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('textbox', { name: /add a feed by url/i }), FEED.enteredUrl)
-    await user.keyboard('{Enter}')
+    await addByAddress(user, FEED.enteredUrl)
 
-    expect(await screen.findByText('already subscribed')).toBeDefined()
+    expect(await screen.findByText('Already subscribed.')).toBeDefined()
+    expect(screen.getByRole('dialog', { name: 'Add feed' })).toBeDefined()
     expect(screen.getAllByText('Field Notes')).toHaveLength(1)
+  })
+})
+
+describe('the Feeds list', () => {
+  it('groups Subscriptions by Rhythm, and folds a long group behind Show N more', async () => {
+    const daily = Array.from({ length: 8 }, (_, index) => ({
+      ...FEED,
+      feedId: index + 10,
+      title: `Daily ${index + 1}`,
+      cadence: activeOn(20),
+    }))
+    stubApi().on('GET /api/feeds', {
+      body: { subscriptions: [...daily, { ...FEED, title: 'Quiet', cadence: activeOn(0) }] },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Feeds 9' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Daily 8' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Inactive 1' })).toBeDefined()
+    expect(screen.queryByRole('heading', { name: /^Weekly/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Daily 7' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Show 2 more' }))
+
+    expect(screen.getByRole('link', { name: 'Daily 7' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: /more/ })).toBeNull()
+  })
+
+  it('lists every Subscription by name on request', async () => {
+    stubApi().on('GET /api/feeds', {
+      body: {
+        subscriptions: [
+          { ...FEED, feedId: 1, title: 'Wire', cadence: activeOn(20) },
+          { ...FEED, feedId: 2, title: 'Almanac', cadence: activeOn(0) },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'By name' }))
+
+    const names = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    expect(names).toEqual(['Almanac', 'Wire'])
+    expect(screen.queryByRole('heading', { name: /^Daily/ })).toBeNull()
   })
 })
 
@@ -250,7 +325,7 @@ describe('Feed Availability', () => {
     render(<App />)
 
     expect(await screen.findByText('Field Notes')).toBeDefined()
-    expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Retry$/ })).toBeNull()
     expect(screen.queryByText(/waiting for first check/i)).toBeNull()
   })
 
@@ -260,8 +335,8 @@ describe('Feed Availability', () => {
     render(<App />)
 
     expect((await screen.findAllByText('journal.example')).length).toBeGreaterThan(0)
-    expect(await screen.findByText('waiting for first check')).toBeDefined()
-    expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull()
+    expect(await screen.findByText('Waiting for first check')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /^Retry$/ })).toBeNull()
   })
 
   it('surfaces a calm note with the failure category, last success, and a retry action', async () => {
@@ -272,7 +347,7 @@ describe('Feed Availability', () => {
     expect(await screen.findByText(/the publisher is answering with an error/i)).toBeDefined()
     expect(screen.getByText(/last reached/i)).toBeDefined()
     expect(screen.getByText(/items stay in your digest/i)).toBeDefined()
-    expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /^Retry$/ })).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
   })
 
@@ -286,10 +361,10 @@ describe('Feed Availability', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: /retry now/i }))
+    await user.click(await screen.findByRole('button', { name: /^Retry$/ }))
 
-    expect(await screen.findByText('the feed answered — availability restored')).toBeDefined()
-    await waitFor(() => expect(screen.queryByRole('button', { name: /retry now/i })).toBeNull())
+    expect(await screen.findByText('The feed answered. Checking works again.')).toBeDefined()
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Retry$/ })).toBeNull())
     expect(api.requestsTo('POST /api/feeds/1/refresh')).toHaveLength(1)
   })
 
@@ -305,10 +380,10 @@ describe('Feed Availability', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: /retry now/i }))
+    await user.click(await screen.findByRole('button', { name: /^Retry$/ }))
 
-    expect(await screen.findByText('checked a moment ago — wait a little before retrying')).toBeDefined()
-    expect(screen.getByRole('button', { name: /retry now/i })).toBeDefined()
+    expect(await screen.findByText('Checked a moment ago. Wait a little before retrying.')).toBeDefined()
+    expect(screen.getByRole('button', { name: /^Retry$/ })).toBeDefined()
   })
 })
 
@@ -325,10 +400,10 @@ describe('OPML portability', () => {
 
     api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     const file = new File([OPML], 'subscriptions.opml', { type: 'text/x-opml' })
-    await user.upload(await screen.findByLabelText(/import opml/i), file)
+    await importFile(user, file)
 
-    expect(await screen.findByText('imported — 2 added, 1 already subscribed')).toBeDefined()
-    expect(screen.getByText(/not a url — not a usable feed url/i)).toBeDefined()
+    expect(await screen.findByText('Imported: 2 added, 1 already subscribed.')).toBeDefined()
+    expect(screen.getByText(/not a url: not a usable feed address/i)).toBeDefined()
     expect(api.requestsTo('POST /api/subscriptions/import')).toMatchObject([{ body: { opml: OPML } }])
     expect(await screen.findByText('Field Notes')).toBeDefined()
   })
@@ -345,22 +420,9 @@ describe('OPML portability', () => {
     const user = userEvent.setup({ applyAccept: false })
 
     const file = new File(['not xml'], 'notes.txt', { type: 'text/plain' })
-    await user.upload(await screen.findByLabelText(/import opml/i), file)
+    await importFile(user, file)
 
-    expect(await screen.findByText('that file is not an OPML subscription list')).toBeDefined()
-  })
-
-  it('keeps both controls reachable by keyboard', async () => {
-    stubApi()
-    window.history.replaceState(null, '', '/feeds')
-    render(<App />)
-    const user = userEvent.setup()
-
-    await user.click(await screen.findByRole('textbox', { name: /add a feed by url/i }))
-    await user.tab()
-    expect(document.activeElement).toBe(screen.getByLabelText(/import opml/i))
-    await user.tab()
-    expect(document.activeElement).toBe(screen.getByRole('link', { name: /export opml/i }))
+    expect(await screen.findByText('That file isn’t an OPML subscription list.')).toBeDefined()
   })
 
   it('offers the export as a plain same-origin download link', async () => {
@@ -368,92 +430,8 @@ describe('OPML portability', () => {
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
 
-    const link = (await screen.findByRole('link', { name: /export opml/i })) as HTMLAnchorElement
+    const link = (await screen.findByRole('link', { name: /export/i })) as HTMLAnchorElement
     expect(link.getAttribute('href')).toBe('/api/subscriptions/export')
     expect(link.getAttribute('download')).toBe('subscriptions.opml')
-  })
-})
-
-describe('daily Digest band', () => {
-  it('is stable for one date and changes with the date', () => {
-    const first = dailyShadows('2026-08-08', 12, 20, 20)
-    expect(dailyShadows('2026-08-08', 12, 20, 20)).toBe(first)
-    expect(dailyShadows('2026-08-09', 12, 20, 20)).not.toBe(first)
-  })
-})
-describe('Digest', () => {
-  it('renders chronological date groups with the Feed, time, and save affordance', async () => {
-    stubApi().on('GET /api/digest', {
-      body: {
-        today: { date: '2026-08-08', volume: 1 },
-        groups: [
-          {
-            date: '2026-08-08',
-            label: 'today',
-            items: [
-              {
-                feedItemId: 1,
-                title: 'First light',
-                feedId: 1,
-                feedTitle: 'Field Notes',
-                link: 'https://journal.example/first-light',
-                publishedAt: '2026-08-08T07:15:00.000Z',
-                displayTime: '07:15',
-                imageUrl: null,
-                summary: 'A clear morning.',
-                firstSeenAt: '2026-08-08T09:00:00.000Z',
-                saved: false,
-              },
-            ],
-          },
-        ],
-        nextCursor: null,
-      },
-    })
-    window.history.replaceState(null, '', '/digest')
-    const { container } = render(<App />)
-
-    expect(await screen.findByRole('heading', { name: 'today · 1 post' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
-    expect(screen.getByText('Field Notes')).toBeDefined()
-    expect(container.querySelectorAll('.daily-band-field')).toHaveLength(1)
-    expect(screen.getByText('07:15')).toBeDefined()
-    expect(screen.getByRole('button', { name: /save first light/i }).textContent).toBe('save')
-    await waitFor(() => expect(container.textContent).not.toMatch(/unread/i))
-  })
-
-  it('keeps the zero-volume daily band when the newest item is older than today', async () => {
-    stubApi().on('GET /api/digest', {
-      body: {
-        today: { date: '2026-08-08', volume: 0 },
-        groups: [
-          {
-            date: '2026-08-07',
-            label: 'yesterday',
-            items: [
-              {
-                feedItemId: 1,
-                title: 'Yesterday',
-                feedId: 1,
-                feedTitle: 'Field Notes',
-                link: null,
-                publishedAt: '2026-08-07T07:15:00.000Z',
-                displayTime: '07:15',
-                imageUrl: null,
-                summary: null,
-                firstSeenAt: '2026-08-07T09:00:00.000Z',
-                saved: false,
-              },
-            ],
-          },
-        ],
-        nextCursor: null,
-      },
-    })
-    window.history.replaceState(null, '', '/digest')
-    const { container } = render(<App />)
-
-    await screen.findByRole('heading', { name: 'yesterday' })
-    expect(container.querySelector('.daily-band')).not.toBeNull()
   })
 })
