@@ -17,7 +17,6 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await page.getByRole('link', { name: 'Feeds', exact: true }).click()
   await page.getByRole('button', { name: 'Add feed' }).click()
   await page.getByRole('textbox', { name: 'URL' }).fill(installation.feedUrl)
-  // Pressed rather than submitted with Enter: on a phone the sheet must sit above the tab bar.
   await page.getByRole('button', { name: 'Subscribe' }).click()
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
@@ -170,9 +169,10 @@ test.describe('desktop Feed and Digest rendering', () => {
 test.describe('phone Feed and Digest rendering', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
-  test('keeps the same structure on the phone screen, sections along the bottom', async ({ page, installation }) => {
+  test('keeps the same structure on the phone screen, sections in the top bar', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+    const settings = await page.getByRole('link', { name: 'Settings', exact: true }).boundingBox()
+    expect(settings?.y).toBeLessThan(60)
   })
 
   test('keeps the whole Cadence grid selectable on the phone screen', async ({ page, installation }) => {

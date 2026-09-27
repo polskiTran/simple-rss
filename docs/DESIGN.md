@@ -125,18 +125,19 @@ Numbers in counts and meta use tabular figures.
 
 ## 5. Components
 
-**Header (desktop, 68px).** Mark and wordmark; Digest / Feeds / Saved as a
-switch of links; on the right, the search field (340px) and a Settings button.
-Settings shows it is the current screen with a 1px ink ring instead of a fill.
-The header scrolls with the page.
+**Header (desktop, 68px).** Mark and wordmark; Digest / Feeds as a switch of
+links; on the right, the search field (340px), then Saved and Settings as grey
+buttons with their icons. Saved or Settings shows it is the current screen
+with a 1px ink ring instead of a fill. The header scrolls with the page.
 
-**Phone chrome.** A 60px top bar: the mark on the left, a 44px search square
-on the right. A nested screen — an opened Feed, the Reader — swaps the mark for
-a back square, and the Reader sets Open original and Save as squares beside the
-search square, so one row holds its whole toolbar. Pressing the search square
-turns the bar into the search field with a back square. A bottom tab bar carries Digest, Feeds, Saved and Settings
-as a 48px grey track whose current tab is a ground segment; the Reader, search
-and dialogs hide it.
+**Phone chrome.** One 60px top bar that scrolls with the page, and nothing
+fixed to the bottom edge: the mark without its wordmark, the Digest / Feeds
+switch, then 44px squares for search, Saved and Settings, the current one
+ringed in ink. An opened Feed swaps the mark and the switch for a back square.
+The Reader keeps only the back square and its toolbar — Open original and Save
+beside the search square — so one row holds it whole; a search hides the
+sections too. Pressing the search square turns the bar into the search field
+with a back square.
 
 **Section.** Exactly one section is current, including in the Reader: it
 borrows the section it was opened from — Saved for a save, Feeds for an item of
@@ -163,7 +164,8 @@ the 2px focus outline every control does.
 
 **Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
 before the label (after it for chevrons and the ↗ of a link that leaves).
-Icons are 16px, drawn on a 24px grid at a 2 stroke with square caps.
+Icons are Lucide's, at 16px from its 24px grid at a 2 stroke, with square caps
+and mitred joins.
 Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
 text. Disabled: `control` fill with `ink-3` text. A control that is busy
 keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,

@@ -66,7 +66,7 @@ export function App() {
   )
 }
 
-/** Which chrome a screen takes: a phone hides the tab bar in the Reader and a search, and leads with a back square on nested screens. */
+/** Which chrome a screen takes: a phone hides the sections in the Reader and a search, and leads with a back square on nested screens. */
 function screenOf(navigation: Navigation): 'search' | 'reader' | 'feed' | 'section' {
   if (navigation.kind === 'search') return 'search'
   if (navigation.readerItemId !== undefined) return 'reader'

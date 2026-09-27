@@ -39,6 +39,7 @@
     "html-to-text": "^10.0.0",
     "katex": "^0.16.47",
     "linkedom": "^0.18.13",
+    "lucide-react": "^1.48.0",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-math": "^3.0.0",

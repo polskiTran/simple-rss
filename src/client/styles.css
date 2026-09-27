@@ -489,7 +489,7 @@
 
   /* Dialog */
 
-  /* Above the phone's fixed tab bar, which a dialog covers like everything else. */
+  /* Above the chrome, which a dialog covers like everything else. */
   .dialog-backdrop,
   .dialog-viewport {
     z-index: 10;
@@ -1759,7 +1759,7 @@
 
   .chrome {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 340px) auto;
+    grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 340px) auto auto;
     align-items: center;
     grid-template-rows: 68px;
     column-gap: 12px;
@@ -1806,25 +1806,18 @@
     margin: 0;
   }
 
-  .settings-link {
+  .saved-link {
     grid-column: 5;
     grid-row: 1;
   }
 
-  .chrome .settings-link {
-    height: 36px;
-    padding: 0 14px;
-    background: var(--color-control);
-    color: var(--color-ink);
-    font-size: 14px;
-    box-shadow: none;
+  .settings-link {
+    grid-column: 6;
+    grid-row: 1;
   }
 
-  .chrome .settings-link:hover {
-    background: var(--color-control-hover);
-  }
-
-  .chrome .settings-link[aria-current='page'] {
+  /* The current section among the buttons: a ring instead of a fill. */
+  .section-button[aria-current='page'] {
     background: var(--color-ground);
     box-shadow: inset 0 0 0 1px var(--color-ink);
   }
@@ -1910,7 +1903,7 @@
   }
 
   .page {
-    padding-block: 24px calc(112px + env(safe-area-inset-bottom));
+    padding-block: 24px calc(56px + env(safe-area-inset-bottom));
   }
 
   .app[data-screen='feed'] .page {
@@ -1919,10 +1912,6 @@
 
   .app[data-screen='reader'] .page {
     padding-top: 24px;
-  }
-
-  .app:is([data-screen='reader'], [data-screen='search']) .page {
-    padding-bottom: 56px;
   }
 
   .page-title {
@@ -1962,12 +1951,14 @@
     font-size: 16px;
   }
 
-  /* Chrome: a top bar with the mark or a back square and a search square,
-     and the sections as a tab bar along the bottom edge. */
+  /* Chrome: one top bar that scrolls with the page — the mark or a back
+     square, the Digest and Feeds switch, then the search, Saved and Settings
+     squares. Nothing is fixed to the bottom edge. */
 
   .chrome {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
     grid-template-rows: 60px;
+    column-gap: 6px;
   }
 
   .chrome-back {
@@ -1985,7 +1976,7 @@
   /* The toolbar joins the top bar, ending beside the search square; the
      chrome's own back square stands in for the one it carries. */
   .chrome-toolbar {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     justify-self: end;
     margin: 0;
@@ -2003,8 +1994,10 @@
     font-size: 19px;
   }
 
-  .search {
-    grid-column: 3;
+  /* Tight enough that the whole row fits a 360px phone. */
+  .chrome > .wordmark {
+    height: 44px;
+    padding-right: 10px;
   }
 
   .search-open {
@@ -2050,40 +2043,35 @@
     display: none;
   }
 
-  .sections {
-    position: fixed;
-    z-index: 5;
-    inset: auto 12px calc(12px + env(safe-area-inset-bottom));
-    display: flex;
-    gap: 2px;
-    padding: 3px;
-    background: var(--color-control);
-    /* Ground around the bar, so the list never shows through beside it. */
-    box-shadow: 0 0 0 12px var(--color-ground);
-  }
-
   .sections-switch {
-    display: contents;
+    margin-left: 0;
   }
 
-  .sections .switch-segment,
-  .chrome .settings-link {
-    flex: 1;
-    height: 42px;
+  .sections-switch .switch-segment {
+    flex: none;
     padding: 0 8px;
-    background: transparent;
-    color: var(--color-ink-off);
-    font-size: 14px;
-    box-shadow: none;
   }
 
-  .sections .switch-segment[aria-current='page'],
-  .chrome .settings-link[aria-current='page'] {
-    background: var(--color-segment);
-    color: var(--color-ink);
-    box-shadow: 0 0 0 1px var(--color-edge);
+  .section-button {
+    width: 44px;
+    padding: 0;
   }
 
+  /* Signed in, the mark stands alone and each section button is an icon
+     square; their words stay as the links' accessible names. */
+  .app:not([data-screen='gate']) .chrome .wordmark-name,
+  .section-button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* An opened Feed leads with its way back instead of the switch; the Reader
+     and a search give the whole bar to their own controls. */
+  .app[data-screen='feed'] .sections-switch,
   .app:is([data-screen='reader'], [data-screen='search']) .sections,
   .chrome:has(.search[data-open]) .sections {
     display: none;

@@ -94,7 +94,7 @@ A future requirement for concurrent replicas, separate worker services, or high 
 
 Next.js is intentionally absent. The private client does not need SSR, SEO, React Server Components, or framework-managed caching. Vite produces static assets that the same Hono process serves alongside `/api` routes.
 
-The interface uses no visually prescriptive component suite and no headless-component library. Every interactive control is a native element — `<button aria-pressed>` for toggles, `<a aria-current="page">` inside a labelled `<nav>` for the tab bar, `role="group"` around related choices — with accessible behavior hand-built rather than supplied. Typography, spacing, color, density, and motion are owned entirely by Simple RSS.
+The interface uses no visually prescriptive component suite and no headless-component library. Every interactive control is a native element — `<button aria-pressed>` for toggles, `<a aria-current="page">` inside a labelled `<nav>` for the sections, `role="group"` around related choices — with accessible behavior hand-built rather than supplied. Typography, spacing, color, density, and motion are owned entirely by Simple RSS.
 
 ## Application boundaries
 
