@@ -126,7 +126,7 @@ describe('the Digest narrowed', () => {
 })
 
 describe('the Digest calendar', () => {
-  it('counts every day of the grid window, today last, under an optional Rhythm', async () => {
+  it('counts every day of the grid window across the whole Digest, today last', async () => {
     const { user } = await threeRhythms()
 
     const calendar = digestCalendarSchema.parse(await (await user.get('/api/digest/days')).json())
@@ -137,11 +137,7 @@ describe('the Digest calendar', () => {
     expect(count('2026-08-06')).toBe(2)
     expect(count('2026-05-01')).toBe(1)
 
-    const weekly = digestCalendarSchema.parse(await (await user.get('/api/digest/days?rhythm=weekly')).json())
-    expect(weekly.days.find((day) => day.date === '2026-08-06')?.count).toBe(1)
-    expect(weekly.days.reduce((sum, day) => sum + day.count, 0)).toBe(5)
-
-    expect((await user.get('/api/digest/days?rhythm=hourly')).status).toBe(400)
+    expect(calendar.days.reduce((sum, day) => sum + day.count, 0)).toBe(26)
   })
 
   it('names the Feeds of one day, busiest first', async () => {

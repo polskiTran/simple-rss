@@ -8,6 +8,7 @@ import {
 } from '../../shared/api.js'
 import { ApiError, fetchSearchResults } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
+import { FeedFilter } from '../components/feed-filter.js'
 import { Choice } from '../components/choice.js'
 import { Group } from '../components/group.js'
 import { HomePageLink } from '../components/home-page-link.js'
@@ -130,7 +131,7 @@ export function SearchResultsView({
           Nothing in {place} matches “{line}”.
         </p>
       ) : (
-        <div className="search-answer" role="region" aria-label="search results" aria-busy={found.kind === 'loading'}>
+        <div className="with-aside" role="region" aria-label="search results" aria-busy={found.kind === 'loading'}>
           <div>
             <MatchingFeeds subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
             {filtered.length > 0 ? (
@@ -156,7 +157,9 @@ export function SearchResultsView({
               </div>
             ) : null}
           </div>
-          {feeds.length > 1 ? <FeedFilter feeds={feeds} shown={shownFeeds} onChange={setShownFeeds} /> : null}
+          {feeds.length > 1 ? (
+            <FeedFilter id="search-feeds" title="Feeds" feeds={feeds} shown={shownFeeds} onChange={setShownFeeds} />
+          ) : null}
         </div>
       )}
     </div>
@@ -178,58 +181,6 @@ function feedsOf(results: readonly SearchResult[]) {
   return [...Map.groupBy(results, (result) => result.feedId)]
     .map(([feedId, matches]) => ({ feedId, title: matches[0]?.feedTitle ?? '', count: matches.length }))
     .sort((left, right) => right.count - left.count || left.title.localeCompare(right.title))
-}
-
-/** Ticked Feeds narrow the results to themselves; none ticked shows every result. */
-function FeedFilter({
-  feeds,
-  shown,
-  onChange,
-}: {
-  feeds: readonly { feedId: number; title: string; count: number }[]
-  shown: ReadonlySet<number>
-  onChange: (shown: ReadonlySet<number>) => void
-}) {
-  const toggle = (feedId: number) => {
-    const next = new Set(shown)
-    if (next.has(feedId)) next.delete(feedId)
-    else next.add(feedId)
-    onChange(next)
-  }
-
-  return (
-    <aside className="search-filter" aria-label="Narrow by feed">
-      <Group
-        id="search-feeds"
-        title="Feeds"
-        className="panel"
-        aside={
-          shown.size > 0 ? (
-            <button type="button" className="button button-ghost button-small" onClick={() => onChange(new Set())}>
-              Clear
-            </button>
-          ) : undefined
-        }
-      >
-        <ul className="filter-list">
-          {feeds.map((feed) => (
-            <li key={feed.feedId}>
-              <label className="filter-row">
-                <input
-                  type="checkbox"
-                  className="checkbox"
-                  checked={shown.has(feed.feedId)}
-                  onChange={() => toggle(feed.feedId)}
-                />
-                <span className="filter-name">{feed.title}</span>
-                <span className="filter-count">{feed.count}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </Group>
-    </aside>
-  )
 }
 
 /** Subscriptions the words matched by name or host, as a way into each Feed. */

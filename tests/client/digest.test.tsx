@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
+import { cadenceWindow } from './cadence-window.js'
 import { stubApi } from './stub-api.js'
 
 const item = (feedItemId: number, title: string, displayTime: string) => ({
@@ -153,3 +154,181 @@ describe('the chronological Digest', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
   })
 })
+
+const CALENDAR = {
+  today: '2026-08-08',
+  days: cadenceWindow({ '2026-08-08': 2, '2026-08-07': 1, '2026-08-03': 4, '2026-06-03': 1 }),
+}
+
+const DAY = {
+  date: '2026-08-07',
+  feeds: [
+    { feedId: 1, title: 'Field Notes', count: 3 },
+    { feedId: 2, title: 'Weekly Letters', count: 1 },
+  ],
+}
+
+const dayDigest = (date: string, label: string, titles: readonly string[]) => ({
+  today: '2026-08-08',
+  groups: [
+    {
+      date,
+      label,
+      count: titles.length,
+      items: titles.map((title, index) => item(10 + index, title, '09:00')),
+    },
+  ],
+  nextCursor: null,
+})
+
+const digestWithCalendar = () =>
+  stubApi().on('GET /api/digest', { body: DIGEST }).on('GET /api/digest/days', { body: CALENDAR })
+
+describe('the Digest read three ways', () => {
+  it('names the last week beside All items, each day a way into it', async () => {
+    digestWithCalendar()
+      .on('GET /api/digest?day=2026-08-07', { body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']) })
+      .on('GET /api/digest/days/2026-08-07', { body: DAY })
+    window.history.replaceState(null, '', '/digest')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const days = await screen.findByRole('navigation', { name: 'Days' })
+    expect(
+      within(days)
+        .getAllByRole('link')
+        .map((day) => day.textContent),
+    ).toEqual(['Today2', 'Yesterday1', 'Thu 6 Aug0', 'Wed 5 Aug0', 'Tue 4 Aug0', 'Mon 3 Aug4', 'Sun 2 Aug0'])
+
+    await user.click(within(days).getByRole('link', { name: /^Yesterday/ }))
+
+    expect(window.location.search).toBe('?by=day&day=2026-08-07')
+    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+  })
+
+  it('narrows All items to the Feeds of one Rhythm, and says when none of them published', async () => {
+    const api = digestWithCalendar().on('GET /api/digest?rhythm=inactive', {
+      body: { today: '2026-08-08', groups: [], nextCursor: null },
+    })
+    window.history.replaceState(null, '', '/digest')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await screen.findByRole('heading', { name: 'Today 2' })
+    await user.click(within(screen.getByRole('group', { name: 'Rhythm' })).getByRole('button', { name: 'Inactive' }))
+
+    expect(await screen.findByText('Nothing from inactive feeds.')).toBeDefined()
+    expect(window.location.search).toBe('?rhythm=inactive')
+    expect(api.requestsTo('GET /api/digest?rhythm=inactive')).toHaveLength(1)
+  })
+
+  it('shows one day under the calendar, steps between days, and never past today', async () => {
+    digestWithCalendar()
+      .on('GET /api/digest?day=2026-08-08', { body: dayDigest('2026-08-08', 'Today', ['First light', 'Second']) })
+      .on('GET /api/digest/days/2026-08-08', { body: { date: '2026-08-08', feeds: [DAY.feeds[0]] } })
+      .on('GET /api/digest?day=2026-08-07', { body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']) })
+      .on('GET /api/digest/days/2026-08-07', { body: DAY })
+    window.history.replaceState(null, '', '/digest')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'By day' }))
+
+    expect(window.location.search).toBe('?by=day')
+    expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(fact('Day')).toBe('Saturday 8 August')
+    expect(fact('Last 26 weeks')).toBe('8 items')
+    expect(screen.getByRole('button', { name: 'Next day' }).getAttribute('aria-disabled')).toBe('true')
+
+    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+
+    expect(window.location.search).toBe('?by=day&day=2026-08-07')
+    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+    expect(await screen.findByText('Weekly Letters')).toBeDefined()
+    expect(fact('Items')).toBe('4')
+    expect(fact('Feeds')).toBe('2')
+
+    await user.click(screen.getByRole('button', { name: '4 items on 3 August 2026, show that day' }))
+    expect(window.location.search).toBe('?by=day&day=2026-08-03')
+  })
+
+  it('narrows a day to the Feeds ticked beside it, and Clear shows all of it again', async () => {
+    const api = digestWithCalendar()
+      .on('GET /api/digest?day=2026-08-07', {
+        body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes', 'A letter']),
+      })
+      .on('GET /api/digest?day=2026-08-07&feed=2', { body: dayDigest('2026-08-07', 'Yesterday', ['A letter']) })
+      .on('GET /api/digest/days/2026-08-07', { body: DAY })
+    window.history.replaceState(null, '', '/digest?by=day&day=2026-08-07')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const filter = await screen.findByRole('complementary', { name: 'Narrow by feed' })
+    await user.click(within(filter).getByRole('checkbox', { name: /Weekly Letters/ }))
+
+    await waitFor(() => expect(screen.queryByText('Evening notes')).toBeNull())
+    expect(api.requestsTo('GET /api/digest?day=2026-08-07&feed=2')).toHaveLength(1)
+
+    await user.click(within(filter).getByRole('button', { name: 'Clear' }))
+    expect(await screen.findByText('Evening notes')).toBeDefined()
+  })
+
+  it('gives each Feed a card of its newest items, dated as briefly as the distance allows', async () => {
+    const row = (feedItemId: number, title: string, date: string, displayTime: string) => ({
+      feedItemId,
+      title,
+      link: null,
+      publishedAt: `${date}T${displayTime}:00.000Z`,
+      firstSeenAt: `${date}T${displayTime}:00.000Z`,
+      date,
+      displayTime,
+      saved: false,
+    })
+    digestWithCalendar().on('GET /api/digest/feeds', {
+      body: {
+        today: '2026-08-08',
+        feeds: [
+          {
+            feedId: 1,
+            title: 'Field Notes',
+            description: null,
+            domain: 'journal.example',
+            homePageUrl: 'https://journal.example/',
+            enteredUrl: 'https://journal.example/feed',
+            resolvedUrl: 'https://journal.example/feed',
+            readingSource: 'original-webpage',
+            subscribedAt: '2026-01-01T00:00:00.000Z',
+            cadence: Array.from({ length: 30 }, () => 0),
+            availability: {
+              state: 'available',
+              lastCheckedAt: null,
+              lastSuccessAt: null,
+              consecutiveFailures: 0,
+              category: null,
+            },
+            items: [
+              row(3, 'First light', '2026-08-08', '07:15'),
+              row(2, 'Evening notes', '2026-08-07', '21:00'),
+              row(1, 'Monday thoughts', '2026-08-03', '09:00'),
+            ],
+          },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/digest?by=feed')
+    render(<App />)
+
+    const card = await screen.findByRole('region', { name: 'Field Notes' })
+    expect(within(card).getByRole('link', { name: 'Field Notes' }).getAttribute('href')).toBe('/feeds/1')
+    expect(within(card).getByRole('link', { name: 'journal.example' })).toBeDefined()
+    expect(
+      within(card)
+        .getAllByRole('listitem')
+        .map((entry) => entry.textContent),
+    ).toEqual(['First light07:15', 'Evening notesYesterday', 'Monday thoughtsMon'])
+  })
+})
+
+function fact(label: string): string | null | undefined {
+  return screen.getByText(label, { selector: 'dt' }).nextElementSibling?.textContent
+}

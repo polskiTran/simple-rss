@@ -359,8 +359,6 @@ export const digestRequestSchema = z
   })
   .transform(({ rhythm, day, feed }) => ({ rhythm, day, feeds: feed }) satisfies DigestFilter)
 
-export const digestCalendarRequestSchema = z.object({ rhythm: z.enum(RHYTHMS).optional() })
-
 /** The Digest's own cadence: every day of the grid window, with `today` ending it. */
 export const digestCalendarSchema = z.object({
   today: z.string(),

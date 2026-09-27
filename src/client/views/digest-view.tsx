@@ -1,128 +1,159 @@
-import { useState } from 'react'
-import type { Digest } from '../../shared/api.js'
-import { fetchDigest } from '../api.js'
+import { Button } from '@base-ui/react/button'
+import type { DigestCalendar } from '../../shared/api.js'
+import { RHYTHM_LABELS, RHYTHMS } from '../../shared/rhythm.js'
+import { fetchDigestCalendar } from '../api.js'
+import { Choice } from '../components/choice.js'
 import { Group } from '../components/group.js'
-import { ItemBox } from '../components/item-box.js'
-import { LoadFailure } from '../components/load-failure.js'
-import { LoadingNote } from '../components/loading-note.js'
-import { OlderItems, type OlderState } from '../components/older-items.js'
-import { dayBefore, longDay, shortDay } from '../day-names.js'
-import { useResource } from '../use-resource.js'
+import { Icon } from '../components/icon.js'
+import { dayAfter, dayBefore, longDay, recentDayName, shortDay } from '../day-names.js'
+import { routedClick } from '../routed-link.js'
+import { ALL_POSTS, digestPathOf, type DigestMode } from '../routing.js'
+import { useResource, valueInView, type Resource } from '../use-resource.js'
+import { DigestByDay } from './digest-by-day.js'
+import { DigestByFeed } from './digest-by-feed.js'
+import { DigestList } from './digest-list.js'
 
 export interface DigestViewProps {
+  readonly mode: DigestMode
+  onMode(mode: DigestMode): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
 
-function withOlderPage(digest: Digest, page: Digest): Digest {
-  const groups = [...digest.groups]
-  const seam = groups.at(-1)
-  const [first, ...rest] = page.groups
-  if (seam && first && first.date === seam.date) {
-    groups[groups.length - 1] = { ...seam, items: [...seam.items, ...first.items] }
-    groups.push(...rest)
-  } else {
-    groups.push(...page.groups)
-  }
-  return { ...digest, groups, nextCursor: page.nextCursor }
-}
+const MODES = [
+  { value: 'all', label: 'All items' },
+  { value: 'day', label: 'By day' },
+  { value: 'feed', label: 'By feed' },
+] as const
 
-export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
-  const [state, { retry, set }] = useResource((signal) => fetchDigest(undefined, signal), [])
-  const [older, setOlder] = useState<OlderState>('idle')
+const RHYTHM_CHOICES = [
+  { value: 'everything', label: 'Everything' },
+  ...RHYTHMS.map((rhythm) => ({ value: rhythm, label: RHYTHM_LABELS[rhythm] })),
+] as const
 
-  const loadOlder = (cursor: string) => {
-    setOlder('loading')
-    void fetchDigest(cursor)
-      .then((page) => {
-        setOlder('idle')
-        set((digest) => withOlderPage(digest, page))
-      })
-      .catch(() => setOlder('failed'))
-  }
+/** Days the All items list names beside itself, today first. */
+const RECENT_DAYS = 7
 
-  const setSaved = (feedItemId: number, saved: boolean) => {
-    set((digest) => ({
-      ...digest,
-      groups: digest.groups.map((group) => ({
-        ...group,
-        items: group.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
-      })),
-    }))
-  }
+/**
+ * The Digest read three ways. The calendar — the whole Digest's count for each
+ * day — names today in the title, lists recent days beside All items, and draws
+ * By day. Its counts are never narrowed: each day it names opens By day, which
+ * shows all of that day.
+ */
+export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewProps) {
+  const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
+  const today = valueInView(calendar)?.today
+  const day = mode.by === 'day' ? (mode.day ?? today) : undefined
+  const showDay = (date: string) => onMode({ by: 'day', day: date === today ? undefined : date })
 
-  const today = state.kind === 'loaded' ? state.value.today : undefined
-  const head = (
-    <header className="page-head">
-      <h1 className="page-title">
-        Digest
-        {today ? <span className="page-title-companion">{shortDay(today)}</span> : null}
-      </h1>
-    </header>
-  )
-
-  if (state.kind === 'loading') {
-    return (
-      <div className="view">
-        {head}
-        <LoadingNote>Loading the digest</LoadingNote>
-      </div>
-    )
-  }
-  if (state.kind === 'unavailable' || state.kind === 'unreachable') {
-    return (
-      <div className="view">
-        {head}
-        <LoadFailure
-          subject="The digest"
-          kind={state.kind}
-          onRetry={() => {
-            setOlder('idle')
-            retry()
-          }}
-        />
-      </div>
-    )
-  }
-
-  const digest = state.value
   return (
     <div className="view">
-      {head}
-      {digest.groups.length === 0 ? (
-        <p className="note">Nothing yet. Subscribe to a feed in Feeds to start your digest.</p>
-      ) : (
-        digest.groups.map((group) => (
-          <Group
-            key={group.date}
-            id={`day-${group.date}`}
-            title={group.label}
-            count={group.count}
-            aside={relativeDay(group.date, digest.today) ? longDay(group.date) : undefined}
-          >
-            <div className="item-list">
-              {group.items.map((item) => (
-                <ItemBox
-                  key={item.feedItemId}
-                  feedItemId={item.feedItemId}
-                  title={item.title}
-                  saved={item.saved}
-                  feed={{ feedId: item.feedId, title: item.feedTitle, onOpen: onOpenFeed }}
-                  when={{ label: item.displayTime, dateTime: item.publishedAt ?? item.firstSeenAt }}
-                  onOpen={onOpenItem}
-                  onSaved={(saved) => setSaved(item.feedItemId, saved)}
-                />
-              ))}
-            </div>
-          </Group>
-        ))
-      )}
-      <OlderItems nextCursor={digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
+      <header className="page-head">
+        <h1 className="page-title">
+          Digest
+          {today ? <span className="page-title-companion">{shortDay(today)}</span> : null}
+        </h1>
+        <div className="toolbar digest-toolbar">
+          <Choice
+            label="Read the digest"
+            options={MODES}
+            value={mode.by}
+            onChange={(by) => onMode(by === 'all' ? ALL_POSTS : by === 'day' ? { by, day: undefined } : { by })}
+          />
+          {mode.by === 'all' ? (
+            <Choice
+              label="Rhythm"
+              className="toolbar-end rhythm-choice"
+              options={RHYTHM_CHOICES}
+              value={mode.rhythm ?? 'everything'}
+              onChange={(chosen) => onMode({ by: 'all', rhythm: chosen === 'everything' ? undefined : chosen })}
+            />
+          ) : null}
+          {day && today ? <DayStepper day={day} today={today} onDay={showDay} /> : null}
+          {mode.by === 'feed' ? <p className="note toolbar-end">Ordered by most recent item</p> : null}
+        </div>
+      </header>
+
+      {mode.by === 'all' ? (
+        <div className="with-aside">
+          <DigestList
+            filter={{ rhythm: mode.rhythm }}
+            onRetry={retryCalendar}
+            empty={
+              mode.rhythm
+                ? `Nothing from ${RHYTHM_LABELS[mode.rhythm].toLowerCase()} feeds.`
+                : 'Nothing yet. Subscribe to a feed in Feeds to start your digest.'
+            }
+            onOpenItem={onOpenItem}
+            onOpenFeed={onOpenFeed}
+          />
+          <RecentDays calendar={calendar} onDay={showDay} />
+        </div>
+      ) : null}
+      {mode.by === 'day' ? (
+        <DigestByDay
+          key={day}
+          day={day}
+          calendar={calendar}
+          onRetryCalendar={retryCalendar}
+          onDay={showDay}
+          onOpenItem={onOpenItem}
+          onOpenFeed={onOpenFeed}
+        />
+      ) : null}
+      {mode.by === 'feed' ? <DigestByFeed onOpenItem={onOpenItem} onOpenFeed={onOpenFeed} /> : null}
     </div>
   )
 }
 
-/** Today and Yesterday are labelled relatively, so the day they name follows them. */
-function relativeDay(date: string, today: string): boolean {
-  return date === today || date === dayBefore(today)
+/** Back a day, forward up to today, and straight back to today. */
+function DayStepper({ day, today, onDay }: { day: string; today: string; onDay: (day: string) => void }) {
+  const isToday = day === today
+  return (
+    <div className="toolbar-group toolbar-end day-stepper">
+      <Button className="button button-icon" aria-label="Previous day" onClick={() => onDay(dayBefore(day))}>
+        <Icon name="chevron-left" />
+      </Button>
+      <Button className="button wide-only" focusableWhenDisabled disabled={isToday} onClick={() => onDay(today)}>
+        Today
+      </Button>
+      <span className="day-stepper-day">{longDay(day)}</span>
+      <Button
+        className="button button-icon"
+        aria-label="Next day"
+        focusableWhenDisabled
+        disabled={isToday}
+        onClick={() => onDay(dayAfter(day))}
+      >
+        <Icon name="chevron-right" />
+      </Button>
+    </div>
+  )
+}
+
+/** The last week of days with their counts, each a way into that day. */
+function RecentDays({ calendar, onDay }: { calendar: Resource<DigestCalendar>; onDay: (day: string) => void }) {
+  const shown = valueInView(calendar)
+  if (!shown) return null
+  const days = shown.days.slice(-RECENT_DAYS).toReversed()
+  return (
+    <nav className="recent-days" aria-label="Days">
+      <Group id="recent-days" title="Days" className="panel">
+        <ul className="day-list">
+          {days.map(({ date, count }) => (
+            <li key={date}>
+              <a
+                className="day-row"
+                href={digestPathOf({ by: 'day', day: date })}
+                onClick={routedClick(() => onDay(date))}
+              >
+                <span className="day-row-name">{recentDayName(date, shown.today)}</span>
+                <span className="day-row-count">{count.toLocaleString('en-GB')}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Group>
+    </nav>
+  )
 }

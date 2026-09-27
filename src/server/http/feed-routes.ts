@@ -2,7 +2,6 @@ import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
   dateKeySchema,
-  digestCalendarRequestSchema,
   digestRequestSchema,
   feedIdParameterSchema,
   importOpmlRequestSchema,
@@ -160,11 +159,7 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     return c.json<Digest>(deps.digest.read(filter.data, cursor.cursor), 200, NO_STORE)
   })
 
-  app.get('/digest/days', (c) => {
-    const request = digestCalendarRequestSchema.safeParse(c.req.query())
-    if (!request.success) return invalidDigestRequest(c)
-    return c.json<DigestCalendar>(deps.digest.calendar(request.data.rhythm), 200, NO_STORE)
-  })
+  app.get('/digest/days', (c) => c.json<DigestCalendar>(deps.digest.calendar(), 200, NO_STORE))
 
   app.get('/digest/days/:date', (c) => {
     const date = readIdParam(c, 'date', dateKeySchema)

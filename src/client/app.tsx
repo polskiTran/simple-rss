@@ -5,6 +5,7 @@ import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
 import {
   DIGEST_ORIGIN,
+  digestOrigin,
   FEEDS_ORIGIN,
   SAVED_ORIGIN,
   feedOrigin,
@@ -120,8 +121,10 @@ function signedInView(navigation: Navigation, gate: Gate) {
     case 'digest':
       return (
         <DigestView
-          onOpenItem={(feedItemId) => navigation.openReader(feedItemId, DIGEST_ORIGIN)}
-          onOpenFeed={(feedId) => navigation.openFeed(feedId, DIGEST_ORIGIN)}
+          mode={navigation.digest}
+          onMode={navigation.showDigest}
+          onOpenItem={(feedItemId) => navigation.openReader(feedItemId, digestOrigin(navigation.digest))}
+          onOpenFeed={(feedId) => navigation.openFeed(feedId, digestOrigin(navigation.digest))}
         />
       )
     case 'feeds':
