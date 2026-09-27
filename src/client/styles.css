@@ -29,7 +29,7 @@
   --color-ground: light-dark(oklch(100% 0 0), oklch(18.2% 0 0));
   --color-ink: light-dark(oklch(17.8% 0 0), oklch(94.6% 0 0));
   --color-ink-2: light-dark(oklch(53.8% 0 0), oklch(68.6% 0 0));
-  --color-ink-3: light-dark(oklch(71.5% 0 0), oklch(54.5% 0 0));
+  --color-ink-3: light-dark(oklch(62% 0 0), oklch(53% 0 0));
   --color-ink-off: light-dark(oklch(47.5% 0 0), oklch(68.6% 0 0));
   --color-reader-body: light-dark(oklch(21.8% 0 0), oklch(88.8% 0 0));
   --color-control: light-dark(oklch(95.2% 0 0), oklch(26.9% 0 0));
@@ -49,9 +49,9 @@
   --color-danger-fill: light-dark(oklch(94.8% 0.02 25.2), oklch(27% 0.05 27));
 
   --color-ramp-1: light-dark(oklch(95.7% 0.015 277.9), oklch(23.9% 0.023 96.7));
-  --color-ramp-2: light-dark(oklch(84.5% 0.058 278.5), oklch(37.5% 0.063 97.7));
-  --color-ramp-3: light-dark(oklch(70% 0.118 276.9), oklch(53% 0.098 95.7));
-  --color-ramp-4: light-dark(oklch(55.5% 0.184 273.5), oklch(73.1% 0.138 94.5));
+  --color-ramp-2: light-dark(oklch(67.5% 0.11 277.5), oklch(49% 0.08 97));
+  --color-ramp-3: light-dark(oklch(59.4% 0.153 274.2), oklch(61.3% 0.106 96.1));
+  --color-ramp-4: light-dark(oklch(51.4% 0.197 270.9), oklch(73.5% 0.132 95.2));
   --color-ramp-5: light-dark(oklch(43.3% 0.24 267.6), oklch(85.8% 0.158 94.4));
   --color-saved: var(--color-ramp-5);
   --color-saved-edge: var(--color-ramp-3);
@@ -384,7 +384,7 @@
   }
 
   .field-input::placeholder {
-    color: var(--color-ink-3);
+    color: var(--color-ink-2);
     opacity: 1;
   }
 
@@ -572,7 +572,7 @@
   .group-count {
     margin-left: 6px;
     font-weight: 400;
-    color: var(--color-ink-3);
+    color: var(--color-ink-2);
     font-variant-numeric: tabular-nums;
   }
 
@@ -706,7 +706,7 @@
 
   .match {
     background: var(--color-match);
-    color: inherit;
+    color: var(--color-ink);
   }
 
   .save-toggle {
@@ -878,7 +878,7 @@
 
   .button-count {
     font-weight: 400;
-    color: var(--color-ink-3);
+    color: var(--color-ink-2);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1346,7 +1346,7 @@
   }
 
   .day-row-count {
-    color: var(--color-ink-3);
+    color: var(--color-ink-2);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1499,7 +1499,7 @@
   }
 
   .filter-count {
-    color: var(--color-ink-3);
+    color: var(--color-ink-2);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1559,7 +1559,7 @@
 
   .settings-version {
     margin-top: 48px;
-    color: var(--color-ink-3);
+    color: var(--color-ink-2);
   }
 
   /* Sign in and setup */
