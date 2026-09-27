@@ -81,7 +81,7 @@ test.describe('the mark', () => {
     expect(await glintFrame(page)).toEqual(chromeAtRest)
   })
 
-  test('breathes rather than stops for a User who asked for less motion', async ({ page, installation }) => {
+  test('holds the waiting tile still for a User who asked for less motion', async ({ page, installation }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await claim(page, installation)
     await hangTheDigest(page)
@@ -97,7 +97,7 @@ test.describe('the mark', () => {
     }
 
     expect(await glintFrame(page, '.loading-note')).toEqual(cells)
-    expect(opacities.size).toBeGreaterThan(2)
+    expect([...opacities]).toEqual(['1'])
   })
 
   test('is a mark rather than a way through until the installation is claimed', async ({ page, installation }) => {

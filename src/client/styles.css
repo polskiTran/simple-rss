@@ -2285,14 +2285,4 @@
   .wordmark-cell {
     animation: none;
   }
-
-  .loading-note .wordmark-grid {
-    animation: loading-mark-breathe 1800ms ease-in-out infinite;
-  }
-
-  @keyframes loading-mark-breathe {
-    50% {
-      opacity: 0.45;
-    }
-  }
 }

@@ -70,8 +70,8 @@ describe('motion under prefers-reduced-motion', () => {
     expect(reduced()).toMatch(/\.dialog\[data-ending-style\]\s*\{\s*transition-duration: 0s/)
   })
 
-  it('stops the mark’s glint but keeps the waiting tile breathing', () => {
+  it('stops the mark’s glint, so the waiting tile holds still', () => {
     expect(reduced()).toMatch(/\.wordmark-cell\s*\{\s*animation: none/)
-    expect(reduced()).toMatch(/\.loading-note \.wordmark-grid\s*\{\s*animation: loading-mark-breathe/)
+    expect(reduced()).not.toMatch(/animation: (?!none)/)
   })
 })
