@@ -106,6 +106,13 @@
     outline-offset: 2px;
   }
 
+  /* Headings and sections take focus only by script, to announce an Arrival or
+     carry the keyboard into a jump; they are not controls, so they draw no ring.
+     WebKit would otherwise show one, since a mouse click leaves nothing focused. */
+  :is(h1, section)[tabindex='-1']:focus-visible {
+    outline: none;
+  }
+
   ::selection {
     background: var(--color-match);
   }
