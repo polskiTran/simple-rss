@@ -53,7 +53,7 @@ any ground.
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
 | `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(84.5% 0.058 278.5)` · `oklch(70% 0.118 276.9)` · `oklch(55.5% 0.184 273.5)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
-| `away` | `ramp-5` | a Feed's host in a Feed row |
+| `away` | `ramp-5` | a Feed's host, wherever it is shown |
 | `match` | `oklch(91.4% 0.032 277.9)` | search highlight |
 | `scrim` | ink at `.24` | behind a dialog |
 
@@ -170,7 +170,9 @@ title with the matched words marked in `match`.
 
 **Feed row.** A thin-edged box with 16px padding: Feed name in Literata 19 with
 a Cadence strip on the right, and under it the Feed Home Page host in `away`,
-marked ↗ and underlined on hover — meta text when the Feed names no site. Rows
+marked ↗ and underlined on hover — meta text when the Feed names no site. The
+host looks the same wherever a Feed is named; it opens a new tab, and its
+accessible name says so. Rows
 are two columns on desktop with 8px between them, one on a phone with 12px.
 
 **Label and value rows.** Label left in `ink-2`, value right in ink, 40px
@@ -222,7 +224,8 @@ with each Rhythm's count reach the groups; By name lists everything
 alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
 
-**One Feed.** The way back, then the Feed's name, description and host with
+**One Feed.** The way back, then the Feed's name, description and host (as in
+a Feed row) with
 Edit, Refresh now and Unsubscribe beside them, then three panels: Cadence (the
 grid), Info (subscribed, items in 26 weeks, busiest day, longest quiet
 stretch, last checked) and Settings (Check every, Open items with). Items follow, grouped by

@@ -287,12 +287,7 @@ function FeedRows({
             </h3>
             <CadenceStrip counts={subscription.cadence} title={subscription.title} />
           </div>
-          <HomePageLink
-            className="feed-row-domain"
-            domain={subscription.domain}
-            homePageUrl={subscription.homePageUrl}
-            arrow
-          />
+          <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
           <Availability
             subscription={subscription}
             retrying={retryingFeedId === subscription.feedId}

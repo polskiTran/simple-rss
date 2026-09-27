@@ -210,12 +210,7 @@ function MatchingFeeds({
                 </h3>
                 <CadenceStrip counts={subscription.cadence} title={subscription.title} />
               </div>
-              <HomePageLink
-                className="feed-row-domain"
-                domain={subscription.domain}
-                homePageUrl={subscription.homePageUrl}
-                arrow
-              />
+              <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
             </article>
           ))}
         </div>

@@ -926,8 +926,9 @@
     text-underline-offset: 3px;
   }
 
-  /* The host leads away to the publisher, in colour and marked ↗; grey text when there is no site. */
-  :is(.feed-row-domain, .feed-card-domain) {
+  /* A Feed's host, wherever a Feed is named: it leads away to the publisher, in
+     colour and marked ↗; grey text when there is no site. */
+  .feed-host {
     justify-self: start;
     display: inline-flex;
     align-items: center;
@@ -939,16 +940,16 @@
     overflow-wrap: anywhere;
   }
 
-  a:is(.feed-row-domain, .feed-card-domain) {
+  a.feed-host {
     color: var(--color-away);
     text-decoration-color: transparent;
   }
 
-  a:is(.feed-row-domain, .feed-card-domain):hover {
+  a.feed-host:hover {
     text-decoration-color: currentColor;
   }
 
-  :is(.feed-row-domain, .feed-card-domain) .icon {
+  .feed-host .icon {
     width: 14px;
     height: 14px;
   }
@@ -1020,11 +1021,6 @@
     margin: 0;
     font: 400 17px/1.5 var(--font-read);
     color: var(--color-reader-body);
-  }
-
-  .feed-domain {
-    font-size: 13px;
-    color: var(--color-ink-2);
   }
 
   .feed-actions {

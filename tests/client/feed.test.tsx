@@ -91,7 +91,9 @@ describe('opening one Feed', () => {
     expect(await screen.findByRole('group', { name: /26 weeks of Cadence for Field Notes/i })).toBeDefined()
     expect(window.location.pathname).toBe('/feeds/1')
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Back to Feeds' })).toBeDefined()
-    expect(screen.getByRole('link', { name: 'journal.example' }).getAttribute('href')).toBe('https://journal.example/')
+    expect(screen.getByRole('link', { name: 'journal.example (opens in a new tab)' }).getAttribute('href')).toBe(
+      'https://journal.example/',
+    )
     expect(container.querySelector('.feed-description')).toBeNull()
 
     expect(container.querySelectorAll('.cadence-grid .cadence-cell')).toHaveLength(181)

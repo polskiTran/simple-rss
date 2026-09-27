@@ -139,7 +139,7 @@ describe('Feeds', () => {
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
   })
 
-  it('links the domain to the Feed’s home page, and leaves it plain text without one', async () => {
+  it('links the domain to the Feed’s home page in a new tab, and leaves it plain text without one', async () => {
     const api = stubApi().on('GET /api/feeds', {
       body: {
         subscriptions: [FEED, { ...FEED, feedId: 2, title: 'Other Wire', domain: 'wire.example', homePageUrl: null }],
@@ -148,7 +148,7 @@ describe('Feeds', () => {
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
 
-    const link = await screen.findByRole('link', { name: 'journal.example' })
+    const link = await screen.findByRole('link', { name: 'journal.example (opens in a new tab)' })
     expect(link.getAttribute('href')).toBe('https://journal.example/')
     expect(link.getAttribute('rel')).toBe('noopener noreferrer')
     expect(screen.getByText('wire.example').tagName).toBe('SPAN')
