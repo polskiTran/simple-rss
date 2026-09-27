@@ -36,7 +36,7 @@ export function DigestByFeed({ onOpenItem, onOpenFeed }: DigestByFeedProps) {
             </h2>
             <CadenceStrip counts={feed.cadence} title={feed.title} />
           </div>
-          <HomePageLink className="feed-card-domain" domain={feed.domain} homePageUrl={feed.homePageUrl} button />
+          <HomePageLink className="feed-card-domain" domain={feed.domain} homePageUrl={feed.homePageUrl} arrow />
           {feed.items.length === 0 ? (
             <p className="note">Nothing retained yet.</p>
           ) : (
