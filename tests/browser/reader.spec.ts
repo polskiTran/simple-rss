@@ -231,8 +231,9 @@ test.describe('Reader View', () => {
     const toggle = page.getByRole('button', { name: 'Save First light' })
     await expect(toggle).toHaveText('Save')
     await toggle.click()
-    await expect(toggle).toHaveText('Saved')
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    const saved = page.getByRole('button', { name: 'Saved First light' })
+    await expect(saved).toHaveText('Saved')
+    await expect(saved).toHaveAttribute('aria-pressed', 'true')
 
     await section(page, 'Saved').click()
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()

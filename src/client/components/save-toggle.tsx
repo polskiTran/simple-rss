@@ -12,7 +12,11 @@ export interface SaveToggleProps {
   onSaved(saved: boolean): void
 }
 
-/** Library membership, pressed while saved. A failed toggle leaves the state as it was. */
+/**
+ * Library membership, pressed while saved. A failed toggle leaves the state as it was.
+ * The name starts with the word on screen — the labelled toggle's Save or Saved — and
+ * the icon-only square keeps a steady Save, leaving the state to `aria-pressed`.
+ */
 export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
   const [pending, setPending] = useState(false)
 
@@ -32,7 +36,7 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
     <Toggle
       className={labelled ? 'button save-toggle save-toggle-labelled' : 'save-toggle'}
       pressed={saved}
-      aria-label={`Save ${title}`}
+      aria-label={`${labelled && saved ? 'Saved' : 'Save'} ${title}`}
       onPressedChange={() => void toggle()}
     >
       <Icon name="bookmark" filled={saved} />
