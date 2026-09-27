@@ -201,7 +201,8 @@ the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
 is right-aligned Cancel and the primary action, which stays disabled until
 there is something to submit. On a phone it is a hard-edged sheet rising from
 the bottom edge with Cancel and the primary action side by side at 48px. In at
-150ms, out at 120ms, opacity only.
+150ms, out at 120ms, opacity only. While one is open the page's scrollbar
+gutter takes the scrim's colour too, so no bright strip runs down the edge.
 
 **Undo line.** Removing something from a list leaves a `row-hover` line in
 its place saying what happened, with an outlined Undo button, so the list does

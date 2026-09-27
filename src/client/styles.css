@@ -493,6 +493,17 @@
     transition: opacity 150ms ease-out;
   }
 
+  /* The page keeps a scrollbar gutter the fixed scrim cannot reach, and the
+     gutter paints only the root's background colour. While a dialog is open
+     that colour is the scrim laid over the ground, mixed solid: `scrim` is ink
+     at .24 in light and black at .5 in dark. */
+  html:has(.dialog-backdrop) {
+    background: light-dark(
+      color-mix(in srgb, var(--color-ink) 24%, var(--color-ground)),
+      color-mix(in srgb, black 50%, var(--color-ground))
+    );
+  }
+
   .dialog-viewport {
     position: fixed;
     inset: 0;
