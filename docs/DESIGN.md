@@ -175,10 +175,12 @@ a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
 the title, then a 36px save square; in a Feed's own list, which names no Feed,
 the meta column narrows to 56px for the time. The save square shows on hover
 and focus; a saved item shows it always, filled in `saved`, and keeps a
-`saved-edge` border. On a phone the Feed name and time share one line above
-the title and the save square is always visible at 44px. The whole box opens the Reader; the
-Feed name inside it opens the Feed. In search results a snippet sits under the
-title with the matched words marked in `match`.
+`saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
+every item is saved and the edge would say nothing. On a phone the Feed name
+and time share one line above the title and the save square is always visible
+at 44px. The whole box opens the Reader; the Feed name inside it opens the
+Feed. In search results a snippet sits under the title with the matched words
+marked in `match`.
 
 **Feed row.** A thin-edged box with 16px padding: Feed name in Literata 19 with
 a Cadence strip on the right, and under it the Feed Home Page host in `away`,

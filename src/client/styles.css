@@ -663,6 +663,19 @@
     border-color: var(--color-saved-edge);
   }
 
+  .item[data-saved]:hover {
+    border-color: var(--color-ramp-4);
+  }
+
+  /* On Saved every item is saved, so the saved edge would say nothing. */
+  .library-list .item[data-saved] {
+    border-color: var(--color-edge);
+  }
+
+  .library-list .item[data-saved]:hover {
+    border-color: var(--color-edge-hover);
+  }
+
   .item:has(.item-title a:focus-visible) {
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
