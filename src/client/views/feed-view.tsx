@@ -19,6 +19,7 @@ import {
   updatePollingInterval,
   updateReadingSource,
 } from '../api.js'
+import { useScreenTitle } from '../arrival.js'
 import { cadenceGrid, counted } from '../cadence.js'
 import { ActionDialog, DialogCancel } from '../components/action-dialog.js'
 import { BackButton } from '../components/back-button.js'
@@ -51,6 +52,7 @@ export interface FeedViewProps {
 
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
   const [state, { retry, set }] = useResource((signal) => fetchFeedDetail(feedId, signal), [feedId])
+  useScreenTitle(state.kind === 'loaded' ? state.value.title : undefined)
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [changing, setChanging] = useState(false)

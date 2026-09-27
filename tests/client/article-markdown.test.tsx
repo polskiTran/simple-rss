@@ -69,15 +69,22 @@ describe('article markdown rendering', () => {
     expect(body.querySelector('[data-streamdown="code-block"]')?.getAttribute('data-language')).toBe('python')
   })
 
-  it('gives code the renderer’s own chrome, fenced and inline', () => {
-    const body = bodyOf('Run `observe()`.\n\n```python\nprint(1)\n```')
+  it('renders prose blocks as plain elements, left to the house rules', () => {
+    const body = bodyOf(
+      '# Part\n\n## Step\n\n- one\n\n1. first\n\n> said\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n---\n\nend',
+    )
 
-    expect(body.querySelector('[data-streamdown="inline-code"]')?.className).toContain('bg-muted')
-    expect(body.querySelector('[data-streamdown="code-block"]')?.className).toContain('bg-sidebar')
-    expect(body.querySelector('[data-streamdown="code-block-header"]')?.textContent).toBe('python')
-    expect(body.querySelector('[data-streamdown="code-block-body"]')?.className).toContain('bg-background')
-    expect(body.querySelector('[data-streamdown="code-block-copy-button"]')).not.toBeNull()
-    expect(body.querySelector('[data-streamdown="code-block-download-button"]')).not.toBeNull()
+    const blocks = body.querySelectorAll('h2, h3, ul, ol, li, blockquote, table, thead, tbody, tr, th, td, hr')
+    expect(blocks).toHaveLength(17)
+    expect([...blocks].filter((block) => block.hasAttribute('class'))).toEqual([])
+    expect(body.querySelector('table')?.parentElement?.className).toBe('article-table')
+  })
+
+  it('offers no controls on code or tables', () => {
+    const body = bodyOf('Run `observe()`.\n\n```python\nprint(1)\n```\n\n| a |\n| - |\n| 1 |')
+
+    expect(body.querySelector('[data-streamdown="code-block"]')).not.toBeNull()
+    expect(body.querySelectorAll('button')).toHaveLength(0)
   })
 
   it('colours a language it carries, and leaves one it does not', async () => {

@@ -25,7 +25,8 @@ test.describe('claiming an installation in a browser', () => {
     await expect(page.getByRole('form', { name: 'Claim this installation' })).toBeVisible()
     await claim(page, installation)
 
-    await expect(page.getByText('Nothing yet. Subscribe to a feed in Feeds to start your digest.')).toBeVisible()
+    await expect(page.getByText('Nothing yet. Subscribe to a feed to start your digest.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add feed' })).toBeVisible()
   })
 
   test('never offers setup again, even to a browser that has never been here', async ({

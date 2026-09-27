@@ -304,6 +304,24 @@ describe('the Feeds list', () => {
     expect(screen.getByRole('button', { name: 'Show 2 more' })).toBeDefined()
   })
 
+  it('takes focus into the Rhythm group a jump reaches', async () => {
+    stubApi().on('GET /api/feeds', {
+      body: {
+        subscriptions: [
+          { ...FEED, title: 'Busy', cadence: activeOn(20) },
+          { ...FEED, feedId: 2, title: 'Quiet', cadence: activeOn(0) },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /^Inactive/ }))
+
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Inactive 1' }))
+  })
+
   it('lists every Subscription by name on request', async () => {
     stubApi().on('GET /api/feeds', {
       body: {
@@ -452,12 +470,21 @@ describe('OPML portability', () => {
   })
 
   it('offers the export as a plain same-origin download link', async () => {
-    stubApi()
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [FEED] } })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
 
     const link = (await screen.findByRole('link', { name: /export/i })) as HTMLAnchorElement
     expect(link.getAttribute('href')).toBe('/api/subscriptions/export')
     expect(link.getAttribute('download')).toBe('subscriptions.opml')
+  })
+
+  it('offers no export before there is a Subscription to export', async () => {
+    stubApi()
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    expect(await screen.findByText(/^No feeds yet\./)).toBeDefined()
+    expect(screen.queryByRole('link', { name: /export/i })).toBeNull()
   })
 })

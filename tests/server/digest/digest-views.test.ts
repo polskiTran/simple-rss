@@ -140,6 +140,17 @@ describe('the Digest calendar', () => {
     expect(calendar.days.reduce((sum, day) => sum + day.count, 0)).toBe(26)
   })
 
+  it('counts the Subscriptions feeding it, including one not yet checked', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    const subscriptions = async () =>
+      digestCalendarSchema.parse(await (await user.get('/api/digest/days')).json()).subscriptions
+
+    expect(await subscriptions()).toBe(0)
+    await subscribe(service, user, 'Field Notes', [])
+    expect(await subscriptions()).toBe(1)
+  })
+
   it('names the Feeds of one day, busiest first', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

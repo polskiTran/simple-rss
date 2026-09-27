@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { dateKeySchema, searchParamsOf, searchRequestSchema, type SearchScope, type SearchSort } from '../shared/api.js'
 import { RHYTHMS, type Rhythm } from '../shared/rhythm.js'
 
@@ -124,7 +124,7 @@ export function feedOrigin(feedId: number, title: string, from: Origin | undefin
 }
 
 export function readerOrigin(feedItemId: number, from: Origin | undefined): Origin {
-  return { path: readerPathOf(feedItemId), label: 'Article', from }
+  return { path: readerPathOf(feedItemId), label: 'Reader', from }
 }
 
 export function searchOrigin(query: string, scope: SearchScope, sort: SearchSort, from: Origin | undefined): Origin {
@@ -150,9 +150,25 @@ const historyOriginSchema = z.object({
   from: z.unknown().optional(),
 })
 
+/**
+ * What the app keeps on a history entry. `beneath` is the address of the entry
+ * under this one, set when the app pushed it, so the way back can be the
+ * browser's own Back. `scrollY` is where the page stood when the app left it.
+ */
 const historyStateSchema = z.object({
   origin: z.unknown().optional(),
+  beneath: z.string().optional(),
+  scrollY: z.number().optional(),
 })
+
+function historyState() {
+  const parsed = historyStateSchema.safeParse(window.history.state)
+  return parsed.success ? parsed.data : {}
+}
+
+function currentPath(): string {
+  return window.location.pathname + window.location.search
+}
 
 function trailOf(value: unknown, depth = 0): Origin | undefined {
   if (depth >= MAX_TRAIL) return undefined
@@ -187,10 +203,22 @@ interface SearchLocation {
   readonly searchSort: SearchSort
 }
 
+/**
+ * Set each time the User arrives at a history entry — a push, or the browser
+ * or the way back going back — and kept by an in-place replace. `scrollY` is
+ * where the page should stand: the top of a new screen, where a returned-to one
+ * was left, or undefined when this app never recorded it. Undefined on first load.
+ */
+export interface Arrival {
+  readonly scrollY: number | undefined
+}
+
 interface NavigationActions {
+  readonly arrival: Arrival | undefined
   navigate(route: Route): void
   openFeed(feedId: number, from: Origin): void
   openReader(feedItemId: number, from: Origin): void
+  /** Goes back to the entry beneath when it is the origin; otherwise walks to the origin's address. */
   returnTo(origin: Origin): void
   updateSearch(query: string): void
   /** Re-asks the same words in another scope; the origin stays, so clearing still lands there. */
@@ -209,29 +237,53 @@ type Location = ScreenLocation | SearchLocation
 
 export function useNavigation(): Navigation {
   const [location, setLocation] = useState<Location>(() => currentLocation())
+  const [arrival, setArrival] = useState<Arrival>()
+  // Set between asking the browser to go back and its popstate, so a double
+  // press cannot go back twice.
+  const goingBack = useRef(false)
 
   useEffect(() => {
-    const onPopState = () => setLocation(currentLocation())
+    const onPopState = () => {
+      goingBack.current = false
+      setLocation(currentLocation())
+      setArrival({ scrollY: historyState().scrollY })
+    }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   const place = useCallback((path: string, from: Origin | undefined, how: 'push' | 'replace') => {
     const origin = trailOf(from)
-    window.history[`${how}State`](origin ? { origin } : null, '', path)
+    const here = historyState()
+    if (how === 'push') {
+      window.history.replaceState({ ...here, scrollY: window.scrollY }, '')
+      window.history.pushState({ origin, beneath: currentPath() }, '', path)
+      setArrival({ scrollY: 0 })
+    } else {
+      window.history.replaceState({ origin, beneath: here.beneath }, '', path)
+    }
     setLocation(locationOf(path, origin))
   }, [])
 
   const go = useCallback(
-    (path: string, from: Origin | undefined) =>
-      place(path, from, window.location.pathname + window.location.search === path ? 'replace' : 'push'),
+    (path: string, from: Origin | undefined) => place(path, from, currentPath() === path ? 'replace' : 'push'),
     [place],
   )
 
   const navigate = useCallback((next: Route) => go(pathOf(next), undefined), [go])
   const openFeed = useCallback((feedId: number, from: Origin) => go(feedPathOf(feedId), from), [go])
   const openReader = useCallback((feedItemId: number, from: Origin) => go(readerPathOf(feedItemId), from), [go])
-  const returnTo = useCallback((origin: Origin) => go(origin.path, origin.from), [go])
+  const returnTo = useCallback(
+    (origin: Origin) => {
+      if (historyState().beneath !== origin.path) {
+        go(origin.path, origin.from)
+      } else if (!goingBack.current) {
+        goingBack.current = true
+        window.history.back()
+      }
+    },
+    [go],
+  )
 
   const updateSearch = useCallback(
     (query: string) => {
@@ -270,13 +322,22 @@ export function useNavigation(): Navigation {
 
   const showDigest = useCallback((mode: DigestMode) => place(digestPathOf(mode), undefined, 'replace'), [place])
 
-  return { ...location, navigate, openFeed, openReader, returnTo, updateSearch, searchIn, sortSearch, showDigest }
+  return {
+    ...location,
+    arrival,
+    navigate,
+    openFeed,
+    openReader,
+    returnTo,
+    updateSearch,
+    searchIn,
+    sortSearch,
+    showDigest,
+  }
 }
 
 function currentLocation(): Location {
-  const state = historyStateSchema.safeParse(window.history.state)
-  const origin = trailOf(state.success ? state.data.origin : undefined)
-  return locationOf(window.location.pathname + window.location.search, origin)
+  return locationOf(currentPath(), trailOf(historyState().origin))
 }
 
 function locationOf(path: string, origin: Origin | undefined): Location {

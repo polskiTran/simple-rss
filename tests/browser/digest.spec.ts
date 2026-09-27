@@ -90,17 +90,41 @@ test.describe('the Digest presentation', () => {
     await expect(page.locator('main')).not.toContainText('07:15')
   })
 
-  test('ends at fifty items with Show older items, and one press extends the day', async ({ page, installation }) => {
+  test('ends at fifty items with Show more, and one press extends the day', async ({ page, installation }) => {
     await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
     await expect(page.locator('main article.item')).toHaveCount(50)
-    const older = page.getByRole('button', { name: 'Show older items' })
-    await expect(older).toBeVisible()
+    const more = page.getByRole('button', { name: 'Show more' })
+    await expect(more).toBeVisible()
 
-    await older.click()
+    await more.click()
     await expect(page.locator('main article.item')).toHaveCount(55)
-    await expect(older).toBeHidden()
+    await expect(more).toBeHidden()
+  })
+
+  test('comes back from an article to the same entry and place, announced', async ({ page, installation }) => {
+    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    const deep = page.getByRole('link', { name: 'Meadow note 30', exact: true })
+    await deep.scrollIntoViewIfNeeded()
+    const left = await page.evaluate(() => window.scrollY)
+    expect(left).toBeGreaterThan(0)
+
+    await deep.click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 30' })).toBeFocused()
+    await expect(page).toHaveTitle('Meadow note 30 — simple')
+    const entries = await page.evaluate(() => history.length)
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+
+    await expect(page).toHaveURL(/\/digest$/)
+    await expect(page).toHaveTitle('Digest — simple')
+    await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    expect(await page.evaluate(() => history.length)).toBe(entries)
+
+    await page.goBack()
+    await expect(page).not.toHaveURL(/\/reader\//)
   })
 
   test('names a network loss plainly and recovers on Retry', async ({ page, installation }) => {

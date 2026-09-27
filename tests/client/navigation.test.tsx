@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -130,9 +130,11 @@ function reading(path: string): StubbedApi {
   return api
 }
 
-/** The view's own way back; the phone bar repeats it outside `main`. */
+/** The view's own way back, after the phone bar's square that repeats it. */
 function wayBack() {
-  return within(screen.getByRole('main')).getByRole('link', { name: /^Back to / })
+  const way = screen.getAllByRole('link', { name: /^Back to / }).at(-1)
+  if (!way) throw new Error('the screen offers no way back')
+  return way
 }
 
 /** The scope the results' switch holds. */
@@ -175,7 +177,7 @@ describe('a Feed Item’s attribution', () => {
 
   it('returns an article opened from one day of the Digest to that same day', async () => {
     reading('/digest?by=day&day=2026-08-07')
-      .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow() } })
+      .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 1 } })
       .on('GET /api/digest/days/2026-08-07', { body: { date: '2026-08-07', feeds: [] } })
       .on('GET /api/digest?day=2026-08-07', { body: DIGEST })
     render(<App />)
@@ -247,7 +249,7 @@ describe('a Feed Item’s attribution', () => {
     expect(screen.queryByRole('link', { name: /Slow Press/ })).toBeNull()
   })
 
-  it('opens its Feed from the Reader, and that Feed returns to the article', async () => {
+  it('opens its Feed from the Reader, and that Feed returns to the Reader', async () => {
     reading('/reader/3')
     render(<App />)
     const user = userEvent.setup()
@@ -258,7 +260,7 @@ describe('a Feed Item’s attribution', () => {
     await user.click(attribution)
 
     await openedFeed()
-    expect(wayBack().textContent).toBe('Article')
+    expect(wayBack().textContent).toBe('Reader')
 
     await user.click(wayBack())
     expect(await openedArticle()).toBeDefined()
@@ -331,6 +333,34 @@ describe('the way back out of an opened screen', () => {
 
     await user.click(wayBack())
     expect(window.location.pathname).toBe('/digest')
+  })
+
+  it('goes back to the entry it was opened from rather than stacking another', async () => {
+    reading('/digest')
+    render(<App />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('link', { name: 'First light' }))
+    await openedArticle()
+    const entries = window.history.length
+
+    await user.click(wayBack())
+
+    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(window.location.pathname).toBe('/digest')
+    expect(window.history.length).toBe(entries)
+  })
+
+  it('walks to the origin of an article opened by address, which the browser’s Back then leaves', async () => {
+    reading('/reader/3')
+    render(<App />)
+    const user = userEvent.setup()
+    await openedArticle()
+
+    await user.click(wayBack())
+    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+
+    window.history.back()
+    expect(await openedArticle()).toBeDefined()
   })
 
   it('is restored with the entry the browser goes back to', async () => {
@@ -529,5 +559,27 @@ describe('the scope a search takes from its screen', () => {
 
     await screen.findByRole('region', { name: 'search results' })
     expect(screen.queryByRole('group', { name: 'Search in' })).toBeNull()
+  })
+})
+
+describe('the screen a navigation arrives at', () => {
+  it('names itself in the title and takes focus at its heading, but not on first load', async () => {
+    reading('/digest')
+    render(<App />)
+    const user = userEvent.setup()
+    const attribution = await screen.findByRole('link', { name: 'Field Notes' })
+    expect(document.title).toBe('Digest — simple')
+    expect(document.activeElement).toBe(document.body)
+
+    await user.click(attribution)
+
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Field Notes' })
+    expect(document.title).toBe('Field Notes — simple')
+    await waitFor(() => expect(document.activeElement).toBe(heading))
+
+    await user.click(wayBack())
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 })))
+    expect(document.title).toBe('Digest — simple')
   })
 })
