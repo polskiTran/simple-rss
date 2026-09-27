@@ -110,7 +110,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
           <div className="toolbar-group feeds-actions">
             <a className="button" href="/api/subscriptions/export" download="subscriptions.opml">
               <Icon name="download" />
-              Export<span className="wide-only"> OPML</span>
+              <span>
+                Export<span className="wide-only"> OPML</span>
+              </span>
             </a>
             <AddFeedDialog
               onSubscribed={(created) => void subscribed(created.subscription.feedId)}

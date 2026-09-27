@@ -197,11 +197,6 @@
     color: var(--color-danger);
   }
 
-  /* Words a phone's narrower control can go without. */
-  .wide-only {
-    white-space: pre;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -1734,6 +1729,7 @@
     font-size: 32px;
   }
 
+  /* Words a phone's narrower control can go without. */
   .wide-only {
     display: none;
   }

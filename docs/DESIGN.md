@@ -139,6 +139,7 @@ ground-coloured with a 1px ink ring and a clear button.
 
 **Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
 before the label (after it for chevrons and the ↗ of a link that leaves).
+Icons are 16px, drawn on a 24px grid at a 2 stroke with square caps.
 Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
 text. Disabled: `control` fill with `ink-3` text. A control that is busy
 keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,

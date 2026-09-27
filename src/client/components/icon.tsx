@@ -1,7 +1,7 @@
 /**
- * Every glyph the interface draws, on one 24px grid with a 1.5 stroke, so
- * icons read as one set at the 16px they are shown at. Decorative: the control
- * that holds an icon carries the name.
+ * Every glyph the interface draws, on one 24px grid with a 2 stroke, so icons
+ * read as one set at the 16px they are shown at, as heavy as the 14/500 labels
+ * beside them. Decorative: the control that holds an icon carries the name.
  */
 const PATHS = {
   'arrow-left': 'M19 12H5M11 18l-6-6 6-6',
@@ -34,7 +34,7 @@ export function Icon({ name, filled = false }: { readonly name: IconName; readon
       height="16"
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="2"
       strokeLinecap="square"
       aria-hidden="true"
       focusable="false"
