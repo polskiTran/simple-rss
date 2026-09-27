@@ -286,6 +286,34 @@ describe('the Digest read three ways', () => {
     expect(await screen.findByText('Evening notes')).toBeDefined()
   })
 
+  it('keeps the day on show while the next one loads, and leaves its ticked Feeds behind', async () => {
+    const nextDay = Promise.withResolvers<{ body: ReturnType<typeof dayDigest> }>()
+    const api = digestWithCalendar()
+      .on('GET /api/digest?day=2026-08-07', { body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']) })
+      .on('GET /api/digest?day=2026-08-07&feed=2', { body: dayDigest('2026-08-07', 'Yesterday', ['A letter']) })
+      .on('GET /api/digest/days/2026-08-07', { body: DAY })
+      .on('GET /api/digest?day=2026-08-06', () => nextDay.promise)
+      .on('GET /api/digest/days/2026-08-06', { body: { date: '2026-08-06', feeds: [] } })
+    window.history.replaceState(null, '', '/digest?by=day&day=2026-08-07')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const filter = await screen.findByRole('complementary', { name: 'Narrow by feed' })
+    await user.click(within(filter).getByRole('checkbox', { name: /Weekly Letters/ }))
+    expect(await screen.findByText('A letter')).toBeDefined()
+
+    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+
+    expect(fact('Day')).toBe('Thursday 6 August')
+    await waitFor(() => expect(api.requestsTo('GET /api/digest?day=2026-08-06')).toHaveLength(1))
+    expect(screen.getByText('A letter')).toBeDefined()
+    expect(screen.queryByText('Loading the digest')).toBeNull()
+
+    nextDay.resolve({ body: dayDigest('2026-08-06', 'Thursday 6 August', ['Morning notes']) })
+    expect(await screen.findByText('Morning notes')).toBeDefined()
+    expect(screen.queryByText('A letter')).toBeNull()
+  })
+
   it('gives each Feed a card of its newest items, dated as briefly as the distance allows', async () => {
     const row = (feedItemId: number, title: string, date: string, displayTime: string) => ({
       feedItemId,

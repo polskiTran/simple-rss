@@ -21,7 +21,13 @@ export interface DigestByDayProps {
   onOpenFeed(feedId: number): void
 }
 
-/** One day of the Digest under its 26 weeks, narrowed by the Feeds ticked beside it. */
+const NONE_TICKED: ReadonlySet<number> = new Set()
+
+/**
+ * One day of the Digest under its 26 weeks, narrowed by the Feeds ticked beside it.
+ * Stepping to another day keeps the one on show — its counts, items and Feeds —
+ * until the next day answers, so the screen changes once rather than emptying first.
+ */
 export function DigestByDay({ day, calendar, onRetryCalendar, ...rest }: DigestByDayProps) {
   const shown = valueInView(calendar)
   if (day === undefined) {
@@ -46,8 +52,11 @@ function Day({
   calendar: DigestCalendar | undefined
 }) {
   const [feeds] = useResource((signal) => fetchDigestDay(day, signal), [day])
-  const [ticked, setTicked] = useState<ReadonlySet<number>>(new Set())
-  const dayFeeds = valueInView(feeds)?.feeds ?? []
+  // Ticked Feeds belong to the day they were ticked on; stepping away leaves them behind.
+  const [tickedOn, setTickedOn] = useState<{ day: string; feeds: ReadonlySet<number> }>({ day, feeds: new Set() })
+  const ticked = tickedOn.day === day ? tickedOn.feeds : NONE_TICKED
+  const shownFeeds = valueInView(feeds)
+  const dayFeeds = shownFeeds?.feeds ?? []
   const grid = calendar ? cadenceGrid(calendar.days) : undefined
 
   return (
@@ -56,7 +65,7 @@ function Day({
         {grid ? <CadenceGrid grid={grid} title="your digest" selected={day} onShowDay={onDay} /> : <div />}
         <dl className="rows day-facts">
           <Row label="Day" value={calendar ? dayOfDigest(day, calendar.today) : longDay(day)} />
-          {feeds.kind === 'loaded' ? (
+          {shownFeeds ? (
             <>
               <Row label="Items" value={dayFeeds.reduce((sum, feed) => sum + feed.count, 0).toLocaleString('en-GB')} />
               <Row label="Feeds" value={dayFeeds.length.toLocaleString('en-GB')} />
@@ -79,7 +88,13 @@ function Day({
           onOpenFeed={onOpenFeed}
         />
         {dayFeeds.length > 1 ? (
-          <FeedFilter id="day-feeds" title="Feeds that day" feeds={dayFeeds} shown={ticked} onChange={setTicked} />
+          <FeedFilter
+            id="day-feeds"
+            title="Feeds that day"
+            feeds={dayFeeds}
+            shown={ticked}
+            onChange={(chosen) => setTickedOn({ day, feeds: chosen })}
+          />
         ) : null}
       </div>
     </>

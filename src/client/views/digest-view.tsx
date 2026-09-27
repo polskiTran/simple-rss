@@ -103,7 +103,6 @@ export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewP
       ) : null}
       {mode.by === 'day' ? (
         <DigestByDay
-          key={day}
           day={day}
           calendar={calendar}
           onRetryCalendar={retryCalendar}
