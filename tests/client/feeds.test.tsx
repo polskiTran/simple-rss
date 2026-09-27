@@ -273,7 +273,7 @@ describe('Feeds', () => {
 })
 
 describe('the Feeds list', () => {
-  it('groups Subscriptions by Rhythm, and folds a long group behind Show N more', async () => {
+  it('groups Subscriptions by Rhythm, and folds a long group behind Show N more and back', async () => {
     const daily = Array.from({ length: 8 }, (_, index) => ({
       ...FEED,
       feedId: index + 10,
@@ -297,6 +297,11 @@ describe('the Feeds list', () => {
 
     expect(screen.getByRole('link', { name: 'Daily 7' })).toBeDefined()
     expect(screen.queryByRole('button', { name: /more/ })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Show fewer' }))
+
+    expect(screen.queryByRole('link', { name: 'Daily 7' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Show 2 more' })).toBeDefined()
   })
 
   it('lists every Subscription by name on request', async () => {

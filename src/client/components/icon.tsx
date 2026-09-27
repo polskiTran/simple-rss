@@ -9,6 +9,7 @@ const PATHS = {
   'chevron-down': 'M6 9l6 6 6-6',
   'chevron-left': 'M15 6l-6 6 6 6',
   'chevron-right': 'M9 6l6 6-6 6',
+  'chevron-up': 'M6 15l6-6 6 6',
   download: 'M12 4v11M7 10.5l5 5 5-5M5 20h14',
   external: 'M7 17L17 7M8.5 7H17v8.5',
   eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',

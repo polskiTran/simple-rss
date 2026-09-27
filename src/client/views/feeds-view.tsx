@@ -227,6 +227,14 @@ function RhythmGroup({
   const shown = expanded ? subscriptions : subscriptions.slice(0, GROUP_PREVIEW)
   const hidden = subscriptions.slice(shown.length)
 
+  const fold = () => {
+    setExpanded(false)
+    // Folding from the foot of a long group would leave the reader in the next
+    // one; bring the group back when its heading has scrolled away.
+    const top = document.getElementById(rhythmAnchor(rhythm))?.getBoundingClientRect().top ?? 0
+    if (top < 0) showGroup(rhythm)
+  }
+
   return (
     <Group
       id={rhythmAnchor(rhythm)}
@@ -243,6 +251,13 @@ function RhythmGroup({
             <Icon name="chevron-down" />
           </Button>
           <p className="note more-names">{hidden.map((subscription) => subscription.title).join(', ')}</p>
+        </div>
+      ) : expanded ? (
+        <div className="more">
+          <Button className="button" onClick={fold}>
+            Show fewer
+            <Icon name="chevron-up" />
+          </Button>
         </div>
       ) : null}
     </Group>

@@ -193,7 +193,8 @@ its place saying what happened, with an outlined Undo button, so the list does
 not jump.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
-rows to a group, then Show N more with the rest named beside it. Jump buttons
+rows to a group, then Show N more with the rest named beside it; opened,
+Show fewer folds it back. Jump buttons
 with each Rhythm's count reach the groups; By name lists everything
 alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
