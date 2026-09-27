@@ -135,8 +135,15 @@ an opened Feed, the Digest otherwise and when opened by address. An opened Feed
 is always Feeds. A search reads under its scope's section.
 
 **Back button.** A grey button with a leading arrow, named after the screen it
-returns to: Digest, Feeds, Saved, Article, Search, or the Feed's name. A screen
-opened by address falls back to its own section.
+returns to: Digest, Feeds, Saved, Article, Search, or the Feed's name. It is
+the browser's Back when the screen was opened from there, so it lands on the
+same entry, scrolled where it was left, and the browser's Back never reopens
+what was just closed. A screen opened by address walks forward to its own
+section instead.
+
+**Arriving.** Every screen names itself in the tab — `Digest — simple`, the
+Feed's name, the Feed Item's title — and on each navigation its heading takes
+focus, so the change is announced; the first load leaves focus alone.
 
 **Search field.** Grey, a magnifier before the words and a `/` key hint after
 them; `/` anywhere outside a field focuses it. The placeholder names the Search

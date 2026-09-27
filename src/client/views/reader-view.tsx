@@ -8,6 +8,7 @@ import {
   type ReaderItem,
   type ReadingSource,
 } from '../../shared/api.js'
+import { useScreenTitle } from '../arrival.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackButton } from '../components/back-button.js'
 import { Choice } from '../components/choice.js'
@@ -61,6 +62,7 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
     (signal) => fetchReaderItem(feedItemId, signal),
     [feedItemId],
   )
+  useScreenTitle(itemState.kind === 'loaded' ? itemState.value.title : undefined)
 
   useEffect(() => {
     performance.mark(READER_MARKS.entry)

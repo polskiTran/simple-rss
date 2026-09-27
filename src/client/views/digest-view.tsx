@@ -1,4 +1,5 @@
 import { Button } from '@base-ui/react/button'
+import { useScreenTitle } from '../arrival.js'
 import type { DigestCalendar } from '../../shared/api.js'
 import { RHYTHM_LABELS, RHYTHMS } from '../../shared/rhythm.js'
 import { fetchDigestCalendar } from '../api.js'
@@ -43,6 +44,7 @@ const RECENT_DAYS = 7
  * the first; until the calendar answers, the Digest is drawn as begun.
  */
 export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewProps) {
+  useScreenTitle('Digest')
   const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
   const today = valueInView(calendar)?.today
   const firstRun = valueInView(calendar)?.subscriptions === 0

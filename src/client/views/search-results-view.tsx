@@ -6,6 +6,7 @@ import {
   type SearchSort,
   type SearchSubscriptionMatch,
 } from '../../shared/api.js'
+import { useScreenTitle } from '../arrival.js'
 import { ApiError, fetchSearchResults } from '../api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedFilter } from '../components/feed-filter.js'
@@ -46,6 +47,7 @@ export function SearchResultsView({
   const request = searchParamsOf(line, scope, sort).toString()
   const [found, { retry, set }] = useResource((signal) => fetchSearchResults(line, scope, sort, signal), [request])
   const [shownFeeds, setShownFeeds] = useState<ReadonlySet<number>>(new Set())
+  useScreenTitle('Search')
   const answer = valueInView(found)
 
   const setSaved = (feedItemId: number, saved: boolean) =>
