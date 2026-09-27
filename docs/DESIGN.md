@@ -142,7 +142,8 @@ opened by address falls back to its own section.
 them; `/` anywhere outside a field focuses it. The placeholder names the Search
 Scope taken from the screen: "Search your reading", "Search your saves",
 "Search your feeds", "Search this feed". With words in it, the field turns
-ground-coloured with a 1px ink ring and a clear button.
+ground-coloured with a 1px ink ring and a clear button. Focused, it carries
+the 2px focus outline every control does.
 
 **Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
 before the label (after it for chevrons and the ↗ of a link that leaves).

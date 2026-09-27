@@ -1705,10 +1705,14 @@
     color: var(--color-ink-2);
   }
 
-  .search[data-filled] .search-field,
-  .search-field:focus-within {
+  .search[data-filled] .search-field {
     background: var(--color-ground);
     box-shadow: inset 0 0 0 1px var(--color-ink);
+  }
+
+  .search-field:focus-within {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
   }
 
   .search-input {
