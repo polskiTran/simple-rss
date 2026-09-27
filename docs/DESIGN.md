@@ -179,7 +179,8 @@ and 2px on a phone), month labels under it and a Fewer → More legend. A day
 with items is a button that scrolls to that day's items.
 
 **Group.** A group heading with its count in `ink-3`, a `rule` under it on
-panels, then its content. A count appears only when the whole group is loaded.
+panels, then its content. A count is always the whole group's: the Digest's
+come from the server; elsewhere a count appears only once the group is loaded.
 
 **Dialog.** A 560px ground panel with a hairline ring and a soft shadow over
 the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
@@ -191,6 +192,22 @@ the bottom edge with Cancel and the primary action side by side at 48px. In at
 **Undo line.** Removing something from a list leaves a `row-hover` line in
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
+
+**Digest.** Today's short date as the title's companion, then a switch of All
+items, By day and By feed; the address keeps the choice, so the way back from
+an article returns to it. All items groups by day, with a switch of Everything
+and each Rhythm at the other end narrowing it to the Feeds of that Rhythm;
+beside it, the last seven days with the whole Digest's count, each opening that
+day. By day draws 26 weeks of the whole Digest as the Cadence grid with the day
+on show ringed, and its facts beside it — the day, its items and Feeds, the 26
+weeks' items and busiest weekday — over the day's items; previous, Today and
+next step through days, never past today, and the Feeds that day narrow the
+list when ticked, as in search. By feed is a card per Subscription, the most
+recently published first: its name, the last 14 days of Cadence, its host, and
+its three newest items, each dated as briefly as the distance allows — 09:12,
+Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
+scroll as chips, the day list and the facts give way, the stepper names the
+day, and the cards stack.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,
@@ -267,7 +284,6 @@ fades and scrolling go instant, and the waiting tile holds still.
 
 ## 8. Not yet designed
 
-Drawn but waiting on the API: Digest by day and by source, the Digest's Rhythm
-filter and day list, Show in digest, and a Feed's editable URL. Not drawn: first-run and empty states,
+Drawn but waiting on the API: Show in digest and a Feed's editable URL. Not drawn: first-run and empty states,
 confirmations after adding or importing, the reader fallback, offline, and the
 dark versions of most screens — these follow the components above.
