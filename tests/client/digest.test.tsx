@@ -69,7 +69,7 @@ describe('the chronological Digest', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Today 60' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Show older items' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeDefined()
   })
 
   it('flips save to saved in place once the server confirms, and back', async () => {
@@ -110,12 +110,24 @@ describe('the chronological Digest', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('offers direction rather than mechanics when there is nothing yet', async () => {
+  it('leads to Add feed before any Subscription, with no Rhythms or Days to choose from', async () => {
+    stubApi().on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 0 } })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+
+    expect(await screen.findByText('Nothing yet. Subscribe to a feed to start your digest.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Add feed' })).toBeDefined()
+    expect(screen.queryByRole('group', { name: 'Rhythm' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Days' })).toBeNull()
+  })
+
+  it('says items are on their way when Subscriptions have yet to publish', async () => {
     stubApi()
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('Nothing yet. Subscribe to a feed in Feeds to start your digest.')).toBeDefined()
+    expect(await screen.findByText('Nothing yet. Items arrive here as your feeds publish.')).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Add feed' })).toBeNull()
   })
 
   it('tells a silent network apart from a refusing server, and offers the way back', async () => {
@@ -158,6 +170,7 @@ describe('the chronological Digest', () => {
 const CALENDAR = {
   today: '2026-08-08',
   days: cadenceWindow({ '2026-08-08': 2, '2026-08-07': 1, '2026-08-03': 4, '2026-06-03': 1 }),
+  subscriptions: 1,
 }
 
 const DAY = {

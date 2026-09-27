@@ -1,5 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import type { ReactNode } from 'react'
+import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { signOut } from '../api.js'
 import { Group } from '../components/group.js'
@@ -14,6 +15,7 @@ export interface SettingsViewProps {
 }
 
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
+  useScreenTitle('Settings')
   async function leave() {
     try {
       await signOut()

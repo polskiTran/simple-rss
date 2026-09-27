@@ -359,10 +359,14 @@ export const digestRequestSchema = z
   })
   .transform(({ rhythm, day, feed }) => ({ rhythm, day, feeds: feed }) satisfies DigestFilter)
 
-/** The Digest's own cadence: every day of the grid window, with `today` ending it. */
+/**
+ * The Digest's own cadence: every day of the grid window, with `today` ending
+ * it, and how many Subscriptions feed it — none means the Digest has yet to begin.
+ */
 export const digestCalendarSchema = z.object({
   today: z.string(),
   days: z.array(cadenceObservationSchema),
+  subscriptions: z.number().int().nonnegative(),
 })
 export type DigestCalendar = z.infer<typeof digestCalendarSchema>
 

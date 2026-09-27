@@ -1,5 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { useState, type FormEvent } from 'react'
+import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { ApiError, claimInstallation } from '../api.js'
 import { Field } from '../components/field.js'
@@ -12,6 +13,7 @@ export interface SetupViewProps {
 }
 
 export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
+  useScreenTitle('Set up')
   const [setupSecret, setSetupSecret] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')

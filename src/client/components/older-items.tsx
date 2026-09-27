@@ -3,20 +3,19 @@ import { Button } from '@base-ui/react/button'
 export type OlderState = 'idle' | 'loading' | 'failed'
 
 /**
- * The way further along a paged list — back in time, or forward when the list
- * runs oldest first; absent once the list has ended.
+ * The way further along a paged list, in whichever order it runs; absent once
+ * the list has ended. It says Show more rather than a number: a page may finish
+ * the last day shown and run on into others, and nothing counts what remains.
  */
 export function OlderItems({
   nextCursor,
   older,
   noun,
-  toward = 'older',
   onLoadOlder,
 }: {
   nextCursor: string | null
   older: OlderState
   noun: 'items' | 'saves'
-  toward?: 'older' | 'newer'
   onLoadOlder: (cursor: string) => void
 }) {
   if (nextCursor === null) return null
@@ -28,11 +27,11 @@ export function OlderItems({
         disabled={older === 'loading'}
         onClick={() => onLoadOlder(nextCursor)}
       >
-        {older === 'loading' ? `Loading ${toward} ${noun}…` : older === 'failed' ? 'Retry' : `Show ${toward} ${noun}`}
+        {older === 'loading' ? `Loading more ${noun}…` : older === 'failed' ? 'Retry' : 'Show more'}
       </Button>
       {older === 'failed' ? (
         <p className="note note-error" role="status">
-          {toward === 'older' ? 'Older' : 'Newer'} {noun} are out of reach.
+          More {noun} are out of reach.
         </p>
       ) : null}
     </div>

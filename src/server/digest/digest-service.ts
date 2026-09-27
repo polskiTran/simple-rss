@@ -94,14 +94,15 @@ export class DigestService {
     }
   }
 
-  /** Every day of the cadence grid window, counted across the whole Digest. */
+  /** Every day of the cadence grid window, counted across the whole Digest, and the Subscriptions feeding it. */
   calendar(): DigestCalendar {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const today = dateKey(now, timezone)
     const days = gridDayKeys(today)
     const counts = this.#countsByDay([], days[0] ?? today, today, now, timezone)
-    return { today, days: days.map((date) => ({ date, count: counts.get(date) ?? 0 })) }
+    const subscribed = this.#db.select({ count: count() }).from(subscriptions).get()?.count ?? 0
+    return { today, days: days.map((date) => ({ date, count: counts.get(date) ?? 0 })), subscriptions: subscribed }
   }
 
   /** The Feeds that published on `date`, busiest first, then by title. */
