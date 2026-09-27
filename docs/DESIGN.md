@@ -107,8 +107,9 @@ Numbers in counts and meta use tabular figures.
 ## 4. Space and size
 
 - Desktop pages are 40px from the sides with content no wider than 1280px;
-  content starts 56px below the header (32px on the Reader and an opened Feed,
-  which lead with a back button).
+  content starts 56px below the header (32px on an opened Feed, which leads
+  with a back button). The Reader's toolbar sits 32px below the header and its
+  title 64px below that.
 - Control height is 36px on desktop and 44px on a phone (48px for fields and
   sheet buttons). Small inline controls are 30px.
 - Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
@@ -124,8 +125,9 @@ The header scrolls with the page.
 
 **Phone chrome.** A 60px top bar: the mark on the left, a 44px search square
 on the right. A nested screen — an opened Feed, the Reader — swaps the mark for
-a back square. Pressing the search square turns the bar into the search field
-with a back square. A bottom tab bar carries Digest, Feeds, Saved and Settings
+a back square, and the Reader sets Open original and Save as squares beside the
+search square, so one row holds its whole toolbar. Pressing the search square
+turns the bar into the search field with a back square. A bottom tab bar carries Digest, Feeds, Saved and Settings
 as a 48px grey track whose current tab is a ground segment; the Reader, search
 and dialogs hide it.
 
@@ -248,15 +250,22 @@ grid), Info (subscribed, items in 26 weeks, busiest day, longest quiet
 stretch, last checked) and Settings (Check every, Open items with). Items follow, grouped by
 day with whole counts.
 
-**Reader.** A toolbar — the way back on the left; the Reading Source switch,
-Open original ↗ and Save on the right — over a 680px column: the title, a meta
-line of the Feed (a link), the day and the minutes to read, then the article.
+**Reader.** A toolbar — the way back on the left, Open original ↗ and Save on
+the right — over a 680px column: the title, a meta line of the Feed (a link),
+the day and the minutes to read, the Reading Source switch (spanning the column
+on a phone), then the article.
 The meta line names the reading only when it is not the one chosen: "Feed
 content for now" while the Original webpage loads or fails, or the one reading
 an item has when the chosen one is missing. Article links are ink and
 underlined; they all leave, so none carries ↗. Next in the digest closes the
-article as an item box. On a phone the switch takes its own row under the Open
-original and Save squares.
+article as an item box.
+
+The reading is set by the stylesheet, not the renderer: headings in Literata at
+1.42em, 1.2em and 1em (600), each with room above it; list markers hanging
+outside the column; a quote behind a 1px ink rule; tables in Instrument Sans
+14/1.45 between hairlines; code squared in a thin-edged box with no controls;
+images inside a faint 1px inset line. Waiting and retrying say what is read —
+"Reading the original webpage", then plain Retry.
 
 **Saved.** The count of saves as the title's companion, then a switch of
 Newest saved, Oldest saved and By feed. The save orders group by the month

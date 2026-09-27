@@ -30,7 +30,7 @@ describe('a wait', () => {
     ['/saved', 'Loading your saves'],
     ['/feeds', 'Loading feeds'],
     ['/feeds/1', 'Loading the feed'],
-    ['/reader/3', 'Opening the article'],
+    ['/reader/3', 'Opening the item'],
   ])('puts the mark beside the words at %s', async (path, words) => {
     waiting()
     renderAt(path)

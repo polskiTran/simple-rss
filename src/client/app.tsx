@@ -1,7 +1,8 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useArrival } from './arrival.js'
 import { useAccess, type Gate } from './authentication.js'
 import { BackButton } from './components/back-button.js'
+import { ChromeToolbarSlot } from './components/chrome-toolbar.js'
 import { GlobalSearch } from './components/global-search.js'
 import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
@@ -36,6 +37,7 @@ export function App() {
   const open = gate.access.kind === 'open'
   const back = open ? nestedOrigin(navigation) : undefined
   const page = useRef<HTMLElement>(null)
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null)
   useArrival(navigation.arrival, page)
 
   return (
@@ -51,12 +53,15 @@ export function App() {
               onQueryChange={navigation.updateSearch}
             />
             <SectionNav active={navigation.route} onNavigate={navigation.navigate} />
+            <div className="chrome-toolbar" ref={setToolbarSlot} />
           </>
         ) : null}
       </header>
-      <main className="page" ref={page}>
-        {viewFor(gate, navigation)}
-      </main>
+      <ChromeToolbarSlot value={toolbarSlot}>
+        <main className="page" ref={page}>
+          {viewFor(gate, navigation)}
+        </main>
+      </ChromeToolbarSlot>
     </div>
   )
 }

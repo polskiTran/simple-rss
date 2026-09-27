@@ -130,9 +130,11 @@ function reading(path: string): StubbedApi {
   return api
 }
 
-/** The view's own way back; the phone bar repeats it outside `main`. */
+/** The view's own way back, after the phone bar's square that repeats it. */
 function wayBack() {
-  return within(screen.getByRole('main')).getByRole('link', { name: /^Back to / })
+  const way = screen.getAllByRole('link', { name: /^Back to / }).at(-1)
+  if (!way) throw new Error('the screen offers no way back')
+  return way
 }
 
 /** The scope the results' switch holds. */
@@ -247,7 +249,7 @@ describe('a Feed Item’s attribution', () => {
     expect(screen.queryByRole('link', { name: /Slow Press/ })).toBeNull()
   })
 
-  it('opens its Feed from the Reader, and that Feed returns to the article', async () => {
+  it('opens its Feed from the Reader, and that Feed returns to the Reader', async () => {
     reading('/reader/3')
     render(<App />)
     const user = userEvent.setup()
@@ -258,7 +260,7 @@ describe('a Feed Item’s attribution', () => {
     await user.click(attribution)
 
     await openedFeed()
-    expect(wayBack().textContent).toBe('Article')
+    expect(wayBack().textContent).toBe('Reader')
 
     await user.click(wayBack())
     expect(await openedArticle()).toBeDefined()

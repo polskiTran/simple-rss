@@ -59,7 +59,7 @@ test.describe('Reader View', () => {
       await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
       await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
       await expect(page.locator('.reader-meta')).toContainText('1 min read')
-      await expect(page.getByText('Parsing the original page')).toBeVisible()
+      await expect(page.getByText('Reading the original webpage')).toBeVisible()
       const link = page.getByRole('link', { name: 'the feed notebook' })
       await expect(link).toHaveAttribute('href', 'https://publisher.example/feed-notes')
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
@@ -107,7 +107,7 @@ test.describe('Reader View', () => {
 
     await page.getByRole('button', { name: 'Original webpage' }).click()
     await expect.poll(() => articleRequests.length).toBe(1)
-    await expect(page.getByText('Parsing the original page')).toBeVisible()
+    await expect(page.getByText('Reading the original webpage')).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
     await page.getByRole('button', { name: 'Feed content' }).click()
     held.resolve()
@@ -131,7 +131,7 @@ test.describe('Reader View', () => {
 
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
     await expect(page.getByText('A clear morning.')).toBeVisible()
-    await expect(page.getByText('Parsing the original page')).toBeVisible()
+    await expect(page.getByText('Reading the original webpage')).toBeVisible()
     const meta = page.locator('.reader-meta')
     await expect(meta).toContainText('Field Notes')
     await expect(meta).toContainText(/\d+ min read/)
@@ -217,7 +217,7 @@ test.describe('Reader View', () => {
 
     await page.getByRole('link', { name: 'First light' }).click()
     await expect(page.getByText('A clear morning.')).toBeVisible()
-    await expect(page.getByText('Parsing the original page')).toBeVisible()
+    await expect(page.getByText('Reading the original webpage')).toBeVisible()
 
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('A clear morning.')).toHaveCount(0)
@@ -252,7 +252,7 @@ test.describe('Reader View', () => {
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
 
-    const retry = page.getByRole('button', { name: 'Retry parsing' })
+    const retry = page.getByRole('button', { name: 'Retry' })
     for (let attempt = 1; attempt < 5; attempt += 1) {
       const failed = page.waitForResponse((response) => response.url().endsWith('/reader'))
       await retry.click()
@@ -329,7 +329,7 @@ test.describe('Reader View at the server deadline', () => {
     await page.getByRole('link', { name: 'Slow ridge' }).click()
 
     await expect(page.getByText('The ridge holds its light.')).toBeVisible()
-    await expect(page.getByText('Parsing the original page')).toBeVisible()
+    await expect(page.getByText('Reading the original webpage')).toBeVisible()
 
     const answered = await deadline
     expect(answered.status()).toBe(504)
@@ -361,7 +361,7 @@ test.describe('Reader View at phone width', () => {
     await subscribe(page, installation, installation.brokenArticleFeedUrl)
     await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'Slow water' }).click()
-    await expect(page.getByRole('button', { name: 'Retry parsing' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
     await expect(page.getByText('Shortened by simple. Open the original for the rest.')).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Feed content')
@@ -396,7 +396,7 @@ test.describe('Reader View at phone width', () => {
     await subscribe(page, installation, installation.imageOnlyFeedUrl)
     await section(page, 'Digest').click()
     await page.getByRole('link', { name: 'Moonrise' }).click()
-    await expect(page.getByRole('button', { name: 'Retry parsing' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Feed content')
     await expect(page.getByText('A separate preview, not the drawing.')).toHaveCount(0)
     const image = page.getByRole('img', { name: 'The moon rises over a sleeping valley' })
@@ -426,6 +426,21 @@ test.describe('Reader View at phone width', () => {
     const back = page.getByRole('link', { name: 'Back to Digest' })
     await expect(back).toHaveCount(1)
     await expect(back).toHaveClass(/chrome-back/)
+
+    // One top bar: the back square, then Open original, Save and search, in that order.
+    const topBar = [
+      back,
+      page.getByRole('link', { name: 'Open original' }),
+      page.getByRole('button', { name: 'Save First light' }),
+      page.getByRole('button', { name: 'Search' }),
+    ]
+    const boxes = await Promise.all(topBar.map((control) => control.boundingBox()))
+    for (const box of boxes) {
+      expect(box?.height).toBe(44)
+      expect(box?.y).toBe(boxes[0]?.y)
+    }
+    const lefts = boxes.map((box) => box?.x ?? Number.NaN)
+    expect(lefts).toEqual([...lefts].sort((a, b) => a - b))
     await expect(page.getByText('Next in the digest')).toHaveCount(0)
 
     await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()
