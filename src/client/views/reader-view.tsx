@@ -211,7 +211,9 @@ function OpenReader({
         ) : null}
         {displayed ? (
           <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
-            <ArticleMarkdown markdown={displayed.content.markdown} />
+            {/* Keyed by source, so the Original webpage arriving over Feed Content is a
+                new article that fades in, never text rewritten under the reader. */}
+            <ArticleMarkdown key={displayed.source} markdown={displayed.content.markdown} />
             {selectedLoaded ? <MarkdownCommitted /> : null}
           </Suspense>
         ) : null}

@@ -63,11 +63,41 @@ describe('type', () => {
   })
 })
 
+describe('motion', () => {
+  const startingStyles = () =>
+    [...css.matchAll(/@starting-style\s*\{([^}]*)\{\s*opacity: 0;\s*\}/g)].map(([, rule]) => rule)
+
+  it('opens a screen at once and fades in only what the server sends', () => {
+    expect(startingStyles().some((rule) => rule?.includes('.view'))).toBe(false)
+    const arrival = startingStyles().find((rule) => rule?.includes('.item'))
+    for (const data of ['.item', '.feed-row', '.feed-card', '.page-title-companion']) expect(arrival).toContain(data)
+  })
+
+  it('shows a waiting line only once the wait passes 400ms', () => {
+    expect(block('.loading-note')).toContain('animation: note-arrive 150ms ease-out 400ms both')
+  })
+
+  it('fades the scrollbar gutter with the scrim, out as well as in', () => {
+    expect(block('html:has(.dialog-backdrop)')).toContain('transition: background-color 150ms')
+    expect(block('html:has(.dialog-backdrop[data-ending-style])')).toContain('background: var(--color-ground)')
+  })
+
+  it('raises the phone sheet from the bottom edge', () => {
+    const phone = css.slice(css.indexOf('@media (max-width: 640px)'))
+    expect(phone).toMatch(
+      /\.dialog:is\(\[data-starting-style\], \[data-ending-style\]\)\s*\{\s*opacity: 1;\s*transform: translateY\(100%\)/,
+    )
+  })
+})
+
 describe('motion under prefers-reduced-motion', () => {
   const reduced = () => css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
 
-  it('opens and closes dialogs instantly', () => {
-    expect(reduced()).toMatch(/\.dialog\[data-ending-style\]\s*\{\s*transition-duration: 0s/)
+  it('keeps the fades but moves nothing: the phone sheet fades in place', () => {
+    expect(reduced()).toMatch(
+      /\.dialog:is\(\[data-starting-style\], \[data-ending-style\]\)\s*\{\s*opacity: 0;\s*transform: none/,
+    )
+    expect(reduced()).not.toContain('transition-duration: 0s')
   })
 
   it('stops the mark’s glint, so the waiting tile holds still', () => {

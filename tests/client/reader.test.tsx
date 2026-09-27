@@ -93,6 +93,27 @@ describe('Reader View', () => {
     expect(screen.getByRole('button', { name: 'Feed content' }).getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('brings the Original webpage in as a new article over Feed Content, never rewriting it in place', async () => {
+    const pending = Promise.withResolvers<void>()
+    reading()
+      .on('GET /api/items/3', {
+        body: { ...ITEM, feedContent: { markdown: '## Feed methods', truncated: true, readingTimeMinutes: 2 } },
+      })
+      .on('GET /api/items/3/reader', async () => {
+        await pending.promise
+        return { body: ARTICLE }
+      })
+    render(<App />)
+
+    const standIn = (await screen.findByRole('heading', { name: 'Feed methods' })).closest('.article-body')
+    pending.resolve()
+    const arrived = (await screen.findByRole('heading', { name: 'Dawn' })).closest('.article-body')
+
+    expect(arrived).not.toBeNull()
+    expect(arrived).not.toBe(standIn)
+    expect(standIn?.isConnected).toBe(false)
+  })
+
   it('uses the Subscription preference without requesting the original and ignores a held old source', async () => {
     const original = Promise.withResolvers<{ body: typeof ARTICLE }>()
     const feedContent = {

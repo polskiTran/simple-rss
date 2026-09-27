@@ -225,9 +225,11 @@ come from the server; elsewhere a count appears only once the group is loaded.
 the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
 is right-aligned Cancel and the primary action, which stays disabled until
 there is something to submit. On a phone it is a hard-edged sheet rising from
-the bottom edge with Cancel and the primary action side by side at 48px. In at
-150ms, out at 120ms, opacity only. While one is open the page's scrollbar
-gutter takes the scrim's colour too, so no bright strip runs down the edge.
+the bottom edge with Cancel and the primary action side by side at 48px. The
+scrim and the desktop panel fade in over 150ms and out over 120ms; the sheet
+rises in over 240ms and sinks out over 180ms, opaque, under the fading scrim.
+While one is open the page's scrollbar gutter takes the scrim's colour too,
+fading with it both ways, so no strip runs down the edge.
 
 **Undo line.** Removing something from a list leaves a `row-hover` line in
 its place saying what happened, with an outlined Undo button, so the list does
@@ -332,10 +334,21 @@ isn't right. Passwords are case-sensitive."
 
 ## 7. Motion
 
-A pressed control answers instantly; motion belongs to arrivals. A screen fades
-in over 150ms, an article arriving from extraction over 200ms, opacity only. A
-dialog is the one thing with an exit. Under `prefers-reduced-motion` the dialog
-fades and scrolling go instant, and the waiting tile holds still.
+Chrome is instant; data arrives. What the User presses or opens — a control, a
+switch, a screen with its title and toolbar, a hover — changes in the same
+frame, and nothing moves: a pressed control steps its fill, never its size.
+What the server sends — item boxes, Feed rows and cards, a group's heading, a
+title's companion value, a Feed's panels — fades in over 150ms as it mounts,
+opacity only; an article over 200ms, and the Original webpage arriving over
+Feed Content is a new article that fades in, never text rewritten in place. A
+wait shorter than 400ms shows nothing; after that the waiting line fades in.
+Stepping to another day keeps the one on show until the next answers, so the
+screen changes once rather than emptying first.
+
+A dialog is the one thing with an exit (see Dialog). Under
+`prefers-reduced-motion` there is less motion, not none: fades stay, nothing
+moves — the sheet fades in place instead of rising, jumps scroll instantly, and
+the waiting tile holds still.
 
 ## 8. Not yet designed
 

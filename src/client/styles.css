@@ -133,12 +133,17 @@
     padding-top: 64px;
   }
 
-  .view {
+  /* Chrome is instant; data arrives. A screen's own title and controls are
+     there the moment it opens; what the server sends — item boxes, Feed rows
+     and cards, a group's heading, a title's companion value, a Feed's panels —
+     fades in once, as it mounts. Nothing here nests inside another, so no
+     fade compounds. */
+  :is(.item, .feed-row, .feed-card, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
     transition: opacity 150ms ease-out;
   }
 
   @starting-style {
-    .view {
+    :is(.item, .feed-row, .feed-card, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
       opacity: 0;
     }
   }
@@ -500,12 +505,19 @@
   /* The page keeps a scrollbar gutter the fixed scrim cannot reach, and the
      gutter paints only the root's background colour. While a dialog is open
      that colour is the scrim laid over the ground, mixed solid: `scrim` is ink
-     at .24 in light and black at .5 in dark. */
+     at .24 in light and black at .5 in dark. It fades with the scrim, both
+     ways, so no dark strip runs ahead of it or outlasts it. */
   html:has(.dialog-backdrop) {
     background: light-dark(
       color-mix(in srgb, var(--color-ink) 24%, var(--color-ground)),
       color-mix(in srgb, black 50%, var(--color-ground))
     );
+    transition: background-color 150ms ease-out;
+  }
+
+  html:has(.dialog-backdrop[data-ending-style]) {
+    background: var(--color-ground);
+    transition-duration: 120ms;
   }
 
   .dialog-viewport {
@@ -899,6 +911,14 @@
     margin: 0;
     font-size: 14px;
     color: var(--color-ink-2);
+    /* A wait shorter than 400ms shows nothing; a longer one fades the line in. */
+    animation: note-arrive 150ms ease-out 400ms both;
+  }
+
+  @keyframes note-arrive {
+    from {
+      opacity: 0;
+    }
   }
 
   .loading-note .wordmark-cell {
@@ -2341,7 +2361,8 @@
     height: 48px;
   }
 
-  /* Dialog: a sheet from the bottom edge. */
+  /* Dialog: a sheet that rises from the bottom edge under the fading scrim,
+     and sinks back into it. The sheet stays opaque; only the scrim fades. */
 
   .dialog-viewport {
     align-items: flex-end;
@@ -2352,6 +2373,16 @@
     width: 100%;
     padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
     box-shadow: none;
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dialog:is([data-starting-style], [data-ending-style]) {
+    opacity: 1;
+    transform: translateY(100%);
+  }
+
+  .dialog[data-ending-style] {
+    transition-duration: 180ms;
   }
 
   .dialog-footer > * {
@@ -2401,12 +2432,20 @@
   }
 }
 
+/* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
+   place instead of rising, and the waiting tile holds still. */
 @media (prefers-reduced-motion: reduce) {
-  .dialog-backdrop,
-  .dialog,
-  .dialog-backdrop[data-ending-style],
+  .dialog {
+    transition: opacity 150ms ease-out;
+  }
+
+  .dialog:is([data-starting-style], [data-ending-style]) {
+    opacity: 0;
+    transform: none;
+  }
+
   .dialog[data-ending-style] {
-    transition-duration: 0s;
+    transition-duration: 120ms;
   }
 
   .wordmark-cell {
