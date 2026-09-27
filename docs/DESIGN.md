@@ -33,14 +33,21 @@ CAPS, decoration without a source in the data.
 Tokens are OKLCH. Ink rules are the ink at an alpha, so they sit correctly on
 any ground.
 
+`ink-2` is the quietest grey for small text — meta, counts, placeholders. On
+`ground`, `ink-3` clears only 3:1, so it is text only where that is enough:
+the page title's companion value, disabled controls and separator dots. On a
+selected filter's `ink` fill it clears 4.5:1 and carries that filter's count.
+The lowest step with items, `ramp-2`, is 3:1 against `ground`, so a day with
+one item never reads as empty.
+
 ### Light
 
 | Token | Value | Use |
 | --- | --- | --- |
 | `ground` | `oklch(100% 0 0)` | page, dialog panel, selected segment |
 | `ink` | `oklch(17.8% 0 0)` | text, primary button fill |
-| `ink-2` | `oklch(53.8% 0 0)` | meta, secondary text |
-| `ink-3` | `oklch(71.5% 0 0)` | counts, companion values |
+| `ink-2` | `oklch(53.8% 0 0)` | meta, secondary text, counts, placeholders |
+| `ink-3` | `oklch(62% 0 0)` | title companion values, disabled text, separators |
 | `ink-off` | `oklch(47.5% 0 0)` | unselected segment text |
 | `control` | `oklch(95.2% 0 0)` | grey buttons, fields, switch tracks |
 | `control-hover` | `oklch(91.9% 0 0)` | |
@@ -51,10 +58,10 @@ any ground.
 | `rule-soft` | ink at `.07` | between rows |
 | `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
-| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(84.5% 0.058 278.5)` · `oklch(70% 0.118 276.9)` · `oklch(55.5% 0.184 273.5)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
+| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.5% 0.11 277.5)` · `oklch(59.4% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
 | `away` | `ramp-5` | a Feed's host in a Feed row |
-| `match` | `oklch(91.4% 0.032 277.9)` | search highlight |
+| `match` | `oklch(91.4% 0.032 277.9)` | search highlight, under `ink` text |
 | `scrim` | ink at `.24` | behind a dialog |
 
 ### Dark
@@ -63,7 +70,7 @@ any ground.
 | --- | --- |
 | `ground` | `oklch(18.2% 0 0)` |
 | `ink` | `oklch(94.6% 0 0)`; a primary button's text is `ground` |
-| `ink-2` / `ink-3` | `oklch(68.6% 0 0)` / `oklch(54.5% 0 0)` |
+| `ink-2` / `ink-3` | `oklch(68.6% 0 0)` / `oklch(53% 0 0)` |
 | `control` / `control-hover` | `oklch(26.9% 0 0)` / `oklch(30.9% 0 0)` |
 | selected segment | `oklch(34.8% 0 0)` |
 | `row-hover` | `oklch(22.6% 0 0)` |
@@ -72,10 +79,10 @@ any ground.
 | rules and edges | `ink` at the light alphas |
 | reader body | `oklch(88.8% 0 0)` |
 | `danger` | `oklch(73.2% 0.164 27.1)` |
-| `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(37.5% 0.063 97.7)` · `oklch(53% 0.098 95.7)` · `oklch(73.1% 0.138 94.5)` · `oklch(85.8% 0.158 94.4)` |
+| `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(49% 0.08 97)` · `oklch(61.3% 0.106 96.1)` · `oklch(73.5% 0.132 95.2)` · `oklch(85.8% 0.158 94.4)` |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` |
 | `away` | `ramp-5` |
-| `match` | `ramp-2` |
+| `match` | `oklch(37.5% 0.063 97.7)` |
 
 Appearance follows the system unless the User picks Light or Dark in Settings;
 the choice is per device.
@@ -85,7 +92,7 @@ the choice is per device.
 | Role | Face | Size / line-height | Weight |
 | --- | --- | --- | --- |
 | Page title | Instrument Sans | 40/1 desktop, 32/1 phone, −0.015em | 500; companion value in `ink-3` at 400 |
-| Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-3` at 400 |
+| Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-2` at 400 |
 | Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
 | Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
 | Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
@@ -191,7 +198,7 @@ phone. A day with no items is `ramp-1`; items step up the ramp.
 and 2px on a phone), month labels under it and a Fewer → More legend. A day
 with items is a button that scrolls to that day's items.
 
-**Group.** A group heading with its count in `ink-3`, a `rule` under it on
+**Group.** A group heading with its count in `ink-2`, a `rule` under it on
 panels, then its content. A count is always the whole group's: the Digest's
 come from the server; elsewhere a count appears only once the group is loaded.
 
@@ -220,12 +227,18 @@ recently published first: a Feed row with the last 14 days of Cadence, then
 under a `rule-soft` line its three newest items, each dated as briefly as the
 distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
 scroll as chips, the day list and the facts give way, the stepper names the
-day, and the cards stack.
+day, and the cards stack. A long list ends in Show more, which loads the next
+page wherever it falls — the rest of a day or days beyond it — so it names no
+number; Saved ends the same way. Before the first Subscription, All items is a
+note and Add feed as the primary action, with no Rhythms and no days beside
+it; with Subscriptions but nothing yet, the note says items arrive as the
+Feeds publish.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,
-Show fewer folds it back. Jump buttons
-with each Rhythm's count scroll to a group and take focus into it; By name lists everything
+Show fewer folds it back. With no Subscriptions there is nothing to export,
+so Export OPML gives way to Add feed alone. Jump buttons
+with each Rhythm's count reach the groups; By name lists everything
 alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
 
@@ -297,6 +310,6 @@ fades and scrolling go instant, and the waiting tile holds still.
 
 ## 8. Not yet designed
 
-Drawn but waiting on the API: Show in digest and a Feed's editable URL. Not drawn: first-run and empty states,
-confirmations after adding or importing, the reader fallback, offline, and the
+Drawn but waiting on the API: Show in digest and a Feed's editable URL. Not drawn: empty states beyond the Digest's
+first run, confirmations after adding or importing, the reader fallback, offline, and the
 dark versions of most screens — these follow the components above.

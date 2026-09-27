@@ -90,17 +90,17 @@ test.describe('the Digest presentation', () => {
     await expect(page.locator('main')).not.toContainText('07:15')
   })
 
-  test('ends at fifty items with Show older items, and one press extends the day', async ({ page, installation }) => {
+  test('ends at fifty items with Show more, and one press extends the day', async ({ page, installation }) => {
     await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
     await expect(page.locator('main article.item')).toHaveCount(50)
-    const older = page.getByRole('button', { name: 'Show older items' })
-    await expect(older).toBeVisible()
+    const more = page.getByRole('button', { name: 'Show more' })
+    await expect(more).toBeVisible()
 
-    await older.click()
+    await more.click()
     await expect(page.locator('main article.item')).toHaveCount(55)
-    await expect(older).toBeHidden()
+    await expect(more).toBeHidden()
   })
 
   test('comes back from an article to the same entry and place, announced', async ({ page, installation }) => {

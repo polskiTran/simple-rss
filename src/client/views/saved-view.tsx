@@ -162,13 +162,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
           </Group>
         ))
       )}
-      <OlderItems
-        nextCursor={library.nextCursor}
-        older={older}
-        noun="saves"
-        toward={fetchOrder === 'oldest' ? 'newer' : 'older'}
-        onLoadOlder={loadOlder}
-      />
+      <OlderItems nextCursor={library.nextCursor} older={older} noun="saves" onLoadOlder={loadOlder} />
     </div>
   )
 }

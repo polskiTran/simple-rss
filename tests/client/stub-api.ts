@@ -20,7 +20,7 @@ export class StubbedApi {
     this.on('GET /api/meta', { body: { name: 'simple-rss', version: '0.1.0' } })
     this.on('GET /api/feeds', { body: { subscriptions: [] } })
     this.on('GET /api/digest', { body: { today: '2026-08-08', groups: [], nextCursor: null } })
-    this.on('GET /api/digest/days', { body: { today: '2026-08-08', days: [] } })
+    this.on('GET /api/digest/days', { body: { today: '2026-08-08', days: [], subscriptions: 1 } })
     this.on('GET /api/library', { body: { today: '2026-08-08', total: 0, items: [], nextCursor: null } })
     this.on('GET /api/settings', { body: { timezone: 'UTC' } })
   }

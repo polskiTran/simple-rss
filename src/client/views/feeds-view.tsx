@@ -110,10 +110,12 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
             {subscriptions ? <span className="page-title-companion">{subscriptions.length}</span> : null}
           </h1>
           <div className="toolbar-group feeds-actions">
-            <a className="button" href="/api/subscriptions/export" download="subscriptions.opml">
-              <Icon name="download" />
-              Export<span className="wide-only"> OPML</span>
-            </a>
+            {subscriptions?.length === 0 ? null : (
+              <a className="button" href="/api/subscriptions/export" download="subscriptions.opml">
+                <Icon name="download" />
+                Export<span className="wide-only"> OPML</span>
+              </a>
+            )}
             <AddFeedDialog
               onSubscribed={(created) => void subscribed(created.subscription.feedId)}
               onImported={imported}
