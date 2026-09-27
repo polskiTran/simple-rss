@@ -11,6 +11,7 @@ import {
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackButton } from '../components/back-button.js'
 import { Choice } from '../components/choice.js'
+import { ChromeToolbar } from '../components/chrome-toolbar.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
 import { Icon } from '../components/icon.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
@@ -45,7 +46,7 @@ const DEADLINE_REFETCH_ATTEMPTS = 2
 
 const STAGE_NOTES = {
   publisher: 'Waiting on the publisher',
-  parsing: 'Parsing the article',
+  parsing: 'Still reading the original webpage',
 } as const satisfies Record<ReaderDeadlineStage, string>
 
 export interface ReaderViewProps {
@@ -73,14 +74,14 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
   if (itemState.kind === 'loading' || itemState.kind === 'unavailable' || itemState.kind === 'unreachable') {
     return (
       <div className="view reader">
-        <div className="view-topline">
+        <ChromeToolbar>
           <BackButton className="view-back" origin={origin} onBack={onBack} />
-        </div>
+        </ChromeToolbar>
         <div className="reader-column">
           {itemState.kind === 'loading' ? (
-            <LoadingNote>Opening the article</LoadingNote>
+            <LoadingNote>Opening the item</LoadingNote>
           ) : (
-            <LoadFailure subject="The article" kind={itemState.kind} onRetry={retry} />
+            <LoadFailure subject="The item" kind={itemState.kind} onRetry={retry} />
           )}
         </div>
       </div>
@@ -130,7 +131,7 @@ function OpenReader({
         ? 'original-webpage'
         : 'feed-content'
   const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
-  const [sourceState, { retry: retryParsing }] = useResource(
+  const [sourceState, { retry: retrySource }] = useResource(
     async (signal): Promise<SourceResult> => {
       setPreparingStage(undefined)
       if (source === 'feed-content' && item.feedContent) {
@@ -153,7 +154,7 @@ function OpenReader({
   const displayed: SourceResult | undefined =
     selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
   const next = item.nextInDigest
-  const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'Parsing the original page'
+  const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'Reading the original webpage'
   const waitingContent = item.summary ? (
     <div className="reader-waiting">
       <p className="reader-summary">{item.summary}</p>
@@ -166,22 +167,13 @@ function OpenReader({
 
   return (
     <article className="view reader">
-      <div className="view-topline">
+      <ChromeToolbar>
         <BackButton className="view-back" origin={origin} onBack={onBack} />
-        <div className="toolbar-group reader-actions">
-          {canSwitchSource ? (
-            <Choice
-              label="Reading source"
-              className="reader-source"
-              options={READING_SOURCES.map((option) => ({ value: option, label: READING_SOURCE_LABELS[option] }))}
-              value={viewSource}
-              onChange={setViewSource}
-            />
-          ) : null}
+        <div className="toolbar-group">
           {item.link ? <OpenOriginal link={item.link} /> : null}
           <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} labelled onSaved={onSaved} />
         </div>
-      </div>
+      </ChromeToolbar>
 
       <div className="reader-column">
         <header className="reader-header">
@@ -199,6 +191,15 @@ function OpenReader({
               {displayed ? <ReadingNote shown={displayed.source} resolved={source} chosen={viewSource} /> : null}
             </span>
           </p>
+          {canSwitchSource ? (
+            <Choice
+              label="Reading source"
+              className="reader-source"
+              options={READING_SOURCES.map((option) => ({ value: option, label: READING_SOURCE_LABELS[option] }))}
+              value={viewSource}
+              onChange={setViewSource}
+            />
+          ) : null}
         </header>
 
         {displayed?.source === 'feed-content' && displayed.content.truncated ? (
@@ -224,7 +225,7 @@ function OpenReader({
             item={item}
             waitSeconds={waitSecondsOf(sourceState.error)}
             stage={deadlineStage(sourceState.error)}
-            onRetry={item.link ? retryParsing : undefined}
+            onRetry={item.link ? retrySource : undefined}
           />
         ) : null}
 
@@ -331,7 +332,7 @@ function pause(milliseconds: number, signal: AbortSignal): Promise<void> {
 
 const STAGE_FALLBACKS = {
   publisher: 'The publisher didn’t answer in time.',
-  parsing: 'Parsing the article took too long.',
+  parsing: 'Reading the original webpage took too long.',
 } as const satisfies Record<ReaderDeadlineStage, string>
 
 interface FallbackProps {
@@ -355,14 +356,14 @@ function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
       {!item.feedContent && item.summary ? (
         <p className="reader-summary">{item.summary}</p>
       ) : (
-        <p className="note">{stage ? STAGE_FALLBACKS[stage] : 'The original page couldn’t be read as an article.'}</p>
+        <p className="note">{stage ? STAGE_FALLBACKS[stage] : 'The original webpage couldn’t be read.'}</p>
       )}
       {item.link || onRetry ? (
         <p className="reader-fallback-actions">
           {onRetry ? (
             <Button className="button" onClick={onRetry}>
               <Icon name="refresh" />
-              Retry parsing
+              Retry
             </Button>
           ) : null}
           {item.link ? <OpenOriginal link={item.link} /> : null}

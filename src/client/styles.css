@@ -125,8 +125,12 @@
     padding-block: 56px 96px;
   }
 
-  .app:is([data-screen='reader'], [data-screen='feed']) .page {
+  .app[data-screen='feed'] .page {
     padding-top: 32px;
+  }
+
+  .app[data-screen='reader'] .page {
+    padding-top: 64px;
   }
 
   .view {
@@ -1131,12 +1135,8 @@
 
   /* Reader */
 
-  .reader-actions {
-    justify-content: flex-end;
-  }
-
   .reader-source {
-    margin-right: 16px;
+    margin-top: 24px;
   }
 
   /* The Reader's Save is a grey button, not an item box's square. */
@@ -1162,10 +1162,6 @@
     margin-inline: auto;
   }
 
-  .reader-header {
-    margin-top: 24px;
-  }
-
   .reader-title {
     margin: 0;
     font: 400 44px/1.16 var(--font-read);
@@ -1176,6 +1172,7 @@
 
   .reader-meta {
     display: flex;
+    font-variant-numeric: tabular-nums;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 4px 0;
@@ -1251,6 +1248,104 @@
     margin: 0;
   }
 
+  .article-body > :first-child {
+    margin-top: 0;
+  }
+
+  .article-body :is(h2, h3, h4, h5, h6) {
+    margin: 1.8em 0 0.5em;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+
+  .article-body h2 {
+    font-size: 1.42em;
+  }
+
+  .article-body h3 {
+    font-size: 1.2em;
+  }
+
+  .article-body :is(h4, h5, h6) {
+    font-size: 1em;
+    font-weight: 600;
+  }
+
+  /* Markers hang outside the column's left edge, so wrapped lines align with
+     the words rather than the bullet. */
+  .article-body :is(ul, ol) {
+    margin: 0 0 1.4em;
+    padding-inline-start: 1.3em;
+  }
+
+  .article-body ul {
+    list-style: disc outside;
+  }
+
+  .article-body ol {
+    list-style: decimal outside;
+  }
+
+  .article-body :is(ul, ol) :is(ul, ol) {
+    margin-bottom: 0;
+  }
+
+  .article-body li + li {
+    margin-top: 0.3em;
+  }
+
+  .article-body li::marker {
+    color: var(--color-ink-2);
+  }
+
+  .article-body blockquote {
+    margin: 0 0 1.4em;
+    padding-inline-start: 1em;
+    border-inline-start: 1px solid var(--color-ink);
+    color: var(--color-ink-2);
+  }
+
+  .article-body blockquote > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* A table is data to operate on, not prose: set in the interface face. */
+  .article-table {
+    margin: 0 0 1.4em;
+    overflow-x: auto;
+  }
+
+  .article-table table {
+    min-width: 100%;
+    border-collapse: collapse;
+    font: 400 14px/1.45 var(--font-ui);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .article-table :is(th, td) {
+    padding: 8px 16px 8px 0;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .article-table th {
+    font-weight: 500;
+    color: var(--color-ink);
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .article-table td {
+    border-bottom: 1px solid var(--color-rule-soft);
+  }
+
+  .article-body hr {
+    margin: 2.4em 0;
+    border: 0;
+    border-top: 1px solid var(--color-rule);
+  }
+
   /* KaTeX's own 1.21em step eased back, so an equation reads at the size of
      the prose it sits in. */
   .article-body .katex {
@@ -1275,7 +1370,10 @@
     padding-inline: 3.5em;
   }
 
+  /* The inset line keeps a white image's edge from dissolving into the page. */
   .article-body .article-image {
+    outline: 1px solid light-dark(oklch(0% 0 0 / 0.1), oklch(100% 0 0 / 0.1));
+    outline-offset: -1px;
     display: block;
     max-width: 100%;
     height: auto;
@@ -1593,8 +1691,8 @@
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 340px) auto;
     align-items: center;
+    grid-template-rows: 68px;
     column-gap: 12px;
-    height: 68px;
   }
 
   .chrome > .wordmark {
@@ -1603,6 +1701,21 @@
   }
 
   .chrome-back {
+    display: none;
+  }
+
+  /* A screen's toolbar: a row of its own under the header. */
+  .chrome-toolbar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 32px;
+  }
+
+  .chrome-toolbar:empty {
     display: none;
   }
 
@@ -1726,8 +1839,12 @@
     padding-block: 24px calc(112px + env(safe-area-inset-bottom));
   }
 
-  .app:is([data-screen='reader'], [data-screen='feed']) .page {
+  .app[data-screen='feed'] .page {
     padding-top: 8px;
+  }
+
+  .app[data-screen='reader'] .page {
+    padding-top: 24px;
   }
 
   .app:is([data-screen='reader'], [data-screen='search']) .page {
@@ -1775,7 +1892,7 @@
 
   .chrome {
     grid-template-columns: auto minmax(0, 1fr) auto;
-    height: 60px;
+    grid-template-rows: 60px;
   }
 
   .chrome-back {
@@ -1788,6 +1905,15 @@
 
   .chrome-back .back-button-label {
     display: none;
+  }
+
+  /* The toolbar joins the top bar, ending beside the search square; the
+     chrome's own back square stands in for the one it carries. */
+  .chrome-toolbar {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    margin: 0;
   }
 
   .app:is([data-screen='reader'], [data-screen='feed']) .chrome > .wordmark {
@@ -1844,7 +1970,7 @@
     display: none;
   }
 
-  .chrome:has(.search[data-open]) > :is(.wordmark, .chrome-back) {
+  .chrome:has(.search[data-open]) > :is(.wordmark, .chrome-back, .chrome-toolbar) {
     display: none;
   }
 
@@ -2033,17 +2159,11 @@
     padding-block: 12px;
   }
 
-  /* Reader: the source switch takes its own row under the buttons. */
-
-  .reader-actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
+  /* Reader: the source switch spans the column. */
 
   .reader-source {
-    order: 1;
-    flex-basis: 100%;
-    margin-right: 0;
+    display: flex;
+    margin-top: 20px;
   }
 
   /* Restated here: this block is unlayered, so the item box's phone rules
@@ -2236,4 +2356,40 @@
       opacity: 0.45;
     }
   }
+}
+
+/* Streamdown's code, squared to the system. Unlayered, so it outranks the
+   utility classes the renderer puts on these elements; the language header
+   goes, since a reader has nothing to operate there. */
+.article-body [data-streamdown='code-block'] {
+  gap: 0;
+  margin: 0 0 1.4em;
+  padding: 0;
+  border: 1px solid var(--color-edge);
+  border-radius: 0;
+  background: var(--color-row-hover);
+}
+
+.article-body [data-streamdown='code-block-header'] {
+  display: none;
+}
+
+.article-body [data-streamdown='code-block-body'] {
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.article-body [data-streamdown='code-block-body'] pre {
+  background: transparent;
+}
+
+.article-body [data-streamdown='inline-code'] {
+  padding: 0.1em 0.3em;
+  border-radius: 0;
+  background: var(--color-control);
+  font-size: 0.85em;
 }

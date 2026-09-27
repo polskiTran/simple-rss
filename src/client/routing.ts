@@ -124,7 +124,7 @@ export function feedOrigin(feedId: number, title: string, from: Origin | undefin
 }
 
 export function readerOrigin(feedItemId: number, from: Origin | undefined): Origin {
-  return { path: readerPathOf(feedItemId), label: 'Article', from }
+  return { path: readerPathOf(feedItemId), label: 'Reader', from }
 }
 
 export function searchOrigin(query: string, scope: SearchScope, sort: SearchSort, from: Origin | undefined): Origin {
