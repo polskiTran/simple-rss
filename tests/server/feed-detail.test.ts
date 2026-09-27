@@ -43,6 +43,7 @@ describe('one opened Feed', () => {
       homePageUrl: 'https://journal.example/',
       availability: { state: 'available', consecutiveFailures: 0 },
       schedule: { pollingIntervalMinutes: 120 },
+      subscribedDate: '2026-08-08',
     })
 
     expect(detail.items.map(({ title, date, displayTime }) => [title, date, displayTime])).toEqual([

@@ -5,6 +5,8 @@ import { App } from '../../src/client/app.js'
 import { stubApi } from './stub-api.js'
 
 const LIBRARY = {
+  today: '2026-08-08',
+  total: 2,
   items: [
     {
       feedItemId: 3,
@@ -16,7 +18,7 @@ const LIBRARY = {
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       savedAt: '2026-08-08T09:05:00.000Z',
-      displayDate: 'Today, 07:15',
+      savedDate: '2026-08-08',
     },
     {
       feedItemId: 1,
@@ -27,8 +29,8 @@ const LIBRARY = {
       link: null,
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
-      savedAt: '2026-08-01T08:00:00.000Z',
-      displayDate: '3 June',
+      savedAt: '2026-07-28T08:00:00.000Z',
+      savedDate: '2026-07-28',
     },
   ],
   nextCursor: null,
@@ -39,7 +41,7 @@ afterEach(() => {
 })
 
 describe('the Saved tab', () => {
-  it('lists the Library in the shared shape: title, source, date, saved', async () => {
+  it('lists the Library in the shared shape: title, source, when it was saved, saved', async () => {
     stubApi().on('GET /api/library', { body: LIBRARY })
     window.history.replaceState(null, '', '/saved')
     const { container } = render(<App />)
@@ -48,9 +50,9 @@ describe('the Saved tab', () => {
     expect(screen.getByRole('heading', { name: 'A June letter' })).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
     expect(screen.getByText('The Slow Press')).toBeDefined()
-    expect(screen.getByRole('heading', { level: 1, name: 'Saved' })).toBeDefined()
-    expect(screen.getByText('Today, 07:15')).toBeDefined()
-    expect(screen.getByText('3 June')).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1, name: 'Saved 2' })).toBeDefined()
+    expect(screen.getByText('Saved today')).toBeDefined()
+    expect(screen.getByText('Saved 28 July')).toBeDefined()
 
     for (const title of ['First light', 'A June letter']) {
       const toggle = screen.getByRole('button', { name: `Save ${title}` })
@@ -102,14 +104,56 @@ describe('the Saved tab', () => {
 
   it('says quietly when a save outlived its Subscription, keeping the attribution', async () => {
     const items = [LIBRARY.items[0], { ...LIBRARY.items[1], subscribed: false }]
-    stubApi().on('GET /api/library', { body: { items, nextCursor: null } })
+    stubApi().on('GET /api/library', { body: { ...LIBRARY, items } })
     window.history.replaceState(null, '', '/saved')
     const { container } = render(<App />)
 
-    expect(await screen.findByText('3 June · No longer subscribed')).toBeDefined()
+    expect(await screen.findByText('Saved 28 July · No longer subscribed')).toBeDefined()
     expect(screen.getByText('The Slow Press').tagName).toBe('SPAN')
     expect(screen.getByText('Field Notes').textContent).toBe('Field Notes')
     expect(container.querySelector('main')?.textContent).not.toMatch(/remove|delete|clean/i)
+  })
+
+  it('groups saves by the month they were saved, counting a month only once it is whole', async () => {
+    stubApi().on('GET /api/library', { body: { ...LIBRARY, total: 3, nextCursor: 'more' } })
+    window.history.replaceState(null, '', '/saved')
+    render(<App />)
+
+    // August has given way to July, so August is whole; July may go on past this page.
+    expect(await screen.findByRole('heading', { level: 2, name: 'August 1' })).toBeDefined()
+    expect(screen.getByRole('heading', { level: 2, name: 'July' })).toBeDefined()
+  })
+
+  it('turns the Library around by asking for the oldest saves, and pages toward newer ones', async () => {
+    const api = stubApi()
+      .on('GET /api/library', { body: LIBRARY })
+      .on('GET /api/library?order=oldest', {
+        body: { ...LIBRARY, items: LIBRARY.items.toReversed(), nextCursor: 'next' },
+      })
+      .on('GET /api/library?order=oldest&cursor=next', { body: { ...LIBRARY, items: [], nextCursor: null } })
+    window.history.replaceState(null, '', '/saved')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Oldest saved' }))
+
+    const headings = await screen.findAllByRole('heading', { level: 3 })
+    expect(headings.map((heading) => heading.textContent)).toEqual(['A June letter', 'First light'])
+    await user.click(screen.getByRole('button', { name: 'Show newer saves' }))
+    expect(api.requestsTo('GET /api/library?order=oldest&cursor=next')).toHaveLength(1)
+  })
+
+  it('groups the saves by Feed without asking again, counting a Feed only once the list has ended', async () => {
+    const api = stubApi().on('GET /api/library', { body: LIBRARY })
+    window.history.replaceState(null, '', '/saved')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'By feed' }))
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Field Notes 1' })).toBeDefined()
+    expect(screen.getByRole('heading', { level: 2, name: 'The Slow Press 1' })).toBeDefined()
+    expect(api.requestsTo('GET /api/library')).toHaveLength(1)
   })
 
   it('explains an empty Library with direction, not mechanics', async () => {

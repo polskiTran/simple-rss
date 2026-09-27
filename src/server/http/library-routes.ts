@@ -1,5 +1,10 @@
 import { Hono } from 'hono'
-import { feedItemIdParameterSchema, type Library, type LibraryMembership } from '../../shared/api.js'
+import {
+  feedItemIdParameterSchema,
+  libraryRequestSchema,
+  type Library,
+  type LibraryMembership,
+} from '../../shared/api.js'
 import type { LibraryService } from '../library/library-service.js'
 import { readIdParam } from './id-param.js'
 import { readListCursor } from './list-cursor.js'
@@ -14,9 +19,17 @@ export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   const app = new Hono()
 
   app.get('/library', (c) => {
+    const request = libraryRequestSchema.safeParse(c.req.query())
+    if (!request.success) {
+      return c.json(
+        { error: { code: 'invalid_request', message: 'The Library orders by newest or oldest save' } },
+        400,
+        NO_STORE,
+      )
+    }
     const cursor = readListCursor(c)
     if (!cursor.ok) return cursor.response
-    return c.json<Library>(deps.library.list(cursor.cursor), 200, NO_STORE)
+    return c.json<Library>(deps.library.list(request.data.order, cursor.cursor), 200, NO_STORE)
   })
 
   app.put('/library/:feedItemId', (c) => {

@@ -1,5 +1,5 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import type { SearchResult, SearchResults, SearchScope, SearchSubscriptionMatch } from '../../shared/api.js'
+import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
 import { chronologySql } from '../digest/list-page.js'
@@ -40,7 +40,7 @@ export class SearchService {
   }
 
   /** Undefined when scoped to a Feed the User is not subscribed to — the screen that scope came from is gone too. */
-  search(query: string, scope: SearchScope): SearchResults | undefined {
+  search(query: string, scope: SearchScope, sort: SearchSort): SearchResults | undefined {
     const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
@@ -54,10 +54,10 @@ export class SearchService {
             timezone,
             now,
           ),
-          results: this.#itemMatches(words, scope, timezone, now),
+          results: this.#itemMatches(words, scope, sort, timezone, now),
         }
       case 'saved':
-        return { scope: 'saved', results: this.#itemMatches(words, scope, timezone, now) }
+        return { scope: 'saved', results: this.#itemMatches(words, scope, sort, timezone, now) }
       case 'subscriptions':
         return {
           scope: 'subscriptions',
@@ -66,7 +66,7 @@ export class SearchService {
       case 'feed': {
         const title = this.#subscribedTitleOf(scope.feedId)
         if (title === undefined) return undefined
-        return { scope: 'feed', feed: { title }, results: this.#itemMatches(words, scope, timezone, now) }
+        return { scope: 'feed', feed: { title }, results: this.#itemMatches(words, scope, sort, timezone, now) }
       }
     }
   }
@@ -83,6 +83,7 @@ export class SearchService {
   #itemMatches(
     words: readonly string[],
     scope: Extract<SearchScope, { kind: 'everywhere' | 'saved' | 'feed' }>,
+    sort: SearchSort,
     timezone: string,
     now: Date,
   ): SearchResult[] {
@@ -93,6 +94,7 @@ export class SearchService {
     // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
     // the LIMIT bounds the right fifty. bm25() is more negative the better the
     // match; dividing by the age factor shrinks it toward zero as the item ages.
+    // Sorted newest, the chronology alone orders — and bounds — the matches.
     const chronology = chronologySql(now)
     const relevance = sql`bm25(${feedItemSearch}, ${ITEM_TITLE_WEIGHT}, ${SUMMARY_WEIGHT}, ${FEED_TITLE_WEIGHT})
       / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_DECAY_DAYS})`
@@ -124,7 +126,7 @@ export class SearchService {
           scope.kind === 'feed' ? eq(feedItems.feedId, scope.feedId) : undefined,
         ),
       )
-      .orderBy(relevance, sql`${chronology} DESC`, desc(feedItems.id))
+      .orderBy(...(sort === 'best' ? [relevance] : []), sql`${chronology} DESC`, desc(feedItems.id))
       .limit(SEARCH_RESULT_LIMIT)
       .all()
 

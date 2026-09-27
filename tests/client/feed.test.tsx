@@ -28,6 +28,7 @@ const DETAIL = {
   availability: AVAILABLE,
   schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
   readingSource: 'original-webpage',
+  subscribedDate: '2026-05-20',
   cadence: cadence({ '2026-06-03': 2, '2026-08-08': 1 }),
   items: [
     {
@@ -62,6 +63,7 @@ const LIST_FEED = {
   enteredUrl: DETAIL.enteredUrl,
   resolvedUrl: DETAIL.resolvedUrl,
   readingSource: 'original-webpage',
+  subscribedAt: '2026-05-20T09:00:00.000Z',
   cadence: Array.from({ length: 30 }, () => 0),
   availability: AVAILABLE,
 }
@@ -96,6 +98,7 @@ describe('opening one Feed', () => {
     expect(container.querySelectorAll('.cadence-grid .cadence-cell[data-level="2"]')).toHaveLength(1)
     const months = [...container.querySelectorAll('.cadence-month')].map((label) => label.textContent)
     expect(months).toEqual(['Feb', 'Apr', 'Jun', 'Aug'])
+    expect(infoValue('Subscribed')).toBe('20 May')
     expect(infoValue('Items, last 26 weeks')).toBe('3')
     expect(infoValue('Busiest day')).toBe('Wednesday')
     expect(infoValue('Longest quiet stretch')).toBe('114 days')

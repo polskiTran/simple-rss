@@ -73,6 +73,7 @@ interface FeedRecord {
 
 interface SubscribedFeedRecord extends FeedRecord, RecordedAvailability {
   readonly readingSource: ReadingSource
+  readonly subscribedAt: string
 }
 
 const FEED_RECORD_COLUMNS = {
@@ -94,6 +95,7 @@ const SUBSCRIBED_FEED_COLUMNS = {
   consecutiveFailures: subscriptions.consecutiveFailures,
   lastFailureCategory: subscriptions.lastFailureCategory,
   readingSource: subscriptions.readingSource,
+  subscribedAt: subscriptions.createdAt,
 }
 
 /** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
@@ -163,6 +165,7 @@ export class SubscriptionService {
           consecutiveFailures: 0,
           lastFailureCategory: null,
           readingSource: DEFAULT_READING_SOURCE,
+          subscribedAt: now,
         }
       })
     } catch (error) {
@@ -205,6 +208,7 @@ export class SubscriptionService {
         consecutiveFailures: 0,
         lastFailureCategory: null,
         readingSource: DEFAULT_READING_SOURCE,
+        subscribedAt: now,
       }),
     }
   }
@@ -454,6 +458,7 @@ export class SubscriptionService {
         nextPollAt: record.nextPollAt,
       },
       readingSource: record.readingSource,
+      subscribedDate: dateKey(new Date(record.subscribedAt), timezone),
       cadence: gridDayKeys(today).map((date) => ({ date, count: counts.get(date) ?? 0 })),
       items,
     }
@@ -520,6 +525,7 @@ function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => 
     enteredUrl: record.enteredUrl,
     resolvedUrl: record.resolvedUrl,
     readingSource: record.readingSource,
+    subscribedAt: record.subscribedAt,
     cadence: cadenceOf(record.feedId),
     availability: availabilityOf(record),
   }

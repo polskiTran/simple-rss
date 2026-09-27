@@ -165,6 +165,41 @@ describe('the search line in the chrome', () => {
     expect(field.value).toBe('chronology')
   })
 
+  it('ranks by newest on request, keeping the order in the address while the words change', async () => {
+    const api = stubApi()
+      .on('GET /api/search?q=chronology', {
+        body: { scope: 'everywhere', subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
+      })
+      .on('GET /api/search?q=chronology&sort=newest', {
+        body: { scope: 'everywhere', subscriptions: [], results: [result(8, 'Tide chronology', '3 june')] },
+      })
+      .on('GET /api/search?q=chronology+notes&sort=newest', {
+        body: { scope: 'everywhere', subscriptions: [], results: [] },
+      })
+    window.history.replaceState(null, '', '/search?q=chronology')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Newest' }))
+
+    expect(await screen.findByRole('heading', { name: 'Tide chronology' })).toBeDefined()
+    expect(window.location.search).toBe('?q=chronology&sort=newest')
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search your reading' }), ' notes')
+    await waitFor(() => expect(api.requestsTo('GET /api/search?q=chronology+notes&sort=newest')).toHaveLength(1))
+  })
+
+  it('offers no ranking where the answer is Subscriptions alone', async () => {
+    stubApi().on('GET /api/search?q=field&in=subscriptions', {
+      body: { scope: 'subscriptions', subscriptions: [] },
+    })
+    window.history.replaceState(null, '', '/search?q=field&in=subscriptions')
+    render(<App />)
+
+    expect(await screen.findByText(/Nothing in/)).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Newest' })).toBeNull()
+  })
+
   it('marks the words that matched, in the title and the snippet alike', async () => {
     stubApi().on('GET /api/search?q=Tide', {
       body: {

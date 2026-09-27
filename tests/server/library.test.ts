@@ -87,7 +87,7 @@ describe('saving Feed Items to the Library', () => {
     expect((await user.put('/api/library/not-a-number')).status).toBe(404)
   })
 
-  it('lists the Library in Digest chronology with source attribution', async () => {
+  it('lists the Library by when each item was saved, with the day it was saved', async () => {
     const service = await startTestService()
     stubFeed(
       service,
@@ -101,22 +101,20 @@ describe('saving Feed Items to the Library', () => {
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    for (const title of ['A June letter', 'First light', 'Evening notes']) {
+    for (const title of ['First light', 'A June letter', 'Evening notes']) {
       const { feedItemId } = await digestItem(user, title)
       expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
+      service.clock.advance(24 * 60 * 60 * 1_000)
     }
 
     const saved = await library(user)
-    expect(saved.items.map((entry) => [entry.title, entry.feedTitle, entry.displayDate])).toEqual([
-      ['First light', 'Field Notes', 'Today, 07:15'],
-      ['Evening notes', 'Field Notes', 'Yesterday, 09:31'],
-      ['A June letter', 'Field Notes', '3 June'],
+    expect(saved.items.map((entry) => [entry.title, entry.feedTitle, entry.savedDate])).toEqual([
+      ['Evening notes', 'Field Notes', '2026-08-10'],
+      ['A June letter', 'Field Notes', '2026-08-09'],
+      ['First light', 'Field Notes', '2026-08-08'],
     ])
-    expect(saved.items.map((entry) => entry.savedAt)).toEqual([
-      '2026-08-08T09:00:00.000Z',
-      '2026-08-08T09:00:00.000Z',
-      '2026-08-08T09:00:00.000Z',
-    ])
+    expect(saved.today).toBe('2026-08-11')
+    expect(saved.total).toBe(3)
   })
 
   it('marks saved state in the Digest and the opened Feed', async () => {

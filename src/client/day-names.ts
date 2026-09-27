@@ -22,6 +22,15 @@ export function longDay(dateKey: string): string {
   return format(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+/** `3 August`, or `3 August 2025` once it is not this year. */
+export function dayOfYear(dateKey: string, today: string): string {
+  const sameYear = dateKey.slice(0, 4) === today.slice(0, 4)
+  return format(
+    dateKey,
+    sameYear ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' },
+  )
+}
+
 /** `August`, or `August 2025` once it is not this year. */
 export function monthName(dateKey: string, today: string): string {
   const sameYear = dateKey.slice(0, 4) === today.slice(0, 4)

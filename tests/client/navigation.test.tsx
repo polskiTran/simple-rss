@@ -52,6 +52,7 @@ const DETAIL = {
   },
   schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
   readingSource: 'original-webpage',
+  subscribedDate: '2026-08-08',
   cadence: cadenceWindow({ '2026-08-08': 1 }),
   items: [
     {
@@ -84,6 +85,8 @@ const ITEM = {
 }
 
 const LIBRARY = {
+  today: '2026-08-08',
+  total: 2,
   items: [
     {
       feedItemId: 3,
@@ -95,7 +98,7 @@ const LIBRARY = {
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
       savedAt: '2026-08-08T09:05:00.000Z',
-      displayDate: 'today, 07:15',
+      savedDate: '2026-08-08',
     },
     {
       feedItemId: 1,
@@ -107,7 +110,7 @@ const LIBRARY = {
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       savedAt: '2026-08-01T08:00:00.000Z',
-      displayDate: '3 june',
+      savedDate: '2026-08-01',
     },
   ],
   nextCursor: null,
@@ -221,7 +224,7 @@ describe('a Feed Item’s attribution', () => {
     reading('/saved')
     render(<App />)
 
-    expect(await screen.findByText('3 june · No longer subscribed')).toBeDefined()
+    expect(await screen.findByText('Saved 1 August · No longer subscribed')).toBeDefined()
     expect(screen.queryByRole('link', { name: /Slow Press/ })).toBeNull()
   })
 

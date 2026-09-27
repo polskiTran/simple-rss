@@ -25,7 +25,7 @@ const UNCHECKED_REFRESH_ROUNDS = 20
 /** Rows a Rhythm group shows before Show N more. */
 const GROUP_PREVIEW = 6
 
-type Order = 'rhythm' | 'name'
+type Order = 'rhythm' | 'name' | 'recent'
 
 export interface FeedsViewProps {
   onOpenFeed(feedId: number): void
@@ -135,6 +135,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
               options={[
                 { value: 'rhythm', label: 'By rhythm' },
                 { value: 'name', label: 'By name' },
+                { value: 'recent', label: 'Recently added' },
               ]}
               value={order}
               onChange={setOrder}
@@ -170,7 +171,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
           ))
         ) : (
           <FeedRows
-            subscriptions={[...subscriptions].sort((left, right) => left.title.localeCompare(right.title))}
+            subscriptions={ordered(subscriptions, order)}
             retryingFeedId={retryingFeedId}
             onRetry={retry}
             onOpen={onOpenFeed}
@@ -178,6 +179,15 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         )
       ) : null}
     </div>
+  )
+}
+
+/** The flat orders: by effective title, or newest Subscription first. */
+function ordered(subscriptions: readonly SubscriptionSummary[], order: 'name' | 'recent') {
+  return subscriptions.toSorted((left, right) =>
+    order === 'recent'
+      ? right.subscribedAt.localeCompare(left.subscribedAt) || left.title.localeCompare(right.title)
+      : left.title.localeCompare(right.title),
   )
 }
 
@@ -217,6 +227,14 @@ function RhythmGroup({
   const shown = expanded ? subscriptions : subscriptions.slice(0, GROUP_PREVIEW)
   const hidden = subscriptions.slice(shown.length)
 
+  const fold = () => {
+    setExpanded(false)
+    // Folding from the foot of a long group would leave the reader in the next
+    // one; bring the group back when its heading has scrolled away.
+    const top = document.getElementById(rhythmAnchor(rhythm))?.getBoundingClientRect().top ?? 0
+    if (top < 0) showGroup(rhythm)
+  }
+
   return (
     <Group
       id={rhythmAnchor(rhythm)}
@@ -233,6 +251,13 @@ function RhythmGroup({
             <Icon name="chevron-down" />
           </Button>
           <p className="note more-names">{hidden.map((subscription) => subscription.title).join(', ')}</p>
+        </div>
+      ) : expanded ? (
+        <div className="more">
+          <Button className="button" onClick={fold}>
+            Show fewer
+            <Icon name="chevron-up" />
+          </Button>
         </div>
       ) : null}
     </Group>

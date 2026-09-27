@@ -25,6 +25,7 @@ import {
   type FeedDetailsUpdate,
   type InstallationPreferences,
   type Library,
+  type LibraryOrder,
   type LibraryMembership,
   type OpmlImportReport,
   type PollingIntervalMinutes,
@@ -37,6 +38,7 @@ import {
   type RefreshFeedResponse,
   type SearchResults,
   type SearchScope,
+  type SearchSort,
   type SubscriptionList,
   type ServiceMeta,
   type UpdateFeedDetailsRequest,
@@ -219,14 +221,19 @@ export async function fetchDigest(cursor?: string, signal?: AbortSignal): Promis
 export async function fetchSearchResults(
   query: string,
   scope: SearchScope,
+  sort: SearchSort,
   signal?: AbortSignal,
 ): Promise<SearchResults> {
-  const response = await read(`/api/search?${searchParamsOf(query, scope)}`, signal)
+  const response = await read(`/api/search?${searchParamsOf(query, scope, sort)}`, signal)
   return searchResultsSchema.parse(await response.json())
 }
 
-export async function fetchLibrary(cursor?: string, signal?: AbortSignal): Promise<Library> {
-  const response = await read(cursor ? `/api/library?cursor=${encodeURIComponent(cursor)}` : '/api/library', signal)
+/** Newest save first needs no parameter; a cursor continues the order it came from. */
+export async function fetchLibrary(order: LibraryOrder, cursor?: string, signal?: AbortSignal): Promise<Library> {
+  const params = new URLSearchParams()
+  if (order !== 'newest') params.set('order', order)
+  if (cursor) params.set('cursor', cursor)
+  const response = await read(params.size > 0 ? `/api/library?${params}` : '/api/library', signal)
   return librarySchema.parse(await response.json())
 }
 

@@ -220,6 +220,8 @@ const cadenceStripSchema = z.array(z.number().int().nonnegative()).length(CADENC
 
 export const subscriptionSummarySchema = feedSummarySchema.extend({
   readingSource: readingSourceSchema,
+  /** When this Subscription began; a revived one starts again. */
+  subscribedAt: z.string(),
   cadence: cadenceStripSchema,
   availability: feedAvailabilitySchema,
 })
@@ -275,6 +277,8 @@ export const feedDetailSchema = feedSummarySchema.extend({
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
   readingSource: readingSourceSchema,
+  /** The installation-timezone day this Subscription began. */
+  subscribedDate: z.string(),
   cadence: z.array(cadenceObservationSchema),
   items: z.array(feedItemRowSchema),
 })
@@ -329,12 +333,25 @@ export const libraryItemSchema = z.object({
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   savedAt: z.string(),
-  displayDate: z.string(),
+  /** The installation-timezone day it was saved. */
+  savedDate: z.string(),
 })
 export type LibraryItem = z.infer<typeof libraryItemSchema>
 
+export const LIBRARY_ORDERS = ['newest', 'oldest'] as const
+export type LibraryOrder = (typeof LIBRARY_ORDERS)[number]
+
+/** `?order=oldest` turns the Library around; absent is newest save first. */
+export const libraryRequestSchema = z.object({
+  order: z.enum(LIBRARY_ORDERS).default('newest'),
+})
+
 export const librarySchema = z.object({
-  /** Newest first, in the Digest's own chronology. */
+  /** The installation-timezone day, so saves read as today or yesterday. */
+  today: z.string(),
+  /** Every save, not just this page's. */
+  total: z.number().int().nonnegative(),
+  /** By saved time, in the requested order. */
   items: z.array(libraryItemSchema),
   /** Opaque cursor; null at the very end. */
   nextCursor: z.string().nullable(),
@@ -410,15 +427,25 @@ export type SearchScope =
   | { readonly kind: 'feed'; readonly feedId: number }
 
 /**
+ * How a search ranks what it found: best match (ADR 0009) or newest first.
+ * Either way it answers at most fifty — the newest fifty matches, not the best
+ * fifty re-sorted.
+ */
+export const SEARCH_SORTS = ['best', 'newest'] as const
+export type SearchSort = (typeof SEARCH_SORTS)[number]
+
+/**
  * How a search travels, in the client address and the API request alike: `q`
  * for the words, then at most one scope parameter beside it — `feed=<id>` or
- * `in=saved|subscriptions`. Everywhere needs none. `searchParamsOf` and
- * `searchRequestSchema` are the two directions of one encoding.
+ * `in=saved|subscriptions` — and `sort=newest` when not ranked by best match.
+ * Everywhere needs no scope. `searchParamsOf` and `searchRequestSchema` are the
+ * two directions of one encoding.
  */
-export function searchParamsOf(query: string, scope: SearchScope): URLSearchParams {
+export function searchParamsOf(query: string, scope: SearchScope, sort: SearchSort = 'best'): URLSearchParams {
   const params = new URLSearchParams({ q: query })
   if (scope.kind === 'feed') params.set('feed', String(scope.feedId))
   else if (scope.kind !== 'everywhere') params.set('in', scope.kind)
+  if (sort !== 'best') params.set('sort', sort)
   return params
 }
 
@@ -427,15 +454,17 @@ export const searchRequestSchema = z
     q: searchQuerySchema,
     feed: feedIdParameterSchema.optional(),
     in: z.enum(['saved', 'subscriptions']).optional(),
+    sort: z.enum(SEARCH_SORTS).default('best'),
   })
   .refine((request) => request.feed === undefined || request.in === undefined, 'A search takes one scope at most')
-  .transform(({ q, feed, in: within }) => ({
+  .transform(({ q, feed, in: within, sort }) => ({
     query: q,
     scope: (feed !== undefined
       ? { kind: 'feed', feedId: feed }
       : within !== undefined
         ? { kind: within }
         : { kind: 'everywhere' }) satisfies SearchScope,
+    sort,
   }))
 
 export const searchResultSchema = z.object({
