@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { sql, type SQL } from 'drizzle-orm'
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { feedItems } from '../persistence/schema.js'
 import { plausibleHorizon } from './chronology.js'
@@ -7,13 +8,13 @@ import { plausibleHorizon } from './chronology.js'
 export const LIST_PAGE_SIZE = 50
 
 export interface ListCursor {
-  /** The resolved chronology instant of the last item shown, as stored ISO. */
-  readonly chronology: string
+  /** The ordering instant of the last item shown, as stored ISO: its chronology in the Digest, its save in the Library. */
+  readonly instant: string
   readonly feedItemId: number
 }
 
 export function encodeListCursor(cursor: ListCursor): string {
-  return Buffer.from(JSON.stringify([cursor.chronology, cursor.feedItemId]), 'utf8').toString('base64url')
+  return Buffer.from(JSON.stringify([cursor.instant, cursor.feedItemId]), 'utf8').toString('base64url')
 }
 
 const STORED_ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
@@ -31,8 +32,8 @@ export function decodeListCursor(value: string): ListCursor | undefined {
   try {
     const parsed = listCursorSchema.safeParse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')))
     if (!parsed.success) return undefined
-    const [chronology, feedItemId] = parsed.data
-    return { chronology, feedItemId }
+    const [instant, feedItemId] = parsed.data
+    return { instant, feedItemId }
   } catch {
     return undefined
   }
@@ -43,7 +44,7 @@ export function nextListCursor(
   last: { readonly row: { readonly feedItemId: number }; readonly chronology: number } | undefined,
 ): string | null {
   return fetchedCount > LIST_PAGE_SIZE && last
-    ? encodeListCursor({ chronology: new Date(last.chronology).toISOString(), feedItemId: last.row.feedItemId })
+    ? encodeListCursor({ instant: new Date(last.chronology).toISOString(), feedItemId: last.row.feedItemId })
     : null
 }
 
@@ -59,8 +60,18 @@ export function chronologySql(now: Date): SQL {
   END`
 }
 
-/** Rows strictly beyond the cursor in Digest order: older, ties to lower id. */
-export function beyondCursorSql(chronology: SQL, cursor: ListCursor): SQL {
-  return sql`(${chronology} < ${cursor.chronology}
-    OR (${chronology} = ${cursor.chronology} AND ${feedItems.id} < ${cursor.feedItemId}))`
+/**
+ * Rows strictly beyond the cursor along `ordering`: newest first by default,
+ * so older, ties to lower id; oldest first, the mirror.
+ */
+export function beyondCursorSql(
+  ordering: SQL | SQLiteColumn,
+  cursor: ListCursor,
+  direction: 'newest' | 'oldest' = 'newest',
+): SQL {
+  return direction === 'newest'
+    ? sql`(${ordering} < ${cursor.instant}
+    OR (${ordering} = ${cursor.instant} AND ${feedItems.id} < ${cursor.feedItemId}))`
+    : sql`(${ordering} > ${cursor.instant}
+    OR (${ordering} = ${cursor.instant} AND ${feedItems.id} > ${cursor.feedItemId}))`
 }

@@ -21,42 +21,68 @@ const minuteItems = (count: number) =>
     item(`note-${index}`, `note-${index}`, `2026-08-08T00:${String(index).padStart(2, '0')}:00.000Z`),
   )
 
+/** Subscribes to 55 items and saves them newest item first — against Digest order — `gapMs` apart. */
+async function savedNotes(gapMs: number) {
+  const service = await startTestService()
+  service.upstream.stub(FEED_URL, {
+    headers: { 'content-type': 'application/rss+xml' },
+    body: rss(...minuteItems(55)),
+  })
+  const user = await claimedDevice(service)
+  expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+  await service.wakeScheduler()
+
+  const firstPage = digestSchema.parse(await (await user.get('/api/digest')).json())
+  const restPage = digestSchema.parse(
+    await (await user.get(`/api/digest?cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`)).json(),
+  )
+  const allIds = [...firstPage.groups, ...restPage.groups].flatMap((group) =>
+    group.items.map((entry) => entry.feedItemId),
+  )
+  expect(allIds).toHaveLength(55)
+  for (const feedItemId of allIds) {
+    expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
+    service.clock.advance(gapMs)
+  }
+  return user
+}
+
+/** Every page of the Library in one order, following cursors to the end. */
+async function pages(user: Awaited<ReturnType<typeof savedNotes>>, order: 'newest' | 'oldest') {
+  const titles: string[][] = []
+  let cursor: string | null | undefined
+  do {
+    const query = new URLSearchParams({ order, ...(cursor ? { cursor } : {}) })
+    const page = librarySchema.parse(await (await user.get(`/api/library?${query}`)).json())
+    expect(page.total).toBe(55)
+    titles.push(page.items.map((entry) => entry.title))
+    cursor = page.nextCursor
+  } while (cursor)
+  return titles
+}
+
+const notes = (from: number, to: number) =>
+  Array.from({ length: Math.abs(to - from) + 1 }, (_, index) => `note-${from < to ? from + index : from - index}`)
+
 describe('the Library in pages', () => {
-  it('serves fifty saves at a time on the same cursor the Digest speaks', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: rss(...minuteItems(55)),
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
+  it('serves fifty saves at a time, newest save first unless asked for the oldest', async () => {
+    const user = await savedNotes(60_000)
 
-    const firstPage = digestSchema.parse(await (await user.get('/api/digest')).json())
-    const restPage = digestSchema.parse(
-      await (await user.get(`/api/digest?cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`)).json(),
-    )
-    const allIds = [...firstPage.groups, ...restPage.groups].flatMap((group) =>
-      group.items.map((entry) => entry.feedItemId),
-    )
-    expect(allIds).toHaveLength(55)
-    for (const feedItemId of allIds) {
-      expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
-    }
+    expect(await pages(user, 'newest')).toEqual([notes(0, 49), notes(50, 54)])
+    expect(await pages(user, 'oldest')).toEqual([notes(54, 5), notes(4, 0)])
+  })
 
-    const first = librarySchema.parse(await (await user.get('/api/library')).json())
+  it('neither repeats nor drops saves made in the same instant', async () => {
+    const user = await savedNotes(0)
 
-    expect(first.items.map((entry) => entry.title)).toEqual(
-      Array.from({ length: 50 }, (_, index) => `note-${54 - index}`),
-    )
-    expect(first.nextCursor).toEqual(expect.any(String))
+    expect((await pages(user, 'newest')).flat().toSorted()).toEqual(notes(0, 54).toSorted())
+    expect((await pages(user, 'oldest')).flat().toSorted()).toEqual(notes(0, 54).toSorted())
+  })
 
-    const rest = librarySchema.parse(
-      await (await user.get(`/api/library?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
-    )
-
-    expect(rest.items.map((entry) => entry.title)).toEqual(['note-4', 'note-3', 'note-2', 'note-1', 'note-0'])
-    expect(rest.nextCursor).toBeNull()
+  it('refuses an order it does not know', async () => {
+    const user = await claimedDevice(await startTestService())
+    const response = await user.get('/api/library?order=alphabetical')
+    expect(response.status).toBe(400)
   })
 
   it('answers a library that fits one page with no cursor at all', async () => {

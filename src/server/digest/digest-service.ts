@@ -114,7 +114,7 @@ export class DigestService {
 
     const chronology = chronologySql(now)
     const cursor: ListCursor = {
-      chronology: new Date(chronologyTime(current.publishedAt, current.firstSeenAt, now)).toISOString(),
+      instant: new Date(chronologyTime(current.publishedAt, current.firstSeenAt, now)).toISOString(),
       feedItemId,
     }
     const next = this.#db
