@@ -108,6 +108,9 @@ Numbers in counts and meta use tabular figures.
 - Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
 - The reading column is 680px, centred.
 - One breakpoint: `max-width: 640px` is the phone layout.
+- A phone row that scrolls sideways — Rhythm chips, jump buttons, a Feed
+  filter's chips — fades over its trailing 32px, so what is past the edge
+  reads as there.
 
 ## 5. Components
 
@@ -220,9 +223,10 @@ next step through days, never past today, and the Feeds that day narrow the
 list when ticked, as in search. By feed is a card per Subscription, the most
 recently published first: a Feed row with the last 14 days of Cadence, then
 under a `rule-soft` line its three newest items, each dated as briefly as the
-distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
-scroll as chips, the day list and the facts give way, the stepper names the
-day, and the cards stack.
+distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans
+the page, the Rhythms scroll as chips in ink with the chosen one a segment
+ringed in ink, the day list and the facts give way, the stepper names the day
+as plain text between its arrows, and the cards stack.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,
