@@ -267,6 +267,15 @@
     background: var(--color-danger-fill);
   }
 
+  /* Pressed: one step past hover, and nothing moves. */
+  .button:active {
+    background: var(--color-toggle-off);
+  }
+
+  .button-primary:active {
+    background: color-mix(in oklch, var(--color-primary-hover) 88%, var(--color-ground));
+  }
+
   .button-ghost {
     background: transparent;
   }
@@ -447,10 +456,15 @@
     font: 500 14px/1 var(--font-ui);
     text-overflow: ellipsis;
     cursor: pointer;
+    field-sizing: content;
   }
 
   .select-control:hover {
     background: var(--color-control-hover);
+  }
+
+  .select-control:active {
+    background: var(--color-toggle-off);
   }
 
   .select-control:disabled {

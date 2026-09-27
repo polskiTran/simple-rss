@@ -46,7 +46,7 @@ any ground.
 | `control-hover` | `oklch(91.9% 0 0)` | |
 | `primary-hover` | `oklch(32% 0 0)` | primary button under the pointer |
 | `row-hover` | `oklch(97.6% 0 0)` | list rows, undo line |
-| `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off |
+| `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off, a grey control pressed |
 | `rule` | ink at `.14` | under group headings |
 | `rule-soft` | ink at `.07` | between rows |
 | `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
@@ -144,7 +144,10 @@ Icons are 16px, drawn on a 24px grid at a 2 stroke with square caps.
 Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
 text. Disabled: `control` fill with `ink-3` text. A control that is busy
 keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,
-Saving…. Icon-only: square, same height, with an accessible name.
+Saving…. Icon-only: square, same height, with an accessible name. A select is
+a grey button with a trailing chevron, as wide as its chosen value. Pressed, a
+grey control fills with `toggle-off` and the primary one steps a further 12%
+from ink toward `ground`; nothing moves.
 
 **Switch.** A grey track with 3px padding and 2px gaps; the selected segment
 is `ground` with a hairline ring, the rest are `ink-off` and darken on hover.
