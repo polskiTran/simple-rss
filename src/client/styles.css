@@ -1484,6 +1484,18 @@
     gap: 64px;
   }
 
+  /* The column stays in view beside a long list, scrolling itself if taller.
+     It bleeds out by the rows' hover fill and focus ring, which its scrolling
+     would otherwise clip. */
+  .with-aside > :is(.recent-days, .feed-filter) {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100dvh - 48px);
+    margin: -4px -12px;
+    padding: 4px 12px;
+    overflow-y: auto;
+  }
+
   .with-aside:not(:has(> :nth-child(2))) {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2116,6 +2128,11 @@
 
   .feed-filter {
     order: -1;
+    position: static;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
   }
 
   .feed-filter .group-header {

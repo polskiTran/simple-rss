@@ -107,6 +107,9 @@ Numbers in counts and meta use tabular figures.
   sheet buttons). Small inline controls are 30px.
 - Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
 - The reading column is 680px, centred.
+- On desktop a 300px column beside a list — the Digest's days, a Feed filter —
+  holds 24px from the top as the list scrolls, and scrolls itself when taller
+  than the window.
 - One breakpoint: `max-width: 640px` is the phone layout.
 - A phone row that scrolls sideways — Rhythm chips, jump buttons, a Feed
   filter's chips — fades over its trailing 32px, so what is past the edge
