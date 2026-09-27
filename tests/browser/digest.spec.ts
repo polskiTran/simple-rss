@@ -115,7 +115,7 @@ test.describe('the Digest presentation', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 30' })).toBeFocused()
     await expect(page).toHaveTitle('Meadow note 30 — simple')
     const entries = await page.evaluate(() => history.length)
-    await page.locator('main').getByRole('link', { name: 'Back to Digest' }).click()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
 
     await expect(page).toHaveURL(/\/digest$/)
     await expect(page).toHaveTitle('Digest — simple')
