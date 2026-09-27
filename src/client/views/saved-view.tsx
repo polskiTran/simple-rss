@@ -132,7 +132,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
             title={group.title}
             count={group.complete ? group.items.length : undefined}
           >
-            <div className="item-list">
+            <div className="item-list library-list">
               {group.items.map((item) =>
                 unsaved.has(item.feedItemId) ? (
                   <UndoLine key={item.feedItemId} item={item} onResaved={() => mark(item.feedItemId, true)} />

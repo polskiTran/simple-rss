@@ -140,7 +140,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         <div className="feed-identity">
           <h1 className="page-title">{detail.title}</h1>
           {detail.description ? <p className="feed-description">{detail.description}</p> : null}
-          <HomePageLink className="feed-domain" domain={detail.domain} homePageUrl={detail.homePageUrl} />
+          <HomePageLink domain={detail.domain} homePageUrl={detail.homePageUrl} />
         </div>
         <div className="toolbar-group feed-actions">
           <EditFeed detail={detail} onSaved={(details) => set((current) => ({ ...current, ...details }))} />

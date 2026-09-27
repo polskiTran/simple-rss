@@ -196,6 +196,8 @@ describe('Reader View', () => {
     await user.click(toggle)
 
     await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('true'))
+    // The name carries the word on screen, as it changes.
+    expect(toggle.getAttribute('aria-label')).toBe('Saved First light')
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
   })
 

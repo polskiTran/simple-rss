@@ -155,8 +155,9 @@
     margin: 0;
     font-weight: 500;
     font-size: 40px;
-    line-height: 1;
+    line-height: 1.08;
     letter-spacing: -0.015em;
+    overflow-wrap: anywhere;
     text-wrap: balance;
   }
 
@@ -199,11 +200,6 @@
 
   .note-error {
     color: var(--color-danger);
-  }
-
-  /* Words a phone's narrower control can go without. */
-  .wide-only {
-    white-space: pre;
   }
 
   .visually-hidden {
@@ -273,6 +269,15 @@
 
   .button-danger:hover {
     background: var(--color-danger-fill);
+  }
+
+  /* Pressed: one step past hover, and nothing moves. */
+  .button:active {
+    background: var(--color-toggle-off);
+  }
+
+  .button-primary:active {
+    background: color-mix(in oklch, var(--color-primary-hover) 88%, var(--color-ground));
   }
 
   .button-ghost {
@@ -455,10 +460,15 @@
     font: 500 14px/1 var(--font-ui);
     text-overflow: ellipsis;
     cursor: pointer;
+    field-sizing: content;
   }
 
   .select-control:hover {
     background: var(--color-control-hover);
+  }
+
+  .select-control:active {
+    background: var(--color-toggle-off);
   }
 
   .select-control:disabled {
@@ -485,6 +495,17 @@
     inset: 0;
     background: var(--color-scrim);
     transition: opacity 150ms ease-out;
+  }
+
+  /* The page keeps a scrollbar gutter the fixed scrim cannot reach, and the
+     gutter paints only the root's background colour. While a dialog is open
+     that colour is the scrim laid over the ground, mixed solid: `scrim` is ink
+     at .24 in light and black at .5 in dark. */
+  html:has(.dialog-backdrop) {
+    background: light-dark(
+      color-mix(in srgb, var(--color-ink) 24%, var(--color-ground)),
+      color-mix(in srgb, black 50%, var(--color-ground))
+    );
   }
 
   .dialog-viewport {
@@ -600,8 +621,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 50px;
-    padding-block: 8px;
+    min-height: 40px;
+    padding-block: 6px;
     border-bottom: 1px solid var(--color-rule-soft);
   }
 
@@ -633,12 +654,30 @@
     background: var(--color-ground);
   }
 
+  /* A Feed's own list names no Feed, so the meta column holds only the time. */
+  .app[data-screen='feed'] .item {
+    grid-template-columns: 56px minmax(0, 1fr) 36px;
+  }
+
   .item:hover {
     border-color: var(--color-edge-hover);
   }
 
   .item[data-saved] {
     border-color: var(--color-saved-edge);
+  }
+
+  .item[data-saved]:hover {
+    border-color: var(--color-ramp-4);
+  }
+
+  /* On Saved every item is saved, so the saved edge would say nothing. */
+  .library-list .item[data-saved] {
+    border-color: var(--color-edge);
+  }
+
+  .library-list .item[data-saved]:hover {
+    border-color: var(--color-edge-hover);
   }
 
   .item:has(.item-title a:focus-visible) {
@@ -930,8 +969,9 @@
     text-underline-offset: 3px;
   }
 
-  /* The host leads away to the publisher, in colour and marked ↗; grey text when there is no site. */
-  :is(.feed-row-domain, .feed-card-domain) {
+  /* A Feed's host, wherever a Feed is named: it leads away to the publisher, in
+     colour and marked ↗; grey text when there is no site. */
+  .feed-host {
     justify-self: start;
     display: inline-flex;
     align-items: center;
@@ -943,16 +983,16 @@
     overflow-wrap: anywhere;
   }
 
-  a:is(.feed-row-domain, .feed-card-domain) {
+  a.feed-host {
     color: var(--color-away);
     text-decoration-color: transparent;
   }
 
-  a:is(.feed-row-domain, .feed-card-domain):hover {
+  a.feed-host:hover {
     text-decoration-color: currentColor;
   }
 
-  :is(.feed-row-domain, .feed-card-domain) .icon {
+  .feed-host .icon {
     width: 14px;
     height: 14px;
   }
@@ -1024,11 +1064,6 @@
     margin: 0;
     font: 400 17px/1.5 var(--font-read);
     color: var(--color-reader-body);
-  }
-
-  .feed-domain {
-    font-size: 13px;
-    color: var(--color-ink-2);
   }
 
   .feed-actions {
@@ -1408,10 +1443,6 @@
     margin-top: 72px;
   }
 
-  .item-plain {
-    grid-template-columns: 140px minmax(0, 1fr);
-  }
-
   /* Digest */
 
   /* Before any Subscription: the note, then Add feed under it. */
@@ -1441,13 +1472,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 44px;
+    min-height: 36px;
     margin-inline: -12px;
     padding-inline: 12px;
   }
 
   .day-row:hover {
-    background: var(--color-control);
+    background: var(--color-row-hover);
   }
 
   .day-row-count {
@@ -1571,6 +1602,18 @@
     gap: 64px;
   }
 
+  /* The column stays in view beside a long list, scrolling itself if taller.
+     It bleeds out by the rows' hover fill and focus ring, which its scrolling
+     would otherwise clip. */
+  .with-aside > :is(.recent-days, .feed-filter) {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100dvh - 48px);
+    margin: -4px -12px;
+    padding: 4px 12px;
+    overflow-y: auto;
+  }
+
   .with-aside:not(:has(> :nth-child(2))) {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1689,7 +1732,7 @@
 
   .gate-submit {
     width: 100%;
-    height: 44px;
+    height: 40px;
   }
 
   /* Chrome */
@@ -1782,10 +1825,14 @@
     color: var(--color-ink-2);
   }
 
-  .search[data-filled] .search-field,
-  .search-field:focus-within {
+  .search[data-filled] .search-field {
     background: var(--color-ground);
     box-shadow: inset 0 0 0 1px var(--color-ink);
+  }
+
+  .search-field:focus-within {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
   }
 
   .search-input {
@@ -1862,6 +1909,7 @@
     font-size: 32px;
   }
 
+  /* Words a phone's narrower control can go without. */
   .wide-only {
     display: none;
   }
@@ -1966,6 +2014,7 @@
   .search[data-open] .search-field {
     display: flex;
     flex: 1;
+    min-width: 0;
     height: 44px;
   }
 
@@ -2086,18 +2135,24 @@
     scrollbar-width: none;
   }
 
+  /* Chips in ink, the chosen one a segment ringed in ink: one choice of
+     several, where the Feed filter's ink fill is a tick. */
   .rhythm-choice .switch-segment {
     flex: none;
     height: 44px;
     padding-inline: 16px;
     background: var(--color-control);
+    color: var(--color-ink);
   }
 
-  /* Chips, like the Feed filter's: the chosen one filled with ink. */
   .rhythm-choice .switch-segment[data-pressed] {
-    background: var(--color-ink);
-    color: var(--color-ground);
-    box-shadow: none;
+    background: var(--color-segment);
+    box-shadow: inset 0 0 0 1px var(--color-ink);
+  }
+
+  /* A row that scrolls fades at its trailing edge, so what is past it reads as there. */
+  :is(.rhythm-choice, .filter-list, .rhythm-jumps) {
+    mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
   }
 
   .toolbar:has(.rhythm-choice) {
@@ -2126,7 +2181,6 @@
     align-items: center;
     justify-content: center;
     height: 44px;
-    background: var(--color-control);
     font-weight: 500;
   }
 
@@ -2218,6 +2272,11 @@
 
   .feed-filter {
     order: -1;
+    position: static;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
   }
 
   .feed-filter .group-header {
@@ -2352,16 +2411,6 @@
 
   .wordmark-cell {
     animation: none;
-  }
-
-  .loading-note .wordmark-grid {
-    animation: loading-mark-breathe 1800ms ease-in-out infinite;
-  }
-
-  @keyframes loading-mark-breathe {
-    50% {
-      opacity: 0.45;
-    }
   }
 }
 

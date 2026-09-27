@@ -53,14 +53,14 @@ one item never reads as empty.
 | `control-hover` | `oklch(91.9% 0 0)` | |
 | `primary-hover` | `oklch(32% 0 0)` | primary button under the pointer |
 | `row-hover` | `oklch(97.6% 0 0)` | list rows, undo line |
-| `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off |
+| `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off, a grey control pressed |
 | `rule` | ink at `.14` | under group headings |
 | `rule-soft` | ink at `.07` | between rows |
 | `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
 | `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.5% 0.11 277.5)` · `oklch(59.4% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
-| `away` | `ramp-5` | a Feed's host in a Feed row |
+| `away` | `ramp-5` | a Feed's host, wherever it is shown |
 | `match` | `oklch(91.4% 0.032 277.9)` | search highlight, under `ink` text |
 | `scrim` | ink at `.24` | behind a dialog |
 
@@ -91,12 +91,13 @@ the choice is per device.
 
 | Role | Face | Size / line-height | Weight |
 | --- | --- | --- | --- |
-| Page title | Instrument Sans | 40/1 desktop, 32/1 phone, −0.015em | 500; companion value in `ink-3` at 400 |
+| Page title | Instrument Sans | 40/1.08 desktop, 32/1.08 phone, −0.015em | 500; companion value in `ink-3` at 400; an unbroken name wraps anywhere |
 | Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-2` at 400 |
 | Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
 | Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
 | Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
 | Feed name | Literata | 19/1.2 | 400 |
+| Feed card title | Literata | 24/1.2 | 400; the card's heading, a step above a Feed row's name |
 | Feed Description | Literata | 17/1.5 | 400 |
 | Reader title | Literata | 44/1.16 desktop, 30/1.18 phone | 400, `text-wrap: balance` |
 | Reader body | Literata | 19/1.7 desktop, 17/1.65 phone | 400, reader-body colour |
@@ -114,7 +115,13 @@ Numbers in counts and meta use tabular figures.
   sheet buttons). Small inline controls are 30px.
 - Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
 - The reading column is 680px, centred.
+- On desktop a 300px column beside a list — the Digest's days, a Feed filter —
+  holds 24px from the top as the list scrolls, and scrolls itself when taller
+  than the window.
 - One breakpoint: `max-width: 640px` is the phone layout.
+- A phone row that scrolls sideways — Rhythm chips, jump buttons, a Feed
+  filter's chips — fades over its trailing 32px, so what is past the edge
+  reads as there.
 
 ## 5. Components
 
@@ -151,14 +158,19 @@ focus, so the change is announced; the first load leaves focus alone.
 them; `/` anywhere outside a field focuses it. The placeholder names the Search
 Scope taken from the screen: "Search your reading", "Search your saves",
 "Search your feeds", "Search this feed". With words in it, the field turns
-ground-coloured with a 1px ink ring and a clear button.
+ground-coloured with a 1px ink ring and a clear button. Focused, it carries
+the 2px focus outline every control does.
 
 **Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
 before the label (after it for chevrons and the ↗ of a link that leaves).
+Icons are 16px, drawn on a 24px grid at a 2 stroke with square caps.
 Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
 text. Disabled: `control` fill with `ink-3` text. A control that is busy
 keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,
-Saving…. Icon-only: square, same height, with an accessible name.
+Saving…. Icon-only: square, same height, with an accessible name. A select is
+a grey button with a trailing chevron, as wide as its chosen value. Pressed, a
+grey control fills with `toggle-off` and the primary one steps a further 12%
+from ink toward `ground`; nothing moves.
 
 **Switch.** A grey track with 3px padding and 2px gaps; the selected segment
 is `ground` with a hairline ring, the rest are `ink-off` and darken on hover.
@@ -177,16 +189,21 @@ a 1px danger ring, and the reason under it in danger.
 
 **Item box.** A thin-edged box with 20px vertical padding. Desktop is a grid:
 a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
-the title, then a 36px save square. The save square shows on hover and focus;
-a saved item shows it always, filled in `saved`, and keeps a `saved-edge`
-border. On a phone the Feed name and time share one line above the title and
-the save square is always visible at 44px. The whole box opens the Reader; the
-Feed name inside it opens the Feed. In search results a snippet sits under the
-title with the matched words marked in `match`.
+the title, then a 36px save square; in a Feed's own list, which names no Feed,
+the meta column narrows to 56px for the time. The save square shows on hover
+and focus; a saved item shows it always, filled in `saved`, and keeps a
+`saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
+every item is saved and the edge would say nothing. On a phone the Feed name
+and time share one line above the title and the save square is always visible
+at 44px. The whole box opens the Reader; the Feed name inside it opens the
+Feed. In search results a snippet sits under the title with the matched words
+marked in `match`.
 
 **Feed row.** A thin-edged box with 16px padding: Feed name in Literata 19 with
 a Cadence strip on the right, and under it the Feed Home Page host in `away`,
-marked ↗ and underlined on hover — meta text when the Feed names no site. Rows
+marked ↗ and underlined on hover — meta text when the Feed names no site. The
+host looks the same wherever a Feed is named; it opens a new tab, and its
+accessible name says so. Rows
 are two columns on desktop with 8px between them, one on a phone with 12px.
 
 **Label and value rows.** Label left in `ink-2`, value right in ink, 40px
@@ -209,7 +226,8 @@ the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
 is right-aligned Cancel and the primary action, which stays disabled until
 there is something to submit. On a phone it is a hard-edged sheet rising from
 the bottom edge with Cancel and the primary action side by side at 48px. In at
-150ms, out at 120ms, opacity only.
+150ms, out at 120ms, opacity only. While one is open the page's scrollbar
+gutter takes the scrim's colour too, so no bright strip runs down the edge.
 
 **Undo line.** Removing something from a list leaves a `row-hover` line in
 its place saying what happened, with an outlined Undo button, so the list does
@@ -227,14 +245,15 @@ next step through days, never past today, and the Feeds that day narrow the
 list when ticked, as in search. By feed is a card per Subscription, the most
 recently published first: a Feed row with the last 14 days of Cadence, then
 under a `rule-soft` line its three newest items, each dated as briefly as the
-distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
-scroll as chips, the day list and the facts give way, the stepper names the
-day, and the cards stack. A long list ends in Show more, which loads the next
-page wherever it falls — the rest of a day or days beyond it — so it names no
-number; Saved ends the same way. Before the first Subscription, All items is a
-note and Add feed as the primary action, with no Rhythms and no days beside
-it; with Subscriptions but nothing yet, the note says items arrive as the
-Feeds publish.
+distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans
+the page, the Rhythms scroll as chips in ink with the chosen one a segment
+ringed in ink, the day list and the facts give way, the stepper names the day
+as plain text between its arrows, and the cards stack. A long list ends in
+Show more, which loads the next page wherever it falls — the rest of a day or
+days beyond it — so it names no number; Saved ends the same way. Before the
+first Subscription, All items is a note and Add feed as the primary action,
+with no Rhythms and no days beside it; with Subscriptions but nothing yet, the
+note says items arrive as the Feeds publish.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,
@@ -244,7 +263,8 @@ with each Rhythm's count reach the groups; By name lists everything
 alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
 
-**One Feed.** The way back, then the Feed's name, description and host with
+**One Feed.** The way back, then the Feed's name, description and host (as in
+a Feed row) with
 Edit, Refresh now and Unsubscribe beside them, then three panels: Cadence (the
 grid), Info (subscribed, items in 26 weeks, busiest day, longest quiet
 stretch, last checked) and Settings (Check every, Open items with). Items follow, grouped by

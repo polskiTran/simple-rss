@@ -333,7 +333,7 @@ describe('the Digest read three ways', () => {
 
     const card = await screen.findByRole('region', { name: 'Field Notes' })
     expect(within(card).getByRole('link', { name: 'Field Notes' }).getAttribute('href')).toBe('/feeds/1')
-    expect(within(card).getByRole('link', { name: 'journal.example' })).toBeDefined()
+    expect(within(card).getByRole('link', { name: 'journal.example (opens in a new tab)' })).toBeDefined()
     expect(
       within(card)
         .getAllByRole('listitem')

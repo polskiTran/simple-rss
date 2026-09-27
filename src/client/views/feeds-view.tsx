@@ -113,7 +113,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
             {subscriptions?.length === 0 ? null : (
               <a className="button" href="/api/subscriptions/export" download="subscriptions.opml">
                 <Icon name="download" />
-                Export<span className="wide-only"> OPML</span>
+                <span>
+                  Export<span className="wide-only"> OPML</span>
+                </span>
               </a>
             )}
             <AddFeedDialog
@@ -300,12 +302,7 @@ function FeedRows({
             </h3>
             <CadenceStrip counts={subscription.cadence} title={subscription.title} />
           </div>
-          <HomePageLink
-            className="feed-row-domain"
-            domain={subscription.domain}
-            homePageUrl={subscription.homePageUrl}
-            arrow
-          />
+          <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
           <Availability
             subscription={subscription}
             retrying={retryingFeedId === subscription.feedId}
