@@ -19,15 +19,16 @@ const item = (feedItemId: number, title: string, displayTime: string) => ({
 })
 
 const DIGEST = {
-  today: { date: '2026-08-08', volume: 2 },
+  today: '2026-08-08',
   groups: [
     {
       date: '2026-08-08',
       label: 'Today',
+      count: 2,
       items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')],
     },
-    { date: '2026-08-07', label: 'Yesterday', items: [item(1, 'Evening notes', '09:31')] },
-    { date: '2026-06-03', label: 'Wednesday 3 June', items: [item(4, 'A June letter', '12:00')] },
+    { date: '2026-08-07', label: 'Yesterday', count: 1, items: [item(1, 'Evening notes', '09:31')] },
+    { date: '2026-06-03', label: 'Wednesday 3 June', count: 1, items: [item(4, 'A June letter', '12:00')] },
   ],
   nextCursor: null,
 }
@@ -60,13 +61,13 @@ describe('the chronological Digest', () => {
     expect(container.textContent).not.toMatch(/unread|mark|archive/i)
   })
 
-  it('withholds the count of a day the next page may continue', async () => {
-    stubApi().on('GET /api/digest', { body: { ...DIGEST, nextCursor: 'more' } })
+  it('counts a day in full even when the page holds only part of it', async () => {
+    const [today] = DIGEST.groups
+    stubApi().on('GET /api/digest', { body: { ...DIGEST, groups: [{ ...today, count: 60 }], nextCursor: 'more' } })
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Wednesday 3 June' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Today 60' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'Show older items' })).toBeDefined()
   })
 
@@ -106,21 +107,6 @@ describe('the chronological Digest', () => {
 
     await waitFor(() => expect(toggle.getAttribute('aria-pressed')).toBe('false'))
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
-  })
-
-  it('counts today from the server even when nothing has landed yet', async () => {
-    stubApi().on('GET /api/digest', {
-      body: {
-        today: { date: '2026-08-08', volume: 0 },
-        groups: [DIGEST.groups[1], DIGEST.groups[2]],
-        nextCursor: null,
-      },
-    })
-    window.history.replaceState(null, '', '/')
-    render(<App />)
-
-    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
-    expect(screen.queryByRole('heading', { name: /^Today/ })).toBeNull()
   })
 
   it('offers direction rather than mechanics when there is nothing yet', async () => {

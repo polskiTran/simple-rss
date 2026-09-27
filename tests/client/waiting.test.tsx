@@ -69,11 +69,12 @@ describe('a wait', () => {
     stubApi()
       .on('GET /api/digest', {
         body: {
-          today: { date: '2026-08-08', volume: 1 },
+          today: '2026-08-08',
           groups: [
             {
               date: '2026-08-08',
               label: 'Today',
+              count: 1,
               items: [
                 {
                   feedItemId: 3,

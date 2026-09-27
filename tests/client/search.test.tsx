@@ -5,11 +5,12 @@ import { App } from '../../src/client/app.js'
 import { stubApi } from './stub-api.js'
 
 const DIGEST = {
-  today: { date: '2026-08-08', volume: 1 },
+  today: '2026-08-08',
   groups: [
     {
       date: '2026-08-08',
       label: 'Today',
+      count: 1,
       items: [
         {
           feedItemId: 3,

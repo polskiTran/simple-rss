@@ -6,11 +6,12 @@ import { cadenceWindow } from './cadence-window.js'
 import { stubApi, type StubbedApi } from './stub-api.js'
 
 const DIGEST = {
-  today: { date: '2026-08-08', volume: 1 },
+  today: '2026-08-08',
   groups: [
     {
       date: '2026-08-08',
       label: 'Today',
+      count: 1,
       items: [
         {
           feedItemId: 3,

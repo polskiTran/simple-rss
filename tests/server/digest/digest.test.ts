@@ -36,11 +36,11 @@ describe('the chronological Digest', () => {
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
-    expect(digest.today).toEqual({ date: '2026-08-08', volume: 1 })
-    expect(digest.groups.map(({ date, label }) => [date, label])).toEqual([
-      ['2026-08-08', 'Today'],
-      ['2026-08-07', 'Yesterday'],
-      ['2026-06-03', 'Wednesday 3 June'],
+    expect(digest.today).toBe('2026-08-08')
+    expect(digest.groups.map(({ date, label, count }) => [date, label, count])).toEqual([
+      ['2026-08-08', 'Today', 1],
+      ['2026-08-07', 'Yesterday', 1],
+      ['2026-06-03', 'Wednesday 3 June', 1],
     ])
     expect(digest.groups.map((group) => group.items.map((entry) => entry.title))).toEqual([
       ['First light'],

@@ -1,9 +1,22 @@
-import { desc, eq, sql, type SQL } from 'drizzle-orm'
-import type { Digest, DigestItem } from '../../shared/api.js'
+import { and, count, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm'
+import {
+  DIGEST_FEED_ITEMS,
+  type Digest,
+  type DigestCalendar,
+  type DigestDay,
+  type DigestFeeds,
+  type DigestFilter,
+  type DigestGroup,
+  type DigestItem,
+  type FeedItemRow,
+  type SubscriptionSummary,
+} from '../../shared/api.js'
+import { rhythmOf, type Rhythm } from '../../shared/rhythm.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { gridDayKeys, stripCadenceByFeed } from './cadence-window.js'
 import {
   chronologyTime,
   dateKey,
@@ -27,29 +40,20 @@ export class DigestService {
     this.#settings = options.settings
   }
 
-  read(cursor?: ListCursor): Digest {
+  /** One page of the Digest under `filter`, each day's group counted in full. */
+  read(filter: DigestFilter, cursor?: ListCursor): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const chronology = chronologySql(now)
+    const narrowing = this.#narrowing(filter, now, timezone)
 
     const fetched = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        feedId: feeds.id,
-        feedTitle: effectiveFeedTitle,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        imageUrl: feedItems.imageUrl,
-        summary: feedItems.summary,
-        firstSeenAt: feedItems.firstSeenAt,
-        savedAt: libraryItems.savedAt,
-      })
+      .select(DIGEST_ROW_COLUMNS)
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
       .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
-      .where(cursor ? beyondCursorSql(chronology, cursor) : undefined)
+      .where(and(cursor ? beyondCursorSql(chronology, cursor) : undefined, ...narrowing))
       .orderBy(sql`${chronology} DESC`, desc(feedItems.id))
       .limit(LIST_PAGE_SIZE + 1)
       .all()
@@ -58,7 +62,7 @@ export class DigestService {
 
     const today = dateKey(now, timezone)
     const yesterday = dayBefore(today)
-    const groups = new Map<string, { date: string; label: string; items: DigestItem[] }>()
+    const groups = new Map<string, DigestGroup>()
 
     for (const { row, chronology } of rows) {
       const instant = new Date(chronology)
@@ -68,6 +72,7 @@ export class DigestService {
         group = {
           date,
           label: date === today ? 'Today' : date === yesterday ? 'Yesterday' : longDate(instant, today, timezone),
+          count: 0,
           items: [],
         }
         groups.set(date, group)
@@ -76,23 +81,88 @@ export class DigestService {
       group.items.push(digestItemOf(row, instant, timezone))
     }
 
+    const dates = [...groups.keys()]
+    const newest = dates[0]
+    const oldest = dates.at(-1)
+    const counts =
+      newest && oldest ? this.#countsByDay(narrowing, oldest, newest, now, timezone) : new Map<string, number>()
+
     return {
-      today: { date: today, volume: this.#todayVolume(chronology, today, timezone) },
-      groups: [...groups.values()],
+      today,
+      groups: [...groups.values()].map((group) => ({ ...group, count: counts.get(group.date) ?? 0 })),
       nextCursor: nextListCursor(fetched.length, rows.at(-1)),
     }
   }
 
-  #todayVolume(chronology: SQL, today: string, timezone: string): number {
-    const start = dayStartUtc(today, timezone).toISOString()
-    const end = dayStartUtc(dayAfter(today), timezone).toISOString()
+  /** Every day of the cadence grid window, counted under the Rhythm when one is given. */
+  calendar(rhythm: Rhythm | undefined): DigestCalendar {
+    const timezone = this.#settings.effectiveTimezone()
+    const now = this.#clock.now()
+    const today = dateKey(now, timezone)
+    const days = gridDayKeys(today)
+    const counts = this.#countsByDay(this.#narrowing({ rhythm }, now, timezone), days[0] ?? today, today, now, timezone)
+    return { today, days: days.map((date) => ({ date, count: counts.get(date) ?? 0 })) }
+  }
+
+  /** The Feeds that published on `date`, busiest first, then by title. */
+  day(date: string): DigestDay {
+    const timezone = this.#settings.effectiveTimezone()
+    const now = this.#clock.now()
+    const published = count()
     const counted = this.#db
-      .select({ volume: sql<number>`COUNT(*)` })
+      .select({ feedId: feeds.id, title: effectiveFeedTitle, count: published })
+      .from(feedItems)
+      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+      .where(and(...this.#narrowing({ day: date }, now, timezone)))
+      .groupBy(feeds.id)
+      .orderBy(desc(published), effectiveFeedTitle)
+      .all()
+    return { date, feeds: counted }
+  }
+
+  /** Each of `subscribed` with its newest items, the most recently published Feed first. */
+  byFeed(subscribed: readonly SubscriptionSummary[]): DigestFeeds {
+    const timezone = this.#settings.effectiveTimezone()
+    const now = this.#clock.now()
+    const chronology = chronologySql(now)
+
+    const ranked = this.#db
+      .select({
+        feedItemId: feedItems.id,
+        feedId: feedItems.feedId,
+        title: feedItems.title,
+        link: feedItems.link,
+        publishedAt: feedItems.publishedAt,
+        firstSeenAt: feedItems.firstSeenAt,
+        savedAt: libraryItems.savedAt,
+        rank: sql<number>`ROW_NUMBER() OVER (PARTITION BY ${feedItems.feedId} ORDER BY ${chronology} DESC, ${feedItems.id} DESC)`.as(
+          'rank',
+        ),
+      })
       .from(feedItems)
       .innerJoin(subscriptions, eq(subscriptions.feedId, feedItems.feedId))
-      .where(sql`${chronology} >= ${start} AND ${chronology} < ${end}`)
-      .all()[0]
-    return counted?.volume ?? 0
+      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+      .as('ranked')
+    const newest = this.#db.select().from(ranked).where(lte(ranked.rank, DIGEST_FEED_ITEMS)).all()
+
+    const itemsByFeed = Map.groupBy(inDigestOrder(newest, now), ({ row }) => row.feedId)
+    const latest = (feed: SubscriptionSummary) => {
+      const first = itemsByFeed.get(feed.feedId)?.[0]
+      return first ? first.chronology : Number.NEGATIVE_INFINITY
+    }
+
+    return {
+      today: dateKey(now, timezone),
+      feeds: subscribed
+        .toSorted((left, right) => latest(right) - latest(left))
+        .map((feed) => ({
+          ...feed,
+          items: (itemsByFeed.get(feed.feedId) ?? []).map(({ row, chronology }) =>
+            feedItemRowOf(row, new Date(chronology), timezone),
+          ),
+        })),
+    }
   }
 
   /**
@@ -118,18 +188,7 @@ export class DigestService {
       feedItemId,
     }
     const next = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        feedId: feeds.id,
-        feedTitle: effectiveFeedTitle,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        imageUrl: feedItems.imageUrl,
-        summary: feedItems.summary,
-        firstSeenAt: feedItems.firstSeenAt,
-        savedAt: libraryItems.savedAt,
-      })
+      .select(DIGEST_ROW_COLUMNS)
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
@@ -143,6 +202,61 @@ export class DigestService {
     const instant = new Date(chronologyTime(next.publishedAt, next.firstSeenAt, now))
     return digestItemOf(next, instant, timezone)
   }
+
+  /** The filter as WHERE conditions over `feedItems`, joined to current Subscriptions. */
+  #narrowing({ rhythm, day, feeds: feedIds = [] }: DigestFilter, now: Date, timezone: string): SQL[] {
+    const conditions: SQL[] = []
+    if (rhythm) conditions.push(inArray(feedItems.feedId, this.#feedsOfRhythm(rhythm, now, timezone)))
+    if (day) conditions.push(this.#withinDays(day, day, now, timezone))
+    if (feedIds.length > 0) conditions.push(inArray(feedItems.feedId, [...feedIds]))
+    return conditions
+  }
+
+  #feedsOfRhythm(rhythm: Rhythm, now: Date, timezone: string): number[] {
+    const feedIds = this.#db
+      .select({ feedId: subscriptions.feedId })
+      .from(subscriptions)
+      .all()
+      .map(({ feedId }) => feedId)
+    const cadenceOf = stripCadenceByFeed(this.#db, timezone, now, feedIds)
+    return feedIds.filter((feedId) => rhythmOf(cadenceOf(feedId)) === rhythm)
+  }
+
+  /** From the start of `first` to the end of `last`, both installation-timezone days. */
+  #withinDays(first: string, last: string, now: Date, timezone: string): SQL {
+    const chronology = chronologySql(now)
+    const start = dayStartUtc(first, timezone).toISOString()
+    const end = dayStartUtc(dayAfter(last), timezone).toISOString()
+    return sql`${chronology} >= ${start} AND ${chronology} < ${end}`
+  }
+
+  #countsByDay(narrowing: readonly SQL[], first: string, last: string, now: Date, timezone: string) {
+    const rows = this.#db
+      .select({ publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
+      .from(feedItems)
+      .innerJoin(subscriptions, eq(subscriptions.feedId, feedItems.feedId))
+      .where(and(...narrowing, this.#withinDays(first, last, now, timezone)))
+      .all()
+    const counts = new Map<string, number>()
+    for (const row of rows) {
+      const date = dateKey(new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now)), timezone)
+      counts.set(date, (counts.get(date) ?? 0) + 1)
+    }
+    return counts
+  }
+}
+
+const DIGEST_ROW_COLUMNS = {
+  feedItemId: feedItems.id,
+  title: feedItems.title,
+  feedId: feeds.id,
+  feedTitle: effectiveFeedTitle,
+  link: feedItems.link,
+  publishedAt: feedItems.publishedAt,
+  imageUrl: feedItems.imageUrl,
+  summary: feedItems.summary,
+  firstSeenAt: feedItems.firstSeenAt,
+  savedAt: libraryItems.savedAt,
 }
 
 interface DigestRow {
@@ -170,6 +284,24 @@ function digestItemOf(row: DigestRow, instant: Date, timezone: string): DigestIt
     imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
     summary: row.summary,
     firstSeenAt: row.firstSeenAt,
+    saved: row.savedAt !== null,
+  }
+}
+
+/** A Feed Item as its own Feed lists it, placed on its chronology day. */
+export function feedItemRowOf(
+  row: Pick<DigestRow, 'feedItemId' | 'title' | 'link' | 'publishedAt' | 'firstSeenAt' | 'savedAt'>,
+  instant: Date,
+  timezone: string,
+): FeedItemRow {
+  return {
+    feedItemId: row.feedItemId,
+    title: row.title ?? 'Untitled',
+    link: row.link,
+    publishedAt: row.publishedAt,
+    firstSeenAt: row.firstSeenAt,
+    date: dateKey(instant, timezone),
+    displayTime: timeLabel(instant, timezone),
     saved: row.savedAt !== null,
   }
 }

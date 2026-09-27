@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Digest, DigestGroup } from '../../shared/api.js'
+import type { Digest } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { Group } from '../components/group.js'
 import { ItemBox } from '../components/item-box.js'
@@ -51,7 +51,7 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
     }))
   }
 
-  const today = state.kind === 'loaded' ? state.value.today.date : undefined
+  const today = state.kind === 'loaded' ? state.value.today : undefined
   const head = (
     <header className="page-head">
       <h1 className="page-title">
@@ -92,13 +92,13 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       {digest.groups.length === 0 ? (
         <p className="note">Nothing yet. Subscribe to a feed in Feeds to start your digest.</p>
       ) : (
-        digest.groups.map((group, index) => (
+        digest.groups.map((group) => (
           <Group
             key={group.date}
             id={`day-${group.date}`}
             title={group.label}
-            count={countOf(digest, group, index)}
-            aside={relativeDay(group.date, digest.today.date) ? longDay(group.date) : undefined}
+            count={group.count}
+            aside={relativeDay(group.date, digest.today) ? longDay(group.date) : undefined}
           >
             <div className="item-list">
               {group.items.map((item) => (
@@ -120,17 +120,6 @@ export function DigestView({ onOpenItem, onOpenFeed }: DigestViewProps) {
       <OlderItems nextCursor={digest.nextCursor} older={older} noun="items" onLoadOlder={loadOlder} />
     </div>
   )
-}
-
-/**
- * Today's count is the server's own; an older day's is known only once its
- * whole group is loaded — any group but the last, or the last of a list that
- * has ended.
- */
-function countOf(digest: Digest, group: DigestGroup, index: number): number | undefined {
-  if (group.date === digest.today.date) return digest.today.volume
-  const complete = index < digest.groups.length - 1 || digest.nextCursor === null
-  return complete ? group.items.length : undefined
 }
 
 /** Today and Yesterday are labelled relatively, so the day they name follows them. */

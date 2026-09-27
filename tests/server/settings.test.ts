@@ -87,8 +87,8 @@ describe('the Settings preferences API', () => {
     })
 
     const after = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(after.groups.map(({ label }) => label)).toEqual(['Today'])
-    expect(after.today).toEqual({ date: '2026-08-08', volume: 1 })
+    expect(after.groups.map(({ label, count }) => [label, count])).toEqual([['Today', 1]])
+    expect(after.today).toBe('2026-08-08')
   })
 
   it('survives a restart, like any other installation state', async () => {

@@ -1,8 +1,9 @@
-import { inArray } from 'drizzle-orm'
+import { and, inArray, sql } from 'drizzle-orm'
 import { CADENCE_GRID_WEEKS, CADENCE_STRIP_DAYS } from '../../shared/api.js'
-import { chronologyTime, dateKey } from '../digest/chronology.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
+import { chronologyTime, dateKey, dayStartUtc } from './chronology.js'
+import { chronologySql } from './list-page.js'
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
@@ -24,11 +25,13 @@ export function stripCadenceByFeed(
   const cadence = new Map<number, number[]>()
   if (feedIds.length > 0) {
     const today = dateKey(now, timezone)
-    const indexByDate = new Map(trailingDayKeys(today, CADENCE_STRIP_DAYS).map((key, index) => [key, index]))
+    const days = trailingDayKeys(today, CADENCE_STRIP_DAYS)
+    const indexByDate = new Map(days.map((key, index) => [key, index]))
+    const opening = dayStartUtc(days[0] ?? today, timezone).toISOString()
     const rows = db
       .select({ feedId: feedItems.feedId, publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
       .from(feedItems)
-      .where(inArray(feedItems.feedId, [...feedIds]))
+      .where(and(inArray(feedItems.feedId, [...feedIds]), sql`${chronologySql(now)} >= ${opening}`))
       .all()
     for (const row of rows) {
       const time = chronologyTime(row.publishedAt, row.firstSeenAt, now)
