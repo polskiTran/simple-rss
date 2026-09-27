@@ -291,6 +291,7 @@ function FeedRows({
             className="feed-row-domain"
             domain={subscription.domain}
             homePageUrl={subscription.homePageUrl}
+            arrow
           />
           <Availability
             subscription={subscription}

@@ -9,14 +9,17 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
 ## 1. Principles
 
 1. **Colour comes from the content.** The interface is greyscale. Colour
-   appears only in data: Cadence, saved state and search matches. It is blue in
-   light mode and yellow in dark.
+   appears only in data — Cadence, saved state and search matches — and on a
+   Feed's host, the one link that leaves for the publisher. It is blue in light
+   mode and yellow in dark.
 2. **One shape means you can press it.** Every control is a hard-edged block of
    the same height. Grey fill is an ordinary action, ink fill is the single
    primary action on a screen. Counts and status are plain grey text with no
-   box. The only text that acts on its own is a link, and links are underlined.
+   box. The only text that acts on its own is a link, and links are underlined —
+   except a Feed's host, which is coloured instead.
 3. **Hierarchy from size and weight.** No cards, shadows, tinted bars or
-   coloured headers. Hairlines separate groups; thin-edged boxes hold items.
+   coloured headers. Hairlines separate groups; thin-edged boxes hold items and
+   Feeds.
 4. **Say what happens.** Labels are sentence case and name the result: Add
    feed, Export OPML, Show 16 more, Retry, Unsubscribe.
 5. **Type split by job.** Literata for what you read, Instrument Sans for what
@@ -50,6 +53,7 @@ any ground.
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
 | `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(84.5% 0.058 278.5)` · `oklch(70% 0.118 276.9)` · `oklch(55.5% 0.184 273.5)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
+| `away` | `ramp-5` | a Feed's host in a Feed row |
 | `match` | `oklch(91.4% 0.032 277.9)` | search highlight |
 | `scrim` | ink at `.24` | behind a dialog |
 
@@ -70,6 +74,7 @@ any ground.
 | `danger` | `oklch(73.2% 0.164 27.1)` |
 | `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(37.5% 0.063 97.7)` · `oklch(53% 0.098 95.7)` · `oklch(73.1% 0.138 94.5)` · `oklch(85.8% 0.158 94.4)` |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` |
+| `away` | `ramp-5` |
 | `match` | `ramp-2` |
 
 Appearance follows the system unless the User picks Light or Dark in Settings;
@@ -163,9 +168,10 @@ the save square is always visible at 44px. The whole box opens the Reader; the
 Feed name inside it opens the Feed. In search results a snippet sits under the
 title with the matched words marked in `match`.
 
-**Feed row.** Feed name in Literata 19, its Feed Home Page host under it as an
-underlined link in meta, and a Cadence strip on the right. Rows are two
-columns on desktop with `rule-soft` between them, one on a phone.
+**Feed row.** A thin-edged box with 16px padding: Feed name in Literata 19 with
+a Cadence strip on the right, and under it the Feed Home Page host in `away`,
+marked ↗ and underlined on hover — meta text when the Feed names no site. Rows
+are two columns on desktop with 8px between them, one on a phone with 12px.
 
 **Label and value rows.** Label left in `ink-2`, value right in ink, 40px
 minimum height, `rule-soft` between. Used for a Feed's Info and Settings panels
@@ -203,9 +209,9 @@ on show ringed, and its facts beside it — the day, its items and Feeds, the 26
 weeks' items and busiest weekday — over the day's items; previous, Today and
 next step through days, never past today, and the Feeds that day narrow the
 list when ticked, as in search. By feed is a card per Subscription, the most
-recently published first: its name, the last 14 days of Cadence, its host, and
-its three newest items, each dated as briefly as the distance allows — 09:12,
-Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
+recently published first: a Feed row with the last 14 days of Cadence, then
+under a `rule-soft` line its three newest items, each dated as briefly as the
+distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
 scroll as chips, the day list and the facts give way, the stepper names the
 day, and the cards stack.
 

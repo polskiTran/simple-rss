@@ -214,6 +214,7 @@ function MatchingFeeds({
                 className="feed-row-domain"
                 domain={subscription.domain}
                 homePageUrl={subscription.homePageUrl}
+                arrow
               />
             </article>
           ))}

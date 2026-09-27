@@ -55,6 +55,7 @@
   --color-ramp-5: light-dark(oklch(43.3% 0.24 267.6), oklch(85.8% 0.158 94.4));
   --color-saved: var(--color-ramp-5);
   --color-saved-edge: var(--color-ramp-3);
+  --color-away: var(--color-ramp-5);
   --color-match: light-dark(oklch(91.4% 0.032 277.9), oklch(37.5% 0.063 97.7));
 
   /* The Markdown renderer's tokens, under the names its classes ask for. */
@@ -881,18 +882,24 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A Feed is a thin-edged box, like an item: its name and Cadence, its host under them. */
+
   .feed-rows {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 48px;
+    gap: 8px;
+  }
+
+  .panel .feed-rows {
+    margin-top: 14px;
   }
 
   .feed-row {
     display: grid;
     align-content: start;
-    gap: 6px;
-    padding: 18px 0 16px;
-    border-bottom: 1px solid var(--color-rule-soft);
+    gap: 4px;
+    padding: 16px;
+    border: 1px solid var(--color-edge);
   }
 
   .feed-row-head {
@@ -919,10 +926,31 @@
     text-underline-offset: 3px;
   }
 
-  .feed-row-domain {
+  /* The host leads away to the publisher, in colour and marked ↗; grey text when there is no site. */
+  :is(.feed-row-domain, .feed-card-domain) {
     justify-self: start;
-    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 100%;
+    font-size: 14px;
+    line-height: 20px;
     color: var(--color-ink-2);
+    overflow-wrap: anywhere;
+  }
+
+  a:is(.feed-row-domain, .feed-card-domain) {
+    color: var(--color-away);
+    text-decoration-color: transparent;
+  }
+
+  a:is(.feed-row-domain, .feed-card-domain):hover {
+    text-decoration-color: currentColor;
+  }
+
+  :is(.feed-row-domain, .feed-card-domain) .icon {
+    width: 14px;
+    height: 14px;
   }
 
   .feed-row-note {
@@ -930,7 +958,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin: 6px 0 0;
+    margin: 8px 0 0;
   }
 
   .more-names {
@@ -1345,18 +1373,20 @@
       0 0 0 2px var(--color-ink);
   }
 
+  /* By feed: a box per Feed, its head ruled off from its newest items. */
+
   .feed-cards {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 56px 48px;
+    gap: 40px 24px;
   }
 
   .feed-card {
     display: grid;
     align-content: start;
-    gap: 6px;
-    padding-top: 24px;
-    border-top: 1px solid var(--color-rule);
+    gap: 4px;
+    padding: 16px 16px 6px;
+    border: 1px solid var(--color-edge);
   }
 
   .feed-card-head {
@@ -1382,19 +1412,16 @@
     overflow-wrap: break-word;
   }
 
-  .feed-card-domain {
-    justify-self: start;
-    font-size: 13px;
-    color: var(--color-ink-2);
-  }
-
   .feed-card > .note {
-    margin-top: 16px;
+    margin: 12px -16px 0;
+    padding: 16px 16px 10px;
+    border-top: 1px solid var(--color-rule-soft);
   }
 
   .feed-card-items {
-    margin: 16px 0 0;
-    padding: 0;
+    margin: 12px -16px 0;
+    padding: 8px 16px 0;
+    border-top: 1px solid var(--color-rule-soft);
     list-style: none;
   }
 
@@ -1864,6 +1891,7 @@
 
   .feed-rows {
     grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
   }
 
   .cadence-day:nth-child(-n + 16) {
@@ -1971,7 +1999,7 @@
 
   .feed-cards {
     grid-template-columns: minmax(0, 1fr);
-    gap: 40px;
+    gap: 12px;
   }
 
   /* One Feed: identity, then the actions as one row, the panels stacked. */
