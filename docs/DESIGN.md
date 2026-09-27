@@ -16,7 +16,8 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
    primary action on a screen. Counts and status are plain grey text with no
    box. The only text that acts on its own is a link, and links are underlined.
 3. **Hierarchy from size and weight.** No cards, shadows, tinted bars or
-   coloured headers. Hairlines separate groups; thin-edged boxes hold items.
+   coloured headers. Hairlines separate groups; thin-edged boxes hold items and
+   Feeds.
 4. **Say what happens.** Labels are sentence case and name the result: Add
    feed, Export OPML, Show 16 more, Retry, Unsubscribe.
 5. **Type split by job.** Literata for what you read, Instrument Sans for what
@@ -163,9 +164,10 @@ the save square is always visible at 44px. The whole box opens the Reader; the
 Feed name inside it opens the Feed. In search results a snippet sits under the
 title with the matched words marked in `match`.
 
-**Feed row.** Feed name in Literata 19, its Feed Home Page host under it as an
-underlined link in meta, and a Cadence strip on the right. Rows are two
-columns on desktop with `rule-soft` between them, one on a phone.
+**Feed row.** A thin-edged box: Feed name in Literata 19 with a Cadence strip
+on the right, and under it the Feed Home Page host as a small button marked ↗ —
+plain meta text when the Feed names no site. Rows are two columns on desktop
+with 8px between them, one on a phone.
 
 **Label and value rows.** Label left in `ink-2`, value right in ink, 40px
 minimum height, `rule-soft` between. Used for a Feed's Info and Settings panels
@@ -203,9 +205,9 @@ on show ringed, and its facts beside it — the day, its items and Feeds, the 26
 weeks' items and busiest weekday — over the day's items; previous, Today and
 next step through days, never past today, and the Feeds that day narrow the
 list when ticked, as in search. By feed is a card per Subscription, the most
-recently published first: its name, the last 14 days of Cadence, its host, and
-its three newest items, each dated as briefly as the distance allows — 09:12,
-Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
+recently published first: a Feed row with the last 14 days of Cadence, then
+under a `rule-soft` line its three newest items, each dated as briefly as the
+distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans the page, the Rhythms
 scroll as chips, the day list and the facts give way, the stepper names the
 day, and the cards stack.
 

@@ -881,18 +881,24 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A Feed is a thin-edged box, like an item: its name and Cadence, then its host. */
+
   .feed-rows {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 48px;
+    gap: 8px;
+  }
+
+  .panel .feed-rows {
+    margin-top: 14px;
   }
 
   .feed-row {
     display: grid;
     align-content: start;
-    gap: 6px;
-    padding: 18px 0 16px;
-    border-bottom: 1px solid var(--color-rule-soft);
+    gap: 10px;
+    padding: 18px 16px 16px;
+    border: 1px solid var(--color-edge);
   }
 
   .feed-row-head {
@@ -919,10 +925,20 @@
     text-underline-offset: 3px;
   }
 
-  .feed-row-domain {
+  /* The host is a button out to the publisher; plain grey text when there is no site. */
+  :is(.feed-row-domain, .feed-card-domain) {
     justify-self: start;
+    max-width: 100%;
+  }
+
+  :is(.feed-row-domain, .feed-card-domain):not(.button) {
     font-size: 13px;
     color: var(--color-ink-2);
+  }
+
+  :is(.feed-row-domain, .feed-card-domain) .icon {
+    width: 14px;
+    height: 14px;
   }
 
   .feed-row-note {
@@ -930,7 +946,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin: 6px 0 0;
+    margin: 0;
   }
 
   .more-names {
@@ -1345,18 +1361,20 @@
       0 0 0 2px var(--color-ink);
   }
 
+  /* By feed: a box per Feed, its head ruled off from its newest items. */
+
   .feed-cards {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 56px 48px;
+    gap: 40px 24px;
   }
 
   .feed-card {
     display: grid;
     align-content: start;
-    gap: 6px;
-    padding-top: 24px;
-    border-top: 1px solid var(--color-rule);
+    gap: 10px;
+    padding: 20px 20px 12px;
+    border: 1px solid var(--color-edge);
   }
 
   .feed-card-head {
@@ -1382,19 +1400,16 @@
     overflow-wrap: break-word;
   }
 
-  .feed-card-domain {
-    justify-self: start;
-    font-size: 13px;
-    color: var(--color-ink-2);
-  }
-
   .feed-card > .note {
-    margin-top: 16px;
+    margin: 6px -20px 0;
+    padding: 18px 20px 8px;
+    border-top: 1px solid var(--color-rule-soft);
   }
 
   .feed-card-items {
-    margin: 16px 0 0;
-    padding: 0;
+    margin: 6px -20px 0;
+    padding: 6px 20px 0;
+    border-top: 1px solid var(--color-rule-soft);
     list-style: none;
   }
 
@@ -1971,7 +1986,7 @@
 
   .feed-cards {
     grid-template-columns: minmax(0, 1fr);
-    gap: 40px;
+    gap: 12px;
   }
 
   /* One Feed: identity, then the actions as one row, the panels stacked. */
