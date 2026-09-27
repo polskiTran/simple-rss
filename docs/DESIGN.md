@@ -84,12 +84,13 @@ the choice is per device.
 
 | Role | Face | Size / line-height | Weight |
 | --- | --- | --- | --- |
-| Page title | Instrument Sans | 40/1 desktop, 32/1 phone, −0.015em | 500; companion value in `ink-3` at 400 |
+| Page title | Instrument Sans | 40/1.08 desktop, 32/1.08 phone, −0.015em | 500; companion value in `ink-3` at 400; an unbroken name wraps anywhere |
 | Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-3` at 400 |
 | Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
 | Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
 | Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
 | Feed name | Literata | 19/1.2 | 400 |
+| Feed card title | Literata | 24/1.2 | 400; the card's heading, a step above a Feed row's name |
 | Feed Description | Literata | 17/1.5 | 400 |
 | Reader title | Literata | 44/1.16 desktop, 30/1.18 phone | 400, `text-wrap: balance` |
 | Reader body | Literata | 19/1.7 desktop, 17/1.65 phone | 400, reader-body colour |

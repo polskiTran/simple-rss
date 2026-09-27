@@ -151,8 +151,9 @@
     margin: 0;
     font-weight: 500;
     font-size: 40px;
-    line-height: 1;
+    line-height: 1.08;
     letter-spacing: -0.015em;
+    overflow-wrap: anywhere;
     text-wrap: balance;
   }
 
