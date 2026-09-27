@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { RHYTHMS, type Rhythm } from './rhythm.js'
 
 export const livenessSchema = z.object({
   status: z.literal('live'),
@@ -303,15 +304,15 @@ export type DigestItem = z.infer<typeof digestItemSchema>
 export const digestGroupSchema = z.object({
   date: z.string(),
   label: z.string(),
+  /** Every item of the day under the request's filters, however much of it this page holds. */
+  count: z.number().int().nonnegative(),
   items: z.array(digestItemSchema),
 })
 export type DigestGroup = z.infer<typeof digestGroupSchema>
 
 export const digestSchema = z.object({
-  today: z.object({
-    date: z.string(),
-    volume: z.number().int().nonnegative(),
-  }),
+  /** The installation-timezone day. */
+  today: z.string(),
   /**
    * A page may end mid-day; the next page repeats that day's `date` and the
    * client merges the group.
@@ -321,6 +322,77 @@ export const digestSchema = z.object({
   nextCursor: z.string().nullable(),
 })
 export type Digest = z.infer<typeof digestSchema>
+
+/** An installation-timezone calendar day, `2026-09-01`, that exists. */
+export const dateKeySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const time = Date.parse(`${value}T00:00:00Z`)
+    return Number.isFinite(time) && new Date(time).toISOString().startsWith(value)
+  })
+
+/**
+ * What narrows the Digest: the Rhythm of its Feeds, one day, some Feeds. Each
+ * narrows further; the cursor pages under any of them. `digestParamsOf` and
+ * `digestRequestSchema` are the two directions of one encoding.
+ */
+export interface DigestFilter {
+  readonly rhythm?: Rhythm | undefined
+  readonly day?: string | undefined
+  readonly feeds?: readonly number[] | undefined
+}
+
+export function digestParamsOf({ rhythm, day, feeds = [] }: DigestFilter): URLSearchParams {
+  const params = new URLSearchParams()
+  if (rhythm) params.set('rhythm', rhythm)
+  if (day) params.set('day', day)
+  for (const feedId of feeds) params.append('feed', String(feedId))
+  return params
+}
+
+export const digestRequestSchema = z
+  .object({
+    rhythm: z.enum(RHYTHMS).optional(),
+    day: dateKeySchema.optional(),
+    feed: z.array(feedIdParameterSchema).default([]),
+  })
+  .transform(({ rhythm, day, feed }) => ({ rhythm, day, feeds: feed }) satisfies DigestFilter)
+
+/** The Digest's own cadence: every day of the grid window, with `today` ending it. */
+export const digestCalendarSchema = z.object({
+  today: z.string(),
+  days: z.array(cadenceObservationSchema),
+})
+export type DigestCalendar = z.infer<typeof digestCalendarSchema>
+
+/** One day of the Digest by Feed, busiest first. */
+export const digestDaySchema = z.object({
+  date: z.string(),
+  feeds: z.array(
+    z.object({
+      feedId: z.number().int().positive(),
+      title: z.string(),
+      count: z.number().int().positive(),
+    }),
+  ),
+})
+export type DigestDay = z.infer<typeof digestDaySchema>
+
+export const DIGEST_FEED_ITEMS = 3
+
+/** A Subscription with its newest items, at most `DIGEST_FEED_ITEMS`. */
+export const digestFeedSchema = subscriptionSummarySchema.extend({
+  items: z.array(feedItemRowSchema),
+})
+export type DigestFeed = z.infer<typeof digestFeedSchema>
+
+/** Ordered by each Feed's newest item; a Feed with none comes last. */
+export const digestFeedsSchema = z.object({
+  today: z.string(),
+  feeds: z.array(digestFeedSchema),
+})
+export type DigestFeeds = z.infer<typeof digestFeedsSchema>
 
 export const libraryItemSchema = z.object({
   feedItemId: z.number().int().positive(),

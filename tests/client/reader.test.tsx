@@ -382,11 +382,12 @@ describe('Reader View', () => {
 
   it('opens from a Digest title and walks on via next in the digest', async () => {
     const digest = {
-      today: { date: '2026-08-08', volume: 1 },
+      today: '2026-08-08',
       groups: [
         {
           date: '2026-08-08',
           label: 'Today',
+          count: 1,
           items: [
             {
               feedItemId: 3,

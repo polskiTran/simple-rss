@@ -98,11 +98,12 @@ describe('Subscriptions', () => {
     const digest = await user.get('/api/digest')
     expect(digest.status).toBe(200)
     expect(await digest.json()).toEqual({
-      today: { date: '2026-08-08', volume: 1 },
+      today: '2026-08-08',
       groups: [
         {
           date: '2026-08-08',
           label: 'Today',
+          count: 1,
           items: [
             {
               feedItemId: 1,
@@ -329,12 +330,12 @@ describe('Subscriptions', () => {
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    expect(await (await user.get('/api/digest')).json()).toMatchObject({ today: { volume: 0 } })
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [] })
     service.database?.$client.exec('DROP TRIGGER reject_feed_item')
     service.clock.advance(60_000)
     await service.wakeScheduler()
 
-    expect(await (await user.get('/api/digest')).json()).toMatchObject({ today: { volume: 1 } })
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [{ count: 1 }] })
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0].availability).toMatchObject({ state: 'available' })
   })

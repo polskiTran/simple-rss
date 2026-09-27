@@ -4,7 +4,7 @@ export interface GroupProps {
   /** Ties the heading to its section; unique on the page. */
   readonly id: string
   readonly title: ReactNode
-  /** Shown only when the whole group is loaded — a partial count is a wrong one. */
+  /** The whole group's, or none — a partial count is a wrong one. */
   readonly count?: number | undefined
   readonly aside?: ReactNode
   readonly className?: string

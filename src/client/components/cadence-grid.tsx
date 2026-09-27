@@ -4,12 +4,14 @@ import { cadenceDayLabel, type CadenceGrid as Grid } from '../cadence.js'
 export interface CadenceGridProps {
   readonly grid: Grid
   readonly title: string
+  /** The day on show, ringed. */
+  readonly selected?: string | undefined
   /** A day with items is a button that brings its items into view. */
   onShowDay(date: string): void
 }
 
 /** 26 weeks as columns of seven days, oldest on the left, with months under them. */
-export function CadenceGrid({ grid, title, onShowDay }: CadenceGridProps) {
+export function CadenceGrid({ grid, title, selected, onShowDay }: CadenceGridProps) {
   return (
     <div className="cadence-figure">
       <div className="cadence-grid" role="group" aria-label={`26 weeks of Cadence for ${title}`}>
@@ -21,12 +23,20 @@ export function CadenceGrid({ grid, title, onShowDay }: CadenceGridProps) {
                 type="button"
                 className="cadence-cell"
                 data-level={cell.level}
+                data-selected={cell.date === selected ? '' : undefined}
+                aria-pressed={selected === undefined ? undefined : cell.date === selected}
                 aria-label={`${cadenceDayLabel(cell)}, show that day`}
                 title={cadenceDayLabel(cell)}
                 onClick={() => onShowDay(cell.date)}
               />
             ) : (
-              <span key={cell.date} className="cadence-cell" data-level={0} aria-hidden="true" />
+              <span
+                key={cell.date}
+                className="cadence-cell"
+                data-level={0}
+                data-selected={cell.date === selected ? '' : undefined}
+                aria-hidden="true"
+              />
             ),
           ),
         )}

@@ -6,7 +6,7 @@ import { chronologySql } from '../digest/list-page.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import { stripCadenceByFeed } from '../subscriptions/cadence-window.js'
+import { stripCadenceByFeed } from '../digest/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50

@@ -6,11 +6,12 @@ import { cadenceWindow } from './cadence-window.js'
 import { stubApi, type StubbedApi } from './stub-api.js'
 
 const DIGEST = {
-  today: { date: '2026-08-08', volume: 1 },
+  today: '2026-08-08',
   groups: [
     {
       date: '2026-08-08',
       label: 'Today',
+      count: 1,
       items: [
         {
           feedItemId: 3,
@@ -170,6 +171,24 @@ describe('a Feed Item’s attribution', () => {
     await user.click(wayBack())
     expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
+  })
+
+  it('returns an article opened from one day of the Digest to that same day', async () => {
+    reading('/digest?by=day&day=2026-08-07')
+      .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow() } })
+      .on('GET /api/digest/days/2026-08-07', { body: { date: '2026-08-07', feeds: [] } })
+      .on('GET /api/digest?day=2026-08-07', { body: DIGEST })
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('link', { name: 'First light' }))
+    await openedArticle()
+    expect(wayBack().textContent).toBe('Digest')
+
+    await user.click(wayBack())
+    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(window.location.pathname + window.location.search).toBe('/digest?by=day&day=2026-08-07')
+    expect(screen.getByRole('button', { name: 'By day' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('opens its Feed from a search result, and that Feed returns to the results', async () => {

@@ -5,7 +5,6 @@ import {
   pollingIntervalMinutesSchema,
   type FeedDetail,
   type FeedDetailsUpdate,
-  type FeedItemRow,
   type PollingIntervalMinutes,
   type PollingSchedule,
   type ReadingSource,
@@ -14,7 +13,8 @@ import {
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, timeLabel } from '../digest/chronology.js'
+import { chronologyTime, dateKey } from '../digest/chronology.js'
+import { feedItemRowOf } from '../digest/digest-service.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
@@ -27,7 +27,7 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
-import { gridDayKeys, stripCadenceByFeed } from './cadence-window.js'
+import { gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
 import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
@@ -424,20 +424,10 @@ export class SubscriptionService {
       .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
 
     const counts = new Map<string, number>()
-    const items: FeedItemRow[] = rows.map(({ row, chronology }) => {
-      const instant = new Date(chronology)
-      const date = dateKey(instant, timezone)
-      counts.set(date, (counts.get(date) ?? 0) + 1)
-      return {
-        feedItemId: row.feedItemId,
-        title: row.title ?? 'Untitled',
-        link: row.link,
-        publishedAt: row.publishedAt,
-        firstSeenAt: row.firstSeenAt,
-        date,
-        displayTime: timeLabel(instant, timezone),
-        saved: row.savedAt !== null,
-      }
+    const items = rows.map(({ row, chronology }) => {
+      const item = feedItemRowOf(row, new Date(chronology), timezone)
+      counts.set(item.date, (counts.get(item.date) ?? 0) + 1)
+      return item
     })
 
     return {

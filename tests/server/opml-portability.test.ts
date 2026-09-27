@@ -91,7 +91,7 @@ describe('OPML import', () => {
       ['Field Notes', 'available'],
     ])
     const digest = await (await user.get('/api/digest')).json()
-    expect(digest.today.volume).toBe(2)
+    expect(digest.groups).toMatchObject([{ date: '2026-08-08', count: 2 }])
   })
 
   it('drains a bulk import in one wake even when it overflows the batch', async () => {

@@ -32,6 +32,7 @@ import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { NativeSelect } from '../components/native-select.js'
+import { Row } from '../components/row.js'
 import { READING_SOURCE_LABELS } from '../reading-source.js'
 import { dayBefore, dayOfYear, longDay } from '../day-names.js'
 import type { Origin } from '../routing.js'
@@ -221,15 +222,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         }
         onOpenItem={onOpenItem}
       />
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="row">
-      <dt className="row-label">{label}</dt>
-      <dd className="row-value">{value}</dd>
     </div>
   )
 }

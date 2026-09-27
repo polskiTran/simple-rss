@@ -72,7 +72,7 @@ describe('the Digest in pages', () => {
     expect(digest.nextCursor).toBeNull()
   })
 
-  it('counts the whole of today in the daily volume even when the page cuts today short', async () => {
+  it('counts a whole day on the page that cuts it short, and again on the page that finishes it', async () => {
     const service = await startTestService()
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
@@ -84,8 +84,14 @@ describe('the Digest in pages', () => {
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
+    expect(digest.groups[0]).toMatchObject({ date: '2026-08-08', count: 55 })
     expect(digest.groups[0]?.items).toHaveLength(50)
-    expect(digest.today).toEqual({ date: '2026-08-08', volume: 55 })
+
+    const rest = digestSchema.parse(
+      await (await user.get(`/api/digest?cursor=${encodeURIComponent(digest.nextCursor ?? '')}`)).json(),
+    )
+    expect(rest.groups[0]).toMatchObject({ date: '2026-08-08', count: 55 })
+    expect(rest.groups[0]?.items).toHaveLength(5)
   })
 
   it('refuses a cursor it never issued', async () => {

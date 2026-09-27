@@ -116,6 +116,37 @@ test.describe('the Digest presentation', () => {
   })
 })
 
+test.describe('the Digest by day and by feed', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('steps back a day and returns to today, keeping the day in the address', async ({ page, installation }) => {
+    await openDigest(page, installation)
+    await page.getByRole('button', { name: 'By day' }).click()
+
+    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next day' })).toBeDisabled()
+
+    await page.getByRole('button', { name: 'Previous day' }).click()
+    await expect(page.getByText('Nothing landed on this day.')).toBeVisible()
+    await expect(page).toHaveURL(/\?by=day&day=\d{4}-\d{2}-\d{2}$/)
+
+    await page.getByRole('button', { name: 'Today', exact: true }).click()
+    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await expect(page).toHaveURL(/\?by=day$/)
+  })
+
+  test('opens an article from a Feed’s card', async ({ page, installation }) => {
+    await openDigest(page, installation)
+    await page.getByRole('button', { name: 'By feed' }).click()
+
+    const card = page.getByRole('region', { name: 'Field Notes' })
+    await expect(card.getByText('07:15')).toBeVisible()
+    await card.getByRole('link', { name: 'First light' }).click()
+
+    await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
+  })
+})
+
 test.describe('the Digest at phone width', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
@@ -124,6 +155,25 @@ test.describe('the Digest at phone width', () => {
 
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save First light' })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+  })
+
+  test('reads by day, Feeds as chips, and by feed without overflowing the screen', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('button', { name: 'Add feed' }).click()
+    await page.getByRole('textbox', { name: 'URL' }).fill(installation.longFeedUrl)
+    await page.getByRole('button', { name: 'Subscribe' }).click()
+    await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+
+    await page.getByRole('button', { name: 'By day' }).click()
+    await expect(page.getByRole('heading', { name: 'Today 56' })).toBeVisible()
+    await expect(page.getByRole('group', { name: '26 weeks of Cadence for your digest' })).toBeVisible()
+    await expect(page.getByRole('complementary', { name: 'Narrow by feed' })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+
+    await page.getByRole('button', { name: 'By feed' }).click()
+    await expect(page.getByRole('region', { name: 'Field Notes' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })
 })
