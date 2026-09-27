@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+import { useArrival } from './arrival.js'
 import { useAccess, type Gate } from './authentication.js'
 import { BackButton } from './components/back-button.js'
 import { GlobalSearch } from './components/global-search.js'
@@ -33,6 +35,8 @@ export function App() {
   const gate = useAccess()
   const open = gate.access.kind === 'open'
   const back = open ? nestedOrigin(navigation) : undefined
+  const page = useRef<HTMLElement>(null)
+  useArrival(navigation.arrival, page)
 
   return (
     <div className="app" data-screen={open ? screenOf(navigation) : 'gate'}>
@@ -50,7 +54,9 @@ export function App() {
           </>
         ) : null}
       </header>
-      <main className="page">{viewFor(gate, navigation)}</main>
+      <main className="page" ref={page}>
+        {viewFor(gate, navigation)}
+      </main>
     </div>
   )
 }

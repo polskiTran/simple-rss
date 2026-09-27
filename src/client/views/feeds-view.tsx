@@ -1,5 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { useEffect, useEffectEvent, useState } from 'react'
+import { useScreenTitle } from '../arrival.js'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { RHYTHM_LABELS, RHYTHMS, rhythmOf, type Rhythm } from '../../shared/rhythm.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed } from '../api.js'
@@ -32,6 +33,7 @@ export interface FeedsViewProps {
 }
 
 export function FeedsView({ onOpenFeed }: FeedsViewProps) {
+  useScreenTitle('Feeds')
   const [state, { retry: reload, set }] = useResource(
     async (signal) => (await fetchSubscriptions(signal)).subscriptions,
     [],
@@ -123,7 +125,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
             <div className="toolbar-group rhythm-jumps">
               {order === 'rhythm'
                 ? groups.map(({ rhythm, members }) => (
-                    <Button key={rhythm} className="button" onClick={() => showGroup(rhythm)}>
+                    <Button key={rhythm} className="button" onClick={() => enterGroup(rhythm)}>
                       {RHYTHM_LABELS[rhythm]}
                       <span className="button-count">{members.length}</span>
                     </Button>
@@ -202,6 +204,15 @@ function rhythmGroups(subscriptions: readonly SubscriptionSummary[]) {
 
 function rhythmAnchor(rhythm: Rhythm): string {
   return `rhythm-${rhythm}`
+}
+
+/** A jump takes focus into the group as well as the view, so the keyboard carries on from there. */
+function enterGroup(rhythm: Rhythm) {
+  const group = document.getElementById(rhythmAnchor(rhythm))?.closest('section')
+  if (!group) return
+  group.tabIndex = -1
+  group.focus({ preventScroll: true })
+  showGroup(rhythm)
 }
 
 function showGroup(rhythm: Rhythm) {

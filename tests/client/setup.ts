@@ -19,3 +19,6 @@ afterEach(() => {
   cleanup()
   window.history.replaceState(null, '', '/')
 })
+
+// jsdom lays nothing out, so its `scrollTo` only reports itself unimplemented.
+window.scrollTo = () => {}

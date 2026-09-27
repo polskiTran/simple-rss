@@ -304,6 +304,24 @@ describe('the Feeds list', () => {
     expect(screen.getByRole('button', { name: 'Show 2 more' })).toBeDefined()
   })
 
+  it('takes focus into the Rhythm group a jump reaches', async () => {
+    stubApi().on('GET /api/feeds', {
+      body: {
+        subscriptions: [
+          { ...FEED, title: 'Busy', cadence: activeOn(20) },
+          { ...FEED, feedId: 2, title: 'Quiet', cadence: activeOn(0) },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /^Inactive/ }))
+
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Inactive 1' }))
+  })
+
   it('lists every Subscription by name on request', async () => {
     stubApi().on('GET /api/feeds', {
       body: {

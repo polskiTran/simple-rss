@@ -1,4 +1,5 @@
 import { Button } from '@base-ui/react/button'
+import { useScreenTitle } from '../arrival.js'
 import type { DigestCalendar } from '../../shared/api.js'
 import { RHYTHM_LABELS, RHYTHMS } from '../../shared/rhythm.js'
 import { fetchDigestCalendar } from '../api.js'
@@ -41,6 +42,7 @@ const RECENT_DAYS = 7
  * shows all of that day.
  */
 export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewProps) {
+  useScreenTitle('Digest')
   const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
   const today = valueInView(calendar)?.today
   const day = mode.by === 'day' ? (mode.day ?? today) : undefined

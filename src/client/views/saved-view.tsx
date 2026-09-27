@@ -1,5 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { useState } from 'react'
+import { useScreenTitle } from '../arrival.js'
 import type { LibraryItem, LibraryOrder } from '../../shared/api.js'
 import { fetchLibrary, saveToLibrary } from '../api.js'
 import { Choice } from '../components/choice.js'
@@ -25,6 +26,7 @@ const ORDER_OPTIONS = [
 ] as const
 
 export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
+  useScreenTitle('Saved')
   const [order, setOrder] = useState<Order>('newest')
   // By feed groups the newest-first pages; only the two save orders ask anew.
   const fetchOrder = order === 'feed' ? 'newest' : order

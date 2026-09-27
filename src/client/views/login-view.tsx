@@ -1,5 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { useState, type FormEvent } from 'react'
+import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { signIn } from '../api.js'
 import { Field } from '../components/field.js'
@@ -10,6 +11,7 @@ export interface LoginViewProps {
 }
 
 export function LoginView({ onSignedIn }: LoginViewProps) {
+  useScreenTitle('Sign in')
   const [password, setPassword] = useState('')
   const [notice, setNotice] = useState('')
   const [signingIn, setSigningIn] = useState(false)
