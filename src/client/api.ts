@@ -3,7 +3,6 @@ import {
   authStatusSchema,
   createSubscriptionResponseSchema,
   digestCalendarSchema,
-  digestFeedsSchema,
   digestParamsOf,
   digestSchema,
   feedDetailSchema,
@@ -25,7 +24,6 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
-  type DigestFeeds,
   type DigestFilter,
   type FeedDetail,
   type FeedDetailsUpdate,
@@ -227,11 +225,6 @@ export async function fetchDigest(filter: DigestFilter, signal?: AbortSignal): P
 export async function fetchDigestCalendar(signal?: AbortSignal): Promise<DigestCalendar> {
   const response = await read('/api/digest/days', signal)
   return digestCalendarSchema.parse(await response.json())
-}
-
-export async function fetchDigestFeeds(signal?: AbortSignal): Promise<DigestFeeds> {
-  const response = await read('/api/digest/feeds', signal)
-  return digestFeedsSchema.parse(await response.json())
 }
 
 /** Searches retained reading metadata only, within the scope; results ranked by match quality blended with recency. */

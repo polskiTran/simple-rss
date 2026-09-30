@@ -70,7 +70,7 @@ describe('motion', () => {
   it('opens a screen at once and fades in only what the server sends', () => {
     expect(startingStyles().some((rule) => rule?.includes('.view'))).toBe(false)
     const arrival = startingStyles().find((rule) => rule?.includes('.item'))
-    for (const data of ['.item', '.feed-row', '.feed-card', '.page-title-companion']) expect(arrival).toContain(data)
+    for (const data of ['.item', '.feed-row', '.page-title-companion']) expect(arrival).toContain(data)
   })
 
   it('shows a waiting line only once the wait passes 400ms', () => {

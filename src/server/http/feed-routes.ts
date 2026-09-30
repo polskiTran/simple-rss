@@ -10,7 +10,6 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
-  type DigestFeeds,
   type FeedDetail,
   type FeedDetailsUpdate,
   type OpmlImportReport,
@@ -151,8 +150,6 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   })
 
   app.get('/digest/days', (c) => c.json<DigestCalendar>(deps.digest.calendar(), 200, NO_STORE))
-
-  app.get('/digest/feeds', (c) => c.json<DigestFeeds>(deps.digest.byFeed(deps.subscriptions.list()), 200, NO_STORE))
 
   return app
 }

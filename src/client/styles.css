@@ -141,16 +141,16 @@
   }
 
   /* Chrome is instant; data arrives. A screen's own title and controls are
-     there the moment it opens; what the server sends — item boxes, Feed rows
-     and cards, a group's heading, a title's companion value, a Feed's panels —
+     there the moment it opens; what the server sends — item boxes, Feed rows,
+     a group's heading, a title's companion value, a Feed's panels —
      fades in once, as it mounts. Nothing here nests inside another, so no
      fade compounds. */
-  :is(.item, .feed-row, .feed-card, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
+  :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
     transition: opacity 150ms ease-out;
   }
 
   @starting-style {
-    :is(.item, .feed-row, .feed-card, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
+    :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
       opacity: 0;
     }
   }
@@ -173,8 +173,15 @@
     text-wrap: balance;
   }
 
+  /* The companion wraps whole, never mid-date, and flush under the title. */
+  .page-title:has(.page-title-companion) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.3em;
+  }
+
   .page-title-companion {
-    margin-left: 0.3em;
     font-weight: 400;
     color: var(--color-ink-3);
   }
@@ -1704,89 +1711,10 @@
   }
 
 
-  /* By feed: a box per Feed, its head ruled off from its newest items. */
-
-  .feed-cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 40px 24px;
-  }
-
-  .feed-card {
-    display: grid;
-    align-content: start;
-    gap: 4px;
-    padding: 16px 16px 6px;
-    border: 1px solid var(--color-edge);
-  }
-
-  .feed-card-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-  }
-
-  .feed-card-head .cadence-strip {
-    flex: none;
-    margin-top: 10px;
-  }
-
-  /* A card's strip, and a quiet spell's, is its last 14 days, so the name
-     keeps the room. */
-  :where(.feed-card, .quiet-spell) .cadence-day:nth-child(-n + 16) {
+  /* A quiet spell's strip is its last 14 days; `:where` keeps it below the
+     strip's own day rules. */
+  :where(.quiet-spell) .cadence-day:nth-child(-n + 16) {
     display: none;
-  }
-
-  .feed-card-title {
-    margin: 0;
-    font: 400 24px/1.2 var(--font-read);
-    overflow-wrap: break-word;
-  }
-
-  .feed-card > .note {
-    margin: 12px -16px 0;
-    padding: 16px 16px 10px;
-    border-top: 1px solid var(--color-rule-soft);
-  }
-
-  .feed-card-items {
-    margin: 12px -16px 0;
-    padding: 8px 16px 0;
-    border-top: 1px solid var(--color-rule-soft);
-    list-style: none;
-  }
-
-  .feed-card-item {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-    padding-block: 9px;
-  }
-
-  .feed-card-item-title {
-    min-width: 0;
-    font: 400 17px/1.35 var(--font-read);
-    text-wrap: pretty;
-    overflow-wrap: break-word;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-  }
-
-  :is(.feed-card-name, .feed-card-item-title a):hover {
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-  }
-
-  .feed-card-when {
-    flex: none;
-    font-size: 13px;
-    color: var(--color-ink-2);
-    font-variant-numeric: tabular-nums;
   }
 
   /* A list and the column beside it: a Feed filter, or the Digest's month. */
@@ -2303,14 +2231,11 @@
     display: none;
   }
 
-  /* Digest: the switch and the date picker share a row, the note under them. */
-
-  .digest-toolbar > .switch:first-child {
-    flex: 1;
-  }
-
-  .digest-toolbar > .note {
-    flex-basis: 100%;
+  /* Digest: the date picker stands at the end of the title's row. */
+  .digest-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
   }
 
   /* A day's Feeds scroll as one row past the page's edge. */
@@ -2347,11 +2272,6 @@
     display: flex;
     flex-direction: column;
     margin-bottom: 24px;
-  }
-
-  .feed-cards {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
   }
 
   /* One Feed: identity, then the actions as one row, the panels stacked. */

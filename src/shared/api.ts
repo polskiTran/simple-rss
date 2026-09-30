@@ -370,21 +370,6 @@ export const digestCalendarSchema = z.object({
 })
 export type DigestCalendar = z.infer<typeof digestCalendarSchema>
 
-export const DIGEST_FEED_ITEMS = 3
-
-/** A Subscription with its newest items, at most `DIGEST_FEED_ITEMS`. */
-export const digestFeedSchema = subscriptionSummarySchema.extend({
-  items: z.array(feedItemRowSchema),
-})
-export type DigestFeed = z.infer<typeof digestFeedSchema>
-
-/** Ordered by each Feed's newest item; a Feed with none comes last. */
-export const digestFeedsSchema = z.object({
-  today: z.string(),
-  feeds: z.array(digestFeedSchema),
-})
-export type DigestFeeds = z.infer<typeof digestFeedsSchema>
-
 export const libraryItemSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),

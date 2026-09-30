@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CADENCE_GRID_WEEKS, digestCalendarSchema, digestFeedsSchema, digestSchema } from '../../../src/shared/api.js'
+import { CADENCE_GRID_WEEKS, digestCalendarSchema, digestSchema } from '../../../src/shared/api.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 
@@ -125,25 +125,5 @@ describe('the Digest calendar', () => {
     expect(await subscriptions()).toBe(0)
     await subscribe(service, user, 'Field Notes', [])
     expect(await subscriptions()).toBe(1)
-  })
-})
-
-describe('the Digest by Feed', () => {
-  it('gives each Subscription its three newest items, the most recently published Feed first', async () => {
-    const { service, user } = await threeRhythms()
-    await subscribe(service, user, 'Quiet Pages', [])
-    await service.wakeScheduler()
-
-    const byFeed = digestFeedsSchema.parse(await (await user.get('/api/digest/feeds')).json())
-
-    expect(byFeed.today).toBe('2026-08-08')
-    expect(byFeed.feeds.map(({ title, items }) => [title, items.map((entry) => entry.title)])).toEqual([
-      ['Field Notes', ['notes-2026-08-07', 'notes-2026-08-06', 'notes-2026-08-05']],
-      ['Weekly Letters', ['letters-2026-08-06', 'letters-2026-08-05', 'letters-2026-08-04']],
-      ['Old Almanac', ['almanac-may']],
-      ['Quiet Pages', []],
-    ])
-    expect(byFeed.feeds[0]?.items[0]).toMatchObject({ date: '2026-08-07', displayTime: '12:00', saved: false })
-    expect(byFeed.feeds[0]?.cadence.filter((count) => count > 0)).toHaveLength(20)
   })
 })

@@ -148,7 +148,7 @@ test.describe('the Digest presentation', () => {
   })
 })
 
-test.describe('the Digest by item and by feed', () => {
+test.describe('the Digest from a day', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
   test('starts from a day in the address, and goes back to today', async ({ page, installation }) => {
@@ -161,17 +161,6 @@ test.describe('the Digest by item and by feed', () => {
     await page.getByRole('button', { name: 'Back to today' }).click()
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
     await expect(page).toHaveURL(/\/digest$/)
-  })
-
-  test('opens an article from a Feed’s card', async ({ page, installation }) => {
-    await openDigest(page, installation)
-    await page.getByRole('button', { name: 'By feed' }).click()
-
-    const card = page.getByRole('region', { name: 'Field Notes' })
-    await expect(card.getByText('07:15')).toBeVisible()
-    await card.getByRole('link', { name: 'First light' }).click()
-
-    await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
   })
 })
 
@@ -186,7 +175,7 @@ test.describe('the Digest at phone width', () => {
     await expectNoHorizontalOverflow(page)
   })
 
-  test('reads from a picked date, and by feed, without overflowing the screen', async ({ page, installation }) => {
+  test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('button', { name: 'Add feed' }).click()
     await page.getByRole('textbox', { name: 'URL' }).fill(installation.longFeedUrl)
@@ -202,10 +191,6 @@ test.describe('the Digest at phone width', () => {
     await page.getByLabel('Start from a day').fill(daysAgo(1))
     await expect(page).toHaveURL(new RegExp(`\\?from=${daysAgo(1)}$`))
     await expect(page.getByRole('button', { name: 'Back to today' })).toBeVisible()
-    await expectNoHorizontalOverflow(page)
-
-    await page.getByRole('button', { name: 'By feed' }).click()
-    await expect(page.getByRole('region', { name: 'Field Notes' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })
 })

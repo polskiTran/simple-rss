@@ -300,7 +300,7 @@ const dayDigest = (date: string, label: string, titles: readonly string[]) => ({
 const digestWithCalendar = () =>
   stubApi().on('GET /api/digest', { body: DIGEST }).on('GET /api/digest/days', { body: CALENDAR })
 
-describe('the Digest read two ways', () => {
+describe('the Digest from a day', () => {
   it('starts from a day picked on the month, and goes back to today', async () => {
     digestWithCalendar().on('GET /api/digest?from=2026-08-03', {
       body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']),
@@ -364,60 +364,5 @@ describe('the Digest read two ways', () => {
     picked.resolve({ body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']) })
     expect(await screen.findByText('Four letters')).toBeDefined()
     expect(screen.queryByText('First light')).toBeNull()
-  })
-
-  it('gives each Feed a card of its newest items, dated as briefly as the distance allows', async () => {
-    const row = (feedItemId: number, title: string, date: string, displayTime: string) => ({
-      feedItemId,
-      title,
-      link: null,
-      publishedAt: `${date}T${displayTime}:00.000Z`,
-      firstSeenAt: `${date}T${displayTime}:00.000Z`,
-      date,
-      displayTime,
-      saved: false,
-    })
-    digestWithCalendar().on('GET /api/digest/feeds', {
-      body: {
-        today: '2026-08-08',
-        feeds: [
-          {
-            feedId: 1,
-            title: 'Field Notes',
-            description: null,
-            domain: 'journal.example',
-            homePageUrl: 'https://journal.example/',
-            enteredUrl: 'https://journal.example/feed',
-            resolvedUrl: 'https://journal.example/feed',
-            readingSource: 'original-webpage',
-            subscribedAt: '2026-01-01T00:00:00.000Z',
-            cadence: Array.from({ length: 30 }, () => 0),
-            availability: {
-              state: 'available',
-              lastCheckedAt: null,
-              lastSuccessAt: null,
-              consecutiveFailures: 0,
-              category: null,
-            },
-            items: [
-              row(3, 'First light', '2026-08-08', '07:15'),
-              row(2, 'Evening notes', '2026-08-07', '21:00'),
-              row(1, 'Monday thoughts', '2026-08-03', '09:00'),
-            ],
-          },
-        ],
-      },
-    })
-    window.history.replaceState(null, '', '/digest?by=feed')
-    render(<App />)
-
-    const card = await screen.findByRole('region', { name: 'Field Notes' })
-    expect(within(card).getByRole('link', { name: 'Field Notes' }).getAttribute('href')).toBe('/feeds/1')
-    expect(within(card).getByRole('link', { name: 'journal.example (opens in a new tab)' })).toBeDefined()
-    expect(
-      within(card)
-        .getAllByRole('listitem')
-        .map((entry) => entry.textContent),
-    ).toEqual(['First light07:15', 'Evening notesYesterday', 'Monday thoughtsMon'])
   })
 })

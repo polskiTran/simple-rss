@@ -132,8 +132,8 @@ function signedInView(navigation: Navigation, gate: Gate) {
     case 'digest':
       return (
         <DigestView
-          mode={navigation.digest}
-          onMode={navigation.showDigest}
+          filter={navigation.digest}
+          onFilter={navigation.showDigest}
           onOpenItem={(feedItemId) => navigation.openReader(feedItemId, digestOrigin(navigation.digest))}
           onOpenFeed={(feedId) => navigation.openFeed(feedId, digestOrigin(navigation.digest))}
         />

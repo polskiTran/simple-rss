@@ -97,7 +97,6 @@ the choice is per device.
 | Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
 | Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
 | Feed name | Literata | 19/1.2 | 400 |
-| Feed card title | Literata | 24/1.2 | 400; the card's heading, a step above a Feed row's name |
 | Feed Description | Literata | 17/1.5 | 400 |
 | Reader title | Literata | 44/1.16 desktop, 30/1.18 phone | 400, `text-wrap: balance` |
 | Reader body | Literata | 19/1.7 desktop, 17/1.65 phone | 400, reader-body colour |
@@ -237,35 +236,32 @@ fading with it both ways, so no strip runs down the edge.
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
 
-**Digest.** Today's short date as the title's companion, then a switch of By
-item and By feed. By item is one list, newest day first, each day a group
-headed with its count and, for Today and Yesterday, its date. Under the heading
-the day's Feeds stand as chips with their counts after a note of how many; a
-pressed chip, ringed in ink, shows that Feed's box alone, and pressing it again
-shows them all. Each Feed that published that day gets one box, the most recent
-first: a lone item is the ordinary item box; more share a box, the Feed's name,
-its count and its span of times in the meta column and each title on its own
-line with its time. Past 5 items the box shows the newest 3 and Show N more, which turns to Show
-less once pressed. A
-Feed back after a week or more without items says so under its time — its last
-14 days of Cadence, then First item in 12 days. The list starts today, or from a
+**Digest.** Today's short date as the title's companion, then one list, newest
+day first, each day a group headed with its count and, for Today and Yesterday,
+its date. Under the heading the day's Feeds stand as chips with their counts
+after a note of how many; a pressed chip, ringed in ink, shows that Feed's box
+alone, and pressing it again shows them all. Each Feed that published that day
+gets one box, the most recent first: a lone item is the ordinary item box; more
+share a box, the Feed's name, its count and its span of times in the meta
+column and each title on its own line with its time. Past 5 items the box shows
+the newest 3 and Show N more, which turns to Show less once pressed. A Feed
+back after a week or more without items says so under its time — its last 14
+days of Cadence, then First item in 12 days. The list starts today, or from a
 day picked on the month — that day and everything before it — and then Back to
-today stands at its head, as Show more stands at its foot; the address keeps the
-day, so the way back from an article returns to it. Beside the list, a month of
-the whole Digest: its name with turns to the months before and after, the days
-Monday first, each shaded by its count against the calendar's other days, the
-day on show ringed, then the legend and that day's count. Any day with items
-starts the list there. By feed is a card per Subscription, the most recently
-published first: a Feed row with the last 14 days of Cadence, then under a
-`rule-soft` line its three newest items, each dated as briefly as the distance
-allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch fills the row
-beside a calendar button that opens the platform's own date picker, in place of
-the month; a day's chips scroll as one row, and the cards stack. Pages are whole days, as many as reach fifty items, so Show more
-continues from the next day and names no number; Saved ends the same way.
-Before the first Subscription, By item is a note and Add feed as the primary
-action, with no chips and no month; with Subscriptions but nothing yet, the note
-says items arrive as the Feeds publish. The drawn Stream and By source are By
-item and By feed, in the words of `CONTEXT.md`.
+today stands at its head, as Show more stands at its foot; the address keeps
+the day, so the way back from an article returns to it. Beside the list, a
+month of the whole Digest: its name with turns to the months before and after,
+the days Monday first, each shaded by its count against the calendar's other
+days, the day on show ringed, then the legend and that day's count. Any day
+with items starts the list there. The Digest reads one way only: what a single
+Feed has published lately is that Feed's own screen. On a phone a calendar
+button at the end of the title's row opens the platform's own date picker, in
+place of the month, and a day's chips scroll as one row. Pages are whole days,
+as many as reach fifty items, so Show more continues from the next day and
+names no number; Saved ends the same way. Before the first Subscription, the
+Digest is a note and Add feed as the primary action, with no chips and no
+month; with Subscriptions but nothing yet, the note says items arrive as the
+Feeds publish. The drawn Stream / By source switch is left out.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,

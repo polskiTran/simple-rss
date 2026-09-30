@@ -1,17 +1,14 @@
-import { and, count, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import {
   CADENCE_STRIP_DAYS,
-  DIGEST_FEED_ITEMS,
   QUIET_SPELL_DAYS,
   type Digest,
   type DigestCalendar,
-  type DigestFeeds,
   type DigestFilter,
   type DigestGroup,
   type DigestItem,
   type DigestReturn,
   type FeedItemRow,
-  type SubscriptionSummary,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
@@ -97,50 +94,6 @@ export class DigestService {
     const counts = this.#countsByDay(days[0] ?? today, today, now, timezone)
     const subscribed = this.#db.select({ count: count() }).from(subscriptions).get()?.count ?? 0
     return { today, days: days.map((date) => ({ date, count: counts.get(date) ?? 0 })), subscriptions: subscribed }
-  }
-
-  /** Each of `subscribed` with its newest items, the most recently published Feed first. */
-  byFeed(subscribed: readonly SubscriptionSummary[]): DigestFeeds {
-    const timezone = this.#settings.effectiveTimezone()
-    const now = this.#clock.now()
-    const chronology = chronologySql(now)
-
-    const ranked = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        feedId: feedItems.feedId,
-        title: feedItems.title,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        firstSeenAt: feedItems.firstSeenAt,
-        savedAt: libraryItems.savedAt,
-        rank: sql<number>`ROW_NUMBER() OVER (PARTITION BY ${feedItems.feedId} ORDER BY ${chronology} DESC, ${feedItems.id} DESC)`.as(
-          'rank',
-        ),
-      })
-      .from(feedItems)
-      .innerJoin(subscriptions, eq(subscriptions.feedId, feedItems.feedId))
-      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
-      .as('ranked')
-    const newest = this.#db.select().from(ranked).where(lte(ranked.rank, DIGEST_FEED_ITEMS)).all()
-
-    const itemsByFeed = Map.groupBy(inDigestOrder(newest, now), ({ row }) => row.feedId)
-    const latest = (feed: SubscriptionSummary) => {
-      const first = itemsByFeed.get(feed.feedId)?.[0]
-      return first ? first.chronology : Number.NEGATIVE_INFINITY
-    }
-
-    return {
-      today: dateKey(now, timezone),
-      feeds: subscribed
-        .toSorted((left, right) => latest(right) - latest(left))
-        .map((feed) => ({
-          ...feed,
-          items: (itemsByFeed.get(feed.feedId) ?? []).map(({ row, chronology }) =>
-            feedItemRowOf(row, new Date(chronology), timezone),
-          ),
-        })),
-    }
   }
 
   /**
