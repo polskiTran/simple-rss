@@ -3,8 +3,6 @@ import {
   authStatusSchema,
   createSubscriptionResponseSchema,
   digestCalendarSchema,
-  digestDaySchema,
-  digestFeedsSchema,
   digestParamsOf,
   digestSchema,
   feedDetailSchema,
@@ -26,8 +24,6 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
-  type DigestDay,
-  type DigestFeeds,
   type DigestFilter,
   type FeedDetail,
   type FeedDetailsUpdate,
@@ -220,9 +216,8 @@ export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }
 
-export async function fetchDigest(filter: DigestFilter, cursor?: string, signal?: AbortSignal): Promise<Digest> {
+export async function fetchDigest(filter: DigestFilter, signal?: AbortSignal): Promise<Digest> {
   const params = digestParamsOf(filter)
-  if (cursor) params.set('cursor', cursor)
   const response = await read(params.size > 0 ? `/api/digest?${params}` : '/api/digest', signal)
   return digestSchema.parse(await response.json())
 }
@@ -230,16 +225,6 @@ export async function fetchDigest(filter: DigestFilter, cursor?: string, signal?
 export async function fetchDigestCalendar(signal?: AbortSignal): Promise<DigestCalendar> {
   const response = await read('/api/digest/days', signal)
   return digestCalendarSchema.parse(await response.json())
-}
-
-export async function fetchDigestDay(date: string, signal?: AbortSignal): Promise<DigestDay> {
-  const response = await read(`/api/digest/days/${date}`, signal)
-  return digestDaySchema.parse(await response.json())
-}
-
-export async function fetchDigestFeeds(signal?: AbortSignal): Promise<DigestFeeds> {
-  const response = await read('/api/digest/feeds', signal)
-  return digestFeedsSchema.parse(await response.json())
 }
 
 /** Searches retained reading metadata only, within the scope; results ranked by match quality blended with recency. */

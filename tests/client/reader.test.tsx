@@ -424,7 +424,7 @@ describe('Reader View', () => {
         {
           date: '2026-08-08',
           label: 'Today',
-          count: 1,
+          returns: [],
           items: [
             {
               feedItemId: 3,
@@ -442,7 +442,7 @@ describe('Reader View', () => {
           ],
         },
       ],
-      nextCursor: null,
+      nextFrom: null,
     }
     reading()
       .on('GET /api/digest', { body: digest })

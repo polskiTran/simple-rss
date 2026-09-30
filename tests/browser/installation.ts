@@ -181,7 +181,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
               { length: 55 },
               (_, index) => `<item><guid>meadow-${index}</guid><title>Meadow note ${index}</title>
                 <link>https://publisher.example/meadow-${index}</link>
-                <pubDate>${new Date(publishedAt.getTime() - (index + 1) * 60_000).toUTCString()}</pubDate>
+                <pubDate>${new Date(publishedAt.getTime() - 60_000 - index * 86_400_000).toUTCString()}</pubDate>
               </item>`,
             ).join('\n')}
           </channel></rss>`,

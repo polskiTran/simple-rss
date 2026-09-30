@@ -74,7 +74,7 @@ describe('a wait', () => {
             {
               date: '2026-08-08',
               label: 'Today',
-              count: 1,
+              returns: [],
               items: [
                 {
                   feedItemId: 3,
@@ -92,7 +92,7 @@ describe('a wait', () => {
               ],
             },
           ],
-          nextCursor: null,
+          nextFrom: null,
         },
       })
       .on('GET /api/search?q=driftwood', hangs)

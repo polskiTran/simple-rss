@@ -49,7 +49,7 @@ export function stripCadenceByFeed(
 }
 
 /** The `days` most recent date keys ending with `todayKey`, oldest first. */
-function trailingDayKeys(todayKey: string, days: number): string[] {
+export function trailingDayKeys(todayKey: string, days: number): string[] {
   const today = Date.parse(`${todayKey}T00:00:00.000Z`)
   return Array.from({ length: days }, (_, index) => keyOf(today - (days - 1 - index) * DAY_MS))
 }

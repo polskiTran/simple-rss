@@ -87,7 +87,7 @@ describe('the Settings preferences API', () => {
     })
 
     const after = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(after.groups.map(({ label, count }) => [label, count])).toEqual([['Today', 1]])
+    expect(after.groups.map(({ label, items }) => [label, items.length])).toEqual([['Today', 1]])
     expect(after.today).toBe('2026-08-08')
   })
 

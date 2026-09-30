@@ -141,16 +141,16 @@
   }
 
   /* Chrome is instant; data arrives. A screen's own title and controls are
-     there the moment it opens; what the server sends — item boxes, Feed rows
-     and cards, a group's heading, a title's companion value, a Feed's panels —
+     there the moment it opens; what the server sends — item boxes, Feed rows,
+     a group's heading, a title's companion value, a Feed's panels —
      fades in once, as it mounts. Nothing here nests inside another, so no
      fade compounds. */
-  :is(.item, .feed-row, .feed-card, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
+  :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
     transition: opacity 150ms ease-out;
   }
 
   @starting-style {
-    :is(.item, .feed-row, .feed-card, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
+    :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
       opacity: 0;
     }
   }
@@ -173,8 +173,15 @@
     text-wrap: balance;
   }
 
+  /* The companion wraps whole, never mid-date, and flush under the title. */
+  .page-title:has(.page-title-companion) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.3em;
+  }
+
   .page-title-companion {
-    margin-left: 0.3em;
     font-weight: 400;
     color: var(--color-ink-3);
   }
@@ -799,7 +806,7 @@
     color: var(--color-saved);
   }
 
-  .item:is(:hover, :focus-within) .save-toggle,
+  .item:is(:hover, :focus-within) > .save-toggle,
   .save-toggle[data-pressed] {
     opacity: 1;
   }
@@ -843,23 +850,23 @@
     height: 5px;
   }
 
-  :is(.cadence-day, .cadence-cell, .wordmark-cell)[data-level='0'] {
+  :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='0'] {
     background: var(--color-ramp-1);
   }
 
-  :is(.cadence-day, .cadence-cell, .wordmark-cell)[data-level='1'] {
+  :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='1'] {
     background: var(--color-ramp-2);
   }
 
-  :is(.cadence-day, .cadence-cell, .wordmark-cell)[data-level='2'] {
+  :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='2'] {
     background: var(--color-ramp-3);
   }
 
-  :is(.cadence-day, .cadence-cell, .wordmark-cell)[data-level='3'] {
+  :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='3'] {
     background: var(--color-ramp-4);
   }
 
-  :is(.cadence-day, .cadence-cell, .wordmark-cell)[data-level='4'] {
+  :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='4'] {
     background: var(--color-ramp-5);
   }
 
@@ -1479,54 +1486,30 @@
     gap: 20px;
   }
 
-  .day-stepper {
-    flex-wrap: nowrap;
+  /* Started from a day, the list offers today back at its head, as Show more
+     offers what is past its end. */
+  .newer {
+    margin-bottom: 32px;
   }
 
-  /* A phone names the day between the arrows; a wide screen says it in the facts. */
-  .day-stepper-day {
+  /* The phone's date picker: the input, invisible, takes the press. */
+  .day-picker {
+    position: relative;
     display: none;
   }
 
-  .day-list {
-    margin: 8px 0 0;
-    padding: 0;
-    list-style: none;
+  .day-picker:has(:focus-visible) {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
   }
 
-  .day-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    min-height: 36px;
-    margin-inline: -12px;
-    padding-inline: 12px;
-  }
-
-  .day-row:hover {
-    background: var(--color-row-hover);
-  }
-
-  .day-row-count {
-    color: var(--color-ink-2);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .digest-calendar {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: 72px;
-    margin-bottom: 64px;
-  }
-
-  .digest-calendar .cadence-figure {
-    margin-top: 0;
-  }
-
-  .day-facts {
-    border-top: 1px solid var(--color-rule);
+  .day-picker input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
   }
 
   /* The day on show, ringed apart from its neighbours. */
@@ -1536,91 +1519,205 @@
       0 0 0 2px var(--color-ink);
   }
 
-  /* By feed: a box per Feed, its head ruled off from its newest items. */
-
-  .feed-cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 40px 24px;
-  }
-
-  .feed-card {
-    display: grid;
-    align-content: start;
-    gap: 4px;
-    padding: 16px 16px 6px;
-    border: 1px solid var(--color-edge);
-  }
-
-  .feed-card-head {
+  /* A day's Feeds as chips, the one shown alone ringed in ink. */
+  .day-feeds {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
   }
 
-  .feed-card-head .cadence-strip {
+  .day-feeds > .note {
     flex: none;
-    margin-top: 10px;
+    margin-inline-end: 8px;
   }
 
-  /* A card's strip is its last 14 days, so the name keeps the room. */
-  :where(.feed-card) .cadence-day:nth-child(-n + 16) {
-    display: none;
+  .chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    background: var(--color-control);
+    color: var(--color-ink);
+    font: 500 14px/1 var(--font-ui);
+    white-space: nowrap;
+    cursor: pointer;
   }
 
-  .feed-card-title {
-    margin: 0;
-    font: 400 24px/1.2 var(--font-read);
-    overflow-wrap: break-word;
+  .chip:hover {
+    background: var(--color-control-hover);
   }
 
-  .feed-card > .note {
-    margin: 12px -16px 0;
-    padding: 16px 16px 10px;
-    border-top: 1px solid var(--color-rule-soft);
+  .chip[data-pressed] {
+    background: var(--color-segment);
+    box-shadow: inset 0 0 0 1px var(--color-ink);
   }
 
-  .feed-card-items {
-    margin: 12px -16px 0;
-    padding: 8px 16px 0;
-    border-top: 1px solid var(--color-rule-soft);
+  .chip-count {
+    font-weight: 400;
+    color: var(--color-ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A Feed's day in one box: its titles one to a line, each its own way in,
+     each with its own save square beside its time. */
+  /* Folded from far down, the box comes back into view with room above it. */
+  .feed-day {
+    scroll-margin-top: 24px;
+  }
+
+  .feed-day .item-body {
+    grid-column: 2 / -1;
+  }
+
+  .feed-day-items {
+    margin: -8px 0 0;
+    padding: 0;
     list-style: none;
   }
 
-  .feed-card-item {
-    display: flex;
+  .feed-day-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 36px;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-    padding-block: 9px;
+    column-gap: 16px;
+    padding-block: 7px;
   }
 
-  .feed-card-item-title {
-    min-width: 0;
-    font: 400 17px/1.35 var(--font-read);
+  .feed-day-title {
+    margin: 0;
+    font: 400 19px/1.4 var(--font-read);
     text-wrap: pretty;
-    overflow-wrap: break-word;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
   }
 
-  :is(.feed-card-name, .feed-card-item-title a):hover {
+  .feed-day-title a:hover {
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
 
-  .feed-card-when {
-    flex: none;
-    font-size: 13px;
+  /* The square overhangs its line rather than spacing the titles apart. */
+  .feed-day-item .save-toggle {
+    align-self: center;
+    margin-block: -8px;
+  }
+
+  .feed-day-item:is(:hover, :focus-within) .save-toggle {
+    opacity: 1;
+  }
+
+  .feed-day .item-body > .button {
+    margin-top: 12px;
+  }
+
+  /* Back after a quiet spell: the fortnight drawn, then how long it was away. */
+  .quiet-spell {
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+    margin-top: 12px;
     color: var(--color-ink-2);
+  }
+
+  /* The month beside the Digest: seven columns of days, each shaded by its
+     count, the day on show ringed. */
+  .digest-calendar .group-header {
+    align-items: center;
+  }
+
+  .calendar-turns {
+    display: flex;
+    gap: 4px;
+  }
+
+  .calendar-turns .button {
+    width: 30px;
+  }
+
+  .calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 16px;
+  }
+
+  .calendar-weekday {
+    padding-bottom: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    color: var(--color-ink-2);
+  }
+
+  .calendar-day {
+    display: grid;
+    place-items: center;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-ink-3);
+    font: 400 13px/1 var(--font-ui);
     font-variant-numeric: tabular-nums;
   }
 
-  /* A list and the column beside it: a Feed filter, or the Digest's recent days. */
+  .calendar-day[data-level] {
+    color: var(--color-ink);
+  }
+
+  .calendar-day:is([data-level='2'], [data-level='3'], [data-level='4']) {
+    color: var(--color-ground);
+  }
+
+  .calendar-day[data-outside] {
+    opacity: 0.45;
+  }
+
+  button.calendar-day {
+    cursor: pointer;
+  }
+
+  button.calendar-day:hover {
+    box-shadow: 0 0 0 1px var(--color-ink);
+  }
+
+  button.calendar-day:focus-visible {
+    outline-offset: 1px;
+  }
+
+  .calendar-day[aria-pressed='true'] {
+    box-shadow:
+      0 0 0 1px var(--color-ground),
+      0 0 0 2px var(--color-ink);
+  }
+
+  .digest-calendar .cadence-legend {
+    margin-top: 16px;
+  }
+
+  .calendar-facts {
+    margin-top: 20px;
+    border-top: 1px solid var(--color-rule);
+  }
+
+
+  /* A quiet spell's strip is its last 14 days; `:where` keeps it below the
+     strip's own day rules. */
+  :where(.quiet-spell) .cadence-day:nth-child(-n + 16) {
+    display: none;
+  }
+
+  /* A list and the column beside it: a Feed filter, or the Digest's month. */
 
   .with-aside {
     display: grid;
@@ -1632,7 +1729,7 @@
   /* The column stays in view beside a long list, scrolling itself if taller.
      It bleeds out by the rows' hover fill and focus ring, which its scrolling
      would otherwise clip. */
-  .with-aside > :is(.recent-days, .feed-filter) {
+  .with-aside > :is(.digest-calendar, .feed-filter) {
     position: sticky;
     top: 24px;
     max-height: calc(100dvh - 48px);
@@ -2134,74 +2231,47 @@
     display: none;
   }
 
-  /* Digest: the switch spans the page, the Rhythm scrolls, and the day steps
-     under the grid. Recent days and a day's facts give way. */
-
-  .digest-toolbar > .switch:first-child {
-    width: 100%;
+  /* Digest: the date picker stands at the end of the title's row. */
+  .digest-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
   }
 
-  .rhythm-choice {
+  /* A day's Feeds scroll as one row past the page's edge. */
+  .day-feeds {
+    flex-wrap: nowrap;
     overflow-x: auto;
-    gap: 8px;
     margin-inline: -20px;
-    padding: 0 20px;
-    background: none;
+    padding-inline: 20px;
     scrollbar-width: none;
   }
 
-  /* Chips in ink, the chosen one a segment ringed in ink: one choice of
-     several, where the Feed filter's ink fill is a tick. */
-  .rhythm-choice .switch-segment {
-    flex: none;
+  .chip {
     height: 44px;
     padding-inline: 16px;
-    background: var(--color-control);
-    color: var(--color-ink);
-  }
-
-  .rhythm-choice .switch-segment[data-pressed] {
-    background: var(--color-segment);
-    box-shadow: inset 0 0 0 1px var(--color-ink);
   }
 
   /* A row that scrolls fades at its trailing edge, so what is past it reads as there. */
-  :is(.rhythm-choice, .filter-list, .rhythm-jumps) {
+  :is(.day-feeds, .filter-list, .rhythm-jumps) {
     mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
   }
 
-  .toolbar:has(.rhythm-choice) {
-    flex-wrap: nowrap;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .recent-days,
-  .day-facts {
+  /* The month has no room beside the list; the date picker stands in for it. */
+  .digest-calendar {
     display: none;
   }
 
-  .digest-calendar {
-    grid-template-columns: minmax(0, 1fr);
-    margin-bottom: 40px;
-  }
-
-  .day-stepper {
-    width: 100%;
-  }
-
-  .day-stepper-day {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
+  .day-picker {
+    display: inline-flex;
+    width: 44px;
     height: 44px;
-    font-weight: 500;
   }
 
-  .feed-cards {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+  .newer {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 24px;
   }
 
   /* One Feed: identity, then the actions as one row, the panels stacked. */
@@ -2404,6 +2474,31 @@
   .item-meta,
   .item-body {
     grid-column: 1;
+  }
+
+  .feed-day .item-body {
+    grid-column: 1 / -1;
+  }
+
+  .feed-day-item {
+    grid-template-columns: minmax(0, 1fr) auto 44px;
+    column-gap: 12px;
+  }
+
+  .feed-day-item .save-toggle {
+    grid-column: 3;
+    grid-row: 1;
+    margin-block: -10px;
+  }
+
+  .feed-day-title {
+    font-size: 17px;
+    line-height: 1.38;
+  }
+
+  .quiet-spell {
+    flex-basis: 100%;
+    margin-top: 4px;
   }
 
   .item-title {

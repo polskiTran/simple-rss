@@ -10,7 +10,7 @@ const DIGEST = {
     {
       date: '2026-08-08',
       label: 'Today',
-      count: 1,
+      returns: [],
       items: [
         {
           feedItemId: 3,
@@ -28,7 +28,7 @@ const DIGEST = {
       ],
     },
   ],
-  nextCursor: null,
+  nextFrom: null,
 }
 
 const result = (feedItemId: number, title: string, displayDate: string, saved = false) => ({

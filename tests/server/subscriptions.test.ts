@@ -103,7 +103,6 @@ describe('Subscriptions', () => {
         {
           date: '2026-08-08',
           label: 'Today',
-          count: 1,
           items: [
             {
               feedItemId: 1,
@@ -119,9 +118,10 @@ describe('Subscriptions', () => {
               saved: false,
             },
           ],
+          returns: [],
         },
       ],
-      nextCursor: null,
+      nextFrom: null,
     })
   })
 
@@ -335,7 +335,9 @@ describe('Subscriptions', () => {
     service.clock.advance(60_000)
     await service.wakeScheduler()
 
-    expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [{ count: 1 }] })
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({
+      groups: [{ items: [{ title: expect.any(String) }] }],
+    })
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0].availability).toMatchObject({ state: 'available' })
   })

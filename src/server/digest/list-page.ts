@@ -39,15 +39,6 @@ export function decodeListCursor(value: string): ListCursor | undefined {
   }
 }
 
-export function nextListCursor(
-  fetchedCount: number,
-  last: { readonly row: { readonly feedItemId: number }; readonly chronology: number } | undefined,
-): string | null {
-  return fetchedCount > LIST_PAGE_SIZE && last
-    ? encodeListCursor({ instant: new Date(last.chronology).toISOString(), feedItemId: last.row.feedItemId })
-    : null
-}
-
 /**
  * The chronology rule as SQL, so ORDER BY and the keyset filter act before the LIMIT.
  * Stored instants are normalized ISO-8601 UTC, so text comparison is time comparison.

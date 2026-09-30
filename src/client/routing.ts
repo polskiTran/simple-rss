@@ -1,7 +1,14 @@
 import { z } from 'zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dateKeySchema, searchParamsOf, searchRequestSchema, type SearchScope, type SearchSort } from '../shared/api.js'
-import { RHYTHMS, type Rhythm } from '../shared/rhythm.js'
+import {
+  dateKeySchema,
+  digestParamsOf,
+  searchParamsOf,
+  searchRequestSchema,
+  type DigestFilter,
+  type SearchScope,
+  type SearchSort,
+} from '../shared/api.js'
 
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
 export type Route = (typeof ROUTES)[number]
@@ -48,35 +55,18 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
 }
 
 /**
- * The Digest's three ways of reading. The address carries it, so the way back
- * from the Reader returns to the same one. By day without a day is today.
+ * The Digest's address is its API request, so the way back from the Reader
+ * returns to the same day; without `from` it starts today.
  */
-export type DigestMode =
-  | { readonly by: 'all'; readonly rhythm: Rhythm | undefined }
-  | { readonly by: 'day'; readonly day: string | undefined }
-  | { readonly by: 'feed' }
-
-export const ALL_POSTS: DigestMode = { by: 'all', rhythm: undefined }
-
-export function digestPathOf(mode: DigestMode): string {
-  const params = new URLSearchParams()
-  if (mode.by === 'all' && mode.rhythm) params.set('rhythm', mode.rhythm)
-  if (mode.by !== 'all') params.set('by', mode.by)
-  if (mode.by === 'day' && mode.day) params.set('day', mode.day)
+export function digestPathOf(filter: DigestFilter): string {
+  const params = digestParamsOf(filter)
   return params.size > 0 ? `/digest?${params}` : '/digest'
 }
 
-/** Anything unreadable falls back to its mode's default rather than failing the screen. */
-function digestModeOf(search: string): DigestMode {
-  const params = new URLSearchParams(search)
-  const by = params.get('by')
-  if (by === 'feed') return { by: 'feed' }
-  if (by === 'day') {
-    const day = dateKeySchema.safeParse(params.get('day'))
-    return { by: 'day', day: day.success ? day.data : undefined }
-  }
-  const rhythm = z.enum(RHYTHMS).safeParse(params.get('rhythm'))
-  return { by: 'all', rhythm: rhythm.success ? rhythm.data : undefined }
+/** An unreadable day falls back to today rather than failing the screen. */
+function digestFilterOf(search: string): DigestFilter {
+  const from = dateKeySchema.safeParse(new URLSearchParams(search).get('from'))
+  return { from: from.success ? from.data : undefined }
 }
 
 /** The search address is the API request: `/search?` followed by the same parameters. */
@@ -113,8 +103,8 @@ export interface Origin {
 
 export const DIGEST_ORIGIN: Origin = { path: pathOf('digest'), label: ROUTE_LABELS.digest, from: undefined }
 
-export function digestOrigin(mode: DigestMode): Origin {
-  return { ...DIGEST_ORIGIN, path: digestPathOf(mode) }
+export function digestOrigin(filter: DigestFilter): Origin {
+  return { ...DIGEST_ORIGIN, path: digestPathOf(filter) }
 }
 export const FEEDS_ORIGIN: Origin = { path: pathOf('feeds'), label: ROUTE_LABELS.feeds, from: undefined }
 export const SAVED_ORIGIN: Origin = { path: pathOf('saved'), label: ROUTE_LABELS.saved, from: undefined }
@@ -189,8 +179,8 @@ interface ScreenLocation {
   /** Set while a nested screen is open. */
   readonly origin: Origin | undefined
   readonly searchScope: SearchScope
-  /** Read from the address on the Digest; All posts anywhere else. */
-  readonly digest: DigestMode
+  /** Read from the address on the Digest; today anywhere else. */
+  readonly digest: DigestFilter
 }
 
 interface SearchLocation {
@@ -225,8 +215,8 @@ interface NavigationActions {
   searchIn(scope: SearchScope): void
   /** Re-asks the same words ranked another way, in place like `searchIn`. */
   sortSearch(sort: SearchSort): void
-  /** Reads the Digest another way, in place: a switch or a day step is not a trail to walk back. */
-  showDigest(mode: DigestMode): void
+  /** Starts the Digest from another day, in place: a day picked is not a trail to walk back. */
+  showDigest(filter: DigestFilter): void
 }
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
@@ -320,7 +310,7 @@ export function useNavigation(): Navigation {
     [location, place],
   )
 
-  const showDigest = useCallback((mode: DigestMode) => place(digestPathOf(mode), undefined, 'replace'), [place])
+  const showDigest = useCallback((filter: DigestFilter) => place(digestPathOf(filter), undefined, 'replace'), [place])
 
   return {
     ...location,
@@ -373,6 +363,6 @@ function screenLocationOf(pathname: string, search: string, origin: Origin | und
     readerItemId,
     origin,
     searchScope: searchScopeOfScreen(pathname),
-    digest: pathname === pathOf('digest') ? digestModeOf(search) : ALL_POSTS,
+    digest: pathname === pathOf('digest') ? digestFilterOf(search) : {},
   }
 }
