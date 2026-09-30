@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import { digestParamsOf, type Digest, type DigestFilter } from '../../shared/api.js'
+import { digestParamsOf, type DigestFilter } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
-import { Group } from '../components/group.js'
-import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems, type OlderState } from '../components/older-items.js'
-import { dayBefore, longDay } from '../day-names.js'
 import { useResource, valueInView } from '../use-resource.js'
+import { DigestDay } from './digest-day.js'
 
 export interface DigestListProps {
   readonly filter: DigestFilter
@@ -20,24 +18,36 @@ export interface DigestListProps {
 }
 
 /**
- * The Digest under one filter, a day to a group, paged older on request. A new
- * filter keeps the old list in view until its own first page answers.
+ * The Digest from one day, or from today, a day to a group; Show more goes on
+ * from the day the page names. A new filter keeps the old list in view until
+ * its own first page answers.
  */
 export function DigestList({ filter, empty, onRetry, onOpenItem, onOpenFeed }: DigestListProps) {
   const key = digestParamsOf(filter).toString()
   const [state, { retry, set }] = useResource(
-    async (signal) => ({ key, digest: await fetchDigest(filter, undefined, signal) }),
+    async (signal) => ({ key, digest: await fetchDigest(filter, signal) }),
     [key],
   )
   const [older, setOlder] = useState<{ key: string; state: OlderState }>({ key, state: 'idle' })
   const olderState = older.key === key ? older.state : 'idle'
 
-  const loadOlder = (cursor: string) => {
+  const loadOlder = (from: string) => {
     setOlder({ key, state: 'loading' })
-    void fetchDigest(filter, cursor)
+    void fetchDigest({ from })
       .then((page) => {
         setOlder({ key, state: 'idle' })
-        set((current) => (current.key === key ? { key, digest: withOlderPage(current.digest, page) } : current))
+        set((current) =>
+          current.key === key
+            ? {
+                key,
+                digest: {
+                  ...current.digest,
+                  groups: [...current.digest.groups, ...page.groups],
+                  nextFrom: page.nextFrom,
+                },
+              }
+            : current,
+        )
       })
       .catch(() => setOlder({ key, state: 'failed' }))
   }
@@ -80,50 +90,17 @@ export function DigestList({ filter, empty, onRetry, onOpenItem, onOpenFeed }: D
         <p className="note">{empty}</p>
       ) : (
         digest.groups.map((group) => (
-          <Group
+          <DigestDay
             key={group.date}
-            id={`day-${group.date}`}
-            title={group.label}
-            count={group.count}
-            aside={relativeDay(group.date, digest.today) ? longDay(group.date) : undefined}
-          >
-            <div className="item-list">
-              {group.items.map((item) => (
-                <ItemBox
-                  key={item.feedItemId}
-                  feedItemId={item.feedItemId}
-                  title={item.title}
-                  saved={item.saved}
-                  feed={{ feedId: item.feedId, title: item.feedTitle, onOpen: onOpenFeed }}
-                  when={{ label: item.displayTime, dateTime: item.publishedAt ?? item.firstSeenAt }}
-                  onOpen={onOpenItem}
-                  onSaved={(saved) => setSaved(item.feedItemId, saved)}
-                />
-              ))}
-            </div>
-          </Group>
+            group={group}
+            today={digest.today}
+            onOpenItem={onOpenItem}
+            onOpenFeed={onOpenFeed}
+            onSaved={setSaved}
+          />
         ))
       )}
-      <OlderItems nextCursor={digest.nextCursor} older={olderState} noun="items" onLoadOlder={loadOlder} />
+      <OlderItems nextCursor={digest.nextFrom} older={olderState} noun="items" onLoadOlder={loadOlder} />
     </div>
   )
-}
-
-/** A page may continue the last day shown; its first group then joins that one. */
-function withOlderPage(digest: Digest, page: Digest): Digest {
-  const groups = [...digest.groups]
-  const seam = groups.at(-1)
-  const [first, ...rest] = page.groups
-  if (seam && first && first.date === seam.date) {
-    groups[groups.length - 1] = { ...seam, items: [...seam.items, ...first.items] }
-    groups.push(...rest)
-  } else {
-    groups.push(...page.groups)
-  }
-  return { ...digest, groups, nextCursor: page.nextCursor }
-}
-
-/** Today and Yesterday are labelled relatively, so the day they name follows them. */
-function relativeDay(date: string, today: string): boolean {
-  return date === today || date === dayBefore(today)
 }

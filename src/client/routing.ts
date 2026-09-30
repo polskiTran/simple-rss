@@ -1,7 +1,14 @@
 import { z } from 'zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dateKeySchema, searchParamsOf, searchRequestSchema, type SearchScope, type SearchSort } from '../shared/api.js'
-import { RHYTHMS, type Rhythm } from '../shared/rhythm.js'
+import {
+  dateKeySchema,
+  digestParamsOf,
+  searchParamsOf,
+  searchRequestSchema,
+  type DigestFilter,
+  type SearchScope,
+  type SearchSort,
+} from '../shared/api.js'
 
 export const ROUTES = ['digest', 'feeds', 'saved', 'settings'] as const
 export type Route = (typeof ROUTES)[number]
@@ -48,35 +55,25 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
 }
 
 /**
- * The Digest's three ways of reading. The address carries it, so the way back
- * from the Reader returns to the same one. By day without a day is today.
+ * The Digest's two ways of reading. The address carries it, so the way back
+ * from the Reader returns to the same one. By item is the Digest itself, newest
+ * day first: its address is its API request, and without `from` it starts today.
  */
-export type DigestMode =
-  | { readonly by: 'all'; readonly rhythm: Rhythm | undefined }
-  | { readonly by: 'day'; readonly day: string | undefined }
-  | { readonly by: 'feed' }
+export type DigestMode = ({ readonly by: 'item' } & DigestFilter) | { readonly by: 'feed' }
 
-export const ALL_POSTS: DigestMode = { by: 'all', rhythm: undefined }
+export const DIGEST_TODAY: DigestMode = { by: 'item' }
 
 export function digestPathOf(mode: DigestMode): string {
-  const params = new URLSearchParams()
-  if (mode.by === 'all' && mode.rhythm) params.set('rhythm', mode.rhythm)
-  if (mode.by !== 'all') params.set('by', mode.by)
-  if (mode.by === 'day' && mode.day) params.set('day', mode.day)
+  const params = mode.by === 'item' ? digestParamsOf(mode) : new URLSearchParams({ by: mode.by })
   return params.size > 0 ? `/digest?${params}` : '/digest'
 }
 
-/** Anything unreadable falls back to its mode's default rather than failing the screen. */
+/** Anything unreadable falls back to its default rather than failing the screen. */
 function digestModeOf(search: string): DigestMode {
   const params = new URLSearchParams(search)
-  const by = params.get('by')
-  if (by === 'feed') return { by: 'feed' }
-  if (by === 'day') {
-    const day = dateKeySchema.safeParse(params.get('day'))
-    return { by: 'day', day: day.success ? day.data : undefined }
-  }
-  const rhythm = z.enum(RHYTHMS).safeParse(params.get('rhythm'))
-  return { by: 'all', rhythm: rhythm.success ? rhythm.data : undefined }
+  if (params.get('by') === 'feed') return { by: 'feed' }
+  const from = dateKeySchema.safeParse(params.get('from'))
+  return { by: 'item', from: from.success ? from.data : undefined }
 }
 
 /** The search address is the API request: `/search?` followed by the same parameters. */
@@ -373,6 +370,6 @@ function screenLocationOf(pathname: string, search: string, origin: Origin | und
     readerItemId,
     origin,
     searchScope: searchScopeOfScreen(pathname),
-    digest: pathname === pathOf('digest') ? digestModeOf(search) : ALL_POSTS,
+    digest: pathname === pathOf('digest') ? digestModeOf(search) : DIGEST_TODAY,
   }
 }

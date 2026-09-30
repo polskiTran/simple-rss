@@ -32,6 +32,11 @@ async function openDigest(page: Page, installation: Installation): Promise<void>
   await page.getByRole('link', { name: 'Digest', exact: true }).click()
 }
 
+/** The day `count` days before today, in the suite's pinned UTC. */
+function daysAgo(count: number): string {
+  return new Date(Date.now() - count * 86_400_000).toISOString().slice(0, 10)
+}
+
 function groundColour(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 }
@@ -90,7 +95,10 @@ test.describe('the Digest presentation', () => {
     await expect(page.locator('main')).not.toContainText('07:15')
   })
 
-  test('ends at fifty items with Show more, and one press extends the day', async ({ page, installation }) => {
+  test('pages whole days up to fifty items, and Show more goes on from the next day', async ({
+    page,
+    installation,
+  }) => {
     await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
@@ -140,23 +148,19 @@ test.describe('the Digest presentation', () => {
   })
 })
 
-test.describe('the Digest by day and by feed', () => {
+test.describe('the Digest by item and by feed', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('steps back a day and returns to today, keeping the day in the address', async ({ page, installation }) => {
+  test('starts from a day in the address, and goes back to today', async ({ page, installation }) => {
     await openDigest(page, installation)
-    await page.getByRole('button', { name: 'By day' }).click()
-
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Next day' })).toBeDisabled()
 
-    await page.getByRole('button', { name: 'Previous day' }).click()
-    await expect(page.getByText('Nothing landed on this day.')).toBeVisible()
-    await expect(page).toHaveURL(/\?by=day&day=\d{4}-\d{2}-\d{2}$/)
+    await page.goto(`${installation.url}/digest?from=${daysAgo(1)}`)
+    await expect(page.getByText('Nothing on or before this day.')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Today', exact: true }).click()
+    await page.getByRole('button', { name: 'Back to today' }).click()
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
-    await expect(page).toHaveURL(/\?by=day$/)
+    await expect(page).toHaveURL(/\/digest$/)
   })
 
   test('opens an article from a Feed’s card', async ({ page, installation }) => {
@@ -182,7 +186,7 @@ test.describe('the Digest at phone width', () => {
     await expectNoHorizontalOverflow(page)
   })
 
-  test('reads by day, Feeds as chips, and by feed without overflowing the screen', async ({ page, installation }) => {
+  test('reads from a picked date, and by feed, without overflowing the screen', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('button', { name: 'Add feed' }).click()
     await page.getByRole('textbox', { name: 'URL' }).fill(installation.longFeedUrl)
@@ -190,10 +194,14 @@ test.describe('the Digest at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await page.getByRole('button', { name: 'By day' }).click()
-    await expect(page.getByRole('heading', { name: 'Today 56' })).toBeVisible()
-    await expect(page.getByRole('group', { name: '26 weeks of Cadence for your digest' })).toBeVisible()
-    await expect(page.getByRole('complementary', { name: 'Narrow by feed' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Today 2' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Long Meadow 1' })).toBeVisible()
+    await expect(page.locator('.digest-calendar')).toBeHidden()
+    await expectNoHorizontalOverflow(page)
+
+    await page.getByLabel('Start from a day').fill(daysAgo(1))
+    await expect(page).toHaveURL(new RegExp(`\\?from=${daysAgo(1)}$`))
+    await expect(page.getByRole('button', { name: 'Back to today' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
     await page.getByRole('button', { name: 'By feed' }).click()

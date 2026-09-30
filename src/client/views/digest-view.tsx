@@ -1,18 +1,16 @@
 import { Button } from '@base-ui/react/button'
+import { useRef } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { DigestCalendar } from '../../shared/api.js'
-import { RHYTHM_LABELS, RHYTHMS } from '../../shared/rhythm.js'
 import { fetchDigestCalendar } from '../api.js'
 import { Choice } from '../components/choice.js'
-import { Group } from '../components/group.js'
 import { Icon } from '../components/icon.js'
-import { dayAfter, dayBefore, longDay, recentDayName, shortDay } from '../day-names.js'
-import { routedClick } from '../routed-link.js'
-import { ALL_POSTS, digestPathOf, type DigestMode } from '../routing.js'
-import { useResource, valueInView, type Resource } from '../use-resource.js'
+import { shortDay } from '../day-names.js'
+import { DIGEST_TODAY, type DigestMode } from '../routing.js'
+import { useResource, valueInView } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
-import { DigestByDay } from './digest-by-day.js'
 import { DigestByFeed } from './digest-by-feed.js'
+import { DigestMonth } from './digest-month.js'
 import { DigestList } from './digest-list.js'
 
 export interface DigestViewProps {
@@ -23,147 +21,112 @@ export interface DigestViewProps {
 }
 
 const MODES = [
-  { value: 'all', label: 'All items' },
-  { value: 'day', label: 'By day' },
+  { value: 'item', label: 'By item' },
   { value: 'feed', label: 'By feed' },
 ] as const
 
-const RHYTHM_CHOICES = [
-  { value: 'everything', label: 'Everything' },
-  ...RHYTHMS.map((rhythm) => ({ value: rhythm, label: RHYTHM_LABELS[rhythm] })),
-] as const
-
-/** Days the All items list names beside itself, today first. */
-const RECENT_DAYS = 7
-
 /**
- * The Digest read three ways. The calendar — the whole Digest's count for each
- * day — names today in the title, lists recent days beside All items, and draws
- * By day. Its counts are never narrowed: each day it names opens By day, which
- * shows all of that day. With no Subscriptions, All items offers only the way to
- * the first; until the calendar answers, the Digest is drawn as begun.
+ * The Digest read two ways. By item is one list, newest day first, that starts
+ * today or from a day picked on the calendar — a month of the whole Digest
+ * beside the list on a wide screen, the platform's date picker on a phone.
+ * With no Subscriptions, By item offers only the way to the first; until the
+ * calendar answers, the Digest is drawn as begun.
  */
 export function DigestView({ mode, onMode, onOpenItem, onOpenFeed }: DigestViewProps) {
   useScreenTitle('Digest')
   const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
-  const today = valueInView(calendar)?.today
-  const firstRun = valueInView(calendar)?.subscriptions === 0
-  const day = mode.by === 'day' ? (mode.day ?? today) : undefined
-  const showDay = (date: string) => onMode({ by: 'day', day: date === today ? undefined : date })
+  const shown = valueInView(calendar)
+  const firstRun = shown?.subscriptions === 0
+  const stream = useRef<HTMLDivElement>(null)
+
+  const readFrom = (from: string | undefined) => {
+    if (mode.by !== 'item') return
+    onMode({ ...mode, from: from === shown?.today ? undefined : from })
+    // Picked below the fold, the day starts the list back at its top.
+    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo(0, 0)
+  }
 
   return (
     <div className="view">
       <header className="page-head">
         <h1 className="page-title">
           Digest
-          {today ? <span className="page-title-companion">{shortDay(today)}</span> : null}
+          {shown ? <span className="page-title-companion">{shortDay(shown.today)}</span> : null}
         </h1>
         <div className="toolbar digest-toolbar">
           <Choice
             label="Read the digest"
             options={MODES}
             value={mode.by}
-            onChange={(by) => onMode(by === 'all' ? ALL_POSTS : by === 'day' ? { by, day: undefined } : { by })}
+            onChange={(by) => onMode(by === 'item' ? DIGEST_TODAY : { by })}
           />
-          {mode.by === 'all' && !firstRun ? (
-            <Choice
-              label="Rhythm"
-              className="toolbar-end rhythm-choice"
-              options={RHYTHM_CHOICES}
-              value={mode.rhythm ?? 'everything'}
-              onChange={(chosen) => onMode({ by: 'all', rhythm: chosen === 'everything' ? undefined : chosen })}
-            />
+          {mode.by === 'item' && shown && !firstRun ? (
+            <DayPicker calendar={shown} from={mode.from} onFrom={readFrom} />
           ) : null}
-          {day && today ? <DayStepper day={day} today={today} onDay={showDay} /> : null}
           {mode.by === 'feed' ? <p className="note toolbar-end">Ordered by most recent item</p> : null}
         </div>
       </header>
 
-      {mode.by === 'all' && firstRun ? (
+      {mode.by === 'item' && firstRun ? (
         <div className="first-run">
           <p className="note">Nothing yet. Subscribe to a feed to start your digest.</p>
           <AddFeedDialog onSubscribed={retryCalendar} onImported={retryCalendar} />
         </div>
       ) : null}
-      {mode.by === 'all' && !firstRun ? (
+      {mode.by === 'item' && !firstRun ? (
         <div className="with-aside">
-          <DigestList
-            filter={{ rhythm: mode.rhythm }}
-            onRetry={retryCalendar}
-            empty={
-              mode.rhythm
-                ? `Nothing from ${RHYTHM_LABELS[mode.rhythm].toLowerCase()} feeds.`
-                : 'Nothing yet. Items arrive here as your feeds publish.'
-            }
-            onOpenItem={onOpenItem}
-            onOpenFeed={onOpenFeed}
-          />
-          <RecentDays calendar={calendar} onDay={showDay} />
+          <div ref={stream}>
+            {mode.from ? (
+              <div className="newer">
+                <Button className="button" onClick={() => readFrom(undefined)}>
+                  Back to today
+                </Button>
+              </div>
+            ) : null}
+            <DigestList
+              filter={{ from: mode.from }}
+              onRetry={retryCalendar}
+              empty={
+                mode.from ? 'Nothing on or before this day.' : 'Nothing yet. Items arrive here as your feeds publish.'
+              }
+              onOpenItem={onOpenItem}
+              onOpenFeed={onOpenFeed}
+            />
+          </div>
+          {shown ? <DigestMonth calendar={shown} selected={mode.from ?? shown.today} onPick={readFrom} /> : null}
         </div>
-      ) : null}
-      {mode.by === 'day' ? (
-        <DigestByDay
-          day={day}
-          calendar={calendar}
-          onRetryCalendar={retryCalendar}
-          onDay={showDay}
-          onOpenItem={onOpenItem}
-          onOpenFeed={onOpenFeed}
-        />
       ) : null}
       {mode.by === 'feed' ? <DigestByFeed onOpenItem={onOpenItem} onOpenFeed={onOpenFeed} /> : null}
     </div>
   )
 }
 
-/** Back a day, forward up to today, and straight back to today. */
-function DayStepper({ day, today, onDay }: { day: string; today: string; onDay: (day: string) => void }) {
-  const isToday = day === today
+/**
+ * A phone's way to a day, where the month has no room beside the list: the
+ * platform's own date picker, laid invisibly over a calendar button.
+ */
+function DayPicker({
+  calendar,
+  from,
+  onFrom,
+}: {
+  calendar: DigestCalendar
+  from: string | undefined
+  onFrom(day: string): void
+}) {
   return (
-    <div className="toolbar-group toolbar-end day-stepper">
-      <Button className="button button-icon" aria-label="Previous day" onClick={() => onDay(dayBefore(day))}>
-        <Icon name="chevron-left" />
-      </Button>
-      <Button className="button wide-only" focusableWhenDisabled disabled={isToday} onClick={() => onDay(today)}>
-        Today
-      </Button>
-      <span className="day-stepper-day">{longDay(day)}</span>
-      <Button
-        className="button button-icon"
-        aria-label="Next day"
-        focusableWhenDisabled
-        disabled={isToday}
-        onClick={() => onDay(dayAfter(day))}
-      >
-        <Icon name="chevron-right" />
-      </Button>
-    </div>
-  )
-}
-
-/** The last week of days with their counts, each a way into that day. */
-function RecentDays({ calendar, onDay }: { calendar: Resource<DigestCalendar>; onDay: (day: string) => void }) {
-  const shown = valueInView(calendar)
-  if (!shown) return null
-  const days = shown.days.slice(-RECENT_DAYS).toReversed()
-  return (
-    <nav className="recent-days" aria-label="Days">
-      <Group id="recent-days" title="Days" className="panel">
-        <ul className="day-list">
-          {days.map(({ date, count }) => (
-            <li key={date}>
-              <a
-                className="day-row"
-                href={digestPathOf({ by: 'day', day: date })}
-                onClick={routedClick(() => onDay(date))}
-              >
-                <span className="day-row-name">{recentDayName(date, shown.today)}</span>
-                <span className="day-row-count">{count.toLocaleString('en-GB')}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </Group>
-    </nav>
+    <label className="button button-icon day-picker">
+      <Icon name="calendar" />
+      <input
+        type="date"
+        aria-label="Start from a day"
+        min={calendar.days[0]?.date}
+        max={calendar.today}
+        value={from ?? calendar.today}
+        onChange={(event) => {
+          if (event.target.value) onFrom(event.target.value)
+        }}
+      />
+    </label>
   )
 }

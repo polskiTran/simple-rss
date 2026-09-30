@@ -34,6 +34,17 @@ export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
+/**
+ * Levels for counts too large for one Feed's thresholds — the whole Digest's
+ * days — split at the quartiles of `counts`' days with any items.
+ */
+export function relativeLevels(counts: readonly number[]): (count: number) => 0 | 1 | 2 | 3 | 4 {
+  const busy = counts.filter((count) => count > 0).toSorted((left, right) => left - right)
+  const quartile = (fraction: number) => busy[Math.floor((busy.length - 1) * fraction)] ?? 0
+  const [first, second, third] = [quartile(0.25), quartile(0.5), quartile(0.75)]
+  return (count) => (count === 0 ? 0 : count <= first ? 1 : count <= second ? 2 : count <= third ? 3 : 4)
+}
+
 export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   const columns: { cells: CadenceCell[]; monthLabel: string | undefined }[] = []
   for (let start = 0; start < days.length; start += 7) {

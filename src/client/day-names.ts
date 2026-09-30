@@ -42,18 +42,6 @@ export function dayBefore(dateKey: string): string {
   return new Date(Date.parse(`${dateKey}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
 }
 
-/** The calendar day after `dateKey`. */
-export function dayAfter(dateKey: string): string {
-  return new Date(Date.parse(`${dateKey}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
-}
-
-/** `Today`, `Yesterday`, then `Sun 30 Aug` — a day in a list of recent ones. */
-export function recentDayName(dateKey: string, today: string): string {
-  if (dateKey === today) return 'Today'
-  if (dateKey === dayBefore(today)) return 'Yesterday'
-  return shortDay(dateKey)
-}
-
 /**
  * When an item landed, as short as the distance allows: its time today, then
  * `Yesterday`, a weekday within the week, and `21 Aug` — `21 Aug 2025` once it

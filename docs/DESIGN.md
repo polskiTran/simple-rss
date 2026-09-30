@@ -115,12 +115,12 @@ Numbers in counts and meta use tabular figures.
   sheet buttons). Small inline controls are 30px.
 - Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
 - The reading column is 680px, centred.
-- On desktop a 300px column beside a list — the Digest's days, a Feed filter —
+- On desktop a 300px column beside a list — the Digest's month, a Feed filter —
   holds 24px from the top as the list scrolls, and scrolls itself when taller
   than the window.
 - One breakpoint: `max-width: 640px` is the phone layout.
-- A phone row that scrolls sideways — Rhythm chips, jump buttons, a Feed
-  filter's chips — fades over its trailing 32px, so what is past the edge
+- A phone row that scrolls sideways — a day's Feed chips, jump buttons, a
+  Feed filter's chips — fades over its trailing 32px, so what is past the edge
   reads as there.
 
 ## 5. Components
@@ -237,27 +237,35 @@ fading with it both ways, so no strip runs down the edge.
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
 
-**Digest.** Today's short date as the title's companion, then a switch of All
-items, By day and By feed; the address keeps the choice, so the way back from
-an article returns to it. All items groups by day, with a switch of Everything
-and each Rhythm at the other end narrowing it to the Feeds of that Rhythm;
-beside it, the last seven days with the whole Digest's count, each opening that
-day. By day draws 26 weeks of the whole Digest as the Cadence grid with the day
-on show ringed, and its facts beside it — the day, its items and Feeds, the 26
-weeks' items and busiest weekday — over the day's items; previous, Today and
-next step through days, never past today, and the Feeds that day narrow the
-list when ticked, as in search. By feed is a card per Subscription, the most
-recently published first: a Feed row with the last 14 days of Cadence, then
-under a `rule-soft` line its three newest items, each dated as briefly as the
-distance allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch spans
-the page, the Rhythms scroll as chips in ink with the chosen one a segment
-ringed in ink, the day list and the facts give way, the stepper names the day
-as plain text between its arrows, and the cards stack. A long list ends in
-Show more, which loads the next page wherever it falls — the rest of a day or
-days beyond it — so it names no number; Saved ends the same way. Before the
-first Subscription, All items is a note and Add feed as the primary action,
-with no Rhythms and no days beside it; with Subscriptions but nothing yet, the
-note says items arrive as the Feeds publish.
+**Digest.** Today's short date as the title's companion, then a switch of By
+item and By feed. By item is one list, newest day first, each day a group
+headed with its count and, for Today and Yesterday, its date. Under the heading
+the day's Feeds stand as chips with their counts after a note of how many; a
+pressed chip, ringed in ink, shows that Feed's box alone, and pressing it again
+shows them all. Each Feed that published that day gets one box, the most recent
+first: a lone item is the ordinary item box; more share a box, the Feed's name,
+its count and its span of times in the meta column and each title on its own
+line with its time. Past 5 items the box shows the newest 3 and Show N more, which turns to Show
+less once pressed. A
+Feed back after a week or more without items says so under its time — its last
+14 days of Cadence, then First item in 12 days. The list starts today, or from a
+day picked on the month — that day and everything before it — and then Back to
+today stands at its head, as Show more stands at its foot; the address keeps the
+day, so the way back from an article returns to it. Beside the list, a month of
+the whole Digest: its name with turns to the months before and after, the days
+Monday first, each shaded by its count against the calendar's other days, the
+day on show ringed, then the legend and that day's count. Any day with items
+starts the list there. By feed is a card per Subscription, the most recently
+published first: a Feed row with the last 14 days of Cadence, then under a
+`rule-soft` line its three newest items, each dated as briefly as the distance
+allows — 09:12, Yesterday, Thu, 21 Aug. On a phone the switch fills the row
+beside a calendar button that opens the platform's own date picker, in place of
+the month; a day's chips scroll as one row, and the cards stack. Pages are whole days, as many as reach fifty items, so Show more
+continues from the next day and names no number; Saved ends the same way.
+Before the first Subscription, By item is a note and Add feed as the primary
+action, with no chips and no month; with Subscriptions but nothing yet, the note
+says items arrive as the Feeds publish. The drawn Stream and By source are By
+item and By feed, in the words of `CONTEXT.md`.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
 rows to a group, then Show N more with the rest named beside it; opened,
@@ -325,7 +333,6 @@ the shipped words are:
 | Open posts as | Open items with |
 | Activity | Cadence |
 | Edit source | Edit feed |
-| Sources that day | Feeds that day |
 | Search saved posts | Search your saves |
 | By source | By feed |
 

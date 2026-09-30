@@ -24,6 +24,8 @@ export interface ItemBoxProps {
   /** Search results mark their matches; everything else shows the plain title. */
   readonly titleContent?: ReactNode
   readonly snippet?: ReactNode
+  /** Said under the time, in the meta column. */
+  readonly note?: ReactNode
   onOpen(feedItemId: number): void
   onSaved(saved: boolean): void
 }
@@ -37,6 +39,7 @@ export function ItemBox({
   when,
   titleContent,
   snippet,
+  note,
   onOpen,
   onSaved,
 }: ItemBoxProps) {
@@ -51,6 +54,7 @@ export function ItemBox({
         <time className="item-when" dateTime={when.dateTime}>
           {when.label}
         </time>
+        {note}
       </div>
       <div className="item-body">
         <h3 className="item-title">

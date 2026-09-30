@@ -32,13 +32,8 @@ async function savedNotes(gapMs: number) {
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
   await service.wakeScheduler()
 
-  const firstPage = digestSchema.parse(await (await user.get('/api/digest')).json())
-  const restPage = digestSchema.parse(
-    await (await user.get(`/api/digest?cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`)).json(),
-  )
-  const allIds = [...firstPage.groups, ...restPage.groups].flatMap((group) =>
-    group.items.map((entry) => entry.feedItemId),
-  )
+  const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
+  const allIds = digest.groups.flatMap((group) => group.items.map((entry) => entry.feedItemId))
   expect(allIds).toHaveLength(55)
   for (const feedItemId of allIds) {
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)

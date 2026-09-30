@@ -11,7 +11,7 @@ const DIGEST = {
     {
       date: '2026-08-08',
       label: 'Today',
-      count: 1,
+      returns: [],
       items: [
         {
           feedItemId: 3,
@@ -29,7 +29,7 @@ const DIGEST = {
       ],
     },
   ],
-  nextCursor: null,
+  nextFrom: null,
 }
 
 const DETAIL = {
@@ -175,11 +175,10 @@ describe('a Feed Item’s attribution', () => {
     expect(window.location.pathname).toBe('/digest')
   })
 
-  it('returns an article opened from one day of the Digest to that same day', async () => {
-    reading('/digest?by=day&day=2026-08-07')
+  it('returns an article opened from a Digest started from a day to that same day', async () => {
+    reading('/digest?from=2026-08-07')
       .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 1 } })
-      .on('GET /api/digest/days/2026-08-07', { body: { date: '2026-08-07', feeds: [] } })
-      .on('GET /api/digest?day=2026-08-07', { body: DIGEST })
+      .on('GET /api/digest?from=2026-08-07', { body: DIGEST })
     render(<App />)
     const user = userEvent.setup()
 
@@ -189,8 +188,8 @@ describe('a Feed Item’s attribution', () => {
 
     await user.click(wayBack())
     expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
-    expect(window.location.pathname + window.location.search).toBe('/digest?by=day&day=2026-08-07')
-    expect(screen.getByRole('button', { name: 'By day' }).getAttribute('aria-pressed')).toBe('true')
+    expect(window.location.pathname + window.location.search).toBe('/digest?from=2026-08-07')
+    expect(screen.getByRole('button', { name: 'Back to today' })).toBeDefined()
   })
 
   it('opens its Feed from a search result, and that Feed returns to the results', async () => {

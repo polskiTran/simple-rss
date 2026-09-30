@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { digestSchema } from '../../src/shared/api.js'
 import { MAX_OPML_FEEDS } from '../../src/server/subscriptions/opml.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
@@ -90,8 +91,8 @@ describe('OPML import', () => {
       ['Atom Letters', 'available'],
       ['Field Notes', 'available'],
     ])
-    const digest = await (await user.get('/api/digest')).json()
-    expect(digest.groups).toMatchObject([{ date: '2026-08-08', count: 2 }])
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
+    expect(digest.groups.map(({ date, items }) => [date, items.length])).toEqual([['2026-08-08', 2]])
   })
 
   it('drains a bulk import in one wake even when it overflows the batch', async () => {

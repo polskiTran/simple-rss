@@ -1,7 +1,6 @@
 import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
-  dateKeySchema,
   digestRequestSchema,
   feedIdParameterSchema,
   importOpmlRequestSchema,
@@ -11,7 +10,6 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
-  type DigestDay,
   type DigestFeeds,
   type FeedDetail,
   type FeedDetailsUpdate,
@@ -28,7 +26,6 @@ import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
 import { readIdParam } from './id-param.js'
 import { readJsonBody } from './json-body.js'
-import { readListCursor } from './list-cursor.js'
 import { NO_STORE, notFound, retryAfter } from './responses.js'
 import { answer, FEED_ANSWERS } from './retrieval-answers.js'
 
@@ -148,24 +145,12 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   })
 
   app.get('/digest', (c) => {
-    const filter = digestRequestSchema.safeParse({
-      rhythm: c.req.query('rhythm'),
-      day: c.req.query('day'),
-      feed: c.req.queries('feed') ?? [],
-    })
+    const filter = digestRequestSchema.safeParse({ from: c.req.query('from') })
     if (!filter.success) return invalidDigestRequest(c)
-    const cursor = readListCursor(c)
-    if (!cursor.ok) return cursor.response
-    return c.json<Digest>(deps.digest.read(filter.data, cursor.cursor), 200, NO_STORE)
+    return c.json<Digest>(deps.digest.read(filter.data), 200, NO_STORE)
   })
 
   app.get('/digest/days', (c) => c.json<DigestCalendar>(deps.digest.calendar(), 200, NO_STORE))
-
-  app.get('/digest/days/:date', (c) => {
-    const date = readIdParam(c, 'date', dateKeySchema)
-    if (!date.ok) return date.response
-    return c.json<DigestDay>(deps.digest.day(date.value), 200, NO_STORE)
-  })
 
   app.get('/digest/feeds', (c) => c.json<DigestFeeds>(deps.digest.byFeed(deps.subscriptions.list()), 200, NO_STORE))
 
@@ -177,7 +162,7 @@ function invalidDigestRequest(c: Context) {
     {
       error: {
         code: 'invalid_request',
-        message: 'The Digest narrows by a Rhythm, a day as YYYY-MM-DD, and Feed ids',
+        message: 'The Digest starts from a day as YYYY-MM-DD',
       },
     },
     400,

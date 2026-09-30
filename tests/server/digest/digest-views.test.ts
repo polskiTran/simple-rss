@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CADENCE_GRID_WEEKS,
-  digestCalendarSchema,
-  digestDaySchema,
-  digestFeedsSchema,
-  digestSchema,
-} from '../../../src/shared/api.js'
+import { CADENCE_GRID_WEEKS, digestCalendarSchema, digestFeedsSchema, digestSchema } from '../../../src/shared/api.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 
@@ -56,24 +50,8 @@ const digestOf = async (user: Device, query: string) =>
 const titles = (digest: { groups: readonly { items: readonly { title: string }[] }[] }) =>
   digest.groups.flatMap((group) => group.items.map(({ title }) => title))
 
-describe('the Digest narrowed', () => {
-  it('to the Feeds of one Rhythm, counting each day under the same narrowing', async () => {
-    const { user } = await threeRhythms()
-
-    const weekly = await digestOf(user, 'rhythm=weekly')
-    expect(new Set(weekly.groups.flatMap((group) => group.items.map(({ feedTitle }) => feedTitle)))).toEqual(
-      new Set(['Weekly Letters']),
-    )
-    expect(weekly.groups[0]).toMatchObject({ date: '2026-08-06', count: 1 })
-
-    const inactive = await digestOf(user, 'rhythm=inactive')
-    expect(titles(inactive)).toEqual(['almanac-may'])
-
-    const everything = await digestOf(user, '')
-    expect(everything.groups.find(({ date }) => date === '2026-08-06')?.count).toBe(2)
-  })
-
-  it('to one installation-timezone day', async () => {
+describe('the Digest from a day', () => {
+  it('from one installation-timezone day, and every day before it', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
@@ -85,36 +63,34 @@ describe('the Digest narrowed', () => {
     ])
     await service.wakeScheduler()
 
-    const day = await digestOf(user, 'day=2026-08-07')
+    const from = await digestOf(user, 'from=2026-08-07')
 
-    expect(titles(day)).toEqual(['next-evening', 'after-midnight'])
-    expect(day.groups.map(({ date, count }) => [date, count])).toEqual([['2026-08-07', 2]])
+    expect(titles(from)).toEqual(['next-evening', 'after-midnight', 'before-midnight'])
+    expect(from.groups.map(({ date }) => date)).toEqual(['2026-08-07', '2026-08-06'])
   })
 
-  it('to chosen Feeds, page after page', async () => {
+  it('names a Feed back from a quiet spell of a week or more, with its Cadence to that day', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
-    const minutes = (prefix: string, count: number) =>
-      Array.from({ length: count }, (_, index) =>
-        item(`${prefix}-${index}`, `2026-08-08T00:${String(index).padStart(2, '0')}:00.000Z`),
-      )
-    await subscribe(service, user, 'Field Notes', minutes('notes', 55))
-    await subscribe(service, user, 'Weekly Letters', minutes('letters', 5))
+    await subscribe(service, user, 'Field Notes', daily('notes', '2026-08-08', 3))
+    await subscribe(service, user, 'Old Almanac', [
+      item('almanac-back', '2026-08-07T12:00:00.000Z'),
+      item('almanac-before', '2026-07-26T12:00:00.000Z'),
+    ])
     await service.wakeScheduler()
 
-    const first = await digestOf(user, 'day=2026-08-08&feed=1')
-    expect(first.groups[0]?.count).toBe(55)
-    expect(first.nextCursor).toEqual(expect.any(String))
+    const digest = await digestOf(user, '')
 
-    const rest = await digestOf(user, `day=2026-08-08&feed=1&cursor=${encodeURIComponent(first.nextCursor ?? '')}`)
-    expect(titles(rest)).toEqual(['notes-4', 'notes-3', 'notes-2', 'notes-1', 'notes-0'])
-    expect(rest.nextCursor).toBeNull()
-
-    const both = await digestOf(user, 'feed=1&feed=2')
-    expect(both.groups[0]?.count).toBe(60)
+    const yesterday = digest.groups.find(({ date }) => date === '2026-08-07')
+    expect(yesterday?.returns).toHaveLength(1)
+    expect(yesterday?.returns[0]?.quietDays).toBe(12)
+    expect(yesterday?.returns[0]?.cadence.at(-1)).toBe(1)
+    expect(yesterday?.returns[0]?.cadence.at(-13)).toBe(1)
+    expect(yesterday?.returns[0]?.cadence.reduce((sum, count) => sum + count, 0)).toBe(2)
+    expect(digest.groups.find(({ date }) => date === '2026-08-08')?.returns).toEqual([])
   })
 
-  it.each([['rhythm=hourly'], ['day=2026-02-30'], ['day=8 August'], ['feed=notes']])('refuses %s', async (query) => {
+  it.each([['from=2026-02-30'], ['from=8 August']])('refuses %s', async (query) => {
     const service = await startTestService()
     const user = await claimedDevice(service)
 
@@ -149,31 +125,6 @@ describe('the Digest calendar', () => {
     expect(await subscriptions()).toBe(0)
     await subscribe(service, user, 'Field Notes', [])
     expect(await subscriptions()).toBe(1)
-  })
-
-  it('names the Feeds of one day, busiest first', async () => {
-    const service = await startTestService()
-    const user = await claimedDevice(service)
-    await subscribe(service, user, 'Weekly Letters', [item('letter', '2026-08-07T10:00:00.000Z')])
-    await subscribe(service, user, 'Field Notes', [
-      item('morning', '2026-08-07T08:00:00.000Z'),
-      item('evening', '2026-08-07T20:00:00.000Z'),
-      item('today', '2026-08-08T08:00:00.000Z'),
-    ])
-    await subscribe(service, user, 'Almanac', [item('almanac', '2026-08-07T09:00:00.000Z')])
-    await service.wakeScheduler()
-
-    const day = digestDaySchema.parse(await (await user.get('/api/digest/days/2026-08-07')).json())
-
-    expect(day).toEqual({
-      date: '2026-08-07',
-      feeds: [
-        { feedId: 2, title: 'Field Notes', count: 2 },
-        { feedId: 3, title: 'Almanac', count: 1 },
-        { feedId: 1, title: 'Weekly Letters', count: 1 },
-      ],
-    })
-    expect((await user.get('/api/digest/days/2026-13-01')).status).toBe(404)
   })
 })
 

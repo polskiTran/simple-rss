@@ -54,13 +54,20 @@ export function CadenceGrid({ grid, title, selected, onShowDay }: CadenceGridPro
           )
         })}
       </div>
-      <p className="cadence-legend" aria-hidden="true">
-        Fewer
-        {([0, 1, 2, 3, 4] as const).map((level) => (
-          <span key={level} className="cadence-cell" data-level={level} />
-        ))}
-        More items
-      </p>
+      <CadenceLegend />
     </div>
+  )
+}
+
+/** The five shades a count is drawn in, least to most. */
+export function CadenceLegend() {
+  return (
+    <p className="cadence-legend" aria-hidden="true">
+      Fewer
+      {([0, 1, 2, 3, 4] as const).map((level) => (
+        <span key={level} className="cadence-cell" data-level={level} />
+      ))}
+      More items
+    </p>
   )
 }

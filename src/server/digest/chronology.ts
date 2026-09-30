@@ -118,3 +118,10 @@ function millisecondsAheadOfUtc(instant: number, timezone: string): number {
   )
   return wall - instant
 }
+
+/** Whole days from `earlier` to `later`, both day keys. */
+export function daysBetween(later: string, earlier: string): number {
+  return Math.round(
+    (Date.parse(`${later}T00:00:00.000Z`) - Date.parse(`${earlier}T00:00:00.000Z`)) / (24 * 60 * 60 * 1_000),
+  )
+}

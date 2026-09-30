@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   ArrowUpToLine,
   Bookmark,
+  Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +29,7 @@ import {
 const GLYPHS = {
   'arrow-left': ArrowLeft,
   bookmark: Bookmark,
+  calendar: Calendar,
   'chevron-down': ChevronDown,
   'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,

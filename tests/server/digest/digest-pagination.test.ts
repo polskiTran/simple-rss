@@ -27,138 +27,94 @@ const titlesDown = (prefix: string, from: number, to: number) =>
 const flatTitles = (digest: { groups: readonly { items: readonly { title: string }[] }[] }) =>
   digest.groups.flatMap((group) => group.items.map((entry) => entry.title))
 
+async function subscribed(...items: string[]) {
+  const service = await startTestService()
+  service.upstream.stub(FEED_URL, {
+    headers: { 'content-type': 'application/rss+xml' },
+    body: rss('Field Notes', ...items),
+  })
+  const user = await claimedDevice(service)
+  expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+  await service.wakeScheduler()
+  return { service, user }
+}
+
 describe('the Digest in pages', () => {
-  it('serves fifty items at a time, joined by an opaque cursor, splitting a day where the page ends', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: rss('Field Notes', ...minuteItems('2026-08-08', 'today', 55), ...minuteItems('2026-08-07', 'past', 10)),
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
+  it('serves whole days until fifty items are reached, then names the day the next page starts from', async () => {
+    const { user } = await subscribed(
+      ...minuteItems('2026-08-08', 'today', 30),
+      ...minuteItems('2026-08-07', 'yesterday', 30),
+      ...minuteItems('2026-08-06', 'before', 10),
+    )
 
     const first = digestSchema.parse(await (await user.get('/api/digest')).json())
 
-    expect(flatTitles(first)).toEqual(titlesDown('today', 54, 5))
-    expect(first.groups.map(({ date }) => date)).toEqual(['2026-08-08'])
-    expect(first.nextCursor).toEqual(expect.any(String))
-
-    const rest = digestSchema.parse(
-      await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
-    )
-
-    expect(rest.groups.map(({ date, label }) => [date, label])).toEqual([
-      ['2026-08-08', 'Today'],
-      ['2026-08-07', 'Yesterday'],
+    expect(first.groups.map(({ date, items }) => [date, items.length])).toEqual([
+      ['2026-08-08', 30],
+      ['2026-08-07', 30],
     ])
-    expect(flatTitles(rest)).toEqual([...titlesDown('today', 4, 0), ...titlesDown('past', 9, 0)])
-    expect(rest.nextCursor).toBeNull()
+    expect(first.nextFrom).toBe('2026-08-06')
+
+    const rest = digestSchema.parse(await (await user.get(`/api/digest?from=${first.nextFrom}`)).json())
+
+    expect(flatTitles(rest)).toEqual(titlesDown('before', 9, 0))
+    expect(rest.nextFrom).toBeNull()
   })
 
-  it('answers a digest that fits one page with no cursor at all', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: rss('Field Notes', ...minuteItems('2026-08-08', 'today', 3)),
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
+  it('serves a busy day whole, however far past fifty it runs', async () => {
+    const { user } = await subscribed(
+      ...minuteItems('2026-08-08', 'today', 55),
+      ...minuteItems('2026-08-07', 'yesterday', 3),
+    )
+
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
+
+    expect(flatTitles(digest)).toEqual(titlesDown('today', 54, 0))
+    expect(digest.nextFrom).toBe('2026-08-07')
+  })
+
+  it('answers a digest that fits one page with no next day at all', async () => {
+    const { user } = await subscribed(...minuteItems('2026-08-08', 'today', 3))
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
     expect(flatTitles(digest)).toHaveLength(3)
-    expect(digest.nextCursor).toBeNull()
+    expect(digest.nextFrom).toBeNull()
   })
 
-  it('counts a whole day on the page that cuts it short, and again on the page that finishes it', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: rss('Field Notes', ...minuteItems('2026-08-08', 'today', 55)),
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
-
-    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
-
-    expect(digest.groups[0]).toMatchObject({ date: '2026-08-08', count: 55 })
-    expect(digest.groups[0]?.items).toHaveLength(50)
-
-    const rest = digestSchema.parse(
-      await (await user.get(`/api/digest?cursor=${encodeURIComponent(digest.nextCursor ?? '')}`)).json(),
+  it('says what follows an item even when the follower is on the next page', async () => {
+    const { user } = await subscribed(
+      ...minuteItems('2026-08-08', 'today', 50),
+      ...minuteItems('2026-08-07', 'yesterday', 2),
     )
-    expect(rest.groups[0]).toMatchObject({ date: '2026-08-08', count: 55 })
-    expect(rest.groups[0]?.items).toHaveLength(5)
-  })
-
-  it('refuses a cursor it never issued', async () => {
-    const service = await startTestService()
-    const user = await claimedDevice(service)
-
-    const response = await user.get('/api/digest?cursor=not-a-cursor')
-
-    expect(response.status).toBe(400)
-    expect(await response.json()).toMatchObject({ error: { code: 'invalid_cursor' } })
-  })
-
-  it('says what follows an item even when the follower is beyond the page boundary', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: rss('Field Notes', ...minuteItems('2026-08-08', 'today', 52)),
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const first = digestSchema.parse(await (await user.get('/api/digest')).json())
-    const boundary = first.groups[0]?.items.at(-1)
-    expect(boundary?.title).toBe('today-2')
+    const boundary = first.groups.at(-1)?.items.at(-1)
+    expect(boundary?.title).toBe('today-0')
 
     const reader = await (await user.get(`/api/items/${boundary?.feedItemId}`)).json()
-    expect(reader).toMatchObject({ nextInDigest: { title: 'today-1' } })
-
-    const rest = digestSchema.parse(
-      await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
-    )
-    const final = rest.groups.at(-1)?.items.at(-1)
-    expect(final?.title).toBe('today-0')
-    const lastReader = await (await user.get(`/api/items/${final?.feedItemId}`)).json()
-    expect(lastReader).toMatchObject({ nextInDigest: null })
+    expect(reader).toMatchObject({ nextInDigest: { title: 'yesterday-1' } })
   })
 
-  it('continues from a cursor unmoved by items that arrived above it meanwhile', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: rss('Field Notes', ...minuteItems('2026-08-08', 'today', 52)),
-    })
+  it('continues from its day unmoved by items that arrived above it meanwhile', async () => {
+    const { service, user } = await subscribed(
+      ...minuteItems('2026-08-08', 'today', 50),
+      ...minuteItems('2026-08-07', 'yesterday', 2),
+    )
+    const first = digestSchema.parse(await (await user.get('/api/digest')).json())
+
     const LATER_URL = 'https://letters.example/feed'
     service.upstream.stub(LATER_URL, {
       headers: { 'content-type': 'application/rss+xml' },
       body: rss('Letters', item('fresh', 'A newer letter', '2026-08-08T08:00:00.000Z')),
     })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
-
-    const first = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(flatTitles(first)).toEqual(titlesDown('today', 51, 2))
-
     expect((await user.post('/api/subscriptions', { url: LATER_URL })).status).toBe(201)
     await service.wakeScheduler()
 
-    const rest = digestSchema.parse(
-      await (await user.get(`/api/digest?cursor=${encodeURIComponent(first.nextCursor ?? '')}`)).json(),
-    )
-
-    expect(flatTitles(rest)).toEqual(['today-1', 'today-0'])
-    expect(rest.nextCursor).toBeNull()
+    const rest = digestSchema.parse(await (await user.get(`/api/digest?from=${first.nextFrom}`)).json())
+    expect(flatTitles(rest)).toEqual(['yesterday-1', 'yesterday-0'])
 
     const fresh = digestSchema.parse(await (await user.get('/api/digest')).json())
-    expect(flatTitles(fresh).slice(0, 3)).toEqual(['A newer letter', 'today-51', 'today-50'])
+    expect(flatTitles(fresh).slice(0, 2)).toEqual(['A newer letter', 'today-49'])
   })
 })

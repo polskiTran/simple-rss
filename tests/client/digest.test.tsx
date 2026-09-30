@@ -1,15 +1,15 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow } from './cadence-window.js'
 import { stubApi } from './stub-api.js'
 
-const item = (feedItemId: number, title: string, displayTime: string) => ({
+const item = (feedItemId: number, title: string, displayTime: string, feedId = 1, feedTitle = 'Field Notes') => ({
   feedItemId,
   title,
-  feedId: 1,
-  feedTitle: 'Field Notes',
+  feedId,
+  feedTitle,
   link: `https://journal.example/${feedItemId}`,
   publishedAt: '2026-08-08T07:15:00.000Z',
   displayTime,
@@ -25,13 +25,13 @@ const DIGEST = {
     {
       date: '2026-08-08',
       label: 'Today',
-      count: 2,
       items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')],
+      returns: [],
     },
-    { date: '2026-08-07', label: 'Yesterday', count: 1, items: [item(1, 'Evening notes', '09:31')] },
-    { date: '2026-06-03', label: 'Wednesday 3 June', count: 1, items: [item(4, 'A June letter', '12:00')] },
+    { date: '2026-08-07', label: 'Yesterday', items: [item(1, 'Evening notes', '09:31')], returns: [] },
+    { date: '2026-06-03', label: 'Wednesday 3 June', items: [item(4, 'A June letter', '12:00')], returns: [] },
   ],
-  nextCursor: null,
+  nextFrom: null,
 }
 
 afterEach(() => {
@@ -48,8 +48,8 @@ describe('the chronological Digest', () => {
     expect(screen.getByRole('heading', { name: 'Today 2' })).toBeDefined()
     expect(screen.getByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
     expect(screen.getByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
-    expect(screen.getByText('Saturday 8 August')).toBeDefined()
-    expect(screen.getByText('Friday 7 August')).toBeDefined()
+    expect(within(screen.getByRole('region', { name: 'Today 2' })).getByText('Saturday 8 August')).toBeDefined()
+    expect(within(screen.getByRole('region', { name: 'Yesterday 1' })).getByText('Friday 7 August')).toBeDefined()
 
     const [first] = screen.getAllByRole('article')
     expect(
@@ -62,14 +62,125 @@ describe('the chronological Digest', () => {
     expect(container.textContent).not.toMatch(/unread|mark|archive/i)
   })
 
-  it('counts a day in full even when the page holds only part of it', async () => {
+  it('shows more from the day the page names, under the days already shown', async () => {
+    const [today, yesterday, june] = DIGEST.groups
+    const api = stubApi()
+      .on('GET /api/digest', { body: { ...DIGEST, groups: [today, yesterday], nextFrom: '2026-06-03' } })
+      .on('GET /api/digest?from=2026-06-03', { body: { ...DIGEST, groups: [june] } })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await screen.findByRole('heading', { name: 'Yesterday 1' })
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
+
+    expect(await screen.findByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(api.requestsTo('GET /api/digest?from=2026-06-03')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull()
+  })
+
+  it('shows a Feed past five items in a day folded to its newest three, unfolds it, and folds it again', async () => {
+    const titles = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven']
+    stubApi().on('GET /api/digest', {
+      body: {
+        ...DIGEST,
+        groups: [
+          {
+            date: '2026-08-08',
+            label: 'Today',
+            items: titles.map((title, index) => item(20 - index, title, `0${9 - index}:00`)),
+            returns: [],
+          },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const box = await screen.findByRole('article')
+    expect(within(box).getByText('7 items')).toBeDefined()
+    expect(within(box).getByText('03:00–09:00')).toBeDefined()
+    expect(
+      within(box)
+        .getAllByRole('heading')
+        .map((title) => title.textContent),
+    ).toEqual(['One', 'Two', 'Three'])
+
+    await user.click(within(box).getByRole('button', { name: 'Show 4 more' }))
+
+    expect(
+      within(box)
+        .getAllByRole('heading')
+        .map((title) => title.textContent),
+    ).toEqual(titles)
+
+    const less = within(box).getByRole('button', { name: 'Show less' })
+    await user.click(less)
+
+    expect(within(box).getAllByRole('heading')).toHaveLength(3)
+    expect(document.activeElement).toBe(within(box).getByRole('button', { name: 'Show 4 more' }))
+  })
+
+  it('shows one Feed of the day alone while its chip is pressed', async () => {
+    stubApi().on('GET /api/digest', {
+      body: {
+        ...DIGEST,
+        groups: [
+          {
+            date: '2026-08-08',
+            label: 'Today',
+            items: [item(3, 'First light', '07:15'), item(5, 'A letter', '06:00', 2, 'Letters')],
+            returns: [],
+          },
+        ],
+      },
+    })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const chips = await screen.findByRole('group', { name: 'Feeds on Saturday 8 August' })
+    expect(within(chips).getByText('2 feeds')).toBeDefined()
+    const letters = within(chips).getByRole('button', { name: 'Letters 1' })
+
+    await user.click(letters)
+    expect(screen.getAllByRole('article').map((box) => within(box).getByRole('heading').textContent)).toEqual([
+      'A letter',
+    ])
+
+    await user.click(letters)
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+  })
+
+  it('says when a Feed is back after a quiet spell', async () => {
     const [today] = DIGEST.groups
-    stubApi().on('GET /api/digest', { body: { ...DIGEST, groups: [{ ...today, count: 60 }], nextCursor: 'more' } })
+    stubApi().on('GET /api/digest', {
+      body: {
+        ...DIGEST,
+        groups: [
+          {
+            date: '2026-08-08',
+            label: 'Today',
+            items: [item(5, 'A letter', '06:00', 2, 'Letters'), ...(today?.items ?? [])],
+            returns: [
+              {
+                feedId: 2,
+                quietDays: 12,
+                cadence: Array.from({ length: 30 }, (_, day) => (day === 17 || day === 29 ? 1 : 0)),
+              },
+            ],
+          },
+        ],
+      },
+    })
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Today 60' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Show more' })).toBeDefined()
+    const [back, other] = await screen.findAllByRole('article')
+    expect(within(back as HTMLElement).getByText('First item in 12 days')).toBeDefined()
+    expect(within(other as HTMLElement).queryByText(/^First item in/)).toBeNull()
   })
 
   it('flips save to saved in place once the server confirms, and back', async () => {
@@ -110,15 +221,15 @@ describe('the chronological Digest', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('leads to Add feed before any Subscription, with no Rhythms or Days to choose from', async () => {
+  it('leads to Add feed before any Subscription, with no days to choose from', async () => {
     stubApi().on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 0 } })
     window.history.replaceState(null, '', '/')
     render(<App />)
 
     expect(await screen.findByText('Nothing yet. Subscribe to a feed to start your digest.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Add feed' })).toBeDefined()
-    expect(screen.queryByRole('group', { name: 'Rhythm' })).toBeNull()
-    expect(screen.queryByRole('navigation', { name: 'Days' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'August 2026' })).toBeNull()
+    expect(screen.queryByLabelText('Start from a day')).toBeNull()
   })
 
   it('says items are on their way when Subscriptions have yet to publish', async () => {
@@ -173,145 +284,86 @@ const CALENDAR = {
   subscriptions: 1,
 }
 
-const DAY = {
-  date: '2026-08-07',
-  feeds: [
-    { feedId: 1, title: 'Field Notes', count: 3 },
-    { feedId: 2, title: 'Weekly Letters', count: 1 },
-  ],
-}
-
 const dayDigest = (date: string, label: string, titles: readonly string[]) => ({
   today: '2026-08-08',
   groups: [
     {
       date,
       label,
-      count: titles.length,
       items: titles.map((title, index) => item(10 + index, title, '09:00')),
+      returns: [],
     },
   ],
-  nextCursor: null,
+  nextFrom: null,
 })
 
 const digestWithCalendar = () =>
   stubApi().on('GET /api/digest', { body: DIGEST }).on('GET /api/digest/days', { body: CALENDAR })
 
-describe('the Digest read three ways', () => {
-  it('names the last week beside All items, each day a way into it', async () => {
-    digestWithCalendar()
-      .on('GET /api/digest?day=2026-08-07', { body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']) })
-      .on('GET /api/digest/days/2026-08-07', { body: DAY })
-    window.history.replaceState(null, '', '/digest')
-    render(<App />)
-    const user = userEvent.setup()
-
-    const days = await screen.findByRole('navigation', { name: 'Days' })
-    expect(
-      within(days)
-        .getAllByRole('link')
-        .map((day) => day.textContent),
-    ).toEqual(['Today2', 'Yesterday1', 'Thu 6 Aug0', 'Wed 5 Aug0', 'Tue 4 Aug0', 'Mon 3 Aug4', 'Sun 2 Aug0'])
-
-    await user.click(within(days).getByRole('link', { name: /^Yesterday/ }))
-
-    expect(window.location.search).toBe('?by=day&day=2026-08-07')
-    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
-  })
-
-  it('narrows All items to the Feeds of one Rhythm, and says when none of them published', async () => {
-    const api = digestWithCalendar().on('GET /api/digest?rhythm=inactive', {
-      body: { today: '2026-08-08', groups: [], nextCursor: null },
+describe('the Digest read two ways', () => {
+  it('starts from a day picked on the month, and goes back to today', async () => {
+    digestWithCalendar().on('GET /api/digest?from=2026-08-03', {
+      body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']),
     })
     window.history.replaceState(null, '', '/digest')
     render(<App />)
     const user = userEvent.setup()
 
+    const month = await screen.findByRole('region', { name: 'August 2026' })
     await screen.findByRole('heading', { name: 'Today 2' })
-    await user.click(within(screen.getByRole('group', { name: 'Rhythm' })).getByRole('button', { name: 'Inactive' }))
+    expect(within(month).getByText('Saturday 8 August').nextSibling?.textContent).toBe('2 items')
+    expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
 
-    expect(await screen.findByText('Nothing from inactive feeds.')).toBeDefined()
-    expect(window.location.search).toBe('?rhythm=inactive')
-    expect(api.requestsTo('GET /api/digest?rhythm=inactive')).toHaveLength(1)
+    const monday = within(month).getByRole('button', { name: '4 items on 3 August 2026' })
+    await user.click(monday)
+
+    expect(window.location.search).toBe('?from=2026-08-03')
+    expect(await screen.findByRole('heading', { name: 'Monday 3 August 1' })).toBeDefined()
+    expect(monday.getAttribute('aria-pressed')).toBe('true')
+    expect(within(month).getByText('Monday 3 August').nextSibling?.textContent).toBe('4 items')
+
+    await user.click(screen.getByRole('button', { name: 'Back to today' }))
+
+    expect(window.location.search).toBe('')
+    expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
   })
 
-  it('shows one day under the calendar, steps between days, and never past today', async () => {
-    digestWithCalendar()
-      .on('GET /api/digest?day=2026-08-08', { body: dayDigest('2026-08-08', 'Today', ['First light', 'Second']) })
-      .on('GET /api/digest/days/2026-08-08', { body: { date: '2026-08-08', feeds: [DAY.feeds[0]] } })
-      .on('GET /api/digest?day=2026-08-07', { body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']) })
-      .on('GET /api/digest/days/2026-08-07', { body: DAY })
+  it('starts from a day chosen in the date picker, and from today when today is chosen', async () => {
+    digestWithCalendar().on('GET /api/digest?from=2026-08-07', {
+      body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']),
+    })
+    window.history.replaceState(null, '', '/digest')
+    render(<App />)
+
+    const picker = await screen.findByLabelText('Start from a day')
+    expect(picker.getAttribute('max')).toBe('2026-08-08')
+
+    fireEvent.change(picker, { target: { value: '2026-08-07' } })
+    expect(window.location.search).toBe('?from=2026-08-07')
+    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+
+    fireEvent.change(picker, { target: { value: '2026-08-08' } })
+    expect(window.location.search).toBe('')
+  })
+
+  it('keeps the list on show while the day it starts from loads', async () => {
+    const picked = Promise.withResolvers<{ body: ReturnType<typeof dayDigest> }>()
+    const api = digestWithCalendar().on('GET /api/digest?from=2026-08-03', () => picked.promise)
     window.history.replaceState(null, '', '/digest')
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'By day' }))
+    await screen.findByRole('heading', { name: 'Today 2' })
+    await user.click(screen.getByRole('button', { name: '4 items on 3 August 2026' }))
 
-    expect(window.location.search).toBe('?by=day')
-    expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
-    expect(fact('Day')).toBe('Saturday 8 August')
-    expect(fact('Last 26 weeks')).toBe('8 items')
-    expect(screen.getByRole('button', { name: 'Next day' }).getAttribute('aria-disabled')).toBe('true')
-
-    await user.click(screen.getByRole('button', { name: 'Previous day' }))
-
-    expect(window.location.search).toBe('?by=day&day=2026-08-07')
-    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
-    expect(await screen.findByText('Weekly Letters')).toBeDefined()
-    expect(fact('Items')).toBe('4')
-    expect(fact('Feeds')).toBe('2')
-
-    await user.click(screen.getByRole('button', { name: '4 items on 3 August 2026, show that day' }))
-    expect(window.location.search).toBe('?by=day&day=2026-08-03')
-  })
-
-  it('narrows a day to the Feeds ticked beside it, and Clear shows all of it again', async () => {
-    const api = digestWithCalendar()
-      .on('GET /api/digest?day=2026-08-07', {
-        body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes', 'A letter']),
-      })
-      .on('GET /api/digest?day=2026-08-07&feed=2', { body: dayDigest('2026-08-07', 'Yesterday', ['A letter']) })
-      .on('GET /api/digest/days/2026-08-07', { body: DAY })
-    window.history.replaceState(null, '', '/digest?by=day&day=2026-08-07')
-    render(<App />)
-    const user = userEvent.setup()
-
-    const filter = await screen.findByRole('complementary', { name: 'Narrow by feed' })
-    await user.click(within(filter).getByRole('checkbox', { name: /Weekly Letters/ }))
-
-    await waitFor(() => expect(screen.queryByText('Evening notes')).toBeNull())
-    expect(api.requestsTo('GET /api/digest?day=2026-08-07&feed=2')).toHaveLength(1)
-
-    await user.click(within(filter).getByRole('button', { name: 'Clear' }))
-    expect(await screen.findByText('Evening notes')).toBeDefined()
-  })
-
-  it('keeps the day on show while the next one loads, and leaves its ticked Feeds behind', async () => {
-    const nextDay = Promise.withResolvers<{ body: ReturnType<typeof dayDigest> }>()
-    const api = digestWithCalendar()
-      .on('GET /api/digest?day=2026-08-07', { body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']) })
-      .on('GET /api/digest?day=2026-08-07&feed=2', { body: dayDigest('2026-08-07', 'Yesterday', ['A letter']) })
-      .on('GET /api/digest/days/2026-08-07', { body: DAY })
-      .on('GET /api/digest?day=2026-08-06', () => nextDay.promise)
-      .on('GET /api/digest/days/2026-08-06', { body: { date: '2026-08-06', feeds: [] } })
-    window.history.replaceState(null, '', '/digest?by=day&day=2026-08-07')
-    render(<App />)
-    const user = userEvent.setup()
-
-    const filter = await screen.findByRole('complementary', { name: 'Narrow by feed' })
-    await user.click(within(filter).getByRole('checkbox', { name: /Weekly Letters/ }))
-    expect(await screen.findByText('A letter')).toBeDefined()
-
-    await user.click(screen.getByRole('button', { name: 'Previous day' }))
-
-    expect(fact('Day')).toBe('Thursday 6 August')
-    await waitFor(() => expect(api.requestsTo('GET /api/digest?day=2026-08-06')).toHaveLength(1))
-    expect(screen.getByText('A letter')).toBeDefined()
+    await waitFor(() => expect(api.requestsTo('GET /api/digest?from=2026-08-03')).toHaveLength(1))
+    expect(screen.getByText('First light')).toBeDefined()
     expect(screen.queryByText('Loading the digest')).toBeNull()
 
-    nextDay.resolve({ body: dayDigest('2026-08-06', 'Thursday 6 August', ['Morning notes']) })
-    expect(await screen.findByText('Morning notes')).toBeDefined()
-    expect(screen.queryByText('A letter')).toBeNull()
+    picked.resolve({ body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']) })
+    expect(await screen.findByText('Four letters')).toBeDefined()
+    expect(screen.queryByText('First light')).toBeNull()
   })
 
   it('gives each Feed a card of its newest items, dated as briefly as the distance allows', async () => {
@@ -369,7 +421,3 @@ describe('the Digest read three ways', () => {
     ).toEqual(['First light07:15', 'Evening notesYesterday', 'Monday thoughtsMon'])
   })
 })
-
-function fact(label: string): string | null | undefined {
-  return screen.getByText(label, { selector: 'dt' }).nextElementSibling?.textContent
-}
