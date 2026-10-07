@@ -7,6 +7,7 @@ import type { DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
 import { counted } from '../cadence.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedTitleLink } from '../components/feed-title-link.js'
+import { Icon } from '../components/icon.js'
 import { Group } from '../components/group.js'
 import { ItemBox } from '../components/item-box.js'
 import { ItemTitleLink } from '../components/item-title-link.js'
@@ -63,7 +64,7 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
           ))}
         </ToggleGroup>
       ) : null}
-      <div className="item-list">
+      <div className="item-list day-items">
         {feeds
           .filter((feed) => only === undefined || feed.feedId === only)
           .map((feed) => (
@@ -97,7 +98,8 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
 
 /**
  * A lone item is the ordinary item box. More share one box under the Feed's
- * name, each title opening its own item; past `FOLD_OVER` the box opens folded,
+ * name, each title opening its own item — on a phone, where the Digest has no
+ * save squares, a saved title is marked after its time; past `FOLD_OVER` the box opens folded,
  * and folds again on Show less — scrolled back to its head if that has left the
  * screen, so the reader stays at the box they closed.
  */
@@ -154,6 +156,11 @@ function FeedDayBox({
               <time className="item-when" dateTime={item.publishedAt ?? item.firstSeenAt}>
                 {item.displayTime}
               </time>
+              {item.saved ? (
+                <span className="feed-day-saved" role="img" aria-label="Saved">
+                  <Icon name="bookmark" filled />
+                </span>
+              ) : null}
               <SaveToggle
                 feedItemId={item.feedItemId}
                 title={item.title}

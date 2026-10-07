@@ -1615,6 +1615,11 @@
     opacity: 1;
   }
 
+  /* Saved state on a phone, where the Digest has no save square to show it. */
+  .feed-day-saved {
+    display: none;
+  }
+
   .feed-day .item-body > .button {
     margin-top: 12px;
   }
@@ -2480,20 +2485,47 @@
     grid-column: 1 / -1;
   }
 
-  .feed-day-item {
-    grid-template-columns: minmax(0, 1fr) auto 44px;
-    column-gap: 12px;
+  /* The Digest saves from the Reader alone on a phone, so its titles take the
+     whole row; a shared title's time trails its last line, in the room the
+     title leaves, and the row holds three lines as a lone title does. */
+  .day-items .save-toggle {
+    display: none;
   }
 
-  .feed-day-item .save-toggle {
-    grid-column: 3;
-    grid-row: 1;
-    margin-block: -10px;
+  .day-items > .item {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline-end: 16px;
+  }
+
+  .feed-day-item {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
   }
 
   .feed-day-title {
+    display: inline;
     font-size: 17px;
     line-height: 1.38;
+  }
+
+  .feed-day-item > time {
+    margin-inline-start: 8px;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .feed-day-saved {
+    display: inline-flex;
+    margin-inline-start: 6px;
+    vertical-align: -2px;
+    color: var(--color-saved);
+  }
+
+  .feed-day-saved .icon {
+    width: 13px;
+    height: 13px;
   }
 
   .quiet-spell {

@@ -196,7 +196,7 @@ and focus; a saved item shows it always, filled in `saved`, and keeps a
 `saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
 every item is saved and the edge would say nothing. On a phone the Feed name
 and time share one line above the title and the save square is always visible
-at 44px. The whole box opens the Reader; the Feed name inside it opens the
+at 44px — except in the Digest, which saves from the Reader alone. The whole box opens the Reader; the Feed name inside it opens the
 Feed. In search results a snippet sits under the title with the matched words
 marked in `match`.
 
@@ -256,7 +256,11 @@ days, the day on show ringed, then the legend and that day's count. Any day
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the title's row opens the platform's own date picker, in
-place of the month, and a day's chips scroll as one row. Pages are whole days,
+place of the month, and a day's chips scroll as one row. The phone Digest has no
+save squares, so its titles take the whole width of the box: in a shared box
+each title's time trails its last line in meta, three lines at most, and a
+saved title is marked after its time with the bookmark in `saved` — a lone box
+keeps its `saved-edge`. Pages are whole days,
 as many as reach fifty items, so Show more continues from the next day and
 names no number; Saved ends the same way. Before the first Subscription, the
 Digest is a note and Add feed as the primary action, with no chips and no
