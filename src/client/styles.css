@@ -670,10 +670,12 @@
     gap: 8px;
   }
 
+  /* The meta column sits on the title's first baseline, whatever their sizes. */
   .item {
     position: relative;
     display: grid;
     grid-template-columns: 180px minmax(0, 1fr) 36px;
+    align-items: baseline;
     column-gap: 32px;
     padding: 20px 20px 20px 24px;
     border: 1px solid var(--color-edge);
@@ -715,7 +717,6 @@
     display: grid;
     align-content: start;
     gap: 2px;
-    padding-top: 3px;
     font-size: 13px;
     line-height: 1.45;
     font-variant-numeric: tabular-nums;
@@ -787,7 +788,6 @@
     gap: 8px;
     width: 36px;
     height: 36px;
-    margin-top: -6px;
     padding: 0;
     border: 0;
     border-radius: 0;
@@ -1576,7 +1576,7 @@
   }
 
   .feed-day-items {
-    margin: -8px 0 0;
+    margin: -7px 0 0;
     padding: 0;
     list-style: none;
   }
@@ -1587,6 +1587,7 @@
     align-items: baseline;
     column-gap: 16px;
     padding-block: 7px;
+    font-variant-numeric: tabular-nums;
   }
 
   .feed-day-title {
@@ -1605,10 +1606,11 @@
     text-underline-offset: 3px;
   }
 
-  /* The square overhangs its line rather than spacing the titles apart. */
-  .feed-day-item .save-toggle {
-    align-self: center;
-    margin-block: -8px;
+  /* A save square centres on its title's first line, a 26.6px line of a
+     19px title, overhanging it rather than spacing the titles apart. */
+  :is(.item, .feed-day-item) > .save-toggle {
+    align-self: start;
+    margin-block: calc((26.6px - 36px) / 2);
   }
 
   .feed-day-item:is(:hover, :focus-within) .save-toggle {
@@ -2549,7 +2551,7 @@
     align-self: start;
     width: 44px;
     height: 44px;
-    margin-top: -10px;
+    margin-block: -10px 0;
     opacity: 1;
   }
 }
