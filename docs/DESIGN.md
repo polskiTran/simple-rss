@@ -191,7 +191,9 @@ a 1px danger ring, and the reason under it in danger.
 **Item box.** A thin-edged box with 20px vertical padding. Desktop is a grid:
 a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
 the title, then a 36px save square; in a Feed's own list, which names no Feed,
-the meta column narrows to 56px for the time. The save square shows on hover
+the meta column narrows to 56px for the time. The meta column sits on the
+title's first baseline, and the save square centres on its first line, however
+many lines the title runs to. The save square shows on hover
 and focus; a saved item shows it always, filled in `saved`, and keeps a
 `saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
 every item is saved and the edge would say nothing. On a phone the Feed name
