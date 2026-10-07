@@ -124,8 +124,10 @@ test.describe('the Library at phone width', () => {
   test('keeps the item shape at the phone scale without horizontal overflow', async ({ page, installation }) => {
     await subscribe(page, installation)
     await section(page, 'Digest')
+    await page.getByRole('link', { name: 'First light' }).click()
     await page.getByRole('button', { name: 'Save First light' }).click()
-    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
 
     await section(page, 'Saved')
     const title = page.getByRole('heading', { name: 'First light' })
