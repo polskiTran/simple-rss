@@ -1,6 +1,5 @@
 import { Button } from '@base-ui/react/button'
-
-export type OlderState = 'idle' | 'loading' | 'failed'
+import type { OlderState } from '../use-resource.js'
 
 /**
  * The way further along a paged list, in whichever order it runs; absent once

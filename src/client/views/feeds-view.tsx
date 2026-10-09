@@ -35,8 +35,8 @@ export interface FeedsViewProps {
 export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   useScreenTitle('Feeds')
   const [state, { retry: reload, set }] = useResource(
+    'subscriptions',
     async (signal) => (await fetchSubscriptions(signal)).subscriptions,
-    [],
   )
   const [notice, setNotice] = useState('')
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)

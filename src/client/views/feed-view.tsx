@@ -37,7 +37,7 @@ import { Row } from '../components/row.js'
 import { READING_SOURCE_LABELS } from '../reading-source.js'
 import { dayBefore, dayOfYear, longDay } from '../day-names.js'
 import type { Origin } from '../routing.js'
-import { useResource } from '../use-resource.js'
+import { useResource, valueInView } from '../use-resource.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
 
 export interface FeedViewProps {
@@ -51,8 +51,11 @@ export interface FeedViewProps {
 }
 
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
-  const [state, { retry, set }] = useResource((signal) => fetchFeedDetail(feedId, signal), [feedId])
-  useScreenTitle(state.kind === 'loaded' ? state.value.title : undefined)
+  const [state, { retry, set }] = useResource(String(feedId), (signal) => fetchFeedDetail(feedId, signal))
+  const inView = valueInView(state)
+  // While another Feed loads, the one it replaces is not this Feed's to show.
+  const detail = inView?.feedId === feedId ? inView : undefined
+  useScreenTitle(detail?.title)
   const [notice, setNotice] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [changing, setChanging] = useState(false)
@@ -69,10 +72,8 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     } finally {
       setRefreshing(false)
     }
-    try {
-      const detail = await fetchFeedDetail(feedId)
-      set(() => detail)
-    } catch {}
+    // Read again in place: the detail stays in view, and a Feed opened meanwhile cancels it.
+    retry()
   }
 
   async function changeInterval(pollingIntervalMinutes: PollingIntervalMinutes) {
@@ -107,7 +108,20 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
 
   const back = <BackButton className="view-back" origin={origin} onBack={onBack} />
 
-  if (state.kind === 'loading') {
+  if (!detail) {
+    if (state.kind === 'unavailable' || state.kind === 'unreachable') {
+      const missing = state.error instanceof ApiError && state.error.status === 404
+      return (
+        <div className="view">
+          <div className="view-topline">{back}</div>
+          {missing ? (
+            <p className="note">That feed isn’t among your subscriptions.</p>
+          ) : (
+            <LoadFailure subject="The feed" kind={state.kind} onRetry={retry} />
+          )}
+        </div>
+      )
+    }
     return (
       <div className="view">
         <div className="view-topline">{back}</div>
@@ -115,21 +129,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       </div>
     )
   }
-  if (state.kind === 'unavailable' || state.kind === 'unreachable') {
-    const missing = state.error instanceof ApiError && state.error.status === 404
-    return (
-      <div className="view">
-        <div className="view-topline">{back}</div>
-        {missing ? (
-          <p className="note">That feed isn’t among your subscriptions.</p>
-        ) : (
-          <LoadFailure subject="The feed" kind={state.kind} onRetry={retry} />
-        )}
-      </div>
-    )
-  }
 
-  const detail = state.value
   const grid = cadenceGrid(detail.cadence)
   // The Cadence runs through today.
   const today = detail.cadence.at(-1)?.date ?? detail.subscribedDate

@@ -59,9 +59,8 @@ export interface ReaderViewProps {
 }
 
 export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed }: ReaderViewProps) {
-  const [itemState, { retry, set: setItem }] = useResource(
-    (signal) => fetchReaderItem(feedItemId, signal),
-    [feedItemId],
+  const [itemState, { retry, set: setItem }] = useResource(String(feedItemId), (signal) =>
+    fetchReaderItem(feedItemId, signal),
   )
   useScreenTitle(itemState.kind === 'loaded' ? itemState.value.title : undefined)
 
@@ -134,6 +133,7 @@ function OpenReader({
         : 'feed-content'
   const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
   const [sourceState, { retry: retrySource }] = useResource(
+    `${item.feedItemId} ${source}`,
     async (signal): Promise<SourceResult> => {
       setPreparingStage(undefined)
       if (source === 'feed-content' && item.feedContent) {
@@ -147,7 +147,6 @@ function OpenReader({
         if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
       }
     },
-    [item.feedItemId, source],
   )
 
   const loaded = sourceState.kind === 'loaded' ? sourceState.value : undefined

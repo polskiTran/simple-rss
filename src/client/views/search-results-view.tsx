@@ -45,7 +45,7 @@ export function SearchResultsView({
 }: SearchResultsViewProps) {
   const line = settledQuery.trim()
   const request = searchParamsOf(line, scope, sort).toString()
-  const [found, { retry, set }] = useResource((signal) => fetchSearchResults(line, scope, sort, signal), [request])
+  const [found, { retry, set }] = useResource(request, (signal) => fetchSearchResults(line, scope, sort, signal))
   const [shownFeeds, setShownFeeds] = useState<ReadonlySet<number>>(new Set())
   useScreenTitle('Search')
   const answer = valueInView(found)

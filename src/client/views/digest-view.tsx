@@ -26,7 +26,7 @@ export interface DigestViewProps {
  */
 export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestViewProps) {
   useScreenTitle('Digest')
-  const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
+  const [calendar, { retry: retryCalendar }] = useResource('calendar', fetchDigestCalendar)
   const shown = valueInView(calendar)
   const firstRun = shown?.subscriptions === 0
   const stream = useRef<HTMLDivElement>(null)

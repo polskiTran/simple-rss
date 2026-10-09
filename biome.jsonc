@@ -47,7 +47,7 @@
         "useSemanticElements": "off"
       },
       // An extra dependency is never a bug — it is a deliberate re-run trigger,
-      // which is exactly what the views' `attempt` retry counter is.
+      // which is exactly what useResource's `key` and `attempt` are.
       "correctness": {
         "useExhaustiveDependencies": {
           "level": "error",

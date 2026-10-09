@@ -5,7 +5,7 @@ import { useResource } from '../../use-resource.js'
 import { describeFailure } from '../failure.js'
 
 export function TimezoneChoice() {
-  const [preferences, { set }] = useResource((signal) => fetchInstallationPreferences(signal), [])
+  const [preferences, { set }] = useResource('preferences', fetchInstallationPreferences)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
 

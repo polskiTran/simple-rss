@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
-import { library } from './fixtures.js'
+import type { Library } from '../../src/shared/api.js'
+import { library, libraryItem } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const LIBRARY = library()
@@ -112,6 +113,32 @@ describe('the Saved tab', () => {
     expect(headings.map((heading) => heading.textContent)).toEqual(['A June letter', 'First light'])
     await user.click(screen.getByRole('button', { name: 'Show more' }))
     expect(api.requestsTo('GET /api/library?order=oldest&cursor=next')).toHaveLength(1)
+  })
+
+  it('drops a page of the old order that answers after the order changed', async () => {
+    const stalePage = Promise.withResolvers<{ body: Library }>()
+    stubApi()
+      .on('GET /api/library', { body: { ...LIBRARY, nextCursor: 'next' } })
+      .on('GET /api/library?cursor=next', () => stalePage.promise)
+      .on('GET /api/library?order=oldest', { body: { ...LIBRARY, items: LIBRARY.items.toReversed() } })
+    window.history.replaceState(null, '', '/saved')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Show more' }))
+    await user.click(screen.getByRole('button', { name: 'Oldest saved' }))
+    await waitFor(() =>
+      expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
+        'A June letter',
+        'First light',
+      ]),
+    )
+
+    stalePage.resolve({ body: library({ items: [libraryItem({ feedItemId: 9, title: 'A newer save' })] }) })
+    await act(() => stalePage.promise)
+
+    expect(screen.queryByRole('heading', { name: 'A newer save' })).toBeNull()
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2)
   })
 
   it('groups the saves by Feed without asking again, counting a Feed only once the list has ended', async () => {
