@@ -34,6 +34,7 @@ import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { NativeSelect } from '../components/native-select.js'
 import { Row } from '../components/row.js'
+import { withSaved } from '../components/save-toggle.js'
 import { READING_SOURCE_LABELS } from '../reading-source.js'
 import { dayBefore, dayOfYear, longDay } from '../day-names.js'
 import type { Origin } from '../routing.js'
@@ -217,10 +218,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       <Items
         detail={detail}
         onSaved={(feedItemId, saved) =>
-          set((current) => ({
-            ...current,
-            items: current.items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item)),
-          }))
+          set((current) => ({ ...current, items: withSaved(current.items, feedItemId, saved) }))
         }
         onOpenItem={onOpenItem}
       />

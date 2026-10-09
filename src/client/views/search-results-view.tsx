@@ -16,6 +16,7 @@ import { HomePageLink } from '../components/home-page-link.js'
 import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
+import { withSaved } from '../components/save-toggle.js'
 import { routedClick } from '../routed-link.js'
 import { feedPathOf } from '../routing.js'
 import { SEARCH_SCOPE_COPY } from '../search-scope.js'
@@ -52,14 +53,7 @@ export function SearchResultsView({
 
   const setSaved = (feedItemId: number, saved: boolean) =>
     set((current) =>
-      'results' in current
-        ? {
-            ...current,
-            results: current.results.map((result) =>
-              result.feedItemId === feedItemId ? { ...result, saved } : result,
-            ),
-          }
-        : current,
+      'results' in current ? { ...current, results: withSaved(current.results, feedItemId, saved) } : current,
     )
 
   const scoped = scope.kind !== 'everywhere' ? scope : originScope.kind !== 'everywhere' ? originScope : undefined
