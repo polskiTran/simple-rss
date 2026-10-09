@@ -80,7 +80,7 @@ export class Authentication {
     if (this.#isClaimed()) return { kind: 'already-claimed' }
 
     const attempt = await this.#beginAttempt(input.client, 'auth.claim_throttled')
-    if ('kind' in attempt) return attempt
+    if (attempt.kind === 'rate-limited') return attempt
 
     try {
       if (!matches(this.#deps.setupSecret, input.setupSecret)) {
@@ -108,7 +108,7 @@ export class Authentication {
 
   async signIn(input: Attempt & { readonly password: string }): Promise<SignInOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.sign_in_throttled')
-    if ('kind' in attempt) return attempt
+    if (attempt.kind === 'rate-limited') return attempt
 
     try {
       const passwordHash = await this.#verifiedPasswordHash(input.password)
@@ -154,7 +154,7 @@ export class Authentication {
     input: Attempt & { readonly currentPassword: string; readonly newPassword: string },
   ): Promise<PasswordChangeOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.password_change_throttled')
-    if ('kind' in attempt) return attempt
+    if (attempt.kind === 'rate-limited') return attempt
 
     try {
       const currentHash = await this.#verifiedPasswordHash(input.currentPassword)
@@ -201,7 +201,7 @@ export class Authentication {
 
   async #beginAttempt(client: string, event: string): Promise<AllowedAttempt | Throttled> {
     const verdict = this.#deps.limiter.begin(client)
-    if (verdict.allowed) return verdict
+    if (verdict.kind === 'allowed') return verdict
 
     this.#deps.logger.warn(event, { client, retryAfterSeconds: verdict.retryAfterSeconds })
     await this.#deps.sleep(verdict.delayMs)

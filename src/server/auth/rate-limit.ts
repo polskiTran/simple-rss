@@ -12,38 +12,34 @@ const BASE_DELAY_MS = 250
 
 const MAX_DELAY_MS = 2_000
 
-export interface AllowedAttempt {
-  readonly allowed: true
-  /** What a successful secret check costs, based on pressure already present. */
-  readonly successDelayMs: number
-  readonly retryAfterSeconds: 0
-  /** Converts the reservation into a failure and returns this attempt's delay. */
-  recordFailure(): number
-  /** Clears this client's history after it proves it is the User. */
-  recordSuccess(): void
-  /** Releases a reservation when the secret check could not finish. */
-  cancel(): void
-}
+export type AttemptVerdict =
+  | {
+      readonly kind: 'allowed'
+      /** What a successful secret check costs, based on pressure already present. */
+      readonly successDelayMs: number
+      /** Keeps the reservation as a failure and returns this attempt's delay. */
+      recordFailure(): number
+      /** Clears this client's history after it proves it is the User. */
+      recordSuccess(): void
+      /** Releases the reservation when the secret check could not finish. */
+      cancel(): void
+    }
+  | { readonly kind: 'refused'; readonly delayMs: number; readonly retryAfterSeconds: number }
 
-export interface RefusedAttempt {
-  readonly allowed: false
-  readonly delayMs: number
-  readonly retryAfterSeconds: number
-}
+export type AllowedAttempt = Extract<AttemptVerdict, { kind: 'allowed' }>
 
-export type AttemptVerdict = AllowedAttempt | RefusedAttempt
-
-interface AttemptRecord {
-  readonly id: number
-  at: number
-}
-
-type AttemptOutcome = 'failure' | 'success' | 'cancelled'
-
+/**
+ * Counts failed secret checks per client address inside a sliding window.
+ *
+ * `begin` records the attempt's start time before the secret is checked, so
+ * concurrent checks cannot exceed the limit; that record *is* the failure, and
+ * a failure is measured from when its attempt began. The first outcome wins:
+ * failure keeps the record, cancel removes it, success forgets the client.
+ */
 export class LoginRateLimiter {
-  readonly #attempts = new Map<string, AttemptRecord[]>()
+  /** Start times per client, oldest first. */
+  readonly #attempts = new Map<string, number[]>()
   readonly #clock: Clock
-  #nextId = 1
 
   constructor(clock: Clock) {
     this.#clock = clock
@@ -53,65 +49,48 @@ export class LoginRateLimiter {
   begin(client: string): AttemptVerdict {
     const now = this.#clock.now().getTime()
     const recent = this.#recent(client, now)
-    const blockedUntil = deadline(recent, PER_CLIENT_FAILURES)
+    const decisive = recent.at(-PER_CLIENT_FAILURES)
 
-    if (blockedUntil > now) {
+    if (decisive !== undefined && decisive + WINDOW_MS > now) {
       return {
-        allowed: false,
+        kind: 'refused',
         delayMs: MAX_DELAY_MS,
-        retryAfterSeconds: Math.ceil((blockedUntil - now) / 1000),
+        retryAfterSeconds: Math.ceil((decisive + WINDOW_MS - now) / 1000),
       }
     }
 
     const successDelayMs = this.#cost(recent.length, now)
-    const id = this.#nextId
-    this.#nextId += 1
-    recent.push({ id, at: now })
+    recent.push(now)
     this.#attempts.set(client, recent)
     const failureDelayMs = this.#cost(recent.length, now)
     let open = true
-
-    const finish = (outcome: AttemptOutcome): void => {
-      if (!open) return
+    const settle = (): boolean => {
+      const first = open
       open = false
-      this.#finish(client, id, outcome)
+      return first
     }
 
     return {
-      allowed: true,
+      kind: 'allowed',
       successDelayMs,
-      retryAfterSeconds: 0,
       recordFailure: () => {
-        finish('failure')
+        settle()
         return failureDelayMs
       },
-      recordSuccess: () => finish('success'),
-      cancel: () => finish('cancelled'),
+      recordSuccess: () => {
+        if (settle()) this.#attempts.delete(client)
+      },
+      cancel: () => {
+        if (settle()) this.#release(client, now)
+      },
     }
   }
 
-  #finish(client: string, id: number, outcome: AttemptOutcome): void {
-    if (outcome === 'success') {
-      this.#attempts.delete(client)
-      return
-    }
-
-    const now = this.#clock.now().getTime()
-    const recent = this.#recent(client, now)
-    const index = recent.findIndex((attempt) => attempt.id === id)
-
-    if (outcome === 'failure') {
-      const failed = index === -1 ? { id, at: now } : recent[index]
-      if (!failed) return
-      failed.at = now
-      if (index === -1) recent.push(failed)
-    } else if (index !== -1) {
-      recent.splice(index, 1)
-    }
-
-    recent.sort((left, right) => left.at - right.at)
-    if (recent.length === 0) this.#attempts.delete(client)
-    else this.#attempts.set(client, recent)
+  /** Drops one reservation. Records are bare start times, so any one equal to `at` is the same record. */
+  #release(client: string, at: number): void {
+    const kept = this.#attempts.get(client)
+    const index = kept?.indexOf(at) ?? -1
+    if (index !== -1) kept?.splice(index, 1)
   }
 
   #cost(clientAttempts: number, now: number): number {
@@ -119,8 +98,8 @@ export class LoginRateLimiter {
     return Math.max(delayFor(clientAttempts), pressure)
   }
 
-  #recent(client: string, now: number): AttemptRecord[] {
-    const kept = (this.#attempts.get(client) ?? []).filter((attempt) => attempt.at > now - WINDOW_MS)
+  #recent(client: string, now: number): number[] {
+    const kept = (this.#attempts.get(client) ?? []).filter((at) => at > now - WINDOW_MS)
     if (kept.length === 0) this.#attempts.delete(client)
     else this.#attempts.set(client, kept)
     return kept
@@ -131,12 +110,6 @@ export class LoginRateLimiter {
     for (const client of this.#attempts.keys()) count += this.#recent(client, now).length
     return count
   }
-}
-
-function deadline(attempts: readonly AttemptRecord[], limit: number): number {
-  if (attempts.length < limit) return 0
-  const decisive = attempts[attempts.length - limit]
-  return decisive === undefined ? 0 : decisive.at + WINDOW_MS
 }
 
 function delayFor(attempts: number): number {

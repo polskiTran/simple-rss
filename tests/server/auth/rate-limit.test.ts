@@ -18,7 +18,13 @@ describe('LoginRateLimiter', () => {
 
   function allowed(client: string) {
     const verdict = limiter.begin(client)
-    if (!verdict.allowed) throw new Error(`expected ${client} to be allowed`)
+    if (verdict.kind !== 'allowed') throw new Error(`expected ${client} to be allowed`)
+    return verdict
+  }
+
+  function refused(client: string) {
+    const verdict = limiter.begin(client)
+    if (verdict.kind !== 'refused') throw new Error(`expected ${client} to be refused`)
     return verdict
   }
 
@@ -42,25 +48,22 @@ describe('LoginRateLimiter', () => {
   it('blocks once the window holds the per-client limit', () => {
     fail('203.0.113.7', PER_CLIENT_FAILURES)
 
-    const verdict = limiter.begin('203.0.113.7')
-
-    expect(verdict.allowed).toBe(false)
-    expect(verdict.retryAfterSeconds).toBe(WINDOW_MS / 1000)
+    expect(refused('203.0.113.7').retryAfterSeconds).toBe(WINDOW_MS / 1000)
   })
 
   it('reserves five concurrent checks before any verifier finishes', () => {
     const inFlight = Array.from({ length: PER_CLIENT_FAILURES }, () => allowed('203.0.113.7'))
 
-    expect(limiter.begin('203.0.113.7').allowed).toBe(false)
+    expect(limiter.begin('203.0.113.7').kind).toBe('refused')
 
     inFlight[0]?.cancel()
-    expect(limiter.begin('203.0.113.7').allowed).toBe(true)
+    expect(limiter.begin('203.0.113.7').kind).toBe('allowed')
   })
 
   it('leaves every other client alone', () => {
     fail('203.0.113.7', PER_CLIENT_FAILURES)
 
-    expect(limiter.begin('198.51.100.9').allowed).toBe(true)
+    expect(limiter.begin('198.51.100.9').kind).toBe('allowed')
   })
 
   it('recovers as the oldest failure leaves the window, never permanently', () => {
@@ -75,7 +78,7 @@ describe('LoginRateLimiter', () => {
     fail('203.0.113.7', PER_CLIENT_FAILURES)
     clock.advance(WINDOW_MS / 3)
 
-    expect(limiter.begin('203.0.113.7').retryAfterSeconds).toBe(Math.ceil((WINDOW_MS * (2 / 3)) / 1000))
+    expect(refused('203.0.113.7').retryAfterSeconds).toBe(Math.ceil((WINDOW_MS * (2 / 3)) / 1000))
   })
 
   it('unblocks one failure at a time, so a blocked client cannot flood back', () => {
@@ -87,7 +90,7 @@ describe('LoginRateLimiter', () => {
     clock.advance(WINDOW_MS - PER_CLIENT_FAILURES * MINUTE + 1)
 
     allowed('203.0.113.7').recordFailure()
-    expect(limiter.begin('203.0.113.7').allowed).toBe(false)
+    expect(limiter.begin('203.0.113.7').kind).toBe('refused')
   })
 
   it('forgets a client that signs in successfully', () => {
@@ -116,7 +119,7 @@ describe('LoginRateLimiter', () => {
   it('never blocks a client for attempts that were not its own', () => {
     saturateAcrossClients()
 
-    expect(limiter.begin('198.51.100.9').allowed).toBe(true)
+    expect(limiter.begin('198.51.100.9').kind).toBe('allowed')
   })
 
   it('lets the ceiling drain too', () => {
