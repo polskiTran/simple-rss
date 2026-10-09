@@ -4,9 +4,7 @@ import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
-export const RETENTION_PERIOD_DAYS = 90
-
-const RETENTION_PERIOD_MS = RETENTION_PERIOD_DAYS * 24 * 60 * 60 * 1_000
+const RETENTION_PERIOD_MS = 90 * 24 * 60 * 60 * 1_000
 
 const DEFAULT_BATCH_LIMIT = 500
 

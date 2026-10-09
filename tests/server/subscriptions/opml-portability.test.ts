@@ -96,7 +96,7 @@ describe('OPML import', () => {
   })
 
   it('drains a bulk import in one wake even when it overflows the batch', async () => {
-    const service = await startTestService({ scheduling: { batchLimit: 1, concurrency: 1 } })
+    const service = await startTestService({ scheduling: { batchLimit: 1 } })
     stubHealthyFeeds(service)
     const third = 'https://third.example/feed'
     service.upstream.stub(third, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })

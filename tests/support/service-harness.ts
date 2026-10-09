@@ -26,7 +26,7 @@ export interface HarnessOptions {
   readonly retrieval?: Retrieval
   /** Built client bundle to serve. Omitted means "no client on disk". */
   readonly clientDir?: string
-  /** Shrinks the polling batch or concurrency below the production defaults. */
+  /** Shrinks the polling batch below the production default; nudges stay off unless a test turns them on. */
   readonly scheduling?: PollSchedulerLimits
   /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
