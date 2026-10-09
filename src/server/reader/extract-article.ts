@@ -3,7 +3,7 @@ import { parseHTML } from 'linkedom'
 import { elapsedMs } from '../monotonic.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
-import { readingInformation } from '../markdown/reading-information.js'
+import { readingTimeMinutes } from '../markdown/reading-time.js'
 
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
@@ -33,7 +33,6 @@ type ArticleDocument = ReturnType<typeof parseHTML>['document']
 
 export interface ExtractedArticle {
   readonly markdown: string
-  readonly wordCount: number
   readonly readingTimeMinutes: number
 }
 
@@ -93,10 +92,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     if (!markdown) return { article: undefined, timings }
 
     return {
-      article: {
-        markdown,
-        ...readingInformation(markdown),
-      },
+      article: { markdown, readingTimeMinutes: readingTimeMinutes(markdown) },
       timings,
     }
   } catch {

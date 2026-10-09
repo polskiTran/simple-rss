@@ -5,13 +5,15 @@ import {
   type ReaderArticle,
   type ReaderItem,
 } from '../../shared/api.js'
+import type { ReaderItems } from '../reader/reader-items.js'
 import type { ReaderService } from '../reader/reader-service.js'
 import { readIdParam } from './id-param.js'
 import { NO_STORE, notFound, retryAfter } from './responses.js'
 import { answer, ARTICLE_ANSWERS } from './retrieval-answers.js'
 
 export interface ReaderRouteDependencies {
-  readonly reader: Pick<ReaderService, 'item' | 'article'>
+  readonly readerItems: Pick<ReaderItems, 'item'>
+  readonly reader: Pick<ReaderService, 'article'>
 }
 
 /**
@@ -27,7 +29,7 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
     const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
     if (!feedItemId.ok) return feedItemId.response
 
-    const item = deps.reader.item(feedItemId.value)
+    const item = deps.readerItems.item(feedItemId.value)
     if (!item) return notFound(c)
     return c.json<ReaderItem>(item, 200, NO_STORE)
   })

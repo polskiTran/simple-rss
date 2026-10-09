@@ -50,7 +50,7 @@ export function imageRoutes(deps: ImageRouteDependencies): Hono {
     const verified = deps.signature.verify(new URL(c.req.url).searchParams)
     if (!verified.ok) return imageUnavailable(c)
 
-    return answer(c, await deps.images.readerImage(verified.url, c.req.raw.signal))
+    return answer(c, await deps.images.image(verified.url, c.req.raw.signal))
   })
 
   return app

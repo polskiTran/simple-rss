@@ -11,6 +11,7 @@ import type { LibraryService } from './library/library-service.js'
 import { errorForLog, type Logger } from './logger.js'
 import { assertWritable, type DrizzleDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
+import type { ReaderItems } from './reader/reader-items.js'
 import type { ReaderService } from './reader/reader-service.js'
 import type { SearchService } from './search/search-service.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
@@ -45,6 +46,7 @@ export interface Services {
   readonly refresh: FeedRefresh
   readonly digest: DigestService
   readonly library: LibraryService
+  readonly readerItems: ReaderItems
   readonly reader: ReaderService
   readonly search: SearchService
   readonly images: ImageService
@@ -126,7 +128,7 @@ export function createApp(deps: AppDependencies): Hono {
 
     app.route('/api', libraryRoutes({ library: services.library }))
 
-    app.route('/api', readerRoutes({ reader: services.reader }))
+    app.route('/api', readerRoutes({ readerItems: services.readerItems, reader: services.reader }))
 
     app.route('/api', searchRoutes({ search: services.search }))
 

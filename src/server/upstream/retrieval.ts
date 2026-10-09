@@ -118,7 +118,8 @@ export interface RetrievalFailure {
 export type RetrievalResult = RetrievalSuccess | RetrievalFailure
 
 export interface RetrievalBytes extends Omit<RetrievalSuccess, 'body'> {
-  readonly bytes: Uint8Array
+  /** The bytes own their buffer: freshly allocated, offset 0, nothing else on it, so a caller may transfer `bytes.buffer`. */
+  readonly bytes: Uint8Array<ArrayBuffer>
 }
 
 export type RetrievalBytesResult = RetrievalBytes | RetrievalFailure

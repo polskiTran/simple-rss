@@ -28,7 +28,6 @@ const ITEM = {
 const ARTICLE = {
   feedItemId: 3,
   markdown: '## Dawn\n\nThe valley turns from grey to *gold* in about twenty minutes.',
-  wordCount: 900,
   readingTimeMinutes: 4,
 }
 

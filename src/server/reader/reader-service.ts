@@ -1,22 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import {
-  DEFAULT_READING_SOURCE,
-  type ReaderArticle,
-  type ReaderDeadlineStage,
-  type ReaderItem,
-} from '../../shared/api.js'
+import type { ReaderArticle, ReaderDeadlineStage } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, longDate } from '../digest/chronology.js'
-import type { DigestService } from '../digest/digest-service.js'
-import type { SignImageUrl } from '../images/image-url-signature.js'
-import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
 import type { LogField, LogFields, Logger } from '../logger.js'
 import { elapsedMs } from '../monotonic.js'
-import { readingInformation } from '../markdown/reading-information.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
-import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
-import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { feedItems } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure, RetrievalFailureCode } from '../upstream/retrieval.js'
 import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
 
@@ -70,13 +59,15 @@ const ABANDONED_READER_OUTCOME = {
   failure: { ok: false, code: 'cancelled', reason: 'the browser left the Reader' },
 } satisfies ReaderArticleOutcome
 
+/**
+ * Reader View's Original webpage: retrieves and extracts it once per Feed Item
+ * however many readers wait, cools down after repeated failures, and keeps for a
+ * minute an article that finished after the deadline already answered its reader.
+ */
 export class ReaderService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
-  readonly #settings: InstallationSettingsStore
   readonly #retrieval: Retrieval
-  readonly #digest: DigestService
-  readonly #signImageUrl: SignImageUrl
   readonly #extractor: ReaderExtractor
   readonly #logger: Logger
   readonly #budgetMs: number
@@ -87,75 +78,17 @@ export class ReaderService {
   constructor(options: {
     db: DrizzleDatabase
     clock: Clock
-    settings: InstallationSettingsStore
     retrieval: Retrieval
-    digest: DigestService
     extractor: ReaderExtractor
-    signImageUrl: SignImageUrl
     logger: Logger
     budgetMs?: number
   }) {
     this.#db = options.db
     this.#clock = options.clock
-    this.#settings = options.settings
     this.#retrieval = options.retrieval
-    this.#digest = options.digest
     this.#extractor = options.extractor
-    this.#signImageUrl = options.signImageUrl
     this.#logger = options.logger
     this.#budgetMs = options.budgetMs ?? READER_BUDGET_MS
-  }
-
-  item(feedItemId: number): ReaderItem | undefined {
-    const row = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        feedId: feeds.id,
-        feedTitle: effectiveFeedTitle,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        summary: feedItems.summary,
-        feedContentMarkdown: feedItems.feedContentMarkdown,
-        feedContentTruncated: feedItems.feedContentTruncated,
-        firstSeenAt: feedItems.firstSeenAt,
-        chronologyAt: feedItems.chronologyAt,
-        savedAt: libraryItems.savedAt,
-        readingSource: subscriptions.readingSource,
-      })
-      .from(feedItems)
-      .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
-      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
-      .where(eq(feedItems.id, feedItemId))
-      .limit(1)
-      .all()[0]
-    if (!row) return undefined
-
-    const timezone = this.#settings.effectiveTimezone()
-
-    return {
-      feedItemId: row.feedItemId,
-      title: row.title ?? 'Untitled',
-      feedId: row.feedId,
-      feedTitle: row.feedTitle,
-      link: row.link,
-      publishedAt: row.publishedAt,
-      firstSeenAt: row.firstSeenAt,
-      displayDate: longDate(new Date(row.chronologyAt), dateKey(this.#clock.now(), timezone), timezone),
-      summary: row.summary,
-      feedContent: row.feedContentMarkdown
-        ? {
-            // Stored destinations are absolute; no original webpage is needed to refresh capabilities.
-            markdown: applyReaderMarkdownPolicy(row.feedContentMarkdown, { images: this.#signImageUrl }),
-            truncated: row.feedContentTruncated !== 0,
-            readingTimeMinutes: readingInformation(row.feedContentMarkdown).readingTimeMinutes,
-          }
-        : null,
-      saved: row.savedAt !== null,
-      readingSource: row.readingSource ?? DEFAULT_READING_SOURCE,
-      nextInDigest: this.#nextInDigest(feedItemId),
-    }
   }
 
   async article(feedItemId: number, signal?: AbortSignal): Promise<ReaderArticleOutcome> {
@@ -237,8 +170,10 @@ export class ReaderService {
 
     extraction.stage = 'parsing'
     const answered = hostField(result.url)
-    const bytes = ownedArrayBuffer(result.bytes)
-    const parsed = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
+    const parsed = await this.#extractor.extract(
+      { bytes: result.bytes.buffer, charset: result.charset, url: result.url },
+      signal,
+    )
     if (parsed.kind === 'cancelled') {
       return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
     }
@@ -313,17 +248,6 @@ export class ReaderService {
       lastAttemptAt: this.#clock.now().getTime(),
     })
   }
-
-  #nextInDigest(feedItemId: number): ReaderItem['nextInDigest'] {
-    const next = this.#digest.after(feedItemId)
-    if (!next) return null
-    return {
-      feedItemId: next.feedItemId,
-      title: next.title,
-      feedTitle: next.feedTitle,
-      displayTime: next.displayTime,
-    }
-  }
 }
 
 function hostField(url: string): LogFields {
@@ -340,16 +264,4 @@ function definedFields(timings: ReaderExtractionTimings): LogFields {
     if (value !== undefined) fields[phase] = value
   }
   return fields
-}
-
-/**
- * The extractor transfers this buffer to the worker, which detaches every view
- * onto it, so the article has to be the buffer's only occupant.
- */
-function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const owned =
-    bytes.buffer instanceof ArrayBuffer && bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
-  // `bytes.slice()` will not do. On a Node Buffer it aliases `subarray` and
-  // returns a view onto the very pool this is meant to escape.
-  return owned ? bytes.buffer : new Uint8Array(bytes).buffer
 }

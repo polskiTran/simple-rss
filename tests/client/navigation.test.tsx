@@ -123,7 +123,7 @@ function reading(path: string): StubbedApi {
     .on('GET /api/feeds/1', { body: DETAIL })
     .on('GET /api/items/3', { body: ITEM })
     .on('GET /api/items/3/reader', {
-      body: { feedItemId: 3, markdown: 'The valley turns from grey to gold.', wordCount: 8, readingTimeMinutes: 1 },
+      body: { feedItemId: 3, markdown: 'The valley turns from grey to gold.', readingTimeMinutes: 1 },
     })
     .on('GET /api/library', { body: LIBRARY })
   window.history.replaceState(null, '', path)

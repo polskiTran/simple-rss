@@ -72,8 +72,8 @@ describe('extractArticle', () => {
   it('estimates reading time from what the Reader will actually show', async () => {
     const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
 
-    expect(article?.wordCount).toBeGreaterThan(700)
-    expect(article?.readingTimeMinutes).toBe(Math.ceil((article?.wordCount ?? 0) / 225))
+    // Forty 22-word paragraphs: about 900 words at 225 a minute.
+    expect(article?.readingTimeMinutes).toBe(4)
   })
 
   it('times each extraction phase it reached, without recording content', async () => {

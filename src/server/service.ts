@@ -9,13 +9,14 @@ import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
 import { DigestService } from './digest/digest-service.js'
 import { ImageService } from './images/image-service.js'
-import { createImageUrlSignature } from './images/image-url-signature.js'
+import { createImageUrlSignature, IMAGE_URL_KEY_BYTES } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, errorForLog, type Logger } from './logger.js'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderExtractor } from './reader/reader-extractor.js'
+import { ReaderItems } from './reader/reader-items.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
@@ -143,7 +144,7 @@ function compose(
 
     const digest = new DigestService({ db, clock, settings })
     const library = new LibraryService({ db, clock, settings })
-    const imageSigningKey = randomBytes(32)
+    const imageSigningKey = randomBytes(IMAGE_URL_KEY_BYTES)
     const imageSignature = createImageUrlSignature({ key: imageSigningKey, clock })
     const images = new ImageService({ db, retrieval })
     extractor = new ReaderExtractor({
@@ -152,14 +153,12 @@ function compose(
       logger,
       workerUrl: options.readerWorkerUrl,
     })
+    const readerItems = new ReaderItems({ db, clock, settings, digest, signImageUrl: imageSignature.sign })
     const reader = new ReaderService({
       db,
       clock,
-      settings,
       retrieval,
-      digest,
       extractor,
-      signImageUrl: imageSignature.sign,
       logger,
       ...(options.readerBudgetMs === undefined ? {} : { budgetMs: options.readerBudgetMs }),
     })
@@ -174,6 +173,7 @@ function compose(
       refresh,
       digest,
       library,
+      readerItems,
       reader,
       search,
       images,
