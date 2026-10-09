@@ -2,9 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
-import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
+import { digest } from './fixtures.js'
+import { stubApi, type StubbedApi } from './stub-api.js'
 
-const hangs = (): Promise<Reply> => new Promise(() => {})
+const hangs = (): Promise<never> => new Promise(() => {})
 
 function waiting(): StubbedApi {
   return stubApi()
@@ -66,36 +67,7 @@ describe('a wait', () => {
   })
 
   it('announces the one wait the User asked for, and stays quiet for the rest', async () => {
-    stubApi()
-      .on('GET /api/digest', {
-        body: {
-          today: '2026-08-08',
-          groups: [
-            {
-              date: '2026-08-08',
-              label: 'Today',
-              returns: [],
-              items: [
-                {
-                  feedItemId: 3,
-                  title: 'First light',
-                  feedId: 1,
-                  feedTitle: 'Field Notes',
-                  link: 'https://journal.example/first-light',
-                  publishedAt: '2026-08-08T07:15:00.000Z',
-                  displayTime: '07:15',
-                  imageUrl: null,
-                  summary: null,
-                  firstSeenAt: '2026-08-08T09:00:00.000Z',
-                  saved: false,
-                },
-              ],
-            },
-          ],
-          nextFrom: null,
-        },
-      })
-      .on('GET /api/search?q=driftwood', hangs)
+    stubApi().on('GET /api/digest', { body: digest() }).on('GET /api/search?q=driftwood', hangs)
     renderAt('/digest')
     const user = userEvent.setup()
 

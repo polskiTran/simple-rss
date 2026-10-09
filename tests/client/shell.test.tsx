@@ -198,7 +198,7 @@ describe('settings', () => {
   })
 
   it('rejects a response that does not match the agreed shape', async () => {
-    stubApi().on('GET /api/meta', { body: { name: 'something-else' } })
+    stubApi().malformed('GET /api/meta')
     await renderAt('/settings')
 
     await waitFor(() => expect(screen.getByText('simple unavailable')).toBeDefined())

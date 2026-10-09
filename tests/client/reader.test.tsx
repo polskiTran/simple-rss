@@ -2,34 +2,18 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
+import type { ReaderArticle } from '../../src/shared/api.js'
+import { digest, digestGroup, digestItem, readerArticle, readerItem } from './fixtures.js'
 import { stubApi, type StubbedApi } from './stub-api.js'
 
-const ITEM = {
-  feedItemId: 3,
-  title: 'First light',
-  feedId: 1,
-  feedTitle: 'Field Notes',
-  link: 'https://journal.example/first-light',
-  publishedAt: '2026-08-08T07:15:00.000Z',
-  firstSeenAt: '2026-08-08T09:00:00.000Z',
-  displayDate: 'saturday, 8 august',
-  summary: 'A clear morning over the valley.',
-  saved: false,
-  readingSource: 'original-webpage',
-  feedContent: null,
-  nextInDigest: {
-    feedItemId: 4,
-    title: 'Evening notes',
-    feedTitle: 'Field Notes',
-    displayTime: '09:31',
-  },
-}
+const ITEM = readerItem({
+  nextInDigest: { feedItemId: 4, title: 'Evening notes', feedTitle: 'Field Notes', displayTime: '09:31' },
+})
 
-const ARTICLE = {
-  feedItemId: 3,
+const ARTICLE = readerArticle({
   markdown: '## Dawn\n\nThe valley turns from grey to *gold* in about twenty minutes.',
   readingTimeMinutes: 4,
-}
+})
 
 function reading(): StubbedApi {
   const api = stubApi().on('GET /api/items/3', { body: ITEM }).on('GET /api/items/3/reader', { body: ARTICLE })
@@ -114,7 +98,7 @@ describe('Reader View', () => {
   })
 
   it('uses the Subscription preference without requesting the original and ignores a held old source', async () => {
-    const original = Promise.withResolvers<{ body: typeof ARTICLE }>()
+    const original = Promise.withResolvers<{ body: ReaderArticle }>()
     const feedContent = {
       markdown: '## Feed methods\n\nA short body from the Feed.',
       truncated: true,
@@ -417,34 +401,10 @@ describe('Reader View', () => {
   })
 
   it('opens from a Digest title and walks on via next in the digest', async () => {
-    const digest = {
-      today: '2026-08-08',
-      groups: [
-        {
-          date: '2026-08-08',
-          label: 'Today',
-          returns: [],
-          items: [
-            {
-              feedItemId: 3,
-              title: 'First light',
-              feedId: 1,
-              feedTitle: 'Field Notes',
-              link: ITEM.link,
-              publishedAt: ITEM.publishedAt,
-              displayTime: '07:15',
-              imageUrl: null,
-              summary: ITEM.summary,
-              firstSeenAt: ITEM.firstSeenAt,
-              saved: false,
-            },
-          ],
-        },
-      ],
-      nextFrom: null,
-    }
     reading()
-      .on('GET /api/digest', { body: digest })
+      .on('GET /api/digest', {
+        body: digest({ groups: [digestGroup({ items: [digestItem({ summary: ITEM.summary })] })] }),
+      })
       .on('GET /api/items/4', {
         body: { ...ITEM, feedItemId: 4, title: 'Evening notes', nextInDigest: null },
       })

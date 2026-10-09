@@ -2,39 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
+import { library } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
-const LIBRARY = {
-  today: '2026-08-08',
-  total: 2,
-  items: [
-    {
-      feedItemId: 3,
-      title: 'First light',
-      feedId: 1,
-      feedTitle: 'Field Notes',
-      subscribed: true,
-      link: 'https://journal.example/first-light',
-      publishedAt: '2026-08-08T07:15:00.000Z',
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      savedAt: '2026-08-08T09:05:00.000Z',
-      savedDate: '2026-08-08',
-    },
-    {
-      feedItemId: 1,
-      title: 'A June letter',
-      feedId: 2,
-      feedTitle: 'The Slow Press',
-      subscribed: true,
-      link: null,
-      publishedAt: '2026-06-03T12:00:00.000Z',
-      firstSeenAt: '2026-06-03T13:00:00.000Z',
-      savedAt: '2026-07-28T08:00:00.000Z',
-      savedDate: '2026-07-28',
-    },
-  ],
-  nextCursor: null,
-}
+const LIBRARY = library()
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -103,7 +74,7 @@ describe('the Saved tab', () => {
   })
 
   it('says quietly when a save outlived its Subscription, keeping the attribution', async () => {
-    const items = [LIBRARY.items[0], { ...LIBRARY.items[1], subscribed: false }]
+    const items = LIBRARY.items.map((item) => (item.feedItemId === 1 ? { ...item, subscribed: false } : item))
     stubApi().on('GET /api/library', { body: { ...LIBRARY, items } })
     window.history.replaceState(null, '', '/saved')
     const { container } = render(<App />)
@@ -183,7 +154,7 @@ describe('the Saved tab', () => {
   })
 
   it('blames the reader, not the connection, when the answer fails its schema', async () => {
-    stubApi().on('GET /api/library', { body: { unexpected: true } })
+    stubApi().malformed('GET /api/library')
     window.history.replaceState(null, '', '/saved')
     render(<App />)
 
