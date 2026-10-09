@@ -1,5 +1,6 @@
 import { desc, sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { DEFAULT_POLLING_INTERVAL_MINUTES, DEFAULT_READING_SOURCE } from '../../shared/api.js'
 
 /**
  * Typed mirror of the tables the server queries; migrations remain the source of
@@ -102,11 +103,11 @@ export const subscriptions = sqliteTable(
     customTitle: text('custom_title'),
     /** The Custom Description; null means the Feed Description stands. */
     customDescription: text('custom_description'),
-    pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(120),
+    pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(DEFAULT_POLLING_INTERVAL_MINUTES),
     // Keep in step with READING_SOURCES (shared/api.ts).
     readingSource: text('reading_source', { enum: ['original-webpage', 'feed-content'] })
       .notNull()
-      .default('original-webpage'),
+      .default(DEFAULT_READING_SOURCE),
     /** The persisted due-time frontier the scheduler wakes to query. */
     nextPollAt: text('next_poll_at').notNull().default('1970-01-01T00:00:00.000Z'),
     lastPolledAt: text('last_polled_at'),

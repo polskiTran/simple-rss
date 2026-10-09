@@ -1,7 +1,5 @@
 import { and, desc, eq, isNull, lte, or } from 'drizzle-orm'
 import {
-  DEFAULT_POLLING_INTERVAL_MINUTES,
-  DEFAULT_READING_SOURCE,
   pollingIntervalMinutesSchema,
   type FeedDetail,
   type FeedDetailsUpdate,
@@ -129,52 +127,33 @@ export class SubscriptionService {
     if (existing) return { kind: 'duplicate', subscription: this.#withCadence(existing) }
 
     const now = this.#clock.now().toISOString()
-
     const dormant = this.#dormantFeed(requestedUrl, enteredUrl)
-    if (dormant) return this.#resubscribe(dormant, requestedUrl, now)
+    if (dormant) this.#resubscribe(dormant, requestedUrl, now)
+    else this.#subscribe(enteredUrl, requestedUrl, offeredTitle, now)
 
+    // Read back rather than restated: the row's defaults are the only defaults.
+    const recorded = this.#feedByCanonicalUrl(requestedUrl)
+    if (!recorded) throw new Error('A Subscription just recorded did not read back')
+    return { kind: 'created', subscription: this.#withCadence(recorded) }
+  }
+
+  #subscribe(enteredUrl: string, requestedUrl: string, offeredTitle: string | null | undefined, now: string): void {
     // Both stand in for what the Feed document will say: nothing has been
     // retrieved yet (ADR 0007), so the Feed URL is all there is to go on.
     const domain = new URL(requestedUrl).hostname
     const title = offeredTitle?.trim() || domain
-    const created: SubscribedFeedRecord = this.#db.transaction((tx) => {
+    const feedId = this.#db.transaction((tx) => {
       const inserted = tx
         .insert(feeds)
-        .values({
-          enteredUrl,
-          resolvedUrl: requestedUrl,
-          title,
-          domain,
-          createdAt: now,
-          updatedAt: now,
-        })
+        .values({ enteredUrl, resolvedUrl: requestedUrl, title, domain, createdAt: now, updatedAt: now })
         .run()
       const feedId = Number(inserted.lastInsertRowid)
-
       tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).run()
       tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
-      return {
-        feedId,
-        title,
-        description: null,
-        domain,
-        homePageUrl: null,
-        enteredUrl,
-        resolvedUrl: requestedUrl,
-        lastPolledAt: null,
-        lastSuccessAt: null,
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-        readingSource: DEFAULT_READING_SOURCE,
-        subscribedAt: now,
-      }
+      return feedId
     })
 
-    this.#logger.info('subscriptions.subscription_created', {
-      feedId: created.feedId,
-      enteredUrl: loggableUrl(enteredUrl),
-    })
-    return { kind: 'created', subscription: this.#withCadence(created) }
+    this.#logger.info('subscriptions.subscription_created', { feedId, enteredUrl: loggableUrl(enteredUrl) })
   }
 
   /**
@@ -182,7 +161,7 @@ export class SubscriptionService {
    * identity they were saved from — with a fresh default schedule, reclaiming
    * the requested URL's alias if a merge had moved it away.
    */
-  #resubscribe(feed: FeedRecord, requestedUrl: string, now: string): CreateSubscriptionOutcome {
+  #resubscribe(feed: FeedRecord, requestedUrl: string, now: string): void {
     this.#db.transaction((tx) => {
       tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId: feed.feedId }).onConflictDoNothing().run()
       tx.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
@@ -193,18 +172,6 @@ export class SubscriptionService {
       enteredUrl: loggableUrl(feed.enteredUrl),
       revived: true,
     })
-    return {
-      kind: 'created',
-      subscription: this.#withCadence({
-        ...feed,
-        lastPolledAt: null,
-        lastSuccessAt: null,
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-        readingSource: DEFAULT_READING_SOURCE,
-        subscribedAt: now,
-      }),
-    }
   }
 
   importOpml(opml: string): ImportOpmlOutcome {
@@ -459,14 +426,12 @@ export class SubscriptionService {
   }
 }
 
-/** Shared by first subscription and revival: due immediately — the first retrieval is scheduler work (ADR 0007). */
+/**
+ * Shared by first subscription and revival: due immediately — the first retrieval
+ * is scheduler work (ADR 0007) — with every preference left to the column defaults.
+ */
 function newSubscription(feedId: number, now: string) {
-  return {
-    feedId,
-    pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES,
-    nextPollAt: now,
-    createdAt: now,
-  }
+  return { feedId, nextPollAt: now, createdAt: now }
 }
 
 function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => number[]): SubscriptionSummary {
