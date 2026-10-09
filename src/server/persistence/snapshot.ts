@@ -11,14 +11,14 @@ function sidecarsOf(path: string): string[] {
   return [`${path}-wal`, `${path}-shm`]
 }
 
-/**
- * `VACUUM INTO` produces a compacted, transaction-consistent copy even while the WAL is
- * active — safe where a raw file copy of an open database is not.
- */
 export interface SnapshotWriteReport {
   readonly bytes: number
 }
 
+/**
+ * `VACUUM INTO` produces a compacted, transaction-consistent copy even while the WAL is
+ * active — safe where a raw file copy of an open database is not.
+ */
 export function writeSnapshot(source: string, destination: string): SnapshotWriteReport {
   if (!existsSync(source)) {
     throw new Error(`there is no database at ${source} to back up`)

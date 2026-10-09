@@ -48,10 +48,7 @@ describe('runCli', () => {
     expect(JSON.parse(output[0]!)).toEqual({ applied: [], versions: ALL_VERSIONS })
   })
 
-  it('reports an unseeded installation as null rather than failing', async () => {
-    await runCli(['migrate'], context)
-    output.length = 0
-
+  it('reports an unseeded installation on a fresh volume as null rather than failing', async () => {
     expect(await runCli(['show'], context)).toBe(0)
     expect(JSON.parse(output[0]!)).toBeNull()
   })
@@ -104,8 +101,13 @@ describe('runCli', () => {
     expect(await runCli(['set-timezone'], context)).toBe(1)
   })
 
-  it('rejects a timezone the platform cannot resolve', async () => {
-    await expect(runCli(['set-timezone', 'Mars/Olympus_Mons'], context)).rejects.toThrow(/timezone/i)
+  it('rejects a timezone the platform cannot resolve, and says why', async () => {
+    expect(await runCli(['set-timezone', 'Mars/Olympus_Mons'], context)).toBe(1)
+
+    expect(output.join('\n')).toMatch(/Mars\/Olympus_Mons is not a timezone/)
+    output.length = 0
+    await runCli(['show'], context)
+    expect(JSON.parse(output[0]!)).toBeNull()
   })
 
   it('reports an unknown command with usage', async () => {

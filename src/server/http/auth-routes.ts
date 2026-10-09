@@ -39,7 +39,8 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
 
     switch (outcome.kind) {
       case 'claimed':
-        seedTimezone(deps.settings, body.value.timezone, deps.clock.now())
+        // The browser's zone seeds the Digest calendar; one the server cannot resolve leaves it on UTC.
+        if (body.value.timezone) deps.settings.setTimezone(body.value.timezone, deps.clock.now())
         writeSessionCookie(c, outcome.session, deps.clock.now())
         return status(c, { claimed: true, authenticated: true }, 201)
       case 'already-claimed':
@@ -100,13 +101,6 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   })
 
   return app
-}
-
-function seedTimezone(settings: InstallationSettingsStore, timezone: string | undefined, now: Date) {
-  if (!timezone) return
-  try {
-    settings.setTimezone(timezone, now)
-  } catch {}
 }
 
 function status(c: Context, body: AuthStatus, code: 200 | 201 = 200) {

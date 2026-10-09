@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
+import type { AuthStatus } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
@@ -45,13 +46,6 @@ interface Attempt {
   readonly client: string
 }
 
-export interface AuthenticationStatus {
-  /** Whether a User has claimed this installation. */
-  readonly claimed: boolean
-  /** Whether the caller presented a live session. */
-  readonly authenticated: boolean
-}
-
 export class Authentication {
   readonly #deps: AuthenticationOptions
 
@@ -59,7 +53,7 @@ export class Authentication {
     this.#deps = options
   }
 
-  status(token: string | undefined): AuthenticationStatus {
+  status(token: string | undefined): AuthStatus {
     return { claimed: this.#deps.user.isClaimed(), authenticated: this.authenticate(token) }
   }
 

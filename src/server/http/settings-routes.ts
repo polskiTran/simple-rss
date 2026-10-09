@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { updateTimezoneRequestSchema, type InstallationPreferences } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { UnknownTimezoneError, type InstallationSettingsStore } from '../persistence/installation-settings.js'
+import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { apiError, readJsonBody } from './requests.js'
 
 export interface SettingsRouteDependencies {
@@ -19,10 +19,7 @@ export function settingsRoutes(deps: SettingsRouteDependencies): Hono {
     const body = await readJsonBody(c, updateTimezoneRequestSchema)
     if (!body.ok) return body.response
 
-    try {
-      deps.settings.setTimezone(body.value.timezone, deps.clock.now())
-    } catch (error) {
-      if (!(error instanceof UnknownTimezoneError)) throw error
+    if (!deps.settings.setTimezone(body.value.timezone, deps.clock.now())) {
       return apiError(c, 400, 'unknown_timezone', 'That is not a recognizable IANA timezone')
     }
     return c.json<InstallationPreferences>({ timezone: body.value.timezone })

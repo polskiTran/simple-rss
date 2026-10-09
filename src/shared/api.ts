@@ -110,7 +110,9 @@ export const newPasswordSchema = passwordSchema(MIN_PASSWORD_LENGTH)
 const presentedPasswordSchema = passwordSchema(1)
 
 export const authStatusSchema = z.object({
+  /** Whether a User has claimed this installation. */
   claimed: z.boolean(),
+  /** Whether the caller presented a live Session. */
   authenticated: z.boolean(),
 })
 export type AuthStatus = z.infer<typeof authStatusSchema>
