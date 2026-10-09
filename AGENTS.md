@@ -4,10 +4,10 @@ An opinionated, opensource RSS reader: one pnpm package, one Docker image, one S
 
 ## Project map
 
-- `src/server/` — the whole service: Hono API plus in-process scheduler, one folder per domain area (`auth/`, `digest/`, `export/`, `http/`, `images/`, `ingestion/`, `library/`, `persistence/`, `reader/`, `retention/`, `search/`, `subscriptions/`, `upstream/`).
+- `src/server/` — the whole service: Hono API plus in-process scheduler, one folder per domain area (`auth/`, `digest/`, `export/`, `http/`, `images/`, `ingestion/`, `library/`, `markdown/`, `persistence/`, `reader/`, `retention/`, `search/`, `subscriptions/`, `upstream/`), with startup, config, CLI and logging directly in `src/server/`.
 - `src/client/` — the React/Vite UI.
 - `src/shared/api.ts` — the Zod contract both sides import. Any API change starts here.
-- `tests/server/` (harness-driven), `tests/browser/` (Playwright), `tests/smoke/` (container), `tests/support/` (the harness itself).
+- `tests/server/` (node), `tests/client/` (jsdom), `tests/browser/` (Playwright), `tests/smoke/` (container), `tests/support/` (the service harness), `tests/fixtures/` (Feed, OPML and client data).
 
 pnpm only, Node ≥ 22.
 
@@ -19,9 +19,9 @@ pnpm only, Node ≥ 22.
 | `pnpm dev:server` / `pnpm dev:client` | Either half alone |
 | `pnpm build` | Build client then server (`build:client`, `build:server`) |
 | `pnpm start` | Run the built server from `dist/` |
-| `pnpm lint` | `biome check --error-on-warnings .` — formatting and the import boundaries (`biome.jsonc`); a warning fails it |
+| `pnpm lint` | `biome check --error-on-warnings .` (formatting and the import boundaries, `biome.jsonc`), then oxlint with the anti-slop rules (`oxlint.config.mjs`); a warning fails it |
 | `pnpm format` | `biome format --write .` |
-| `pnpm typecheck` | `tsc -p tsconfig.json --noEmit` |
+| `pnpm typecheck` | `tsc --noEmit` over `tsconfig.json` (everything) and `tsconfig.server.json` (the server build) |
 | `pnpm test` / `pnpm test:watch` | Vitest — both projects: `tests/server/` in node, `tests/client/` in jsdom |
 | `pnpm test:browser` | Builds the client, runs Playwright in real Chromium |
 | `pnpm test:smoke` | Container smoke tests (needs Docker) |
@@ -36,6 +36,8 @@ pnpm only, Node ≥ 22.
 <important if="you are writing or modifying server tests">
 
 Server tests run the real service against a temporary SQLite via `tests/support/service-harness.ts` — manual clock, upstream fixtures, injected `Retrieval`. Write new tests through the harness rather than mocking internals.
+
+A server test lives in `tests/server/<folder>/`, named for the `src/server/` folder whose behavior it pins, whether it drives the harness or the module directly. Only tests that span folders — startup, lifecycle, the architecture walk — sit at the `tests/server/` root.
 </important>
 
 <important if="you are designing a feature, changing behavior, or touching an area covered by an ADR">
@@ -56,9 +58,14 @@ Three boundaries hold the server's folder graph. Each is owned by exactly one me
 - **Nothing under `src/server/` calls raw `fetch` or imports `undici`** — ADR 0005, above. Biome again.
 - **The folder graph stays acyclic, and `upstream/` imports no other server folder.** `tests/server/architecture.test.ts` walks it.
 
-Two things that test cannot see. Root-level modules (`app.ts`, `service.ts`, `clock.ts`, `logger.ts`) are not nodes in the graph, so a cycle through one of them passes — when two modules need a shared interface, declare it where it is *consumed* rather than where it is built. And the scan reads text, so a type-only back-edge fails the test: that is deliberate, since a cycle a person has to trace is a cycle whether or not it survives to runtime.
+Two things that test cannot see. Root-level modules (anything directly in `src/server/`) are not nodes in the graph, so a cycle through one of them passes — when two modules need a shared interface, declare it where it is *consumed* rather than where it is built. And the scan reads text, so a type-only back-edge fails the test: that is deliberate, since a cycle a person has to trace is a cycle whether or not it survives to runtime.
 
 Suppress a rule only with its reason attached. Every `biome-ignore` in the repo names why, and every rule turned off in `biome.jsonc` carries its reason on the line above it; a new `overrides` entry does the same. Note that an override *replaces* a rule rather than merging into it — restate what you still want.
+</important>
+
+<important if="you are writing a type assertion, or an anti-slop rule fails">
+
+`pnpm lint` also runs oxlint with the anti-slop plugin vendored in `tools/oxlint/anti-slop/`; `oxlint.config.mjs` picks its rules. Under `src/`, every `as` other than `as const` needs a `// SAFETY:` comment before it or its statement, naming the invariant TypeScript cannot see. A file that must break a rule gets an `overrides` entry in `oxlint.config.mjs` with its reason above it — there are no inline disables.
 </important>
 
 <important if="you are naming things in code, tests, issues, or commit messages">
