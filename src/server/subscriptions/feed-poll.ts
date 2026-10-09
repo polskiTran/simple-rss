@@ -131,7 +131,7 @@ export class FeedPoll {
       feedId,
       parsed,
       resolvedUrl: retrieved.url,
-      validators: { etag: retrieved.etag ?? null, lastModified: retrieved.lastModified ?? null },
+      validators: { etag: retrieved.etag, lastModified: retrieved.lastModified },
       now: this.#clock.now().toISOString(),
     })
   }

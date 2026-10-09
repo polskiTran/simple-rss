@@ -63,38 +63,30 @@ const envSchema = z.object({
     .transform((value) => value === 'true'),
 })
 
-export interface Config {
-  readonly port: number
-  readonly dataDir: string
-  readonly databasePath: string
-  readonly clientDir: string
-  readonly logLevel: LogLevel
-  readonly shutdownGraceMs: number
-  readonly setupSecret: string | undefined
-  readonly publicOrigin: string
-  readonly trustProxyHeaders: boolean
-}
+/** The environment, read into the shape the service runs on, with every path absolute. */
+const configSchema = envSchema.transform((env) => {
+  const dataDir = resolve(env.DATA_DIR)
+  return {
+    port: env.PORT,
+    dataDir,
+    databasePath: join(dataDir, DATABASE_FILE),
+    clientDir: env.CLIENT_DIR ? resolve(env.CLIENT_DIR) : defaultClientDir(),
+    logLevel: env.LOG_LEVEL,
+    shutdownGraceMs: env.SHUTDOWN_GRACE_MS,
+    setupSecret: env.SETUP_SECRET,
+    publicOrigin: env.PUBLIC_ORIGIN,
+    trustProxyHeaders: env.TRUST_PROXY_HEADERS,
+  }
+})
+
+export type Config = Readonly<z.output<typeof configSchema>>
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = envSchema.safeParse(pickDefined(env))
+  const parsed = configSchema.safeParse(pickDefined(env))
   if (!parsed.success) {
     throw new Error(`Invalid environment: ${formatIssues(parsed.error)}`)
   }
-
-  const dataDir = resolve(parsed.data.DATA_DIR)
-  const clientDir = parsed.data.CLIENT_DIR ? resolve(parsed.data.CLIENT_DIR) : defaultClientDir()
-
-  return {
-    port: parsed.data.PORT,
-    dataDir,
-    databasePath: join(dataDir, DATABASE_FILE),
-    clientDir,
-    logLevel: parsed.data.LOG_LEVEL,
-    shutdownGraceMs: parsed.data.SHUTDOWN_GRACE_MS,
-    setupSecret: parsed.data.SETUP_SECRET,
-    publicOrigin: parsed.data.PUBLIC_ORIGIN,
-    trustProxyHeaders: parsed.data.TRUST_PROXY_HEADERS,
-  }
+  return parsed.data
 }
 
 /**

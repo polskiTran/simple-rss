@@ -2,7 +2,7 @@ import { Worker } from 'node:worker_threads'
 import { z } from 'zod'
 import type { Clock } from '../clock.js'
 import { elapsedMs } from '../monotonic.js'
-import { errorForLog, type Logger } from '../logger.js'
+import type { Logger } from '../logger.js'
 import { IMAGE_URL_KEY_BYTES } from '../images/image-url-signature.js'
 import type { ExtractedArticle, ExtractionTimings } from './extract-article.js'
 
@@ -166,7 +166,7 @@ export class ReaderExtractor {
     try {
       worker.postMessage(request, [request.bytes])
     } catch (error) {
-      this.#logger.error('reader.worker_post_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_post_failed', { error })
       this.#replaceFailedWorker(worker)
     }
   }
@@ -224,7 +224,7 @@ export class ReaderExtractor {
     const replace = this.#active !== undefined || this.#queue.length > 0
 
     if (error !== undefined) {
-      this.#logger.error('reader.worker_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_failed', { error })
     }
     const active = this.#active
     this.#active = undefined
@@ -249,7 +249,7 @@ export class ReaderExtractor {
       })
       return worker
     } catch (error) {
-      this.#logger.error('reader.worker_start_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_start_failed', { error })
       return undefined
     }
   }
@@ -270,7 +270,7 @@ export class ReaderExtractor {
     try {
       await worker.terminate()
     } catch (error) {
-      this.#logger.error('reader.worker_termination_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_termination_failed', { error })
     }
   }
 

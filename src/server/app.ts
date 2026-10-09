@@ -8,7 +8,8 @@ import type { DigestService } from './digest/digest-service.js'
 import type { ImageService } from './images/image-service.js'
 import type { ImageUrlSignature } from './images/image-url-signature.js'
 import type { LibraryService } from './library/library-service.js'
-import { errorForLog, type Logger } from './logger.js'
+import type { Logger } from './logger.js'
+import { elapsedMs } from './monotonic.js'
 import { assertWritable, type DrizzleDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderItems } from './reader/reader-items.js'
@@ -169,7 +170,7 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   try {
     assertWritable(services.db, deps.clock.now())
   } catch (error) {
-    deps.logger.error('readiness.write_probe_failed', { error: errorForLog(error) })
+    deps.logger.error('readiness.write_probe_failed', { error })
     return 'database is not writable'
   }
 
@@ -189,20 +190,19 @@ function noStoreByDefault(): MiddlewareHandler {
 }
 
 /** One record per request; query strings are omitted — they carry search terms and signed image URLs. */
-function requestLogging(logger: Logger) {
+function requestLogging(logger: Logger): MiddlewareHandler {
   const scoped = logger.child({ component: 'http' })
 
-  return async (c: { req: { method: string; path: string }; res: Response }, next: () => Promise<void>) => {
-    const startedAt = process.hrtime.bigint()
+  return async (c, next) => {
+    const startedAt = performance.now()
     await next()
-    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
 
     const level = c.req.path.startsWith('/health/') ? 'debug' : 'info'
     scoped[level]('request.completed', {
       method: c.req.method,
       path: c.req.path,
       status: c.res.status,
-      durationMs: Math.round(durationMs * 100) / 100,
+      durationMs: elapsedMs(startedAt),
     })
   }
 }

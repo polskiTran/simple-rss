@@ -1,5 +1,5 @@
 import { loadConfig } from './config.js'
-import { createLogger, errorForLog, type Logger } from './logger.js'
+import { createLogger, type Logger } from './logger.js'
 import { startService, type RunningService } from './service.js'
 
 async function main(): Promise<void> {
@@ -33,7 +33,7 @@ function installSignalHandlers(service: RunningService, logger: Logger): void {
       service.stop().then(
         () => process.exit(0),
         (cause: unknown) => {
-          logger.error('process.stop_failed', { error: errorForLog(cause) })
+          logger.error('process.stop_failed', { error: cause })
           process.exit(1)
         },
       )

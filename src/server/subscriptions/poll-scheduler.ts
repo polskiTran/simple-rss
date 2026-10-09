@@ -1,4 +1,4 @@
-import { errorForLog, type Logger } from '../logger.js'
+import type { Logger } from '../logger.js'
 import type { FeedRefresh } from './feed-refresh.js'
 import type { SubscriptionService } from './subscription-service.js'
 
@@ -116,7 +116,7 @@ export class PollScheduler {
 
       this.#retention.sweep()
     } catch (error) {
-      this.#logger.error('scheduler.tick_failed', { error: errorForLog(error) })
+      this.#logger.error('scheduler.tick_failed', { error })
     }
   }
 
@@ -125,7 +125,7 @@ export class PollScheduler {
       const outcome = await this.#refresh.refresh(feedId)
       this.#logger.debug('scheduler.feed_polled', { feedId, outcome: outcome.kind })
     } catch (error) {
-      this.#logger.error('scheduler.feed_poll_failed', { feedId, error: errorForLog(error) })
+      this.#logger.error('scheduler.feed_poll_failed', { feedId, error: error })
     }
   }
 }

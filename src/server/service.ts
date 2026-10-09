@@ -11,7 +11,7 @@ import { DigestService } from './digest/digest-service.js'
 import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature, IMAGE_URL_KEY_BYTES } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
-import { createLogger, errorForLog, type Logger } from './logger.js'
+import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
@@ -182,10 +182,8 @@ function compose(
     } satisfies Services
     return { kind: 'ready', services }
   } catch (error) {
-    logger.error('startup.failed', { databasePath: config.databasePath, reason, error: errorForLog(error) })
-    extractor
-      ?.close()
-      .catch((closeError) => logger.error('startup.reader_close_failed', { error: errorForLog(closeError) }))
+    logger.error('startup.failed', { databasePath: config.databasePath, reason, error: error })
+    extractor?.close().catch((closeError) => logger.error('startup.reader_close_failed', { error: closeError }))
     db?.$client.close()
     return { kind: 'failed', reason }
   }

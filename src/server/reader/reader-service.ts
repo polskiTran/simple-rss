@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import type { ReaderArticle, ReaderDeadlineStage } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import type { LogField, LogFields, Logger } from '../logger.js'
+import type { LogFields, Logger } from '../logger.js'
 import { elapsedMs } from '../monotonic.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
 import type { Retrieval, RetrievalFailure, RetrievalFailureCode } from '../upstream/retrieval.js'
-import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
+import type { ReaderExtractor } from './reader-extractor.js'
 
 type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed'
 
@@ -144,7 +144,7 @@ export class ReaderService {
     const startedAt = performance.now()
     const finish = <Outcome extends ReaderArticleOutcome>(
       outcome: ReaderTraceOutcome,
-      fields: Readonly<Record<string, LogField>>,
+      fields: LogFields,
       value: Outcome,
     ): Outcome => {
       const level = outcome === 'extracted' || outcome === 'cancelled' ? 'debug' : 'warn'
@@ -183,7 +183,7 @@ export class ReaderService {
     }
     if (parsed.kind !== 'extracted') {
       this.#recordFailure(feedItemId)
-      return finish('unreadable', { ...answered, ...definedFields(parsed.timings) }, { kind: 'unreadable' })
+      return finish('unreadable', { ...answered, ...parsed.timings }, { kind: 'unreadable' })
     }
 
     this.#failures.delete(feedItemId)
@@ -195,7 +195,7 @@ export class ReaderService {
     if (extraction.survivesAbandonment) {
       this.#stash.set(feedItemId, { article, expiresAt: this.#clock.now().getTime() + STASH_TTL_MS })
     }
-    return finish('extracted', { ...answered, ...definedFields(parsed.timings) }, { kind: 'extracted', article })
+    return finish('extracted', { ...answered, ...parsed.timings }, { kind: 'extracted', article })
   }
 
   async #waitForExtraction(
@@ -256,12 +256,4 @@ function hostField(url: string): LogFields {
   } catch {
     return {}
   }
-}
-
-function definedFields(timings: ReaderExtractionTimings): LogFields {
-  const fields: Record<string, LogField> = {}
-  for (const [phase, value] of Object.entries(timings)) {
-    if (value !== undefined) fields[phase] = value
-  }
-  return fields
 }

@@ -1,20 +1,16 @@
 import type { JsonValue } from '../shared/json.js'
 import type { LogLevel } from './config.js'
 
-export type LogValue = JsonValue
+/**
+ * Anything a caller has at hand — thrown values included. The serialiser is
+ * total: it reduces every value to JSON and drops undefined fields.
+ */
+export type LogFields = Readonly<Record<string, unknown>>
 
-export type LogField = LogValue | Error
-export type LogFields = Readonly<Record<string, LogField>>
-
-export interface LogRecord extends Readonly<Record<string, LogValue>> {
+export interface LogRecord extends Readonly<Record<string, JsonValue>> {
   readonly level: LogLevel
   readonly message: string
   readonly time: string
-}
-
-/** Converts JavaScript's unconstrained thrown values into the logger's concrete error contract. */
-export function errorForLog(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(String(cause))
 }
 
 export interface Logger {
@@ -64,21 +60,26 @@ export function createLogger(options: LoggerOptions): Logger {
 }
 
 interface SerialisedFields {
-  [key: string]: LogValue
+  [key: string]: JsonValue
 }
 
 /** Converts every field to a value `JSON.stringify` can emit without throwing. */
 function serialiseFields(fields: LogFields | undefined): SerialisedFields {
-  if (!fields) return {}
+  return fields ? serialiseEntries(Object.entries(fields), new WeakSet()) : {}
+}
 
-  const seen = new WeakSet<object>()
-  const out: Record<string, LogValue> = {}
-  for (const [key, value] of Object.entries(fields)) out[key] = serialiseValue(value, seen)
+/** Undefined entries are dropped, as `JSON.stringify` would. */
+function serialiseEntries(entries: readonly (readonly [string, unknown])[], seen: WeakSet<object>): SerialisedFields {
+  const out: SerialisedFields = {}
+  for (const [key, value] of entries) {
+    if (value !== undefined) out[key] = serialiseValue(value, seen)
+  }
   return out
 }
 
-function serialiseValue(value: unknown, seen: WeakSet<object>): LogValue {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+function serialiseValue(value: unknown, seen: WeakSet<object>): JsonValue {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string' || typeof value === 'boolean') return value
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
   if (typeof value === 'bigint') return value.toString()
   if (value instanceof Error) {
@@ -89,8 +90,7 @@ function serialiseValue(value: unknown, seen: WeakSet<object>): LogValue {
   if (seen.has(value)) return '[Circular]'
 
   seen.add(value)
-  const out: Record<string, LogValue> = {}
-  for (const [key, child] of Object.entries(value)) out[key] = serialiseValue(child, seen)
+  const out = serialiseEntries(Object.entries(value), seen)
   seen.delete(value)
   return out
 }

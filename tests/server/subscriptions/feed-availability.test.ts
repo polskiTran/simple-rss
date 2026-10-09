@@ -337,8 +337,8 @@ describe('congestion at the retrieval boundary', () => {
       url,
       contentType: 'application/rss+xml',
       charset: undefined,
-      etag: undefined,
-      lastModified: undefined,
+      etag: null,
+      lastModified: null,
       notModified: false,
       bytes: new TextEncoder().encode(rss('Field Notes')),
     }

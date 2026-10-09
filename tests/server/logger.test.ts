@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createLogger, type LogRecord, type LogValue } from '../../src/server/logger.js'
+import { createLogger, type LogRecord } from '../../src/server/logger.js'
 
 function collect() {
   const written: LogRecord[] = []
@@ -82,16 +82,17 @@ describe('createLogger', () => {
       now: at,
       stream: { write: (chunk: string) => void lines.push(chunk) },
     })
-    const cycle: Record<string, LogValue> = {}
+    const cycle: Record<string, unknown> = {}
     cycle.self = cycle
 
-    // @ts-expect-error BigInt deliberately exercises the runtime boundary used by JavaScript callers.
-    logger.info('runtime.fields', { cycle, integer: 1n, notFinite: Number.NaN })
+    logger.info('runtime.fields', { cycle, integer: 1n, notFinite: Number.NaN, absent: undefined })
 
-    expect(JSON.parse(lines[0]!)).toMatchObject({
+    const record = JSON.parse(lines[0]!)
+    expect(record).toMatchObject({
       cycle: { self: '[Circular]' },
       integer: '1',
       notFinite: null,
     })
+    expect(record).not.toHaveProperty('absent')
   })
 })

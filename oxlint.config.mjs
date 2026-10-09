@@ -74,11 +74,14 @@ export default defineConfig({
         'anti-slop/no-unknown-parameters': 'off',
       },
     },
+    // The logger's serialiser is total: callers hand it any value, thrown ones
+    // included, and it reduces each to JSON — so its field contract is `unknown`.
     {
       files: ['src/server/logger.ts'],
       rules: {
         'anti-slop/no-runtime-typeof': 'off',
         'anti-slop/no-unknown-parameters': 'off',
+        'anti-slop/no-unsafe-dictionary-type': 'off',
       },
     },
   ],

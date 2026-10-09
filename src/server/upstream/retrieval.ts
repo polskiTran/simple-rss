@@ -98,8 +98,9 @@ export interface RetrievalSuccess {
   readonly url: string
   readonly contentType: string
   readonly charset: string | undefined
-  readonly etag: string | undefined
-  readonly lastModified: string | undefined
+  /** Validators as the response sent them, in the shape `conditional` takes back. */
+  readonly etag: string | null
+  readonly lastModified: string | null
   /** True when a conditional request was answered `304` and there is no body. */
   readonly notModified: boolean
   /** Reading past the profile's byte ceiling errors the stream with a `RetrievalError`. */
@@ -357,8 +358,8 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
         url: url.href,
         contentType: '',
         charset: undefined,
-        etag: response.headers.get('etag') ?? undefined,
-        lastModified: response.headers.get('last-modified') ?? undefined,
+        etag: response.headers.get('etag'),
+        lastModified: response.headers.get('last-modified'),
         notModified: true,
         body: emptyStream(),
       }
@@ -392,8 +393,8 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       url: url.href,
       contentType,
       charset: charsetOf(response.headers.get('content-type')),
-      etag: response.headers.get('etag') ?? undefined,
-      lastModified: response.headers.get('last-modified') ?? undefined,
+      etag: response.headers.get('etag'),
+      lastModified: response.headers.get('last-modified'),
       notModified: false,
       body: boundedBody(response, {
         maxBytes,
