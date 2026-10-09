@@ -10,11 +10,11 @@ import {
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn } from '../calendar.js'
-import { feedItemRowOf } from '../digest/digest-service.js'
+import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import {
   effectiveFeedDescription,
   effectiveFeedTitle,
@@ -310,15 +310,7 @@ export class SubscriptionService {
     const dayOf = dayKeysIn(timezone)
     const counts = new Map<string, number>()
     const items = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        firstSeenAt: feedItems.firstSeenAt,
-        chronologyAt: feedItems.chronologyAt,
-        savedAt: libraryItems.savedAt,
-      })
+      .select({ ...LISTED_ITEM_COLUMNS, link: feedItems.link })
       .from(feedItems)
       .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(eq(feedItems.feedId, feedId))
@@ -327,7 +319,12 @@ export class SubscriptionService {
       .map((row) => {
         const date = dayOf(row.chronologyAt)
         counts.set(date, (counts.get(date) ?? 0) + 1)
-        return feedItemRowOf(row, date, timezone)
+        return {
+          ...listedItemOf(row),
+          link: row.link,
+          date,
+          displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+        }
       })
 
     return {

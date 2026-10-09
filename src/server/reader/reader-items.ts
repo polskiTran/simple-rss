@@ -8,6 +8,7 @@ import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
 import { readingTimeMinutes } from '../markdown/reading-time.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
 /**
@@ -39,18 +40,13 @@ export class ReaderItems {
   item(feedItemId: number): ReaderItem | undefined {
     const row = this.#db
       .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
+        ...LISTED_ITEM_COLUMNS,
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
         link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
         summary: feedItems.summary,
         feedContentMarkdown: feedItems.feedContentMarkdown,
         feedContentTruncated: feedItems.feedContentTruncated,
-        firstSeenAt: feedItems.firstSeenAt,
-        chronologyAt: feedItems.chronologyAt,
-        savedAt: libraryItems.savedAt,
         readingSource: subscriptions.readingSource,
       })
       .from(feedItems)
@@ -65,13 +61,10 @@ export class ReaderItems {
     const timezone = this.#settings.effectiveTimezone()
 
     return {
-      feedItemId: row.feedItemId,
-      title: row.title ?? 'Untitled',
+      ...listedItemOf(row),
       feedId: row.feedId,
       feedTitle: row.feedTitle,
       link: row.link,
-      publishedAt: row.publishedAt,
-      firstSeenAt: row.firstSeenAt,
       displayDate: longDate(new Date(row.chronologyAt), dateKey(this.#clock.now(), timezone), timezone),
       summary: row.summary,
       feedContent: row.feedContentMarkdown
@@ -82,7 +75,6 @@ export class ReaderItems {
             readingTimeMinutes: readingTimeMinutes(row.feedContentMarkdown),
           }
         : null,
-      saved: row.savedAt !== null,
       readingSource: row.readingSource ?? DEFAULT_READING_SOURCE,
       nextInDigest: this.#nextInDigest(feedItemId),
     }

@@ -4,6 +4,7 @@ import type { Clock } from '../clock.js'
 import { dateKey, dayKeysIn, metaRowDate } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { stripCadenceByFeed } from '../digest/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
@@ -100,14 +101,9 @@ export class SearchService {
 
     const rows = this.#db
       .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        publishedAt: feedItems.publishedAt,
-        firstSeenAt: feedItems.firstSeenAt,
-        chronologyAt: feedItems.chronologyAt,
+        ...LISTED_ITEM_COLUMNS,
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
-        savedAt: libraryItems.savedAt,
         summarySnippet: sql<
           string | null
         >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', '…', ${SNIPPET_TOKENS})`,
@@ -131,20 +127,13 @@ export class SearchService {
       .all()
 
     const dayOf = dayKeysIn(timezone)
-    return rows.map((row) => {
-      const displayInstant = new Date(row.chronologyAt)
-      return {
-        feedItemId: row.feedItemId,
-        title: row.title ?? 'Untitled',
-        feedId: row.feedId,
-        feedTitle: row.feedTitle,
-        publishedAt: row.publishedAt,
-        firstSeenAt: row.firstSeenAt,
-        displayDate: metaRowDate(displayInstant, dayOf(row.chronologyAt), today, timezone),
-        saved: row.savedAt !== null,
-        snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
-      }
-    })
+    return rows.map((row) => ({
+      ...listedItemOf(row),
+      feedId: row.feedId,
+      feedTitle: row.feedTitle,
+      displayDate: metaRowDate(new Date(row.chronologyAt), dayOf(row.chronologyAt), today, timezone),
+      snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
+    }))
   }
 
   /** Every word of the line somewhere in the effective title or the domain, in Feeds list order. */

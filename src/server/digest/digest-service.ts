@@ -8,11 +8,11 @@ import {
   type DigestGroup,
   type DigestItem,
   type DigestReturn,
-  type FeedItemRow,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { dateKey, dayAfter, dayBefore, dayKeysIn, daysBetween, dayStartUtc, longDate, timeLabel } from '../calendar.js'
@@ -153,63 +153,30 @@ export class DigestService {
 }
 
 const DIGEST_ROW_COLUMNS = {
-  feedItemId: feedItems.id,
-  title: feedItems.title,
+  ...LISTED_ITEM_COLUMNS,
   feedId: feeds.id,
   feedTitle: effectiveFeedTitle,
   link: feedItems.link,
-  publishedAt: feedItems.publishedAt,
   imageUrl: feedItems.imageUrl,
   summary: feedItems.summary,
-  firstSeenAt: feedItems.firstSeenAt,
-  chronologyAt: feedItems.chronologyAt,
-  savedAt: libraryItems.savedAt,
 }
 
-interface DigestRow {
-  readonly feedItemId: number
-  readonly title: string | null
+interface DigestRow extends ListedItemRow {
   readonly feedId: number
   readonly feedTitle: string
   readonly link: string | null
-  readonly publishedAt: string | null
   readonly imageUrl: string | null
   readonly summary: string | null
-  readonly firstSeenAt: string
-  readonly chronologyAt: string
-  readonly savedAt: string | null
 }
 
 function digestItemOf(row: DigestRow, timezone: string): DigestItem {
   return {
-    feedItemId: row.feedItemId,
-    title: row.title ?? 'Untitled',
+    ...listedItemOf(row),
     feedId: row.feedId,
     feedTitle: row.feedTitle,
     link: row.link,
-    publishedAt: row.publishedAt,
     displayTime: timeLabel(new Date(row.chronologyAt), timezone),
     imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
     summary: row.summary,
-    firstSeenAt: row.firstSeenAt,
-    saved: row.savedAt !== null,
-  }
-}
-
-/** A Feed Item as its own Feed lists it, on its chronology `date`. */
-export function feedItemRowOf(
-  row: Pick<DigestRow, 'feedItemId' | 'title' | 'link' | 'publishedAt' | 'firstSeenAt' | 'chronologyAt' | 'savedAt'>,
-  date: string,
-  timezone: string,
-): FeedItemRow {
-  return {
-    feedItemId: row.feedItemId,
-    title: row.title ?? 'Untitled',
-    link: row.link,
-    publishedAt: row.publishedAt,
-    firstSeenAt: row.firstSeenAt,
-    date,
-    displayTime: timeLabel(new Date(row.chronologyAt), timezone),
-    saved: row.savedAt !== null,
   }
 }
