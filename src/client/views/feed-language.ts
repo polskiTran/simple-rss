@@ -69,8 +69,7 @@ export function noteDate(iso: string): string {
 
 /**
  * What the Add feed field sends: the address as typed, or a bare host given
- * `https://` — the server finds a site's Declared Feed. Anything else is no
- * address at all, and is refused before any request.
+ * `https://`. Anything else is no address at all, and is refused before any request.
  */
 export function feedAddressOf(line: string): string | undefined {
   const address = line.trim()
