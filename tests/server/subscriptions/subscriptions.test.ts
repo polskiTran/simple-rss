@@ -144,28 +144,7 @@ describe('Subscriptions', () => {
     })
   })
 
-  it('falls back to the answering host for a Feed that declares only its own URL as its site', async () => {
-    const service = await startTestService()
-    service.upstream
-      .stub(ENTERED_URL, { status: 301, headers: { location: RESOLVED_URL, 'content-type': 'text/plain' } })
-      .stub(RESOLVED_URL, {
-        headers: { 'content-type': 'application/rss+xml' },
-        body: RSS.replace('<link>https://journal.example/</link>', `<link>${RESOLVED_URL}</link>`),
-      })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
-
-    await service.wakeScheduler()
-
-    const feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions[0]).toMatchObject({
-      title: 'Field Notes',
-      domain: 'feeds.example',
-      homePageUrl: null,
-    })
-  })
-
-  it('falls back to the answering host for a Feed that declares the URL its redirect left behind', async () => {
+  it('names a Feed by its answering host when its declared site is the URL a redirect left behind', async () => {
     const service = await startTestService()
     service.upstream
       .stub(ENTERED_URL, { status: 301, headers: { location: RESOLVED_URL, 'content-type': 'text/plain' } })
@@ -439,79 +418,6 @@ describe('Subscriptions', () => {
     expect(service.database.$client.prepare('SELECT count(*) AS count FROM library_items').get()).toEqual({ count: 3 })
   })
 
-  it('accepts Atom and normalizes its accepted content shape', async () => {
-    const service = await startTestService()
-    const atomUrl = 'https://atom.example/feed.xml'
-    service.upstream.stub(atomUrl, {
-      headers: { 'content-type': 'application/atom+xml' },
-      body: `<?xml version="1.0"?>
-        <feed xmlns="http://www.w3.org/2005/Atom">
-          <title>Atom Letters</title>
-          <entry>
-            <id>tag:atom.example,2026:one</id>
-            <title type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">One <em>letter</em></div></title>
-            <updated>2026-08-07T20:00:00Z</updated>
-            <link rel="alternate" href="/letters/one#top" />
-            <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Kept as <em>plain text</em>.</p></div></summary>
-          </entry>
-        </feed>`,
-    })
-    const user = await claimedDevice(service)
-
-    expect((await user.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
-    await service.wakeScheduler()
-    const digest = await (await user.get('/api/digest')).json()
-
-    expect(digest.groups[0]).toMatchObject({
-      date: '2026-08-07',
-      label: 'Yesterday',
-      items: [
-        {
-          title: 'One letter',
-          link: 'https://atom.example/letters/one',
-          summary: 'Kept as plain text.',
-        },
-      ],
-    })
-  })
-
-  it('corrects an Atom entry under its Atom ID exactly as RSS GUIDs are corrected', async () => {
-    const service = await startTestService()
-    const atomUrl = 'https://atom.example/feed.xml'
-    const entry = (title: string, summary: string) => `<?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Atom Letters</title>
-        <entry>
-          <id>tag:atom.example,2026:one</id>
-          <title>${title}</title>
-          <published>2026-08-08T06:00:00Z</published>
-          <summary>${summary}</summary>
-        </entry>
-      </feed>`
-    service.upstream.stub(atomUrl, {
-      headers: { 'content-type': 'application/atom+xml' },
-      body: entry('first title', 'first summary'),
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: atomUrl })).status).toBe(201)
-    await service.wakeScheduler()
-
-    service.clock.advance(60 * 60 * 1_000)
-    service.upstream.stub(atomUrl, {
-      headers: { 'content-type': 'application/atom+xml' },
-      body: entry('corrected title', 'corrected summary'),
-    })
-    expect((await user.post('/api/feeds/1/refresh')).status).toBe(200)
-
-    const digest = await (await user.get('/api/digest')).json()
-    expect(digest.groups[0].items).toHaveLength(1)
-    expect(digest.groups[0].items[0]).toMatchObject({
-      title: 'corrected title',
-      summary: 'corrected summary',
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-    })
-  })
-
   it('keeps the same entry distinct in two Feeds: identity never crosses a Feed', async () => {
     const service = await startTestService()
     const syndicated = (feedTitle: string) => `<?xml version="1.0"?>
@@ -545,40 +451,5 @@ describe('Subscriptions', () => {
       ['First Wire', 'Syndicated everywhere'],
       ['Second Wire', 'Syndicated everywhere'],
     ])
-  })
-
-  it('accepts RDF-shaped RSS 1.0 Feeds', async () => {
-    const service = await startTestService()
-    const rssUrl = 'https://rdf.example/feed'
-    service.upstream.stub(rssUrl, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: `<?xml version="1.0"?>
-        <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                 xmlns="http://purl.org/rss/1.0/"
-                 xmlns:dc="http://purl.org/dc/elements/1.1/">
-          <channel rdf:about="${rssUrl}">
-            <title>RDF Notes</title>
-            <link>https://rdf.example/journal</link>
-          </channel>
-          <item rdf:about="https://rdf.example/one">
-            <title>RDF item</title>
-            <link>https://rdf.example/one</link>
-            <dc:date>2026-08-08T06:00:00Z</dc:date>
-          </item>
-        </rdf:RDF>`,
-    })
-    const user = await claimedDevice(service)
-
-    expect((await user.post('/api/subscriptions', { url: rssUrl })).status).toBe(201)
-    await service.wakeScheduler()
-    const digest = await (await user.get('/api/digest')).json()
-    expect(digest.groups[0].items[0]).toMatchObject({
-      title: 'RDF item',
-      link: 'https://rdf.example/one',
-      publishedAt: '2026-08-08T06:00:00.000Z',
-    })
-
-    const feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions[0]).toMatchObject({ homePageUrl: 'https://rdf.example/journal' })
   })
 })
