@@ -98,7 +98,7 @@ const SUBSCRIBED_FEED_COLUMNS = {
   subscribedAt: subscriptions.createdAt,
 }
 
-/** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
+/** Subscribing, unsubscribing, and the reads the UI is built from. */
 export class SubscriptionService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -247,8 +247,7 @@ export class SubscriptionService {
 
   /**
    * Folds a duplicate Subscription into the Feed its retrieval revealed (ADR 0007).
-   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor:
-   * the poll discovers the duplicate, but the Subscription writes belong here.
+   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor.
    */
   mergeInto(duplicate: PolledFeed & { readonly readingSource: ReadingSource }, existingFeedId: number): void {
     const now = this.#clock.now().toISOString()

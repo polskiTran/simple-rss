@@ -45,7 +45,7 @@ export interface Service {
   readonly readiness: Readiness
   /** The single outbound HTTP boundary (ADR 0005), shared by every retrieval. */
   readonly retrieval: Retrieval
-  /** Undefined only when startup failed to open the database. */
+  /** Undefined when startup failed. */
   readonly database: DrizzleDatabase | undefined
   readonly settings: InstallationSettingsStore | undefined
   /** The in-process background poller; absent only when startup failed. */
@@ -54,9 +54,9 @@ export interface Service {
 }
 
 /**
- * The composition root. A startup failure is recorded rather than thrown: the
- * process stays up to answer liveness with the reason, while readiness stays
- * closed so no traffic reaches a half-built installation.
+ * The composition root. A startup failure is recorded on `Readiness` rather
+ * than thrown: the process stays up and live, `/health/ready` answers 503 with
+ * the reason, and `/api` answers 503 so no traffic reaches a half-built installation.
  */
 export function createService(options: ServiceOptions): Service {
   const { config } = options

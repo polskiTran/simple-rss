@@ -58,7 +58,7 @@ export interface AppDependencies {
   readonly clock: Clock
   readonly logger: Logger
   readonly readiness: Readiness
-  /** Absent while startup could not open the database; readiness reports that rather than crash-looping. */
+  /** Absent when startup failed; readiness reports that rather than crash-looping. */
   readonly services: Services | undefined
 }
 

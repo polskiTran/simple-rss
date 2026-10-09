@@ -30,8 +30,8 @@ interface PollableFeed extends PolledFeed {
 /**
  * One retrieval of one Feed, end to end: the conditional request, the parse, the
  * Feed Window write, and the single Feed Availability write the outcome earns.
- * A retrieval that reveals a duplicate is handed back to `SubscriptionService`,
- * which owns every Subscription write (ADR 0007).
+ * A retrieval that reveals a duplicate is handed to `SubscriptionService` to
+ * merge (ADR 0007).
  */
 export class FeedPoll {
   readonly #db: DrizzleDatabase
