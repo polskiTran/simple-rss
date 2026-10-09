@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
+// The design system's global invariants (docs/DESIGN.md §1), read off the
+// stylesheet's declarations. Exact values and layout live in the browser tests.
 let css: string
 
 beforeAll(async () => {
@@ -9,9 +11,12 @@ beforeAll(async () => {
   css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
 })
 
-function block(selector: string): string {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return css.match(new RegExp(`\\n\\s*${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+/** Every `property: value` declaration of a property, value trimmed, comments ignored. */
+function declarations(property: string): string[] {
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  return [...code.matchAll(new RegExp(`(?:^|[;{\\s])${property}\\s*:\\s*([^;{}]+)`, 'g'))].map(([, value]) =>
+    (value ?? '').trim(),
+  )
 }
 
 describe('colour', () => {
@@ -20,88 +25,26 @@ describe('colour', () => {
     expect(css).not.toMatch(/\b(rgb|rgba|hsl|hsla)\(/)
   })
 
-  it('binds each token once for both schemes, resolved by the document’s colour scheme', () => {
-    const tokens = css.match(/\n\s*--color-[\w-]+:\s*oklch\(/g) ?? []
-    expect(tokens).toHaveLength(0)
-    expect(css).toMatch(/--color-ink:\s*light-dark\(oklch\(17\.8% 0 0\), oklch\(94\.6% 0 0\)\)/)
-    expect(css).not.toContain('prefers-color-scheme: dark) {\n  :root')
-  })
-
-  it('lets the appearance choice pin a scheme against the device’s', () => {
-    expect(block("html[data-appearance='light']")).toContain('color-scheme: light')
-    expect(block("html[data-appearance='dark']")).toContain('color-scheme: dark')
-    expect(block('html')).toContain('color-scheme: light dark')
-  })
-
-  it('makes the renderer’s `dark:` classes follow the pinned appearance', () => {
-    expect(css).toContain('@custom-variant dark')
-    expect(css).toContain("&:where([data-appearance='dark'], [data-appearance='dark'] *)")
-    expect(css).toContain(":not([data-appearance='light'], [data-appearance='light'] *)")
+  it('binds each colour token once for both schemes', () => {
+    const tokens = css.match(/--color-[\w-]+\s*:\s*[^;]+/g) ?? []
+    expect(tokens.length).toBeGreaterThan(0)
+    for (const token of tokens) expect(token).toMatch(/:\s*(light-dark|var)\(/)
   })
 })
 
 describe('shape', () => {
   it('has no rounded corners', () => {
-    for (const [, value] of css.matchAll(/border-radius:\s*([^;]+);/g)) expect(value).toBe('0')
+    for (const value of declarations('border-radius')) expect(value).toBe('0')
   })
 
   it('never sets words in capitals', () => {
-    expect(css).not.toMatch(/text-transform:\s*uppercase/)
-    expect(css).not.toMatch(/font-variant(-caps)?:\s*(all-)?small-caps/)
+    expect(declarations('text-transform')).not.toContain('uppercase')
+    for (const value of declarations('font-variant(?:-caps)?')) expect(value).not.toMatch(/small-caps/)
   })
 })
 
 describe('type', () => {
-  it('operates in Instrument Sans and reads in Literata', () => {
-    expect(block('body')).toContain('font-family: var(--font-ui)')
-    expect(block('.item-title')).toContain('var(--font-read)')
-    expect(block('.wordmark-name')).toContain('var(--font-read)')
-  })
-
   it('keeps monospace out of the interface', () => {
     expect(css).not.toMatch(/monospace|ui-monospace|Menlo/)
-  })
-})
-
-describe('motion', () => {
-  const startingStyles = () =>
-    [...css.matchAll(/@starting-style\s*\{([^}]*)\{\s*opacity: 0;\s*\}/g)].map(([, rule]) => rule)
-
-  it('opens a screen at once and fades in only what the server sends', () => {
-    expect(startingStyles().some((rule) => rule?.includes('.view'))).toBe(false)
-    const arrival = startingStyles().find((rule) => rule?.includes('.item'))
-    for (const data of ['.item', '.feed-row', '.page-title-companion']) expect(arrival).toContain(data)
-  })
-
-  it('shows a waiting line only once the wait passes 400ms', () => {
-    expect(block('.loading-note')).toContain('animation: note-arrive 150ms ease-out 400ms both')
-  })
-
-  it('fades the scrollbar gutter with the scrim, out as well as in', () => {
-    expect(block('html:has(.dialog-backdrop)')).toContain('transition: background-color 150ms')
-    expect(block('html:has(.dialog-backdrop[data-ending-style])')).toContain('background: var(--color-ground)')
-  })
-
-  it('raises the phone sheet from the bottom edge', () => {
-    const phone = css.slice(css.indexOf('@media (max-width: 640px)'))
-    expect(phone).toMatch(
-      /\.dialog:is\(\[data-starting-style\], \[data-ending-style\]\)\s*\{\s*opacity: 1;\s*transform: translateY\(100%\)/,
-    )
-  })
-})
-
-describe('motion under prefers-reduced-motion', () => {
-  const reduced = () => css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
-
-  it('keeps the fades but moves nothing: the phone sheet fades in place', () => {
-    expect(reduced()).toMatch(
-      /\.dialog:is\(\[data-starting-style\], \[data-ending-style\]\)\s*\{\s*opacity: 0;\s*transform: none/,
-    )
-    expect(reduced()).not.toContain('transition-duration: 0s')
-  })
-
-  it('stops the mark’s glint, so the waiting tile holds still', () => {
-    expect(reduced()).toMatch(/\.wordmark-cell\s*\{\s*animation: none/)
-    expect(reduced()).not.toMatch(/animation: (?!none)/)
   })
 })
