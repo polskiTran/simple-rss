@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Authentication } from '../../../src/server/auth/authentication.js'
 import type { PasswordHasher } from '../../../src/server/auth/password.js'
 import { LoginRateLimiter } from '../../../src/server/auth/rate-limit.js'
-import { ABSOLUTE_TIMEOUT_MS, IDLE_TIMEOUT_MS, SessionStore } from '../../../src/server/auth/sessions.js'
-import { UserAuthStore } from '../../../src/server/auth/user-auth.js'
+import { ABSOLUTE_TIMEOUT_MS, CredentialStore, IDLE_TIMEOUT_MS } from '../../../src/server/auth/credentials.js'
 import { SESSION_COOKIE } from '../../../src/server/http/session-cookie.js'
 import { createLogger } from '../../../src/server/logger.js'
 import { type DrizzleDatabase, openDatabase } from '../../../src/server/persistence/database.js'
@@ -698,9 +697,8 @@ describe('credential rotation races', () => {
     const clock = new ManualClock('2026-08-08T09:00:00.000Z')
     applyMigrations(database, clock)
 
-    const user = new UserAuthStore(database)
-    const sessions = new SessionStore(database)
-    user.claim('hash:old-password', clock.now())
+    const credentials = new CredentialStore(database)
+    credentials.claim('hash:old-password', clock.now())
 
     let verificationStarted!: () => void
     const started = new Promise<void>((resolve) => {
@@ -719,8 +717,7 @@ describe('credential rotation races', () => {
       },
     }
     const authentication = new Authentication({
-      user,
-      sessions,
+      credentials,
       hasher,
       limiter: new LoginRateLimiter(clock),
       sleep: async () => {},
@@ -735,6 +732,6 @@ describe('credential rotation races', () => {
     finishVerification()
 
     expect(await staleSignIn).toEqual({ kind: 'rejected' })
-    expect(user.read()?.passwordHash).toBe('hash:new-password')
+    expect(credentials.passwordHash()).toBe('hash:new-password')
   })
 })

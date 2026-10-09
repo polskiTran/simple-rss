@@ -1,8 +1,7 @@
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { UserAuthStore } from '../../src/server/auth/user-auth.js'
+import { CredentialStore } from '../../src/server/auth/credentials.js'
 import { argon2idHasher } from '../../src/server/auth/password.js'
-import { SessionStore } from '../../src/server/auth/sessions.js'
 import { runCli, NEW_PASSWORD_VARIABLE, type CliContext } from '../../src/server/cli.js'
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger, type Logger } from '../../src/server/logger.js'
@@ -126,11 +125,11 @@ describe('runCli reset-password', () => {
   let output: string[]
   let dataDir: string
 
-  function inspect<T>(read: (stores: { user: UserAuthStore; sessions: SessionStore }) => T): T {
+  function inspect<T>(read: (credentials: CredentialStore) => T): T {
     const db = openDatabase(join(dataDir, 'simple-rss.db'))
     try {
       applyMigrations(db)
-      return read({ user: new UserAuthStore(db), sessions: new SessionStore(db) })
+      return read(new CredentialStore(db))
     } finally {
       db.$client.close()
     }
@@ -150,31 +149,28 @@ describe('runCli reset-password', () => {
   it('installs a verifier that accepts the new password', async () => {
     expect(await runCli(['reset-password', 'a-recovered-password'], context)).toBe(0)
 
-    const record = inspect(({ user }) => user.read())
-    expect(await argon2idHasher().verify(record!.passwordHash, 'a-recovered-password')).toBe(true)
+    const verifier = inspect((credentials) => credentials.passwordHash())
+    expect(await argon2idHasher().verify(verifier!, 'a-recovered-password')).toBe(true)
   })
 
   it('claims an installation whose setup secret was never used', async () => {
     await runCli(['reset-password', 'a-recovered-password'], context)
 
-    expect(inspect(({ user }) => user.isClaimed())).toBe(true)
+    expect(inspect((credentials) => credentials.passwordHash() !== undefined)).toBe(true)
   })
 
   it('revokes every session, and says how many it ended', async () => {
     const at = context.clock.now()
-    const issued = inspect(({ user, sessions }) => {
-      user.resetPassword('an-existing-verifier', at)
-      return [
-        sessions.issueForPasswordHash('an-existing-verifier', at),
-        sessions.issueForPasswordHash('an-existing-verifier', at),
-      ]
-    })
+    const issued = inspect((credentials) => [
+      credentials.claim('an-existing-verifier', at),
+      credentials.issueSession('an-existing-verifier', at),
+    ])
 
     await runCli(['reset-password', 'a-recovered-password'], context)
 
     expect(JSON.parse(output[0]!)).toEqual({ passwordReset: true, sessionsRevoked: 2 })
-    expect(inspect(({ sessions }) => sessions.touch(issued[0]!.token, at))).toBe(false)
-    expect(inspect(({ sessions }) => sessions.touch(issued[1]!.token, at))).toBe(false)
+    expect(inspect((credentials) => credentials.touch(issued[0]!.token, at))).toBe(false)
+    expect(inspect((credentials) => credentials.touch(issued[1]!.token, at))).toBe(false)
   })
 
   it('replaces a password the User has forgotten, without being told it', async () => {
@@ -183,9 +179,9 @@ describe('runCli reset-password', () => {
 
     await runCli(['reset-password', 'the-recovered-password'], context)
 
-    const record = inspect(({ user }) => user.read())
-    expect(await argon2idHasher().verify(record!.passwordHash, 'the-recovered-password')).toBe(true)
-    expect(await argon2idHasher().verify(record!.passwordHash, 'the-original-password')).toBe(false)
+    const verifier = inspect((credentials) => credentials.passwordHash())
+    expect(await argon2idHasher().verify(verifier!, 'the-recovered-password')).toBe(true)
+    expect(await argon2idHasher().verify(verifier!, 'the-original-password')).toBe(false)
   })
 
   it('takes the password from the environment, to keep it out of shell history', async () => {
@@ -193,8 +189,8 @@ describe('runCli reset-password', () => {
 
     expect(await runCli(['reset-password'], withEnv)).toBe(0)
 
-    const record = inspect(({ user }) => user.read())
-    expect(await argon2idHasher().verify(record!.passwordHash, 'a-recovered-password')).toBe(true)
+    const verifier = inspect((credentials) => credentials.passwordHash())
+    expect(await argon2idHasher().verify(verifier!, 'a-recovered-password')).toBe(true)
   })
 
   it('prefers the argument over the environment when both are given', async () => {
@@ -202,8 +198,8 @@ describe('runCli reset-password', () => {
 
     await runCli(['reset-password', 'the-argument-one'], withEnv)
 
-    const record = inspect(({ user }) => user.read())
-    expect(await argon2idHasher().verify(record!.passwordHash, 'the-argument-one')).toBe(true)
+    const verifier = inspect((credentials) => credentials.passwordHash())
+    expect(await argon2idHasher().verify(verifier!, 'the-argument-one')).toBe(true)
   })
 
   it('does not migrate an older database before validating the password', async () => {
@@ -228,20 +224,20 @@ describe('runCli reset-password', () => {
     expect(await runCli(['reset-password'], context)).toBe(1)
 
     expect(output.join('\n')).toContain(NEW_PASSWORD_VARIABLE)
-    expect(inspect(({ user }) => user.isClaimed())).toBe(false)
+    expect(inspect((credentials) => credentials.passwordHash() !== undefined)).toBe(false)
   })
 
   it('holds a recovered password to the same length rule as a chosen one', async () => {
     expect(await runCli(['reset-password', 'short'], context)).toBe(1)
 
     expect(output.join('\n')).toMatch(/at least 12 characters/)
-    expect(inspect(({ user }) => user.isClaimed())).toBe(false)
+    expect(inspect((credentials) => credentials.passwordHash() !== undefined)).toBe(false)
   })
 
   it('rejects a multibyte password beyond the hashing byte limit', async () => {
     expect(await runCli(['reset-password', '界'.repeat(400)], context)).toBe(1)
 
-    expect(inspect(({ user }) => user.isClaimed())).toBe(false)
+    expect(inspect((credentials) => credentials.passwordHash() !== undefined)).toBe(false)
   })
 
   it('is listed in the usage an operator sees', async () => {
