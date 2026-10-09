@@ -113,7 +113,6 @@ export const subscriptions = sqliteTable(
     lastPolledAt: text('last_polled_at'),
     /** Feed Availability: how the recent attempts went, in safe categories. */
     lastSuccessAt: text('last_success_at'),
-    lastFailureAt: text('last_failure_at'),
     consecutiveFailures: integer('consecutive_failures').notNull().default(0),
     lastFailureCategory: text('last_failure_category', {
       enum: ['unreachable', 'timeout', 'too_large', 'unsupported_content', 'http_error', 'invalid_feed'],
