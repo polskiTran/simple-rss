@@ -28,7 +28,7 @@ import {
   subscriptions,
 } from '../persistence/schema.js'
 import { gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
-import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
+import { availabilityOf, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
 import { nextPollTime } from './polling-schedule.js'
@@ -98,7 +98,10 @@ const SUBSCRIBED_FEED_COLUMNS = {
   subscribedAt: subscriptions.createdAt,
 }
 
-/** Subscribing, unsubscribing, and the reads the UI is built from. */
+/**
+ * The User's Subscription changes — subscribing, OPML, preferences, unsubscribing —
+ * and the reads the UI is built from. Poll outcomes are written by `FeedPoll`.
+ */
 export class SubscriptionService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -234,36 +237,6 @@ export class SubscriptionService {
 
   exportOpml(): string {
     return serializeOpml(this.#subscribedFeeds(), this.#clock.now())
-  }
-
-  /**
-   * Folds a duplicate Subscription into the Feed its retrieval revealed (ADR 0007).
-   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor.
-   */
-  mergeInto(duplicate: PolledFeed & { readonly readingSource: ReadingSource }, existingFeedId: number): void {
-    const now = this.#clock.now().toISOString()
-    this.#db.transaction((tx) => {
-      const existingSubscribed = tx
-        .select({ feedId: subscriptions.feedId })
-        .from(subscriptions)
-        .where(eq(subscriptions.feedId, existingFeedId))
-        .limit(1)
-        .all()[0]
-      tx.update(feedUrlAliases).set({ feedId: existingFeedId }).where(eq(feedUrlAliases.feedId, duplicate.feedId)).run()
-      tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
-
-      if (!existingSubscribed) {
-        tx.insert(subscriptions)
-          .values({
-            ...newSubscription(existingFeedId, now),
-            pollingIntervalMinutes: duplicate.pollingIntervalMinutes,
-            readingSource: duplicate.readingSource,
-          })
-          .run()
-      }
-    })
-
-    this.#logger.info('subscriptions.feeds_merged', { feedId: duplicate.feedId, intoFeedId: existingFeedId })
   }
 
   /**

@@ -2,14 +2,13 @@ import { eq } from 'drizzle-orm'
 import type { ReadingSource } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { FeedDocumentError, parseFeedDocument, type ParsedFeedDocument } from '../ingestion/feed-document.js'
-import { persistFeedWindow } from '../ingestion/feed-window.js'
+import { type DatabaseTransaction, persistFeedWindow } from '../ingestion/feed-window.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedUrlAliases, feeds, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalBytes } from '../upstream/retrieval.js'
-import type { FailedPoll, FeedAvailabilityLedger, PolledFeed } from './feed-availability.js'
+import { settle, type FailedPoll, type PolledFeed, type SettledPoll } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
-import type { SubscriptionService } from './subscription-service.js'
 
 export type IngestFeedOutcome =
   | { readonly kind: 'updated'; readonly observedItems: number }
@@ -27,65 +26,83 @@ interface PollableFeed extends PolledFeed {
   readonly lastModified: string | null
 }
 
+/** What the publisher said, before anything is written. */
+type Answer =
+  | FailedPoll
+  | { readonly kind: 'not-modified'; readonly retrieved: RetrievalBytes }
+  | { readonly kind: 'parsed'; readonly retrieved: RetrievalBytes; readonly parsed: ParsedFeedDocument }
+
 /**
- * One retrieval of one Feed, end to end: the conditional request, the parse, the
- * Feed Window write, and the single Feed Availability write the outcome earns.
- * A retrieval that reveals a duplicate is handed to `SubscriptionService` to
- * merge (ADR 0007).
+ * One retrieval of one Feed, end to end: the conditional request, the parse,
+ * then every write the answer earns in one transaction — the Feed Window, a
+ * merge the retrieval revealed (ADR 0007), and the Feed Availability that
+ * `settle` decides. Poll outcomes are written here and nowhere else.
  */
 export class FeedPoll {
   readonly #db: DrizzleDatabase
   readonly #retrieval: Retrieval
   readonly #clock: Clock
   readonly #logger: Logger
-  readonly #subscriptions: Pick<SubscriptionService, 'mergeInto'>
-  readonly #availability: FeedAvailabilityLedger
 
-  constructor(options: {
-    db: DrizzleDatabase
-    retrieval: Retrieval
-    clock: Clock
-    logger: Logger
-    subscriptions: Pick<SubscriptionService, 'mergeInto'>
-    availability: FeedAvailabilityLedger
-  }) {
+  constructor(options: { db: DrizzleDatabase; retrieval: Retrieval; clock: Clock; logger: Logger }) {
     this.#db = options.db
     this.#retrieval = options.retrieval
     this.#clock = options.clock
     this.#logger = options.logger.child({ component: 'subscriptions' })
-    this.#subscriptions = options.subscriptions
-    this.#availability = options.availability
   }
 
   async ingest(feedId: number): Promise<IngestFeedOutcome> {
     const feed = this.#pollableFeed(feedId)
     if (!feed) return { kind: 'missing' }
 
-    const outcome = await this.#poll(feed)
-    if (outcome.kind === 'missing' || outcome.kind === 'merged') return outcome
-    this.#availability.record(feed, outcome)
-    return outcome
+    const answer = await this.#ask(feed)
+    const now = this.#clock.now()
+    return this.#db.transaction((tx) => this.#record(tx, feed, answer, now))
   }
 
-  async #poll(feed: PollableFeed): Promise<IngestFeedOutcome> {
+  async #ask(feed: PollableFeed): Promise<Answer> {
     const retrieved = await this.#retrieval.retrieveBytes({
       url: feed.resolvedUrl,
       operation: 'feed',
       conditional: { etag: feed.etag, lastModified: feed.lastModified },
     })
     if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
+    if (retrieved.notModified) return { kind: 'not-modified', retrieved }
 
-    if (retrieved.notModified) {
+    try {
+      const parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
+      return { kind: 'parsed', retrieved, parsed }
+    } catch (error) {
+      if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
+      throw error
+    }
+  }
+
+  /**
+   * Writes nothing when the Subscription is gone by the time the answer lands:
+   * unsubscribing takes effect immediately, and an in-flight poll must not
+   * resurrect what the User let go of.
+   */
+  #record(tx: DatabaseTransaction, feed: PollableFeed, answer: Answer, now: Date): IngestFeedOutcome {
+    const subscribed = tx
+      .select({ feedId: subscriptions.feedId })
+      .from(subscriptions)
+      .where(eq(subscriptions.feedId, feed.feedId))
+      .limit(1)
+      .all()[0]
+    if (!subscribed) return { kind: 'missing' }
+
+    if (answer.kind === 'not-modified') {
       // A 304 may still rotate the validators; keeping the newest ones keeps
       // later requests conditional. No Feed Item row is touched.
-      this.#db
-        .update(feeds)
+      tx.update(feeds)
         .set({
-          etag: retrieved.etag ?? feed.etag,
-          lastModified: retrieved.lastModified ?? feed.lastModified,
+          etag: answer.retrieved.etag ?? feed.etag,
+          lastModified: answer.retrieved.lastModified ?? feed.lastModified,
         })
         .where(eq(feeds.id, feed.feedId))
         .run()
+      this.#settle(tx, feed, answer, now)
       this.#logger.info('subscriptions.feed_unchanged', {
         feedId: feed.feedId,
         resolvedUrl: loggableUrl(feed.resolvedUrl),
@@ -93,28 +110,31 @@ export class FeedPoll {
       return { kind: 'not-modified' }
     }
 
-    let parsed: ParsedFeedDocument
-    try {
-      parsed = parseFeedDocument(retrieved.bytes, retrieved.url, [feed.enteredUrl, feed.resolvedUrl])
-    } catch (error) {
-      if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
-      throw error
+    if (answer.kind !== 'parsed') {
+      this.#settle(tx, feed, answer, now)
+      return answer
+    }
+
+    const { retrieved, parsed } = answer
+    const window = {
+      parsed,
+      resolvedUrl: retrieved.url,
+      validators: { etag: retrieved.etag, lastModified: retrieved.lastModified },
+      now: now.toISOString(),
     }
 
     // Two entered URLs can hide one Feed; the retrieval is what reveals it.
     // The later Subscription folds into the existing Feed (ADR 0007).
-    const existingFeedId = this.#aliasOwner(retrieved.url)
+    const existingFeedId = aliasOwner(tx, retrieved.url)
     if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
-      this.#subscriptions.mergeInto(feed, existingFeedId)
-      const survivor = this.#pollableFeed(existingFeedId)
-      if (survivor) {
-        this.#write(survivor.feedId, parsed, retrieved)
-        this.#availability.recordSuccess(survivor)
-      }
+      const survivor = this.#mergeInto(tx, feed, existingFeedId, retrieved.url, now)
+      persistFeedWindow(tx, { feedId: survivor.feedId, ...window })
+      this.#settle(tx, survivor, { kind: 'updated' }, now)
       return { kind: 'merged', intoFeedId: existingFeedId }
     }
 
-    if (!this.#write(feed.feedId, parsed, retrieved)) return { kind: 'missing' }
+    persistFeedWindow(tx, { feedId: feed.feedId, ...window })
+    this.#settle(tx, feed, { kind: 'updated' }, now)
     const observedItems = new Set(parsed.items.map((item) => item.dedupeKey)).size
     this.#logger.info('subscriptions.feed_window_ingested', {
       feedId: feed.feedId,
@@ -125,24 +145,56 @@ export class FeedPoll {
     return { kind: 'updated', observedItems }
   }
 
-  /** False when the Subscription vanished mid-flight, which is the one way a write finds nothing to write to. */
-  #write(feedId: number, parsed: ParsedFeedDocument, retrieved: RetrievalBytes): boolean {
-    return persistFeedWindow(this.#db, {
-      feedId,
-      parsed,
-      resolvedUrl: retrieved.url,
-      validators: { etag: retrieved.etag, lastModified: retrieved.lastModified },
-      now: this.#clock.now().toISOString(),
-    })
+  #settle(tx: DatabaseTransaction, feed: PolledFeed, outcome: SettledPoll, now: Date): void {
+    const { patch, log } = settle(feed, outcome, now)
+    tx.update(subscriptions).set(patch).where(eq(subscriptions.feedId, feed.feedId)).run()
+    if (log) this.#logger[log.level](log.message, log.fields)
   }
 
-  #aliasOwner(url: string): number | undefined {
-    return this.#db
-      .select({ feedId: feedUrlAliases.feedId })
-      .from(feedUrlAliases)
-      .where(eq(feedUrlAliases.url, url))
+  /**
+   * Folds the duplicate's Subscription into the existing Feed: the URLs move,
+   * the duplicate's Subscription goes, and its Feed row is left for Retention
+   * to judge like any unsubscribed Feed. An unsubscribed survivor is revived
+   * with the duplicate's preferences. Returns the survivor as the poll settles it.
+   */
+  #mergeInto(
+    tx: DatabaseTransaction,
+    duplicate: PollableFeed,
+    existingFeedId: number,
+    resolvedUrl: string,
+    now: Date,
+  ): PolledFeed {
+    const existing = tx
+      .select({
+        pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
+        consecutiveFailures: subscriptions.consecutiveFailures,
+      })
+      .from(subscriptions)
+      .where(eq(subscriptions.feedId, existingFeedId))
       .limit(1)
-      .all()[0]?.feedId
+      .all()[0]
+    tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
+    tx.update(feedUrlAliases).set({ feedId: existingFeedId }).where(eq(feedUrlAliases.feedId, duplicate.feedId)).run()
+
+    if (!existing) {
+      tx.insert(subscriptions)
+        .values({
+          feedId: existingFeedId,
+          pollingIntervalMinutes: duplicate.pollingIntervalMinutes,
+          readingSource: duplicate.readingSource,
+          nextPollAt: now.toISOString(),
+          createdAt: now.toISOString(),
+        })
+        .run()
+    }
+
+    this.#logger.info('subscriptions.feeds_merged', { feedId: duplicate.feedId, intoFeedId: existingFeedId })
+    return {
+      feedId: existingFeedId,
+      resolvedUrl,
+      pollingIntervalMinutes: existing?.pollingIntervalMinutes ?? duplicate.pollingIntervalMinutes,
+      consecutiveFailures: existing?.consecutiveFailures ?? 0,
+    }
   }
 
   #pollableFeed(feedId: number): PollableFeed | undefined {
@@ -163,4 +215,13 @@ export class FeedPoll {
       .limit(1)
       .all()[0]
   }
+}
+
+function aliasOwner(tx: DatabaseTransaction, url: string): number | undefined {
+  return tx
+    .select({ feedId: feedUrlAliases.feedId })
+    .from(feedUrlAliases)
+    .where(eq(feedUrlAliases.url, url))
+    .limit(1)
+    .all()[0]?.feedId
 }

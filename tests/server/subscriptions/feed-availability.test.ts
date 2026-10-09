@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../../src/shared/api.js'
 import {
-  MAX_BACKOFF_MINUTES,
-  backoffMinutes,
-  nextPollTime,
-  nextRetryTime,
-} from '../../../src/server/subscriptions/polling-schedule.js'
+  availabilityOf as presented,
+  settle,
+  type PolledFeed,
+  type Settlement,
+} from '../../../src/server/subscriptions/feed-availability.js'
 import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../../src/server/upstream/retrieval.js'
 import { Device, claimedDevice } from '../../support/device.js'
 import { ManualClock } from '../../support/manual-clock.js'
@@ -28,6 +28,131 @@ function rss(title: string): string {
 </channel></rss>`
 }
 
+const NOW = new Date(START)
+
+const polled: PolledFeed = {
+  feedId: 7,
+  resolvedUrl: 'https://one.example/feed?token=secret',
+  pollingIntervalMinutes: 120,
+  consecutiveFailures: 0,
+}
+
+function failedWith(code: RetrievalFailureCode) {
+  return { kind: 'retrieval-failed', failure: { ok: false, code, reason: '' } } as const
+}
+
+function waitMinutes(settlement: Settlement): number {
+  return (Date.parse(settlement.patch.nextPollAt) - NOW.getTime()) / 60_000
+}
+
+describe('settling a poll', () => {
+  it.each(['updated', 'not-modified'] as const)('clears the failure run after an %s answer', (kind) => {
+    const settlement = settle({ ...polled, consecutiveFailures: 4 }, { kind }, NOW)
+
+    expect(settlement).toEqual({
+      patch: {
+        nextPollAt: expect.any(String),
+        lastPolledAt: START,
+        lastSuccessAt: START,
+        consecutiveFailures: 0,
+        lastFailureCategory: null,
+      },
+    })
+    expect(waitMinutes(settlement)).toBeGreaterThanOrEqual(120)
+    expect(waitMinutes(settlement)).toBeLessThan(132)
+  })
+
+  it('extends the failure run and doubles the wait from the Polling Interval', () => {
+    const first = settle(polled, failedWith('http_error'), NOW)
+    expect(first.patch).toMatchObject({
+      lastPolledAt: START,
+      consecutiveFailures: 1,
+      lastFailureCategory: 'http_error',
+    })
+    expect(first.patch).not.toHaveProperty('lastSuccessAt')
+    expect(waitMinutes(first)).toBeGreaterThanOrEqual(120)
+    expect(waitMinutes(first)).toBeLessThan(132)
+
+    const third = settle({ ...polled, consecutiveFailures: 2 }, failedWith('http_error'), NOW)
+    expect(third.patch.consecutiveFailures).toBe(3)
+    expect(waitMinutes(third)).toBeGreaterThanOrEqual(480)
+    expect(waitMinutes(third)).toBeLessThan(495)
+  })
+
+  it('never waits longer than 24 hours, whatever the run or the interval', () => {
+    expect(waitMinutes(settle({ ...polled, consecutiveFailures: 5 }, failedWith('timeout'), NOW))).toBe(24 * 60)
+    expect(waitMinutes(settle({ ...polled, pollingIntervalMinutes: 1440 }, failedWith('timeout'), NOW))).toBe(24 * 60)
+  })
+
+  it.each(['busy', 'cancelled'] as const)(
+    'moves one Polling Interval on without blaming the Feed when the attempt was %s',
+    (code) => {
+      const settlement = settle({ ...polled, consecutiveFailures: 2 }, failedWith(code), NOW)
+
+      expect(settlement.patch).toEqual({ nextPollAt: expect.any(String), lastPolledAt: START })
+      expect(waitMinutes(settlement)).toBeGreaterThanOrEqual(120)
+      expect(waitMinutes(settlement)).toBeLessThan(132)
+      expect(settlement.log).toEqual({
+        level: 'info',
+        message: 'subscriptions.feed_poll_deferred',
+        fields: { feedId: 7, resolvedUrl: 'https://one.example/feed', code },
+      })
+    },
+  )
+
+  it.each([
+    ['timeout', 'timeout'],
+    ['body_timeout', 'timeout'],
+    ['too_large', 'too_large'],
+    ['unsupported_content_type', 'unsupported_content'],
+    ['unsupported_content_encoding', 'unsupported_content'],
+    ['http_error', 'http_error'],
+    ['unresolvable_host', 'unreachable'],
+    ['unavailable', 'unreachable'],
+  ] as const)('records a %s failure as %s', (code, category) => {
+    expect(settle(polled, failedWith(code), NOW).patch.lastFailureCategory).toBe(category)
+  })
+
+  it('records a document that would not parse as invalid_feed', () => {
+    expect(settle(polled, { kind: 'invalid-feed', code: 'malformed_feed' }, NOW).patch.lastFailureCategory).toBe(
+      'invalid_feed',
+    )
+  })
+
+  it('logs a failure with the loggable Feed URL and the next attempt', () => {
+    const settlement = settle(polled, failedWith('http_error'), NOW)
+    expect(settlement.log).toEqual({
+      level: 'warn',
+      message: 'subscriptions.feed_poll_failed',
+      fields: {
+        feedId: 7,
+        resolvedUrl: 'https://one.example/feed',
+        category: 'http_error',
+        consecutiveFailures: 1,
+        nextPollAt: settlement.patch.nextPollAt,
+      },
+    })
+  })
+})
+
+describe('presented Feed Availability', () => {
+  const never = { lastPolledAt: null, lastSuccessAt: null, consecutiveFailures: 0, lastFailureCategory: null }
+
+  it('is unchecked until a retrieval succeeds, failures or not', () => {
+    expect(presented(never).state).toBe('unchecked')
+    expect(
+      presented({ ...never, lastPolledAt: START, consecutiveFailures: 2, lastFailureCategory: 'timeout' }).state,
+    ).toBe('unchecked')
+  })
+
+  it('stays available through two failures and turns unavailable at the third', () => {
+    const succeeded = { ...never, lastPolledAt: START, lastSuccessAt: START }
+    expect(presented({ ...succeeded, consecutiveFailures: 2 }).state).toBe('available')
+    expect(presented({ ...succeeded, consecutiveFailures: 3 }).state).toBe('unavailable')
+    expect(presented({ ...never, consecutiveFailures: 3 }).state).toBe('unavailable')
+  })
+})
+
 async function subscribed(user: Device, service: TestService, url: string): Promise<number> {
   service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
   const response = await user.post('/api/subscriptions', { url })
@@ -41,7 +166,6 @@ interface StoredAvailability {
   readonly nextPollAt: string
   readonly lastPolledAt: string | null
   readonly lastSuccessAt: string | null
-  readonly lastFailureAt: string | null
   readonly consecutiveFailures: number
   readonly lastFailureCategory: string | null
 }
@@ -51,7 +175,6 @@ function storedAvailability(service: TestService, feedId: number): StoredAvailab
     .prepare(`SELECT next_poll_at          AS nextPollAt,
           last_polled_at        AS lastPolledAt,
           last_success_at       AS lastSuccessAt,
-          last_failure_at       AS lastFailureAt,
           consecutive_failures  AS consecutiveFailures,
           last_failure_category AS lastFailureCategory
      FROM subscriptions WHERE feed_id = ?`)
@@ -78,25 +201,20 @@ async function availabilityOf(user: Device, feedId: number): Promise<FeedAvailab
 }
 
 describe('Feed Availability', () => {
-  it('backs off exponentially on repeated failures and never waits past 24 hours', async () => {
+  it('waits out the backoff between failed polls, never past 24 hours', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     const url = 'https://one.example/feed'
     const feedId = await subscribed(user, service, url)
 
     service.upstream.stub(url, { status: 500, headers: { 'content-type': 'text/plain' }, body: 'gone' })
-
     for (const failures of [1, 2, 3, 4, 5, 6]) {
       await pollWhenDue(service, feedId)
-      const stored = storedAvailability(service, feedId)
-      expect(stored.consecutiveFailures).toBe(failures)
-      expect(stored.nextPollAt).toBe(nextRetryTime(feedId, 120, failures, service.clock.now()))
-      expect(Date.parse(stored.nextPollAt) - service.clock.now().getTime()).toBeLessThanOrEqual(
-        MAX_BACKOFF_MINUTES * 60_000,
-      )
+      expect(storedAvailability(service, feedId).consecutiveFailures).toBe(failures)
     }
-    expect(backoffMinutes(120, 5)).toBe(MAX_BACKOFF_MINUTES)
-    expect(backoffMinutes(120, 6)).toBe(MAX_BACKOFF_MINUTES)
+    expect(Date.parse(storedAvailability(service, feedId).nextPollAt) - service.clock.now().getTime()).toBe(
+      24 * 60 * 60_000,
+    )
 
     const attempts = service.upstream.requestsTo(url).length
     await service.wakeScheduler()
@@ -155,8 +273,6 @@ describe('Feed Availability', () => {
       consecutiveFailures: 0,
       category: null,
     })
-    expect(storedAvailability(service, feedId).nextPollAt).toBe(nextPollTime(feedId, 120, service.clock.now()))
-    expect(storedAvailability(service, feedId).lastFailureAt).toBeNull()
   })
 
   it('keeps the failure run and its backoff across a restart', async () => {
@@ -369,7 +485,6 @@ describe('congestion at the retrieval boundary', () => {
       consecutiveFailures: 1,
       lastFailureCategory: 'http_error',
       lastPolledAt: service.clock.now().toISOString(),
-      nextPollAt: nextPollTime(feedId, 120, service.clock.now()),
     })
 
     await pollWhenDue(service, feedId)
@@ -377,30 +492,5 @@ describe('congestion at the retrieval boundary', () => {
       consecutiveFailures: 0,
       lastFailureCategory: null,
     })
-  })
-})
-
-describe('availability categories', () => {
-  it('keeps timeout and the other retrieval failures distinguishable', async () => {
-    const verdicts: readonly [RetrievalFailureCode, FeedAvailability['category']][] = [
-      ['timeout', 'timeout'],
-      ['body_timeout', 'timeout'],
-      ['too_large', 'too_large'],
-      ['unsupported_content_type', 'unsupported_content'],
-      ['unsupported_content_encoding', 'unsupported_content'],
-      ['http_error', 'http_error'],
-      ['unresolvable_host', 'unreachable'],
-      ['unavailable', 'unreachable'],
-    ]
-
-    const service = await startTestService({
-      retrieval: scriptedRetrieval(verdicts.map(([code]) => ({ ok: false, code, reason: '' }))),
-    })
-    const feedId = await subscribedOnScript(service, 'https://one.example/feed')
-
-    for (const [code, category] of verdicts) {
-      await pollWhenDue(service, feedId)
-      expect(storedAvailability(service, feedId).lastFailureCategory, code).toBe(category)
-    }
   })
 })

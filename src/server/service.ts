@@ -19,7 +19,6 @@ import { ReaderItems } from './reader/reader-items.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
-import { FeedAvailabilityLedger } from './subscriptions/feed-availability.js'
 import { FeedPoll } from './subscriptions/feed-poll.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
@@ -136,9 +135,8 @@ function compose(
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    const availability = new FeedAvailabilityLedger({ db, clock, logger })
     const subscriptions = new SubscriptionService({ db, clock, settings, logger })
-    const poll = new FeedPoll({ db, retrieval, clock, logger, subscriptions, availability })
+    const poll = new FeedPoll({ db, retrieval, clock, logger })
     const refresh = new FeedRefresh({ clock, poll })
 
     const digest = new DigestService({ db, clock, settings })

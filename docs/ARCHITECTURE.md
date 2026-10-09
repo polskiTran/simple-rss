@@ -87,7 +87,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Client:** views, interactions, browser caching, and same-origin API calls
 - **HTTP:** routing, cookies, request validation, rate limiting, and response policy
 - **Authentication:** setup, credentials, sessions, and emergency reset
-- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` handles the User's Subscription changes (subscribe, OPML, unsubscribe, preferences) and the merge a poll reveals, `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailabilityLedger` writes each poll's Feed Availability (`record` settles a poll outcome, and `recordSuccess` covers the merge survivor)
+- **Subscriptions:** Feed lifecycle and preferences, with writes split by who causes them — `SubscriptionService` writes the User's Subscription changes (subscribe, OPML, unsubscribe, preferences), and `FeedPoll` writes everything a poll earns (the Feed Window, a merge the retrieval reveals, and Feed Availability) in one transaction per poll; the Feed Availability rule itself is the pure `settle` in `feed-availability.ts`
 - **Retrieval:** the one hardened boundary every outbound request passes through — destination and redirect validation, deadlines, decoded-size ceilings, and retrieval budgets
 - **Ingestion:** parsing, normalization, identity, and polling state
 - **Digest:** chronology and date grouping

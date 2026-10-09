@@ -1,19 +1,16 @@
-import { eq } from 'drizzle-orm'
 import {
   FEED_UNAVAILABLE_AFTER_FAILURES,
   type FeedAvailability,
   type FeedAvailabilityCategory,
 } from '../../shared/api.js'
-import type { Clock } from '../clock.js'
 import type { FeedDocumentError } from '../ingestion/feed-document.js'
-import type { Logger } from '../logger.js'
-import type { DrizzleDatabase } from '../persistence/database.js'
-import { subscriptions } from '../persistence/schema.js'
+import type { LogFields } from '../logger.js'
+import type { subscriptions } from '../persistence/schema.js'
 import type { RetrievalFailure } from '../upstream/retrieval.js'
 import { loggableUrl } from './loggable-url.js'
 import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 
-/** What recording an attempt needs to know about the Feed that was just polled. */
+/** What settling an attempt needs to know about the Feed that was just polled. */
 export interface PolledFeed {
   readonly feedId: number
   readonly resolvedUrl: string
@@ -37,94 +34,66 @@ export type FailedPoll =
 /** A poll that reached its verdict: the Feed answered — well or badly — or this installation never asked. */
 export type SettledPoll = { readonly kind: 'updated' } | { readonly kind: 'not-modified' } | FailedPoll
 
+type SubscriptionRow = typeof subscriptions.$inferSelect
+
+/** The `subscriptions` columns one settled poll rewrites; every attempt moves the schedule. */
+export type AvailabilityPatch = Pick<SubscriptionRow, 'nextPollAt' | 'lastPolledAt'> &
+  Partial<Pick<SubscriptionRow, 'lastSuccessAt' | 'consecutiveFailures' | 'lastFailureCategory'>>
+
+export interface Settlement {
+  readonly patch: AvailabilityPatch
+  /** Absent for a success, which the poll's own ingestion record already tells. */
+  readonly log?: { readonly level: 'info' | 'warn'; readonly message: string; readonly fields: LogFields }
+}
+
 /**
- * Every write to a Subscription's Feed Availability. `record` settles a poll on
- * its own — holding the distinction that a publisher that answered badly is not
- * a publisher we never asked — while `recordSuccess` stands alone for the merge
- * survivor, whose success arrives without a poll of its own (ADR 0007).
+ * The Feed Availability rule, pure: what one poll outcome writes and logs.
+ * A publisher that answered badly lengthens the wait without ever removing the
+ * Subscription; a publisher this installation never asked (boundary saturated,
+ * or the caller gave up) leaves Feed Availability untouched and moves one
+ * Polling Interval on.
  */
-export class FeedAvailabilityLedger {
-  readonly #db: DrizzleDatabase
-  readonly #clock: Clock
-  readonly #logger: Logger
-
-  constructor(options: { db: DrizzleDatabase; clock: Clock; logger: Logger }) {
-    this.#db = options.db
-    this.#clock = options.clock
-    this.#logger = options.logger.child({ component: 'subscriptions' })
-  }
-
-  record(feed: PolledFeed, outcome: SettledPoll): void {
-    if (outcome.kind === 'updated' || outcome.kind === 'not-modified') this.recordSuccess(feed)
-    else if (wasNeverAsked(outcome)) this.#recordDeferral(feed, outcome.failure.code)
-    else this.#recordFailure(feed, availabilityCategoryOf(outcome))
-  }
-
-  recordSuccess(feed: PolledFeed): void {
-    const now = this.#clock.now()
-    this.#db
-      .update(subscriptions)
-      .set({
+export function settle(feed: PolledFeed, outcome: SettledPoll, now: Date): Settlement {
+  const lastPolledAt = now.toISOString()
+  if (outcome.kind === 'updated' || outcome.kind === 'not-modified') {
+    return {
+      patch: {
         nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
-        lastPolledAt: now.toISOString(),
-        lastSuccessAt: now.toISOString(),
-        lastFailureAt: null,
+        lastPolledAt,
+        lastSuccessAt: lastPolledAt,
         consecutiveFailures: 0,
         lastFailureCategory: null,
-      })
-      .where(eq(subscriptions.feedId, feed.feedId))
-      .run()
+      },
+    }
   }
 
-  /**
-   * A failure only lengthens the wait; the User can retry by hand. The Subscription
-   * survives — a failing Feed stays subscribed and its Feed Items stay in the Digest.
-   */
-  #recordFailure(feed: PolledFeed, category: FeedAvailabilityCategory): void {
-    const now = this.#clock.now()
-    const consecutiveFailures = feed.consecutiveFailures + 1
-    const nextPollAt = nextRetryTime(feed.feedId, feed.pollingIntervalMinutes, consecutiveFailures, now)
-    this.#db
-      .update(subscriptions)
-      .set({
-        nextPollAt,
-        lastPolledAt: now.toISOString(),
-        lastFailureAt: now.toISOString(),
+  if (wasNeverAsked(outcome)) {
+    return {
+      patch: { nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now), lastPolledAt },
+      log: {
+        level: 'info',
+        message: 'subscriptions.feed_poll_deferred',
+        fields: { feedId: feed.feedId, resolvedUrl: loggableUrl(feed.resolvedUrl), code: outcome.failure.code },
+      },
+    }
+  }
+
+  const category = availabilityCategoryOf(outcome)
+  const consecutiveFailures = feed.consecutiveFailures + 1
+  const nextPollAt = nextRetryTime(feed.feedId, feed.pollingIntervalMinutes, consecutiveFailures, now)
+  return {
+    patch: { nextPollAt, lastPolledAt, consecutiveFailures, lastFailureCategory: category },
+    log: {
+      level: 'warn',
+      message: 'subscriptions.feed_poll_failed',
+      fields: {
+        feedId: feed.feedId,
+        resolvedUrl: loggableUrl(feed.resolvedUrl),
+        category,
         consecutiveFailures,
-        lastFailureCategory: category,
-      })
-      .where(eq(subscriptions.feedId, feed.feedId))
-      .run()
-
-    this.#logger.warn('subscriptions.feed_poll_failed', {
-      feedId: feed.feedId,
-      resolvedUrl: loggableUrl(feed.resolvedUrl),
-      category,
-      consecutiveFailures,
-      nextPollAt,
-    })
-  }
-
-  /**
-   * The publisher was never asked (boundary saturated, or the caller gave up), so
-   * Feed Availability is left untouched and the attempt moves one Polling Interval on.
-   */
-  #recordDeferral(feed: PolledFeed, code: RetrievalFailure['code']): void {
-    const now = this.#clock.now()
-    this.#db
-      .update(subscriptions)
-      .set({
-        nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now),
-        lastPolledAt: now.toISOString(),
-      })
-      .where(eq(subscriptions.feedId, feed.feedId))
-      .run()
-
-    this.#logger.info('subscriptions.feed_poll_deferred', {
-      feedId: feed.feedId,
-      resolvedUrl: loggableUrl(feed.resolvedUrl),
-      code,
-    })
+        nextPollAt,
+      },
+    },
   }
 }
 
