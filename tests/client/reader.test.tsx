@@ -218,8 +218,10 @@ describe('Reader View', () => {
     expect(await screen.findByText('A clear morning over the valley.')).toBeDefined()
     expect(screen.getAllByRole('link', { name: 'Open original' }).length).toBeGreaterThan(0)
 
+    // Heal only once the failure has answered; healing earlier races the first request.
+    const retry = await screen.findByRole('button', { name: 'Retry' })
     healed = true
-    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    await user.click(retry)
     // The first article loads the Markdown renderer lazily; a loaded suite can take over a second.
     expect(await screen.findByRole('heading', { level: 3, name: 'Dawn' }, { timeout: 5_000 })).toBeDefined()
   })
