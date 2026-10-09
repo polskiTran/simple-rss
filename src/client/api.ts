@@ -54,6 +54,7 @@ import {
   type UpdatePollingIntervalRequest,
   type UpdateTimezoneRequest,
 } from '../shared/api.js'
+import type { z } from 'zod'
 import type { JsonValue } from '../shared/json.js'
 
 export class ApiError extends Error {
@@ -94,6 +95,9 @@ interface ApiRequestOptions extends RequestInit {
   readonly timeoutMs?: number
 }
 
+/** What the client checks an answer against: any schema in `shared/api.ts`. */
+type Schema<T> = z.ZodType<T, z.ZodTypeDef, unknown>
+
 async function request(path: string, options: ApiRequestOptions = {}): Promise<Response> {
   const { timeoutMs = REQUEST_TIMEOUT_MS, ...init } = options
   const deadline = AbortSignal.timeout(timeoutMs)
@@ -113,34 +117,49 @@ async function request(path: string, options: ApiRequestOptions = {}): Promise<R
   throw new ApiError(response.status, failure.code, retryAfterOf(response), failure.stage)
 }
 
-function read(path: string, signal: AbortSignal | undefined): Promise<Response> {
-  return request(path, signal ? { signal } : {})
+/** Reads `path` and checks the answer against `schema`. */
+async function getJson<T>(
+  path: string,
+  schema: Schema<T>,
+  options: { readonly signal?: AbortSignal | undefined; readonly timeoutMs?: number } = {},
+): Promise<T> {
+  const { signal, ...rest } = options
+  const response = await request(path, signal ? { ...rest, signal } : rest)
+  return schema.parse(await response.json())
 }
 
-function post(path: string, body: JsonValue | undefined): Promise<Response> {
-  return request(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+/** Sends `body` as JSON — or nothing, when it is undefined — and checks the answer against `schema`. */
+async function sendJson<T>(
+  method: 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body: JsonValue | undefined,
+  schema: Schema<T>,
+): Promise<T> {
+  const response = await request(
+    path,
+    body === undefined
+      ? { method }
+      : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+  )
+  return schema.parse(await response.json())
 }
 
-async function status(response: Response): Promise<AuthStatus> {
-  return authStatusSchema.parse(await response.json())
+/** `path`, with `?params` only when there are any. */
+function withQuery(path: string, params: URLSearchParams): string {
+  return params.size > 0 ? `${path}?${params}` : path
 }
 
-export async function fetchAuthStatus(): Promise<AuthStatus> {
-  return status(await request(STATUS_PATH))
+export function fetchAuthStatus(): Promise<AuthStatus> {
+  return getJson(STATUS_PATH, authStatusSchema)
 }
 
-export async function claimInstallation(setupSecret: string, password: string): Promise<AuthStatus> {
+export function claimInstallation(setupSecret: string, password: string): Promise<AuthStatus> {
   const timezone = detectedTimezone()
-  return status(
-    await post('/api/auth/setup', {
-      setupSecret,
-      password,
-      ...(timezone === undefined ? {} : { timezone }),
-    } satisfies ClaimRequest),
+  return sendJson(
+    'POST',
+    '/api/auth/setup',
+    { setupSecret, password, ...(timezone === undefined ? {} : { timezone }) } satisfies ClaimRequest,
+    authStatusSchema,
   )
 }
 
@@ -152,74 +171,71 @@ function detectedTimezone(): string | undefined {
   }
 }
 
-export async function signIn(password: string): Promise<AuthStatus> {
-  return status(await post('/api/auth/session', { password } satisfies SignInRequest))
+export function signIn(password: string): Promise<AuthStatus> {
+  return sendJson('POST', '/api/auth/session', { password } satisfies SignInRequest, authStatusSchema)
 }
 
 export async function signOut(): Promise<void> {
   await request('/api/auth/session', { method: 'DELETE' })
 }
 
-export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthStatus> {
-  return status(await post('/api/auth/password', { currentPassword, newPassword } satisfies PasswordChangeRequest))
+export function changePassword(currentPassword: string, newPassword: string): Promise<AuthStatus> {
+  return sendJson(
+    'POST',
+    '/api/auth/password',
+    { currentPassword, newPassword } satisfies PasswordChangeRequest,
+    authStatusSchema,
+  )
 }
 
-export async function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
-  const response = await post('/api/subscriptions', { url } satisfies CreateSubscriptionRequest)
-  return createSubscriptionResponseSchema.parse(await response.json())
+export function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
+  return sendJson(
+    'POST',
+    '/api/subscriptions',
+    { url } satisfies CreateSubscriptionRequest,
+    createSubscriptionResponseSchema,
+  )
 }
 
-export async function importOpml(opml: string): Promise<OpmlImportReport> {
-  const response = await post('/api/subscriptions/import', { opml } satisfies ImportOpmlRequest)
-  return opmlImportReportSchema.parse(await response.json())
+export function importOpml(opml: string): Promise<OpmlImportReport> {
+  return sendJson('POST', '/api/subscriptions/import', { opml } satisfies ImportOpmlRequest, opmlImportReportSchema)
 }
 
-export async function refreshFeed(feedId: number): Promise<RefreshFeedResponse> {
-  const response = await post(`/api/feeds/${feedId}/refresh`, undefined)
-  return refreshFeedResponseSchema.parse(await response.json())
+export function refreshFeed(feedId: number): Promise<RefreshFeedResponse> {
+  return sendJson('POST', `/api/feeds/${feedId}/refresh`, undefined, refreshFeedResponseSchema)
 }
 
-export async function fetchSubscriptions(signal?: AbortSignal): Promise<SubscriptionList> {
-  const response = await read('/api/feeds', signal)
-  return subscriptionListSchema.parse(await response.json())
+export function fetchSubscriptions(signal?: AbortSignal): Promise<SubscriptionList> {
+  return getJson('/api/feeds', subscriptionListSchema, { signal })
 }
 
-export async function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<FeedDetail> {
-  const response = await read(`/api/feeds/${feedId}`, signal)
-  return feedDetailSchema.parse(await response.json())
+export function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<FeedDetail> {
+  return getJson(`/api/feeds/${feedId}`, feedDetailSchema, { signal })
 }
 
-export async function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {
-  const response = await request(`/api/feeds/${feedId}/details`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(details),
-  })
-  return feedDetailsUpdateSchema.parse(await response.json())
+export function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {
+  return sendJson('PUT', `/api/feeds/${feedId}/details`, details, feedDetailsUpdateSchema)
 }
 
-export async function updatePollingInterval(
+export function updatePollingInterval(
   feedId: number,
   pollingIntervalMinutes: PollingIntervalMinutes,
 ): Promise<PollingSchedule> {
-  const response = await request(`/api/feeds/${feedId}/interval`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pollingIntervalMinutes } satisfies UpdatePollingIntervalRequest),
-  })
-  return pollingScheduleSchema.parse(await response.json())
+  return sendJson(
+    'PUT',
+    `/api/feeds/${feedId}/interval`,
+    { pollingIntervalMinutes } satisfies UpdatePollingIntervalRequest,
+    pollingScheduleSchema,
+  )
 }
 
-export async function updateReadingSource(
-  feedId: number,
-  readingSource: ReadingSource,
-): Promise<ReadingSourcePreference> {
-  const response = await request(`/api/feeds/${feedId}/reading-source`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ readingSource } satisfies ReadingSourcePreference),
-  })
-  return readingSourcePreferenceSchema.parse(await response.json())
+export function updateReadingSource(feedId: number, readingSource: ReadingSource): Promise<ReadingSourcePreference> {
+  return sendJson(
+    'PUT',
+    `/api/feeds/${feedId}/reading-source`,
+    { readingSource } satisfies ReadingSourcePreference,
+    readingSourcePreferenceSchema,
+  )
 }
 
 /** Polling stops and the Feed's items leave the Digest; saved items stay in the Library. */
@@ -227,77 +243,66 @@ export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }
 
-export async function fetchDigest(start: DigestStart, signal?: AbortSignal): Promise<Digest> {
-  const params = digestParamsOf(start)
-  const response = await read(params.size > 0 ? `/api/digest?${params}` : '/api/digest', signal)
-  return digestSchema.parse(await response.json())
+export function fetchDigest(start: DigestStart, signal?: AbortSignal): Promise<Digest> {
+  return getJson(withQuery('/api/digest', digestParamsOf(start)), digestSchema, { signal })
 }
 
-export async function fetchDigestCalendar(signal?: AbortSignal): Promise<DigestCalendar> {
-  const response = await read('/api/digest/days', signal)
-  return digestCalendarSchema.parse(await response.json())
+export function fetchDigestCalendar(signal?: AbortSignal): Promise<DigestCalendar> {
+  return getJson('/api/digest/days', digestCalendarSchema, { signal })
 }
 
 /** Searches retained reading metadata only, within the scope; results ranked by match quality blended with recency. */
-export async function fetchSearchResults(
+export function fetchSearchResults(
   query: string,
   scope: SearchScope,
   sort: SearchSort,
   signal?: AbortSignal,
 ): Promise<SearchResults> {
-  const response = await read(`/api/search?${searchParamsOf(query, scope, sort)}`, signal)
-  return searchResultsSchema.parse(await response.json())
+  return getJson(withQuery('/api/search', searchParamsOf(query, scope, sort)), searchResultsSchema, { signal })
 }
 
 /** Newest save first needs no parameter; a cursor continues the order it came from. */
-export async function fetchLibrary(order: LibraryOrder, cursor?: string, signal?: AbortSignal): Promise<Library> {
+export function fetchLibrary(order: LibraryOrder, cursor?: string, signal?: AbortSignal): Promise<Library> {
   const params = new URLSearchParams()
   if (order !== 'newest') params.set('order', order)
   if (cursor) params.set('cursor', cursor)
-  const response = await read(params.size > 0 ? `/api/library?${params}` : '/api/library', signal)
-  return librarySchema.parse(await response.json())
+  return getJson(withQuery('/api/library', params), librarySchema, { signal })
 }
 
-export async function saveToLibrary(feedItemId: number): Promise<LibraryMembership> {
-  const response = await request(`/api/library/${feedItemId}`, { method: 'PUT' })
-  return libraryMembershipSchema.parse(await response.json())
+export function saveToLibrary(feedItemId: number): Promise<LibraryMembership> {
+  return sendJson('PUT', `/api/library/${feedItemId}`, undefined, libraryMembershipSchema)
 }
 
-export async function unsaveFromLibrary(feedItemId: number): Promise<LibraryMembership> {
-  const response = await request(`/api/library/${feedItemId}`, { method: 'DELETE' })
-  return libraryMembershipSchema.parse(await response.json())
+export function unsaveFromLibrary(feedItemId: number): Promise<LibraryMembership> {
+  return sendJson('DELETE', `/api/library/${feedItemId}`, undefined, libraryMembershipSchema)
 }
 
-export async function fetchReaderItem(feedItemId: number, signal?: AbortSignal): Promise<ReaderItem> {
-  const response = await read(`/api/items/${feedItemId}`, signal)
-  return readerItemSchema.parse(await response.json())
+export function fetchReaderItem(feedItemId: number, signal?: AbortSignal): Promise<ReaderItem> {
+  return getJson(`/api/items/${feedItemId}`, readerItemSchema, { signal })
 }
 
-export async function fetchReaderArticle(feedItemId: number, signal?: AbortSignal): Promise<ReaderArticle> {
-  const response = await request(`/api/items/${feedItemId}/reader`, {
+export function fetchReaderArticle(feedItemId: number, signal?: AbortSignal): Promise<ReaderArticle> {
+  return getJson(`/api/items/${feedItemId}/reader`, readerArticleSchema, {
+    signal,
     timeoutMs: READER_REQUEST_TIMEOUT_MS,
-    ...(signal ? { signal } : {}),
   })
-  return readerArticleSchema.parse(await response.json())
 }
 
-export async function fetchInstallationPreferences(signal?: AbortSignal): Promise<InstallationPreferences> {
-  const response = await read('/api/settings', signal)
-  return installationPreferencesSchema.parse(await response.json())
+export function fetchInstallationPreferences(signal?: AbortSignal): Promise<InstallationPreferences> {
+  return getJson('/api/settings', installationPreferencesSchema, { signal })
 }
 
-export async function updateInstallationTimezone(timezone: string): Promise<InstallationPreferences> {
-  const response = await request('/api/settings/timezone', {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ timezone } satisfies UpdateTimezoneRequest),
-  })
-  return installationPreferencesSchema.parse(await response.json())
+export function updateInstallationTimezone(timezone: string): Promise<InstallationPreferences> {
+  return sendJson(
+    'PUT',
+    '/api/settings/timezone',
+    { timezone } satisfies UpdateTimezoneRequest,
+    installationPreferencesSchema,
+  )
 }
 
-export async function fetchServiceMeta(signal?: AbortSignal): Promise<ServiceMeta> {
-  const response = await read('/api/meta', signal)
-  return serviceMetaSchema.parse(await response.json())
+export function fetchServiceMeta(signal?: AbortSignal): Promise<ServiceMeta> {
+  return getJson('/api/meta', serviceMetaSchema, { signal })
 }
 
 async function failureOf(response: Response): Promise<{ code: string; stage?: ReaderDeadlineStage }> {
