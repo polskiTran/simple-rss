@@ -38,7 +38,7 @@ describe('service lifecycle', () => {
 
   it('closes the database as part of stopping', async () => {
     const service = await startTestService()
-    const db = service.database!
+    const db = service.database
 
     await service.stop()
 
@@ -99,7 +99,7 @@ describe('service lifecycle', () => {
 
   it('closes readiness when the volume stops accepting writes', async () => {
     const service = await startTestService()
-    service.database!.$client.exec('DROP TABLE write_probe')
+    service.database.$client.exec('DROP TABLE write_probe')
 
     const response = await service.fetch('/health/ready')
 

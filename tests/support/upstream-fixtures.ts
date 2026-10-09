@@ -18,6 +18,8 @@ export interface RecordedRequest {
   readonly method: string
   readonly url: string
   readonly headers: Record<string, string>
+  /** What the socket would have been pinned to for this request. */
+  readonly addresses: readonly string[]
 }
 
 /**
@@ -70,12 +72,13 @@ export class UpstreamFixtures {
   }
 
   get client(): HttpClient {
-    return async (request, onTimings) => {
+    return async (request, { addresses, onTimings }) => {
       const askedAt = performance.now()
       this.#requests.push({
         method: request.method,
         url: request.url,
         headers: Object.fromEntries(request.headers.entries()),
+        addresses,
       })
 
       const stubbed = this.#responses.get(request.url)

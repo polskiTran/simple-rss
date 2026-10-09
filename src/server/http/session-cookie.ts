@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
-import type { IssuedSession } from '../auth/sessions.js'
+import type { IssuedSession } from '../auth/credentials.js'
 
 /** The only place the session token is named; prefixed against collisions on a shared host. */
 export const SESSION_COOKIE = 'simple_rss_session'

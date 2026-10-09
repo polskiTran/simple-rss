@@ -1,9 +1,10 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
 import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn, metaRowDate } from '../digest/chronology.js'
+import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { stripCadenceByFeed } from '../digest/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
@@ -43,11 +44,13 @@ export class SearchService {
     const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
+    const today = dateKey(now, timezone)
 
     switch (scope.kind) {
       case 'everywhere':
         return {
           scope: 'everywhere',
+          today,
           subscriptions: this.#withCadence(
             this.#matchingSubscriptions(words).slice(0, SEARCH_SUBSCRIPTION_LIMIT),
             timezone,
@@ -56,16 +59,22 @@ export class SearchService {
           results: this.#itemMatches(words, scope, sort, timezone, now),
         }
       case 'saved':
-        return { scope: 'saved', results: this.#itemMatches(words, scope, sort, timezone, now) }
+        return { scope: 'saved', today, results: this.#itemMatches(words, scope, sort, timezone, now) }
       case 'subscriptions':
         return {
           scope: 'subscriptions',
+          today,
           subscriptions: this.#withCadence(this.#matchingSubscriptions(words), timezone, now),
         }
       case 'feed': {
         const title = this.#subscribedTitleOf(scope.feedId)
         if (title === undefined) return undefined
-        return { scope: 'feed', feed: { title }, results: this.#itemMatches(words, scope, sort, timezone, now) }
+        return {
+          scope: 'feed',
+          today,
+          feed: { title },
+          results: this.#itemMatches(words, scope, sort, timezone, now),
+        }
       }
     }
   }
@@ -88,7 +97,6 @@ export class SearchService {
   ): SearchResult[] {
     if (words.length === 0) return []
     const match = matchExpressionOf(words)
-    const today = dateKey(now, timezone)
 
     // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
     // the LIMIT bounds the right fifty. bm25() is more negative the better the
@@ -100,14 +108,9 @@ export class SearchService {
 
     const rows = this.#db
       .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        publishedAt: feedItems.publishedAt,
-        firstSeenAt: feedItems.firstSeenAt,
-        chronologyAt: feedItems.chronologyAt,
+        ...LISTED_ITEM_COLUMNS,
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
-        savedAt: libraryItems.savedAt,
         summarySnippet: sql<
           string | null
         >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', '…', ${SNIPPET_TOKENS})`,
@@ -131,20 +134,14 @@ export class SearchService {
       .all()
 
     const dayOf = dayKeysIn(timezone)
-    return rows.map((row) => {
-      const displayInstant = new Date(row.chronologyAt)
-      return {
-        feedItemId: row.feedItemId,
-        title: row.title ?? 'Untitled',
-        feedId: row.feedId,
-        feedTitle: row.feedTitle,
-        publishedAt: row.publishedAt,
-        firstSeenAt: row.firstSeenAt,
-        displayDate: metaRowDate(displayInstant, dayOf(row.chronologyAt), today, timezone),
-        saved: row.savedAt !== null,
-        snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
-      }
-    })
+    return rows.map((row) => ({
+      ...listedItemOf(row),
+      feedId: row.feedId,
+      feedTitle: row.feedTitle,
+      date: dayOf(row.chronologyAt),
+      displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+      snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
+    }))
   }
 
   /** Every word of the line somewhere in the effective title or the domain, in Feeds list order. */

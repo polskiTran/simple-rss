@@ -2,7 +2,7 @@ import { lookup } from 'node:dns/promises'
 import { classifyAddress, unbracket } from './addresses.js'
 
 /** The signal lets bounded adapters stop waiting at the retrieval deadline. */
-export type ResolveAddresses = (hostname: string, signal?: AbortSignal) => Promise<readonly string[]>
+export type ResolveAddresses = (hostname: string, signal: AbortSignal) => Promise<readonly string[]>
 
 export interface DestinationPolicy {
   readonly resolve: ResolveAddresses
@@ -23,7 +23,10 @@ export interface AllowedDestination {
   readonly url: URL
   /** The name asked of the resolver, without a trailing dot or brackets. */
   readonly hostname: string
-  /** Every address the name answered with, each already judged public. */
+  /**
+   * Every address the name answered with, each judged public — the only
+   * addresses the adapter's socket may connect to for this hop.
+   */
   readonly addresses: readonly string[]
 }
 
@@ -45,12 +48,13 @@ const BLOCKED_SUFFIXES = ['localhost', 'local', 'internal', 'arpa']
 /**
  * Validates one URL before any connection: scheme, credentials, name, then
  * every resolved address must be public — a mixed answer is the shape of a
- * rebinding attempt. Each redirect hop is validated by a separate call.
+ * rebinding attempt. This is the hop's only resolution: the socket is pinned
+ * to the approved addresses. Each redirect hop is validated by a separate call.
  */
 export async function validateDestination(
   candidate: string | URL,
   policy: DestinationPolicy,
-  signal?: AbortSignal,
+  signal: AbortSignal,
 ): Promise<DestinationVerdict> {
   let url: URL
   try {
@@ -89,7 +93,7 @@ export async function validateDestination(
 
   let addresses: readonly string[]
   try {
-    addresses = signal ? await policy.resolve(hostname, signal) : await policy.resolve(hostname)
+    addresses = await policy.resolve(hostname, signal)
   } catch (error) {
     if (error instanceof ResolutionCapacityError) {
       return { ok: false, code: 'busy', reason: 'DNS lookup capacity is full' }

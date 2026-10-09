@@ -4,7 +4,7 @@
 @import '@fontsource-variable/literata/opsz-italic.css';
 @import '@fontsource-variable/instrument-sans/wght.css';
 
-@source "../../node_modules/streamdown/dist/*.js";
+@source '../../node_modules/streamdown/dist/*.js';
 
 /* Streamdown's classes ask for `dark:`; it follows the same appearance the
    tokens do. */
@@ -69,6 +69,18 @@
 }
 
 @layer base {
+  /* Control sizes, docs/DESIGN.md §4: a control is 36px on desktop and 44px on
+     a phone; a field is 40px and 48px, as are a phone sheet's buttons. */
+  :root {
+    --control: 36px;
+    --field: 40px;
+
+    @media (max-width: 640px) {
+      --control: 44px;
+      --field: 48px;
+    }
+  }
+
   html {
     color-scheme: light dark;
     background: var(--color-ground);
@@ -126,18 +138,34 @@
     min-height: 100dvh;
     margin-inline: auto;
     padding-inline: 40px;
+
+    @media (max-width: 640px) {
+      padding-inline: 20px;
+    }
   }
 
   .page {
     padding-block: 56px 96px;
+
+    @media (max-width: 640px) {
+      padding-block: 24px calc(56px + env(safe-area-inset-bottom));
+    }
   }
 
   .app[data-screen='feed'] .page {
     padding-top: 32px;
+
+    @media (max-width: 640px) {
+      padding-top: 8px;
+    }
   }
 
   .app[data-screen='reader'] .page {
     padding-top: 64px;
+
+    @media (max-width: 640px) {
+      padding-top: 24px;
+    }
   }
 
   /* Chrome is instant; data arrives. A screen's own title and controls are
@@ -161,6 +189,11 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
     margin-bottom: 48px;
+
+    @media (max-width: 640px) {
+      gap: 20px;
+      margin-bottom: 32px;
+    }
   }
 
   .page-title {
@@ -171,6 +204,10 @@
     letter-spacing: -0.015em;
     overflow-wrap: anywhere;
     text-wrap: balance;
+
+    @media (max-width: 640px) {
+      font-size: 32px;
+    }
   }
 
   /* The companion wraps whole, never mid-date, and flush under the title. */
@@ -197,6 +234,11 @@
   /* Holds its end of the toolbar even when nothing stands at the start. */
   .toolbar-end {
     margin-inline-start: auto;
+
+    /* Wrapped under the scope switch, the sort starts its own row. */
+    @media (max-width: 640px) {
+      margin-inline-start: 0;
+    }
   }
 
   .toolbar-group {
@@ -230,6 +272,13 @@
     white-space: nowrap;
   }
 
+  /* Words a phone’s narrower control can go without. */
+  .wide-only {
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+
   .load-failure {
     display: grid;
     justify-items: start;
@@ -257,13 +306,13 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 36px;
+    height: var(--control);
     padding: 0 14px;
     border: 0;
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 500 14px/1 var(--font-ui);
+    font: 500 14px / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
@@ -312,10 +361,15 @@
     height: 30px;
     padding: 0 10px;
     font-size: 13px;
+
+    /* A phone gives a small control its full height. */
+    @media (max-width: 640px) {
+      height: var(--control);
+    }
   }
 
   .button-icon {
-    width: 36px;
+    width: var(--control);
     padding: 0;
   }
 
@@ -334,7 +388,7 @@
     flex: none;
   }
 
-  /* Switch */
+  /* Switch: its 3px padding brings a segment to a control’s height. */
 
   .switch {
     display: inline-flex;
@@ -347,15 +401,19 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 30px;
+    height: calc(var(--control) - 6px);
     padding: 0 12px;
     border: 0;
     border-radius: 0;
     background: transparent;
     color: var(--color-ink-off);
-    font: 500 13.5px/1 var(--font-ui);
+    font: 500 13.5px / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
+
+    @media (max-width: 640px) {
+      flex: 1;
+    }
   }
 
   .switch-segment:hover {
@@ -394,14 +452,18 @@
   .field-input {
     display: block;
     width: 100%;
-    height: 40px;
+    height: var(--field);
     padding: 0 14px;
     border: 0;
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 400 15px/1.4 var(--font-ui);
+    font: 400 15px / 1.4 var(--font-ui);
     outline: none;
+
+    @media (max-width: 640px) {
+      font-size: 16px;
+    }
   }
 
   textarea.field-input {
@@ -470,13 +532,13 @@
   .select-control {
     appearance: none;
     max-width: 100%;
-    height: 36px;
+    height: var(--control);
     padding: 0 38px 0 14px;
     border: 0;
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 500 14px/1 var(--font-ui);
+    font: 500 14px / 1 var(--font-ui);
     text-overflow: ellipsis;
     cursor: pointer;
     field-sizing: content;
@@ -542,6 +604,11 @@
     justify-content: center;
     padding: 140px 24px 24px;
     overflow-y: auto;
+
+    @media (max-width: 640px) {
+      align-items: flex-end;
+      padding: 0;
+    }
   }
 
   .dialog {
@@ -553,6 +620,15 @@
       0 32px 64px -24px oklch(0% 0 0 / 0.28);
     outline: none;
     transition: opacity 150ms ease-out;
+
+    /* On a phone, a sheet that rises from the bottom edge under the fading scrim,
+       and sinks back into it. The sheet stays opaque; only the scrim fades. */
+    @media (max-width: 640px) {
+      width: 100%;
+      padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+      box-shadow: none;
+      transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
   }
 
   .dialog-backdrop:is([data-starting-style], [data-ending-style]),
@@ -560,9 +636,22 @@
     opacity: 0;
   }
 
+  .dialog:is([data-starting-style], [data-ending-style]) {
+    @media (max-width: 640px) {
+      opacity: 1;
+      transform: translateY(100%);
+    }
+  }
+
   .dialog-backdrop[data-ending-style],
   .dialog[data-ending-style] {
     transition-duration: 120ms;
+  }
+
+  .dialog[data-ending-style] {
+    @media (max-width: 640px) {
+      transition-duration: 180ms;
+    }
   }
 
   .dialog-header {
@@ -599,6 +688,13 @@
     margin-top: 28px;
   }
 
+  .dialog-footer > * {
+    @media (max-width: 640px) {
+      flex: 1;
+      height: var(--field);
+    }
+  }
+
   /* Groups and label-value rows */
 
   .group + .group {
@@ -618,6 +714,10 @@
     font-weight: 500;
     font-size: 17px;
     line-height: 1;
+
+    @media (max-width: 640px) {
+      font-size: 16px;
+    }
   }
 
   .group-count {
@@ -652,6 +752,15 @@
     border-bottom: 1px solid var(--color-rule-soft);
   }
 
+  .row:has(.switch) {
+    @media (max-width: 640px) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding-block: 12px;
+    }
+  }
+
   .row-label {
     color: var(--color-ink-2);
     white-space: nowrap;
@@ -673,18 +782,26 @@
   /* The meta column sits on the title's first baseline, whatever their sizes. */
   .item {
     position: relative;
+    --item-meta: 180px;
     display: grid;
-    grid-template-columns: 180px minmax(0, 1fr) 36px;
+    grid-template-columns: var(--item-meta) minmax(0, 1fr) var(--control);
     align-items: baseline;
     column-gap: 32px;
     padding: 20px 20px 20px 24px;
     border: 1px solid var(--color-edge);
     background: var(--color-ground);
+
+    /* On a phone the Feed name and time share one line above the title. */
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr) var(--control);
+      column-gap: 8px;
+      padding: 16px 12px 18px 16px;
+    }
   }
 
   /* A Feed's own list names no Feed, so the meta column holds only the time. */
   .app[data-screen='feed'] .item {
-    grid-template-columns: 56px minmax(0, 1fr) 36px;
+    --item-meta: 56px;
   }
 
   .item:hover {
@@ -720,6 +837,14 @@
     font-size: 13px;
     line-height: 1.45;
     font-variant-numeric: tabular-nums;
+
+    @media (max-width: 640px) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 10px;
+      margin-bottom: 8px;
+      grid-column: 1;
+    }
   }
 
   .item-feed {
@@ -740,16 +865,25 @@
 
   .item-body {
     min-width: 0;
+
+    @media (max-width: 640px) {
+      grid-column: 1;
+    }
   }
 
   .item-title {
     margin: 0;
-    font: 400 19px/1.4 var(--font-read);
+    font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     overflow: hidden;
+
+    @media (max-width: 640px) {
+      font-size: 17px;
+      line-height: 1.38;
+    }
   }
 
   .item-title a {
@@ -766,12 +900,17 @@
 
   .item-snippet {
     margin: 8px 0 0;
-    font: 400 16px/1.55 var(--font-read);
+    font: 400 16px / 1.55 var(--font-read);
     color: var(--color-ink-2);
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
+
+    @media (max-width: 640px) {
+      font-size: 15px;
+      -webkit-line-clamp: 1;
+    }
   }
 
   .match {
@@ -786,8 +925,8 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    width: 36px;
-    height: 36px;
+    width: var(--control);
+    height: var(--control);
     padding: 0;
     border: 0;
     border-radius: 0;
@@ -795,6 +934,14 @@
     color: var(--color-ink-2);
     cursor: pointer;
     opacity: 0;
+
+    /* Always shown on a phone, beside the meta and title. */
+    @media (max-width: 640px) {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+      align-self: start;
+      opacity: 1;
+    }
   }
 
   .save-toggle:hover {
@@ -834,6 +981,11 @@
     align-items: center;
     gap: 16px;
     margin-top: 24px;
+
+    @media (max-width: 640px) {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
 
   /* Cadence */
@@ -848,6 +1000,13 @@
   .cadence-day {
     width: 5px;
     height: 5px;
+
+    /* A phone draws the last 14 days. */
+    @media (max-width: 640px) {
+      &:nth-child(-n + 16) {
+        display: none;
+      }
+    }
   }
 
   :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='0'] {
@@ -891,7 +1050,11 @@
   }
 
   .wordmark-name {
-    font: italic 400 21px/1 var(--font-read);
+    font: italic 400 21px / 1 var(--font-read);
+
+    @media (max-width: 640px) {
+      font-size: 19px;
+    }
   }
 
   @keyframes mark-glint {
@@ -959,12 +1122,49 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* On a phone Add feed leads the actions, and the jump buttons scroll as one row. */
+  .feeds-actions {
+    @media (max-width: 640px) {
+      width: 100%;
+      flex-wrap: nowrap;
+
+      & > .button-primary {
+        flex: 1;
+        order: -1;
+      }
+    }
+  }
+
+  .rhythm-jumps {
+    @media (max-width: 640px) {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      margin-inline: -20px;
+      padding-inline: 20px;
+      scrollbar-width: none;
+    }
+  }
+
+  /* One line, so it spans the page rather than the scrolling jumps’ content. */
+  .toolbar:has(.rhythm-jumps) {
+    @media (max-width: 640px) {
+      flex-direction: column-reverse;
+      flex-wrap: nowrap;
+      align-items: stretch;
+    }
+  }
+
   /* A Feed is a thin-edged box, like an item: its name and Cadence, its host under them. */
 
   .feed-rows {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
   }
 
   .panel .feed-rows {
@@ -993,7 +1193,7 @@
 
   .feed-row-name {
     margin: 0;
-    font: 400 19px/1.2 var(--font-read);
+    font: 400 19px / 1.2 var(--font-read);
     overflow-wrap: anywhere;
   }
 
@@ -1045,6 +1245,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    @media (max-width: 640px) {
+      display: none;
+    }
   }
 
   .add-feed-ways {
@@ -1078,12 +1282,26 @@
     margin-bottom: 40px;
   }
 
+  /* On a phone the chrome’s back square stands in for the view’s. */
+  .view-back {
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+
   .feed-head {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 24px 40px;
     margin-bottom: 48px;
+
+    /* On a phone: identity, then the actions as one row. */
+    @media (max-width: 640px) {
+      flex-direction: column;
+      align-items: stretch;
+      margin-bottom: 32px;
+    }
   }
 
   .feed-identity {
@@ -1096,12 +1314,19 @@
 
   .feed-description {
     margin: 0;
-    font: 400 17px/1.5 var(--font-read);
+    font: 400 17px / 1.5 var(--font-read);
     color: var(--color-reader-body);
   }
 
   .feed-actions {
     flex-wrap: nowrap;
+
+    @media (max-width: 640px) {
+      & > .button {
+        flex: 1;
+        padding-inline: 8px;
+      }
+    }
   }
 
   .feed-notices > .note {
@@ -1117,6 +1342,12 @@
     grid-template-columns: auto minmax(0, 1fr) minmax(max-content, 1fr);
     gap: 48px 56px;
     margin-bottom: 72px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+      margin-bottom: 48px;
+    }
   }
 
   .feed-panels .group + .group {
@@ -1138,6 +1369,11 @@
     margin-top: 20px;
     gap: 10px;
     justify-content: start;
+
+    @media (max-width: 640px) {
+      --cell: 11px;
+      --gap: 2px;
+    }
   }
 
   .cadence-grid {
@@ -1206,6 +1442,12 @@
 
   .reader-source {
     margin-top: 24px;
+
+    /* On a phone the source switch spans the column. */
+    @media (max-width: 640px) {
+      display: flex;
+      margin-top: 20px;
+    }
   }
 
   /* The Reader's Save is a grey button, not an item box's square. */
@@ -1226,6 +1468,16 @@
     color: var(--color-saved);
   }
 
+  /* On a phone Open original and Save are squares in the top bar. */
+  .reader-original,
+  .save-toggle.save-toggle-labelled {
+    @media (max-width: 640px) {
+      width: var(--control);
+      padding: 0;
+      align-self: center;
+    }
+  }
+
   .reader-column {
     max-width: 680px;
     margin-inline: auto;
@@ -1233,10 +1485,15 @@
 
   .reader-title {
     margin: 0;
-    font: 400 44px/1.16 var(--font-read);
+    font: 400 44px / 1.16 var(--font-read);
     letter-spacing: -0.01em;
     text-wrap: balance;
     overflow-wrap: break-word;
+
+    @media (max-width: 640px) {
+      font-size: 30px;
+      line-height: 1.18;
+    }
   }
 
   .reader-meta {
@@ -1248,6 +1505,12 @@
     margin: 20px 0 0;
     font-size: 14px;
     color: var(--color-ink-2);
+
+    @media (max-width: 640px) {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
   }
 
   .reader-facts {
@@ -1260,6 +1523,12 @@
     content: '·';
     margin-inline: 10px;
     color: var(--color-ink-3);
+  }
+
+  .reader-facts::before {
+    @media (max-width: 640px) {
+      content: none;
+    }
   }
 
   .reader-feed {
@@ -1300,9 +1569,14 @@
 
   .article-body,
   .reader-summary {
-    font: 400 19px/1.7 var(--font-read);
+    font: 400 19px / 1.7 var(--font-read);
     color: var(--color-reader-body);
     overflow-wrap: break-word;
+
+    @media (max-width: 640px) {
+      font-size: 17px;
+      line-height: 1.65;
+    }
   }
 
   .reader-summary {
@@ -1389,7 +1663,7 @@
   .article-table table {
     min-width: 100%;
     border-collapse: collapse;
-    font: 400 14px/1.45 var(--font-ui);
+    font: 400 14px / 1.45 var(--font-ui);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1486,16 +1760,37 @@
     gap: 20px;
   }
 
+  /* On a phone the date picker stands at the end of the title’s row. */
+  .digest-head {
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: 12px;
+    }
+  }
+
   /* Started from a day, the list offers today back at its head, as Show more
      offers what is past its end. */
   .newer {
     margin-bottom: 32px;
+
+    @media (max-width: 640px) {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 24px;
+    }
   }
 
   /* The phone's date picker: the input, invisible, takes the press. */
   .day-picker {
     position: relative;
     display: none;
+
+    @media (max-width: 640px) {
+      display: inline-flex;
+      width: var(--control);
+      height: var(--control);
+    }
   }
 
   .day-picker:has(:focus-visible) {
@@ -1526,11 +1821,27 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 16px;
+
+    /* On a phone a day’s Feeds scroll as one row past the page’s edge. */
+    @media (max-width: 640px) {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      margin-inline: -20px;
+      padding-inline: 20px;
+      scrollbar-width: none;
+    }
   }
 
   .day-feeds > .note {
     flex: none;
     margin-inline-end: 8px;
+  }
+
+  /* A row that scrolls on a phone fades at its trailing edge, so what is past it reads as there. */
+  :is(.day-feeds, .filter-list, .rhythm-jumps) {
+    @media (max-width: 640px) {
+      mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
+    }
   }
 
   .chip {
@@ -1544,9 +1855,14 @@
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 500 14px/1 var(--font-ui);
+    font: 500 14px / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
+
+    @media (max-width: 640px) {
+      height: var(--control);
+      padding-inline: 16px;
+    }
   }
 
   .chip:hover {
@@ -1573,6 +1889,26 @@
 
   .feed-day .item-body {
     grid-column: 2 / -1;
+
+    @media (max-width: 640px) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* The Digest saves from the Reader alone on a phone, so its titles take the
+     whole row; a shared title’s time trails its last line, in the room the
+     title leaves, and the row holds three lines as a lone title does. */
+  .day-items .save-toggle {
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+
+  .day-items > .item {
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr);
+      padding-inline-end: 16px;
+    }
   }
 
   .feed-day-items {
@@ -1583,21 +1919,40 @@
 
   .feed-day-item {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 36px;
+    grid-template-columns: minmax(0, 1fr) auto var(--control);
     align-items: baseline;
     column-gap: 16px;
     padding-block: 7px;
     font-variant-numeric: tabular-nums;
+
+    @media (max-width: 640px) {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+
+      & > time {
+        margin-inline-start: 8px;
+        white-space: nowrap;
+        font-size: 13px;
+      }
+    }
   }
 
   .feed-day-title {
     margin: 0;
-    font: 400 19px/1.4 var(--font-read);
+    font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
+
+    @media (max-width: 640px) {
+      display: inline;
+      font-size: 17px;
+      line-height: 1.38;
+    }
   }
 
   .feed-day-title a:hover {
@@ -1610,7 +1965,11 @@
      19px title, overhanging it rather than spacing the titles apart. */
   :is(.item, .feed-day-item) > .save-toggle {
     align-self: start;
-    margin-block: calc((26.6px - 36px) / 2);
+    margin-block: calc((26.6px - var(--control)) / 2);
+
+    @media (max-width: 640px) {
+      margin-block: -10px 0;
+    }
   }
 
   .feed-day-item:is(:hover, :focus-within) .save-toggle {
@@ -1620,6 +1979,18 @@
   /* Saved state on a phone, where the Digest has no save square to show it. */
   .feed-day-saved {
     display: none;
+
+    @media (max-width: 640px) {
+      display: inline-flex;
+      margin-inline-start: 6px;
+      vertical-align: -2px;
+      color: var(--color-saved);
+
+      & .icon {
+        width: 13px;
+        height: 13px;
+      }
+    }
   }
 
   .feed-day .item-body > .button {
@@ -1633,6 +2004,18 @@
     gap: 8px;
     margin-top: 12px;
     color: var(--color-ink-2);
+
+    @media (max-width: 640px) {
+      flex-basis: 100%;
+      margin-top: 4px;
+    }
+  }
+
+  /* The month has no room beside the list on a phone; the date picker stands in for it. */
+  .digest-calendar {
+    @media (max-width: 640px) {
+      display: none;
+    }
   }
 
   /* The month beside the Digest: seven columns of days, each shaded by its
@@ -1674,7 +2057,7 @@
     border-radius: 0;
     background: transparent;
     color: var(--color-ink-3);
-    font: 400 13px/1 var(--font-ui);
+    font: 400 13px / 1 var(--font-ui);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1717,7 +2100,6 @@
     border-top: 1px solid var(--color-rule);
   }
 
-
   /* A quiet spell's strip is its last 14 days; `:where` keeps it below the
      strip's own day rules. */
   :where(.quiet-spell) .cadence-day:nth-child(-n + 16) {
@@ -1731,6 +2113,11 @@
     grid-template-columns: minmax(0, 1fr) 300px;
     align-items: start;
     gap: 64px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+    }
   }
 
   /* The column stays in view beside a long list, scrolling itself if taller.
@@ -1743,6 +2130,16 @@
     margin: -4px -12px;
     padding: 4px 12px;
     overflow-y: auto;
+
+    /* On a phone a Feed filter becomes a row of chips above its list. */
+    @media (max-width: 640px) {
+      order: -1;
+      position: static;
+      max-height: none;
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+    }
   }
 
   .with-aside:not(:has(> :nth-child(2))) {
@@ -1755,18 +2152,25 @@
     margin-bottom: 48px;
   }
 
+  .feed-filter .group-header {
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+
   .filter-list {
     margin: 8px 0 0;
     padding: 0;
     list-style: none;
-  }
 
-  .filter-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 36px;
-    cursor: pointer;
+    @media (max-width: 640px) {
+      display: flex;
+      gap: 8px;
+      margin: 0 -20px;
+      padding-inline: 20px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
   }
 
   .filter-name {
@@ -1801,6 +2205,45 @@
     box-shadow: inset 0 0 0 2px var(--color-ground);
   }
 
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--control);
+    cursor: pointer;
+
+    /* On a phone, a chip. It holds its hidden tick box, which would otherwise escape the scrolling row. */
+    @media (max-width: 640px) {
+      position: relative;
+      gap: 8px;
+      height: var(--control);
+      padding: 0 14px;
+      background: var(--color-control);
+      font-weight: 500;
+      white-space: nowrap;
+
+      &:has(.checkbox:checked) {
+        background: var(--color-ink);
+        color: var(--color-ground);
+      }
+
+      &:has(.checkbox:focus-visible) {
+        outline: 2px solid var(--color-ink);
+        outline-offset: 2px;
+      }
+
+      & .checkbox {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      &:has(.checkbox:checked) .filter-count {
+        color: var(--color-ink-3);
+      }
+    }
+  }
+
   /* Settings */
 
   .settings-view > * {
@@ -1814,6 +2257,11 @@
     gap: 12px 40px;
     padding: 18px 0;
     border-bottom: 1px solid var(--color-rule-soft);
+
+    /* On a phone each preference’s words stand above its control. */
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .setting-label {
@@ -1828,6 +2276,12 @@
 
   .setting-control {
     min-width: 0;
+  }
+
+  .setting-control .switch {
+    @media (max-width: 640px) {
+      display: flex;
+    }
   }
 
   .setting-stack {
@@ -1847,6 +2301,10 @@
     display: grid;
     gap: 24px;
     max-width: 360px;
+
+    @media (max-width: 640px) {
+      max-width: none;
+    }
   }
 
   .gate-head {
@@ -1857,13 +2315,13 @@
 
   .gate-tagline {
     margin: 0;
-    font: 400 19px/1.4 var(--font-read);
+    font: 400 19px / 1.4 var(--font-read);
     color: var(--color-reader-body);
   }
 
   .gate-submit {
     width: 100%;
-    height: 40px;
+    height: var(--field);
   }
 
   /* Chrome */
@@ -1874,15 +2332,50 @@
     align-items: center;
     grid-template-rows: 68px;
     column-gap: 12px;
+
+    /* On a phone, one top bar that scrolls with the page — the mark or a back
+       square, the Digest and Feeds switch, then the search, Saved and Settings
+       squares. Nothing is fixed to the bottom edge. */
+    @media (max-width: 640px) {
+      grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
+      grid-template-rows: 60px;
+      column-gap: 6px;
+
+      &:has(.search[data-open]) > :is(.wordmark, .chrome-back, .chrome-toolbar) {
+        display: none;
+      }
+    }
   }
 
   .chrome > .wordmark {
     grid-column: 1;
     grid-row: 1;
+
+    /* Tight enough that the whole row fits a 360px phone. */
+    @media (max-width: 640px) {
+      height: var(--control);
+      padding-right: 10px;
+
+      .app:is([data-screen='reader'], [data-screen='feed']) & {
+        display: none;
+      }
+    }
   }
 
   .chrome-back {
     display: none;
+
+    @media (max-width: 640px) {
+      display: inline-flex;
+      grid-column: 1;
+      grid-row: 1;
+      width: var(--control);
+      padding: 0;
+
+      & .back-button-label {
+        display: none;
+      }
+    }
   }
 
   /* A screen's toolbar: a row of its own under the header. */
@@ -1894,6 +2387,15 @@
     justify-content: space-between;
     gap: 12px;
     margin-top: 32px;
+
+    /* On a phone the toolbar joins the top bar, ending beside the search square;
+       the chrome’s own back square stands in for the one it carries. */
+    @media (max-width: 640px) {
+      grid-column: 3;
+      grid-row: 1;
+      justify-self: end;
+      margin: 0;
+    }
   }
 
   .chrome-toolbar:empty {
@@ -1908,13 +2410,25 @@
     grid-column: 2;
     grid-row: 1;
     margin-left: 28px;
+
+    @media (max-width: 640px) {
+      margin-left: 0;
+
+      & .switch-segment {
+        flex: none;
+        padding: 0 8px;
+      }
+    }
   }
 
-  .search {
-    grid-column: 4;
-    grid-row: 1;
-    min-width: 0;
-    margin: 0;
+  /* On a phone an opened Feed leads with its way back instead of the switch; the
+     Reader and a search give the whole bar to their own controls. */
+  .app[data-screen='feed'] .sections-switch,
+  .app:is([data-screen='reader'], [data-screen='search']) .sections,
+  .chrome:has(.search[data-open]) .sections {
+    @media (max-width: 640px) {
+      display: none;
+    }
   }
 
   .saved-link {
@@ -1925,6 +2439,27 @@
   .settings-link {
     grid-column: 6;
     grid-row: 1;
+  }
+
+  .section-button {
+    @media (max-width: 640px) {
+      width: var(--control);
+      padding: 0;
+    }
+  }
+
+  /* Signed in on a phone, the mark stands alone and each section button is an
+     icon square; their words stay as the links' accessible names. */
+  .app:not([data-screen='gate']) .chrome .wordmark-name,
+  .section-button-label {
+    @media (max-width: 640px) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
 
   /* The current section among the buttons: a ring instead of a fill. */
@@ -1938,15 +2473,25 @@
     display: none;
   }
 
+  .search-open {
+    @media (max-width: 640px) {
+      display: inline-flex;
+    }
+  }
+
   .search-field {
     position: relative;
     display: flex;
     align-items: center;
-    height: 36px;
+    height: var(--control);
     padding: 0 8px 0 12px;
     gap: 10px;
     background: var(--color-control);
     color: var(--color-ink-2);
+
+    @media (max-width: 640px) {
+      display: none;
+    }
   }
 
   .search[data-filled] .search-field {
@@ -1959,6 +2504,38 @@
     outline-offset: 2px;
   }
 
+  .search {
+    grid-column: 4;
+    grid-row: 1;
+    min-width: 0;
+    margin: 0;
+
+    /* On a phone the search square opens the field across the whole bar. */
+    @media (max-width: 640px) {
+      &[data-open] {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 8px;
+        z-index: 1;
+        background: var(--color-ground);
+      }
+
+      &[data-open] .search-open {
+        display: none;
+      }
+
+      &[data-open] .search-close {
+        display: inline-flex;
+      }
+
+      &[data-open] .search-field {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+      }
+    }
+  }
+
   .search-input {
     flex: 1;
     min-width: 0;
@@ -1967,8 +2544,12 @@
     border: 0;
     background: transparent;
     color: var(--color-ink);
-    font: 400 14px/1 var(--font-ui);
+    font: 400 14px / 1 var(--font-ui);
     outline: none;
+
+    @media (max-width: 640px) {
+      font-size: 16px;
+    }
   }
 
   .search-input::placeholder {
@@ -1988,7 +2569,11 @@
     height: 20px;
     background: var(--color-ground);
     color: var(--color-ink-2);
-    font: 400 12px/1 var(--font-ui);
+    font: 400 12px / 1 var(--font-ui);
+
+    @media (max-width: 640px) {
+      display: none;
+    }
   }
 
   .search-clear {
@@ -2005,554 +2590,13 @@
   .search-clear:hover {
     color: var(--color-ink);
   }
-
 }
 
-@media (max-width: 640px) {
-  .app {
-    padding-inline: 20px;
-  }
-
-  .page {
-    padding-block: 24px calc(56px + env(safe-area-inset-bottom));
-  }
-
-  .app[data-screen='feed'] .page {
-    padding-top: 8px;
-  }
-
-  .app[data-screen='reader'] .page {
-    padding-top: 24px;
-  }
-
-  .page-title {
-    font-size: 32px;
-  }
-
-  /* Words a phone's narrower control can go without. */
-  .wide-only {
-    display: none;
-  }
-
-  .page-head {
-    gap: 20px;
-    margin-bottom: 32px;
-  }
-
-  .button,
-  .select-control {
-    height: 44px;
-  }
-
-  .button-icon {
-    width: 44px;
-  }
-
-  .switch-segment {
-    height: 38px;
-    flex: 1;
-  }
-
-  .field-input {
-    height: 48px;
-    font-size: 16px;
-  }
-
-  .group-heading {
-    font-size: 16px;
-  }
-
-  /* Chrome: one top bar that scrolls with the page — the mark or a back
-     square, the Digest and Feeds switch, then the search, Saved and Settings
-     squares. Nothing is fixed to the bottom edge. */
-
-  .chrome {
-    grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
-    grid-template-rows: 60px;
-    column-gap: 6px;
-  }
-
-  .chrome-back {
-    display: inline-flex;
-    grid-column: 1;
-    grid-row: 1;
-    width: 44px;
-    padding: 0;
-  }
-
-  .chrome-back .back-button-label {
-    display: none;
-  }
-
-  /* The toolbar joins the top bar, ending beside the search square; the
-     chrome's own back square stands in for the one it carries. */
-  .chrome-toolbar {
-    grid-column: 3;
-    grid-row: 1;
-    justify-self: end;
-    margin: 0;
-  }
-
-  .app:is([data-screen='reader'], [data-screen='feed']) .chrome > .wordmark {
-    display: none;
-  }
-
-  .view-back {
-    display: none;
-  }
-
-  .wordmark-name {
-    font-size: 19px;
-  }
-
-  /* Tight enough that the whole row fits a 360px phone. */
-  .chrome > .wordmark {
-    height: 44px;
-    padding-right: 10px;
-  }
-
-  .search-open {
-    display: inline-flex;
-  }
-
-  .search-field {
-    display: none;
-  }
-
-  .search[data-open] {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 8px;
-    z-index: 1;
-    background: var(--color-ground);
-  }
-
-  .search[data-open] .search-open {
-    display: none;
-  }
-
-  .search[data-open] .search-close {
-    display: inline-flex;
-  }
-
-  .search[data-open] .search-field {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    height: 44px;
-  }
-
-  .search-input {
-    font-size: 16px;
-  }
-
-  .search-key {
-    display: none;
-  }
-
-  .chrome:has(.search[data-open]) > :is(.wordmark, .chrome-back, .chrome-toolbar) {
-    display: none;
-  }
-
-  .sections-switch {
-    margin-left: 0;
-  }
-
-  .sections-switch .switch-segment {
-    flex: none;
-    padding: 0 8px;
-  }
-
-  .section-button {
-    width: 44px;
-    padding: 0;
-  }
-
-  /* Signed in, the mark stands alone and each section button is an icon
-     square; their words stay as the links' accessible names. */
-  .app:not([data-screen='gate']) .chrome .wordmark-name,
-  .section-button-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* An opened Feed leads with its way back instead of the switch; the Reader
-     and a search give the whole bar to their own controls. */
-  .app[data-screen='feed'] .sections-switch,
-  .app:is([data-screen='reader'], [data-screen='search']) .sections,
-  .chrome:has(.search[data-open]) .sections {
-    display: none;
-  }
-
-  /* Feeds: one column, the last 14 days of Cadence, Add feed leading. */
-
-  .feed-rows {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .cadence-day:nth-child(-n + 16) {
-    display: none;
-  }
-
-  .feeds-actions {
-    width: 100%;
-    flex-wrap: nowrap;
-  }
-
-  .feeds-actions > .button-primary {
-    flex: 1;
-    order: -1;
-  }
-
-  .rhythm-jumps {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    margin-inline: -20px;
-    padding-inline: 20px;
-    scrollbar-width: none;
-  }
-
-  /* One line, so it spans the page rather than the scrolling jumps' content. */
-  .toolbar:has(.rhythm-jumps) {
-    flex-direction: column-reverse;
-    flex-wrap: nowrap;
-    align-items: stretch;
-  }
-
-  /* Wrapped under the scope switch, the sort starts its own row. */
-  .toolbar-end {
-    margin-inline-start: 0;
-  }
-
-  .more {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .more-names {
-    display: none;
-  }
-
-  /* Digest: the date picker stands at the end of the title's row. */
-  .digest-head {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 12px;
-  }
-
-  /* A day's Feeds scroll as one row past the page's edge. */
-  .day-feeds {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    margin-inline: -20px;
-    padding-inline: 20px;
-    scrollbar-width: none;
-  }
-
-  .chip {
-    height: 44px;
-    padding-inline: 16px;
-  }
-
-  /* A row that scrolls fades at its trailing edge, so what is past it reads as there. */
-  :is(.day-feeds, .filter-list, .rhythm-jumps) {
-    mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
-  }
-
-  /* The month has no room beside the list; the date picker stands in for it. */
-  .digest-calendar {
-    display: none;
-  }
-
-  .day-picker {
-    display: inline-flex;
-    width: 44px;
-    height: 44px;
-  }
-
-  .newer {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 24px;
-  }
-
-  /* One Feed: identity, then the actions as one row, the panels stacked. */
-
-  .feed-head {
-    flex-direction: column;
-    align-items: stretch;
-    margin-bottom: 32px;
-  }
-
-  .feed-actions > .button {
-    flex: 1;
-    padding-inline: 8px;
-  }
-
-  .feed-panels {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 40px;
-    margin-bottom: 48px;
-  }
-
-  .cadence-figure {
-    --cell: 11px;
-    --gap: 2px;
-  }
-
-  .row:has(.switch) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding-block: 12px;
-  }
-
-  /* Reader: the source switch spans the column. */
-
-  .reader-source {
-    display: flex;
-    margin-top: 20px;
-  }
-
-  /* Restated here: this block is unlayered, so the item box's phone rules
-     for .save-toggle would otherwise win. */
-  .reader-original,
-  .save-toggle.save-toggle-labelled {
-    width: 44px;
-    height: 44px;
-    margin: 0;
-    padding: 0;
-    align-self: center;
-  }
-
-  .reader-meta {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .reader-facts::before {
-    content: none;
-  }
-
-  .reader-title {
-    font-size: 30px;
-    line-height: 1.18;
-  }
-
-  .article-body,
-  .reader-summary {
-    font-size: 17px;
-    line-height: 1.65;
-  }
-
-  .item-plain {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* A Feed filter becomes a row of chips above its list. */
-
-  .with-aside {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
-  }
-
-  .feed-filter {
-    order: -1;
-    position: static;
-    max-height: none;
-    margin: 0;
-    padding: 0;
-    overflow: visible;
-  }
-
-  .feed-filter .group-header {
-    display: none;
-  }
-
-  .filter-list {
-    display: flex;
-    gap: 8px;
-    margin: 0 -20px;
-    padding-inline: 20px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  /* Holds its hidden tick box, which would otherwise escape the scrolling row. */
-  .filter-row {
-    position: relative;
-    gap: 8px;
-    height: 44px;
-    padding: 0 14px;
-    background: var(--color-control);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .filter-row:has(.checkbox:checked) {
-    background: var(--color-ink);
-    color: var(--color-ground);
-  }
-
-  .filter-row:has(.checkbox:focus-visible) {
-    outline: 2px solid var(--color-ink);
-    outline-offset: 2px;
-  }
-
-  .filter-row .checkbox {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .filter-row:has(.checkbox:checked) .filter-count {
-    color: var(--color-ink-3);
-  }
-
-  /* Settings: each preference's words above its control. */
-
-  .setting {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .setting-control .switch {
-    display: flex;
-  }
-
-  .gate {
-    max-width: none;
-  }
-
-  .gate-submit {
-    height: 48px;
-  }
-
-  /* Dialog: a sheet that rises from the bottom edge under the fading scrim,
-     and sinks back into it. The sheet stays opaque; only the scrim fades. */
-
-  .dialog-viewport {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .dialog {
-    width: 100%;
-    padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
-    box-shadow: none;
-    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  .dialog:is([data-starting-style], [data-ending-style]) {
-    opacity: 1;
-    transform: translateY(100%);
-  }
-
-  .dialog[data-ending-style] {
-    transition-duration: 180ms;
-  }
-
-  .dialog-footer > * {
-    flex: 1;
-    height: 48px;
-  }
-
-  /* Items: the Feed name and time on one line above the title. */
-
-  .item {
-    grid-template-columns: minmax(0, 1fr) 44px;
-    column-gap: 8px;
-    padding: 16px 12px 18px 16px;
-  }
-
-  .item-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 10px;
-    padding-top: 0;
-    margin-bottom: 8px;
-  }
-
-  .item-meta,
-  .item-body {
-    grid-column: 1;
-  }
-
-  .feed-day .item-body {
-    grid-column: 1 / -1;
-  }
-
-  /* The Digest saves from the Reader alone on a phone, so its titles take the
-     whole row; a shared title's time trails its last line, in the room the
-     title leaves, and the row holds three lines as a lone title does. */
-  .day-items .save-toggle {
-    display: none;
-  }
-
-  .day-items > .item {
-    grid-template-columns: minmax(0, 1fr);
-    padding-inline-end: 16px;
-  }
-
-  .feed-day-item {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    overflow: hidden;
-  }
-
-  .feed-day-title {
-    display: inline;
-    font-size: 17px;
-    line-height: 1.38;
-  }
-
-  .feed-day-item > time {
-    margin-inline-start: 8px;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .feed-day-saved {
-    display: inline-flex;
-    margin-inline-start: 6px;
-    vertical-align: -2px;
-    color: var(--color-saved);
-  }
-
-  .feed-day-saved .icon {
-    width: 13px;
-    height: 13px;
-  }
-
-  .quiet-spell {
-    flex-basis: 100%;
-    margin-top: 4px;
-  }
-
-  .item-title {
-    font-size: 17px;
-    line-height: 1.38;
-  }
-
-  .item-snippet {
-    font-size: 15px;
-    -webkit-line-clamp: 1;
-  }
-
-  .save-toggle {
-    grid-column: 2;
-    grid-row: 1 / span 3;
-    align-self: start;
-    width: 44px;
-    height: 44px;
-    margin-block: -10px 0;
-    opacity: 1;
+/* A jump within a page glides; under reduced motion it cuts. A scroll that
+   restores a place asks for `instant` itself. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
 }
 

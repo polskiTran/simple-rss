@@ -4,6 +4,9 @@ import type { Clock } from '../clock.js'
 
 export const READER_IMAGE_URL_LIFETIME_SECONDS = 2 * 86_400
 
+/** The least key length that signs image URLs; the installation mints exactly this many bytes. */
+export const IMAGE_URL_KEY_BYTES = 32
+
 /** Mints the signed same-origin proxy path for one approved image target. */
 export type SignImageUrl = (url: string) => string
 
@@ -30,12 +33,10 @@ export function createImageUrlSignature(options: {
   readonly key: Uint8Array
   readonly clock: Clock
 }): ImageUrlSignature {
-  if (options.key.byteLength < 32) {
-    throw new Error('the image URL key must be at least 32 bytes')
+  if (options.key.byteLength < IMAGE_URL_KEY_BYTES) {
+    throw new Error(`the image URL key must be at least ${IMAGE_URL_KEY_BYTES} bytes`)
   }
   const { key, clock } = options
-
-  const mac = (expiry: string, url: string): Buffer => imageUrlMac(key, expiry, url)
 
   return {
     sign(url) {
@@ -51,7 +52,7 @@ export function createImageUrlSignature(options: {
       }
 
       const presented = Buffer.from(sig, 'base64url')
-      const expected = mac(expiry, url)
+      const expected = imageUrlMac(key, expiry, url)
       if (presented.byteLength !== expected.byteLength || !timingSafeEqual(presented, expected)) {
         return { ok: false, reason: 'tampered' }
       }

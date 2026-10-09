@@ -1,32 +1,34 @@
 import { randomBytes } from 'node:crypto'
+import { Server } from 'node:http'
+import { serve } from '@hono/node-server'
 import type { Hono } from 'hono'
-import { createApp, type Services } from './app.js'
-import { createAuthentication } from './auth/authentication.js'
-import type { Sleeper } from './auth/sleeper.js'
+import { createApp, type Services, type Startup } from './app.js'
+import { createAuthentication, type Sleeper } from './auth/authentication.js'
 import { systemClock, type Clock } from './clock.js'
 import type { Config } from './config.js'
 import { DigestService } from './digest/digest-service.js'
 import { ImageService } from './images/image-service.js'
-import { createImageUrlSignature } from './images/image-url-signature.js'
+import { createImageUrlSignature, IMAGE_URL_KEY_BYTES } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
-import { createLogger, errorForLog, type Logger } from './logger.js'
+import { createLogger, type Logger } from './logger.js'
 import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderExtractor } from './reader/reader-extractor.js'
+import { ReaderItems } from './reader/reader-items.js'
 import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
-import { FeedAvailabilityLedger } from './subscriptions/feed-availability.js'
 import { FeedPoll } from './subscriptions/feed-poll.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
-import { Readiness } from './readiness.js'
 import { createNetworkRetrieval, type Retrieval } from './upstream/retrieval.js'
 
 export interface ServiceOptions {
   readonly config: Config
+  /** Overrides `config.port`. Tests pass 0 for any free port; `config.ts` still refuses 0 from a host. */
+  readonly port?: number
   readonly logger?: Logger
   readonly clock?: Clock
   readonly retrieval?: Retrieval
@@ -37,28 +39,27 @@ export interface ServiceOptions {
   readonly readerBudgetMs?: number
 }
 
-export interface Service {
-  readonly app: Hono
-  readonly config: Config
-  readonly logger: Logger
-  readonly clock: Clock
-  readonly readiness: Readiness
-  /** The single outbound HTTP boundary (ADR 0005), shared by every retrieval. */
-  readonly retrieval: Retrieval
-  /** Undefined only when startup failed to open the database. */
-  readonly database: DrizzleDatabase | undefined
-  readonly settings: InstallationSettingsStore | undefined
-  /** The in-process background poller; absent only when startup failed. */
-  readonly scheduler: PollScheduler | undefined
-  shutdown(drain: () => Promise<void>): Promise<void>
+/** A listening service. `stop()` is the only way down: it drains before closing the database. */
+export interface RunningService {
+  /** Undefined when startup failed: `/health/ready` answers 503 with the reason and `/api` answers 503. */
+  readonly services: Services | undefined
+  /** The port actually bound, which differs from the request when it was 0. */
+  readonly port: number
+  /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
+  readonly url: string
+  /** Stops accepting connections, drains in-flight work, closes the database. */
+  stop(): Promise<void>
 }
 
+const IDLE_SWEEP_MS = 20
+
 /**
- * The composition root. A startup failure is recorded rather than thrown: the
- * process stays up to answer liveness with the reason, while readiness stays
- * closed so no traffic reaches a half-built installation.
+ * The composition root. A startup failure is reported rather than thrown: the
+ * process listens anyway, `/health/live` stays green, `/health/ready` answers
+ * 503 with the step that failed, and `/api` answers 503 so no traffic reaches a
+ * half-built installation. Only a socket that cannot bind rejects.
  */
-export function createService(options: ServiceOptions): Service {
+export async function startService(options: ServiceOptions): Promise<RunningService> {
   const { config } = options
   const logger = options.logger ?? createLogger({ level: config.logLevel })
   const clock = options.clock ?? systemClock
@@ -68,15 +69,64 @@ export function createService(options: ServiceOptions): Service {
       logger,
       self: new URL(config.publicOrigin),
     })
-  const readiness = new Readiness()
 
-  let scheduler: PollScheduler | undefined
+  const startup = compose(options, { logger, clock, retrieval })
+  const services = startup.kind === 'ready' ? startup.services : undefined
+  services?.scheduler.start()
+
+  const app = createApp({ config, clock, logger, startup })
+  const { server, port } = await listen(app, options.port ?? config.port)
+  logger.info('server.started', { port, dataDir: config.dataDir })
+
+  /**
+   * Whatever outlives the grace period is cut off, because a platform that
+   * sent SIGTERM sends SIGKILL next.
+   */
+  const shutdown = async (): Promise<void> => {
+    const graceMs = config.shutdownGraceMs
+    logger.info('server.stopping', { graceMs })
+    services?.scheduler.stop()
+    await drain(server, graceMs, logger)
+    await services?.reader.close()
+    services?.db.$client.close()
+    logger.info('server.stopped')
+  }
+
+  let stopped: Promise<void> | undefined
+
+  return {
+    services,
+    port,
+    url: `http://127.0.0.1:${port}`,
+    stop() {
+      stopped ??= shutdown()
+      return stopped
+    },
+  }
+}
+
+/**
+ * Builds every domain service once. The reason names the step that failed;
+ * the log carries the error itself. Whatever was opened before the failure
+ * is closed again, so a failed startup holds no database handle or worker.
+ */
+function compose(
+  options: ServiceOptions,
+  { logger, clock, retrieval }: { readonly logger: Logger; readonly clock: Clock; readonly retrieval: Retrieval },
+): Startup {
+  const { config } = options
+  let reason = 'database could not be opened'
+  let db: DrizzleDatabase | undefined
   let extractor: ReaderExtractor | undefined
-  let services: Services | undefined
 
   try {
-    const db = openDatabase(config.databasePath)
+    db = openDatabase(config.databasePath)
+
+    reason = 'migrations failed'
     const applied = applyMigrations(db, clock)
+    logger.info('startup.migrations_applied', { databasePath: config.databasePath, applied })
+
+    reason = 'services could not start'
     const settings = new InstallationSettingsStore(db)
     const authentication = createAuthentication({
       db,
@@ -85,14 +135,13 @@ export function createService(options: ServiceOptions): Service {
       setupSecret: config.setupSecret,
       ...(options.sleep ? { sleep: options.sleep } : {}),
     })
-    const availability = new FeedAvailabilityLedger({ db, clock, logger })
     const subscriptions = new SubscriptionService({ db, clock, settings, logger })
-    const poll = new FeedPoll({ db, retrieval, clock, logger, subscriptions, availability })
+    const poll = new FeedPoll({ db, retrieval, clock, logger })
     const refresh = new FeedRefresh({ clock, poll })
 
     const digest = new DigestService({ db, clock, settings })
     const library = new LibraryService({ db, clock, settings })
-    const imageSigningKey = randomBytes(32)
+    const imageSigningKey = randomBytes(IMAGE_URL_KEY_BYTES)
     const imageSignature = createImageUrlSignature({ key: imageSigningKey, clock })
     const images = new ImageService({ db, retrieval })
     extractor = new ReaderExtractor({
@@ -101,22 +150,19 @@ export function createService(options: ServiceOptions): Service {
       logger,
       workerUrl: options.readerWorkerUrl,
     })
+    const readerItems = new ReaderItems({ db, clock, settings, digest, signImageUrl: imageSignature.sign })
     const reader = new ReaderService({
       db,
       clock,
-      settings,
       retrieval,
-      digest,
       extractor,
-      signImageUrl: imageSignature.sign,
       logger,
       ...(options.readerBudgetMs === undefined ? {} : { budgetMs: options.readerBudgetMs }),
     })
     const search = new SearchService({ db, clock, settings })
     const retention = new RetentionService({ db, clock, logger, ...options.retention })
-    scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
 
-    services = {
+    const services = {
       db,
       authentication,
       settings,
@@ -124,54 +170,61 @@ export function createService(options: ServiceOptions): Service {
       refresh,
       digest,
       library,
+      readerItems,
       reader,
       search,
       images,
       imageSignature,
-      nudgeScheduler: () => scheduler?.nudge(),
-    }
-
-    scheduler.start()
-    readiness.markReady()
-    logger.info('startup.migrations_applied', {
-      databasePath: config.databasePath,
-      applied,
-    })
+      scheduler: new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling }),
+    } satisfies Services
+    return { kind: 'ready', services }
   } catch (error) {
-    extractor
-      ?.close()
-      .catch((closeError) => logger.error('startup.reader_close_failed', { error: errorForLog(closeError) }))
-    readiness.markFailed('migrations failed')
-    logger.error('startup.migrations_failed', { databasePath: config.databasePath, error: errorForLog(error) })
+    logger.error('startup.failed', { databasePath: config.databasePath, reason, error: error })
+    extractor?.close().catch((closeError) => logger.error('startup.reader_close_failed', { error: closeError }))
+    db?.$client.close()
+    return { kind: 'failed', reason }
   }
+}
 
-  const app = createApp({ config, clock, logger, readiness, services })
+interface ListeningServer {
+  readonly server: Server
+  readonly port: number
+}
 
-  const shutdown = async (drain: () => Promise<void>): Promise<void> => {
-    scheduler?.stop()
-    scheduler = undefined
-    await drain()
-    await services?.reader.close()
-    services?.db.$client.close()
-    services = undefined
-  }
+/** `serve` defaults to Node's HTTP/1 server when no custom server factory is supplied. */
+function listen(app: Hono, port: number): Promise<ListeningServer> {
+  const { promise, resolve, reject } = Promise.withResolvers<ListeningServer>()
+  const candidate = serve({ fetch: app.fetch, port }, (address) => {
+    if (candidate instanceof Server) {
+      resolve({ server: candidate, port: address.port })
+    } else {
+      candidate.close()
+      reject(new Error('Hono created an unexpected HTTP/2 server'))
+    }
+  })
+  candidate.once('error', reject)
+  return promise
+}
 
-  return {
-    app,
-    config,
-    logger,
-    clock,
-    readiness,
-    retrieval,
-    get database() {
-      return services?.db
-    },
-    get settings() {
-      return services?.settings
-    },
-    get scheduler() {
-      return scheduler
-    },
-    shutdown,
-  }
+/** Resolves once every connection has closed, forcing the stragglers after `graceMs`. */
+function drain(server: Server, graceMs: number, logger: Logger): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const forceTimer = setTimeout(() => {
+      logger.warn('server.stop_forced', { graceMs })
+      server.closeAllConnections()
+    }, graceMs)
+    forceTimer.unref()
+
+    // A keep-alive socket goes idle only after its response flushes; a single
+    // sweep would miss connections still writing and wait out the full grace.
+    const sweep = setInterval(() => server.closeIdleConnections(), IDLE_SWEEP_MS)
+    sweep.unref()
+
+    server.close(() => {
+      clearTimeout(forceTimer)
+      clearInterval(sweep)
+      resolve()
+    })
+    server.closeIdleConnections()
+  })
 }

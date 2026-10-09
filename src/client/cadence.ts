@@ -1,19 +1,20 @@
 import type { CadenceObservation } from '../shared/api.js'
+import { counted, fullDate, shortMonth, weekday } from './day-names.js'
 
-export interface CadenceCell {
+interface CadenceCell {
   readonly date: string
   readonly count: number
   readonly level: 0 | 1 | 2 | 3 | 4
 }
 
 /** One week of the grid. The last column ends on today and may be short. */
-export interface CadenceColumn {
+interface CadenceColumn {
   readonly cells: readonly CadenceCell[]
   readonly monthLabel: string | undefined
 }
 
 /** What a Feed's Info panel says about its 26 weeks. */
-export interface CadenceStats {
+interface CadenceStats {
   readonly total: number
   /** Undefined when nothing was published. */
   readonly busiestWeekday: string | undefined
@@ -57,11 +58,12 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   // A label where a column opens a month, never within six columns of the last.
   let lastLabelled: number | undefined
   for (const [index, column] of columns.entries()) {
-    const month = monthOf(column.cells[0]?.date)
-    const previous = monthOf(columns[index - 1]?.cells[0]?.date)
-    if (month === undefined) continue
-    if (index > 0 && (month === previous || (lastLabelled !== undefined && index - lastLabelled < 6))) continue
-    column.monthLabel = MONTHS[month]
+    const opening = column.cells[0]?.date
+    if (opening === undefined) continue
+    const previous = columns[index - 1]?.cells[0]?.date
+    const sameMonth = previous !== undefined && previous.slice(0, 7) === opening.slice(0, 7)
+    if (index > 0 && (sameMonth || (lastLabelled !== undefined && index - lastLabelled < 6))) continue
+    column.monthLabel = shortMonth(opening)
     lastLabelled = index
   }
 
@@ -70,9 +72,7 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
 
 /** Screen-reader label: `3 items on 3 June 2026`. */
 export function cadenceDayLabel(cell: CadenceCell): string {
-  const [year, month, day] = cell.date.split('-')
-  const monthName = MONTH_NAMES[Number(month) - 1] ?? ''
-  return `${counted(cell.count, 'item')} on ${Number(day)} ${monthName} ${year}`
+  return `${counted(cell.count, 'item')} on ${fullDate(cell.date)}`
 }
 
 function statsOf(days: readonly CadenceObservation[]): CadenceStats {
@@ -81,10 +81,12 @@ function statsOf(days: readonly CadenceObservation[]): CadenceStats {
   const byWeekday = Array.from({ length: 7 }, () => 0)
   for (const { date, count } of days) {
     // Monday first, so a tie goes to the earlier day of the week.
-    const weekday = (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7
-    byWeekday[weekday] = (byWeekday[weekday] ?? 0) + count
+    const day = mondayFirst(date)
+    byWeekday[day] = (byWeekday[day] ?? 0) + count
   }
   const busiest = byWeekday.indexOf(Math.max(...byWeekday))
+  // Any day of the busiest weekday names it.
+  const busiestDay = days.find(({ date }) => mondayFirst(date) === busiest)
 
   let quiet = 0
   let longestQuiet = 0
@@ -93,33 +95,10 @@ function statsOf(days: readonly CadenceObservation[]): CadenceStats {
     longestQuiet = Math.max(longestQuiet, quiet)
   }
 
-  return { total, busiestWeekday: total === 0 ? undefined : WEEKDAYS[busiest], longestQuiet }
+  return { total, busiestWeekday: total === 0 || !busiestDay ? undefined : weekday(busiestDay.date), longestQuiet }
 }
 
-function monthOf(date: string | undefined): number | undefined {
-  if (!date) return undefined
-  return Number(date.slice(5, 7)) - 1
+/** The day of the week, Monday 0 to Sunday 6. */
+function mondayFirst(date: string): number {
+  return (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7
 }
-
-export function counted(count: number, noun: string): string {
-  return count === 1 ? `1 ${noun}` : `${count.toLocaleString('en-GB')} ${noun}s`
-}
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const
-
-const MONTHS = MONTH_NAMES.map((name) => name.slice(0, 3))
-
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const

@@ -38,8 +38,9 @@ export class InstallationSettingsStore {
     return this.read()?.timezone ?? 'UTC'
   }
 
-  setTimezone(timezone: string, now: Date): void {
-    assertResolvableTimezone(timezone)
+  /** False, writing nothing, for a zone the platform cannot resolve. */
+  setTimezone(timezone: string, now: Date): boolean {
+    if (!isResolvableTimezone(timezone)) return false
     const at = now.toISOString()
 
     this.#db
@@ -50,20 +51,15 @@ export class InstallationSettingsStore {
         set: { timezone: sql`excluded.timezone`, updatedAt: sql`excluded.updated_at` },
       })
       .run()
+    return true
   }
 }
 
-export class UnknownTimezoneError extends Error {
-  constructor(timezone: string) {
-    super(`Unknown installation timezone: ${timezone}`)
-    this.name = 'UnknownTimezoneError'
-  }
-}
-
-function assertResolvableTimezone(timezone: string): void {
+function isResolvableTimezone(timezone: string): boolean {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone })
+    return true
   } catch {
-    throw new UnknownTimezoneError(timezone)
+    return false
   }
 }

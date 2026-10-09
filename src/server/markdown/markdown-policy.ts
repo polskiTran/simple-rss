@@ -49,8 +49,6 @@ export interface ReaderMarkdownPolicyOptions {
   readonly images?: 'preserve' | ((url: string) => string)
 }
 
-type PolicyContext = ReaderMarkdownPolicyOptions
-
 /**
  * Rebuilds Markdown from the Reader dialect's maintained AST nodes.
  * Unknown syntax and raw HTML are omitted rather than passed through.
@@ -60,11 +58,11 @@ export function applyReaderMarkdownPolicy(markdown: string, options: ReaderMarkd
   return serializeReaderMarkdown(readerMarkdownTree(parsed, options))
 }
 
-function policyBlocks(nodes: readonly RootContent[], context: PolicyContext): BlockContent[] {
+function policyBlocks(nodes: readonly RootContent[], context: ReaderMarkdownPolicyOptions): BlockContent[] {
   return nodes.flatMap((node) => policyBlock(node, context))
 }
 
-function policyBlock(node: RootContent, context: PolicyContext): BlockContent[] {
+function policyBlock(node: RootContent, context: ReaderMarkdownPolicyOptions): BlockContent[] {
   switch (node.type) {
     case 'paragraph': {
       const children = policyPhrasing(node.children, context)
@@ -100,7 +98,7 @@ function policyBlock(node: RootContent, context: PolicyContext): BlockContent[] 
   }
 }
 
-function policyList(node: List, context: PolicyContext): BlockContent[] {
+function policyList(node: List, context: ReaderMarkdownPolicyOptions): BlockContent[] {
   const children = node.children.flatMap((item) => policyListItem(item, context))
   if (children.length === 0) return []
 
@@ -114,12 +112,12 @@ function policyList(node: List, context: PolicyContext): BlockContent[] {
   return [list]
 }
 
-function policyListItem(node: ListItem, context: PolicyContext): ListItem[] {
+function policyListItem(node: ListItem, context: ReaderMarkdownPolicyOptions): ListItem[] {
   const children = policyBlocks(node.children, context)
   return children.length === 0 ? [] : [{ type: 'listItem', spread: node.spread ?? false, children } satisfies ListItem]
 }
 
-function policyTable(node: Table, context: PolicyContext): BlockContent[] {
+function policyTable(node: Table, context: ReaderMarkdownPolicyOptions): BlockContent[] {
   const children = node.children.map(
     (row) =>
       ({
@@ -143,11 +141,11 @@ function policyTable(node: Table, context: PolicyContext): BlockContent[] {
   return [table]
 }
 
-function policyPhrasing(nodes: readonly PhrasingContent[], context: PolicyContext): PhrasingContent[] {
+function policyPhrasing(nodes: readonly PhrasingContent[], context: ReaderMarkdownPolicyOptions): PhrasingContent[] {
   return nodes.flatMap((node) => policyPhrase(node, context))
 }
 
-function policyPhrase(node: PhrasingContent, context: PolicyContext): PhrasingContent[] {
+function policyPhrase(node: PhrasingContent, context: ReaderMarkdownPolicyOptions): PhrasingContent[] {
   switch (node.type) {
     case 'text':
       return [{ type: 'text', value: node.value }]
@@ -177,7 +175,7 @@ function policyPhrase(node: PhrasingContent, context: PolicyContext): PhrasingCo
   }
 }
 
-function policyLink(node: Link, context: PolicyContext): PhrasingContent[] {
+function policyLink(node: Link, context: ReaderMarkdownPolicyOptions): PhrasingContent[] {
   const children = policyPhrasing(node.children, context)
   if (children.length === 0) return []
 
@@ -193,7 +191,7 @@ function policyLink(node: Link, context: PolicyContext): PhrasingContent[] {
   return [link]
 }
 
-function policyImage(node: Image, context: PolicyContext): PhrasingContent[] {
+function policyImage(node: Image, context: ReaderMarkdownPolicyOptions): PhrasingContent[] {
   if (!context.images) return []
   const alt = node.alt?.trim() ?? ''
   const url = absoluteHttpUrl(node.url, context.baseUrl)

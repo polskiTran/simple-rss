@@ -4,21 +4,21 @@ import { startTestService } from '../support/service-harness.js'
 describe('state on the durable volume', () => {
   it('survives replacing the process, which is what a deployment does', async () => {
     const service = await startTestService()
-    service.settings?.setTimezone('Europe/Berlin', service.clock.now())
+    service.settings.setTimezone('Europe/Berlin', service.clock.now())
 
     await service.restart()
 
-    expect(service.settings?.read()?.timezone).toBe('Europe/Berlin')
+    expect(service.settings.read()?.timezone).toBe('Europe/Berlin')
   })
 
   it('keeps the original creation time across the replacement', async () => {
     const service = await startTestService()
-    service.settings?.setTimezone('Europe/Berlin', service.clock.now())
-    const before = service.settings?.read()
+    service.settings.setTimezone('Europe/Berlin', service.clock.now())
+    const before = service.settings.read()
 
     await service.restart()
 
-    expect(service.settings?.read()?.createdAt).toBe(before?.createdAt)
+    expect(service.settings.read()?.createdAt).toBe(before?.createdAt)
   })
 
   it('re-runs no migrations on the second start', async () => {
@@ -42,6 +42,6 @@ describe('state on the durable volume', () => {
   it('starts empty on a fresh volume', async () => {
     const service = await startTestService()
 
-    expect(service.settings?.read()).toBeUndefined()
+    expect(service.settings.read()).toBeUndefined()
   })
 })

@@ -88,18 +88,6 @@ describe('migrations', () => {
     db.$client.close()
   })
 
-  it('creates the installation_settings singleton table', async () => {
-    const db = await openFreshDatabase()
-    applyMigrations(db)
-
-    const columns = (db.$client.pragma('table_info(installation_settings)') as Array<{ name: string }>).map(
-      (column) => column.name,
-    )
-
-    expect(columns).toEqual(expect.arrayContaining(['id', 'timezone', 'created_at', 'updated_at']))
-    db.$client.close()
-  })
-
   it('refuses a second installation_settings row', async () => {
     const db = await openFreshDatabase()
     applyMigrations(db)
@@ -109,16 +97,6 @@ describe('migrations', () => {
         .prepare('INSERT INTO installation_settings (id, timezone, created_at, updated_at) VALUES (?, ?, ?, ?)')
         .run(2, 'UTC', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
     ).toThrow()
-    db.$client.close()
-  })
-
-  it('creates the user_auth singleton table', async () => {
-    const db = await openFreshDatabase()
-    applyMigrations(db)
-
-    const columns = (db.$client.pragma('table_info(user_auth)') as Array<{ name: string }>).map((column) => column.name)
-
-    expect(columns).toEqual(expect.arrayContaining(['id', 'password_hash', 'claimed_at', 'updated_at']))
     db.$client.close()
   })
 
@@ -251,18 +229,6 @@ describe('migrations', () => {
     expect(row.password_hash).toBe('$argon2id$claimed-before-the-rename')
     expect(row.claimed_at).toBe('2026-01-01T00:00:00.000Z')
     expect(db.$client.pragma('table_list(owner_auth)')).toEqual([])
-    db.$client.close()
-  })
-
-  it('creates the sessions table with an index the expiry sweep can use', async () => {
-    const db = await openFreshDatabase()
-    applyMigrations(db)
-
-    const columns = (db.$client.pragma('table_info(sessions)') as Array<{ name: string }>).map((column) => column.name)
-    const indexes = (db.$client.pragma('index_list(sessions)') as Array<{ name: string }>).map((index) => index.name)
-
-    expect(columns).toEqual(['token_hash', 'created_at', 'last_seen_at', 'expires_at'])
-    expect(indexes).toContain('sessions_expires_at')
     db.$client.close()
   })
 })

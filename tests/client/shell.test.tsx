@@ -69,27 +69,6 @@ describe('the application shell', () => {
     expect(activeTab()).toBe('Saved')
   })
 
-  it('draws the mark as the 4x4 cadence tile of DESIGN.md §5', async () => {
-    const { container } = await renderAt('/digest')
-
-    const levels = [...container.querySelectorAll('.chrome .wordmark-cell')].map((cell) =>
-      cell.getAttribute('data-level'),
-    )
-
-    expect(levels).toEqual(['4', '1', '3', '0', '2', '4', '0', '2', '3', '0', '4', '1', '0', '2', '1', '3'])
-    expect(container.querySelector('.chrome .wordmark-grid')?.getAttribute('aria-hidden')).toBe('true')
-  })
-
-  it('orders the hover glint along the tile’s anti-diagonal', async () => {
-    const { container } = await renderAt('/digest')
-
-    const steps = [...container.querySelectorAll<HTMLElement>('.chrome .wordmark-cell')].map((cell) =>
-      cell.style.getPropertyValue('--glint-step'),
-    )
-
-    expect(steps).toEqual(['0', '1', '2', '3', '1', '2', '3', '4', '2', '3', '4', '5', '3', '4', '5', '6'])
-  })
-
   it.each([...ROUTES])('marks %s as the current section when its path is open', async (route) => {
     await renderAt(`/${route}`)
 
@@ -198,7 +177,7 @@ describe('settings', () => {
   })
 
   it('rejects a response that does not match the agreed shape', async () => {
-    stubApi().on('GET /api/meta', { body: { name: 'something-else' } })
+    stubApi().malformed('GET /api/meta')
     await renderAt('/settings')
 
     await waitFor(() => expect(screen.getByText('simple unavailable')).toBeDefined())

@@ -17,7 +17,7 @@ function validateDestination(
   candidate: string | URL,
   policy: Omit<DestinationPolicy, 'self'> & { readonly self?: URL },
 ) {
-  return decideDestination(candidate, { ...policy, self: policy.self ?? TEST_SELF })
+  return decideDestination(candidate, { ...policy, self: policy.self ?? TEST_SELF }, new AbortController().signal)
 }
 
 describe('validateDestination', () => {
@@ -173,6 +173,6 @@ describe('validateDestination', () => {
 
     await validateDestination('https://EXAMPLE.com/feed.xml', { resolve })
 
-    expect(resolve).toHaveBeenCalledWith('example.com')
+    expect(resolve).toHaveBeenCalledWith('example.com', expect.any(AbortSignal))
   })
 })

@@ -19,12 +19,9 @@
       "bracketSpacing": true
     }
   },
-  // styles.css is hand-organised into the sections docs/DESIGN.md names, and
-  // tests/client/design-foundation.test.ts reads it as text — reformatting it
-  // would churn both for nothing. Linting still applies.
   "css": {
     "parser": { "tailwindDirectives": true },
-    "formatter": { "enabled": false }
+    "formatter": { "quoteStyle": "single" }
   },
   // Import order here groups type imports before value imports rather than sorting;
   // that grouping is deliberate, so nothing rewrites it.
@@ -39,13 +36,15 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      // Every control here is a native element plus manual ARIA (docs/ARCHITECTURE.md);
-      // swapping in <search>/<fieldset> would change the boxes styles.css targets.
+      // The roles it flags are deliberate: role="group" labels CSS grids of day cells (the
+      // Cadence grid, the Digest month), where a <fieldset> would bring its own UA box into
+      // the layout; role="search" sits on the form styles.css lays out as `.search`, which a
+      // <search> element would have to wrap.
       "a11y": {
         "useSemanticElements": "off"
       },
       // An extra dependency is never a bug — it is a deliberate re-run trigger,
-      // which is exactly what the views' `attempt` retry counter is.
+      // which is exactly what useResource's `key` and `attempt` are.
       "correctness": {
         "useExhaustiveDependencies": {
           "level": "error",

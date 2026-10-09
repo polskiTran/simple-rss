@@ -1,14 +1,14 @@
 import { Button } from '@base-ui/react/button'
 import { useState } from 'react'
 import type { DigestCalendar } from '../../shared/api.js'
-import { cadenceDayLabel, counted, relativeLevels } from '../cadence.js'
+import { cadenceDayLabel, relativeLevels } from '../cadence.js'
 import { CadenceLegend } from '../components/cadence-grid.js'
 import { Group } from '../components/group.js'
 import { Icon } from '../components/icon.js'
 import { Row } from '../components/row.js'
-import { longDay } from '../day-names.js'
+import { counted, longDay, monthOfYear } from '../day-names.js'
 
-export interface DigestMonthProps {
+interface DigestMonthProps {
   readonly calendar: DigestCalendar
   /** The day the Digest starts from, ringed. */
   readonly selected: string
@@ -32,11 +32,12 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
   const levelOf = relativeLevels(calendar.days.map(({ count }) => count))
   const earliest = (calendar.days[0]?.date ?? calendar.today).slice(0, 7)
   const latest = calendar.today.slice(0, 7)
+  const monthTitle = monthOfYear(`${month}-01`)
 
   return (
     <Group
       id="digest-calendar"
-      title={monthLabel(month)}
+      title={monthTitle}
       className="panel digest-calendar"
       aside={
         <div className="calendar-turns">
@@ -59,7 +60,7 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
         </div>
       }
     >
-      <div className="calendar" role="group" aria-label={`Days of ${monthLabel(month)}`}>
+      <div className="calendar" role="group" aria-label={`Days of ${monthTitle}`}>
         {WEEKDAY_INITIALS.map((initial, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: the seven weekdays never reorder, and two share an initial.
           <span key={index} className="calendar-weekday" aria-hidden="true">
@@ -110,13 +111,6 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
 const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
 
 const DAY_MS = 86_400_000
-
-/** `August 2026`, for a month key `2026-08`. */
-function monthLabel(month: string): string {
-  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(`${month}-01T12:00:00Z`),
-  )
-}
 
 function shiftMonth(month: string, by: number): string {
   const [year, index] = month.split('-').map(Number)

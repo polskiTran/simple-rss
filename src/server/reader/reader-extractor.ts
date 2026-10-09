@@ -2,10 +2,12 @@ import { Worker } from 'node:worker_threads'
 import { z } from 'zod'
 import type { Clock } from '../clock.js'
 import { elapsedMs } from '../monotonic.js'
-import { errorForLog, type Logger } from '../logger.js'
+import type { Logger } from '../logger.js'
+import { IMAGE_URL_KEY_BYTES } from '../images/image-url-signature.js'
 import type { ExtractedArticle, ExtractionTimings } from './extract-article.js'
 
 export interface ReaderExtractionInput {
+  /** Transferred to the worker, which detaches it from the caller. */
   readonly bytes: ArrayBuffer
   readonly charset?: string | undefined
   readonly url: string
@@ -37,7 +39,6 @@ export type ReaderWorkerRequest = z.infer<typeof readerWorkerRequestSchema>
 
 const extractedArticleSchema = z.object({
   markdown: z.string(),
-  wordCount: z.number().int().nonnegative(),
   readingTimeMinutes: z.number().int().positive(),
 })
 
@@ -60,7 +61,7 @@ export const readerWorkerReplySchema = z.discriminatedUnion('kind', [
 export type ReaderWorkerReply = z.infer<typeof readerWorkerReplySchema>
 
 export const readerWorkerDataSchema = z.object({
-  imageSigningKey: z.instanceof(Uint8Array).refine((key) => key.byteLength >= 32),
+  imageSigningKey: z.instanceof(Uint8Array).refine((key) => key.byteLength >= IMAGE_URL_KEY_BYTES),
 })
 
 interface ExtractionTask {
@@ -165,7 +166,7 @@ export class ReaderExtractor {
     try {
       worker.postMessage(request, [request.bytes])
     } catch (error) {
-      this.#logger.error('reader.worker_post_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_post_failed', { error })
       this.#replaceFailedWorker(worker)
     }
   }
@@ -183,14 +184,11 @@ export class ReaderExtractor {
     this.#active = undefined
     this.#settleCancelled(active)
 
+    // An active task always has a worker: `#pump` activates only on one, and
+    // every path that drops the worker clears `#active` with it.
     const worker = this.#worker
     this.#worker = undefined
-    if (worker) {
-      this.#retireWorker(worker, true)
-    } else {
-      if (!this.#closed) this.#worker = this.#spawnWorker()
-      this.#pump()
-    }
+    if (worker) this.#retireWorker(worker, true)
   }
 
   #onMessage(worker: Worker, value: ReaderWorkerReply | undefined): void {
@@ -226,7 +224,7 @@ export class ReaderExtractor {
     const replace = this.#active !== undefined || this.#queue.length > 0
 
     if (error !== undefined) {
-      this.#logger.error('reader.worker_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_failed', { error })
     }
     const active = this.#active
     this.#active = undefined
@@ -251,7 +249,7 @@ export class ReaderExtractor {
       })
       return worker
     } catch (error) {
-      this.#logger.error('reader.worker_start_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_start_failed', { error })
       return undefined
     }
   }
@@ -272,7 +270,7 @@ export class ReaderExtractor {
     try {
       await worker.terminate()
     } catch (error) {
-      this.#logger.error('reader.worker_termination_failed', { error: errorForLog(error) })
+      this.#logger.error('reader.worker_termination_failed', { error })
     }
   }
 

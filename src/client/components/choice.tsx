@@ -1,12 +1,12 @@
 import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
 
-export interface ChoiceOption<Value extends string> {
+interface ChoiceOption<Value extends string> {
   readonly value: Value
   readonly label: string
 }
 
-export interface ChoiceProps<Value extends string> {
+interface ChoiceProps<Value extends string> {
   /** Names the group for assistive technology; the segments name the values. */
   readonly label: string
   readonly options: readonly ChoiceOption<Value>[]

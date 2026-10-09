@@ -3,105 +3,16 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow } from './cadence-window.js'
-import { stubApi, type StubbedApi } from './stub-api.js'
+import type { SearchResults } from '../../src/shared/api.js'
+import { digest, feedDetail, library, libraryItem, readerArticle, readerItem, searchResult } from './fixtures.js'
+import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
 
-const DIGEST = {
-  today: '2026-08-08',
-  groups: [
-    {
-      date: '2026-08-08',
-      label: 'Today',
-      returns: [],
-      items: [
-        {
-          feedItemId: 3,
-          title: 'First light',
-          feedId: 1,
-          feedTitle: 'Field Notes',
-          link: 'https://journal.example/first-light',
-          publishedAt: '2026-08-08T07:15:00.000Z',
-          displayTime: '07:15',
-          imageUrl: null,
-          summary: null,
-          firstSeenAt: '2026-08-08T09:00:00.000Z',
-          saved: false,
-        },
-      ],
-    },
-  ],
-  nextFrom: null,
-}
+const DETAIL = feedDetail({ subscribedDate: '2026-08-08', cadence: cadenceWindow({ '2026-08-08': 1 }) })
 
-const DETAIL = {
-  feedId: 1,
-  title: 'Field Notes',
-  description: null,
-  reportedTitle: 'Field Notes',
-  customTitle: null,
-  reportedDescription: null,
-  customDescription: null,
-  domain: 'journal.example',
-  homePageUrl: 'https://journal.example/',
-  enteredUrl: 'https://journal.example/feed',
-  resolvedUrl: 'https://feeds.example/journal.xml',
-  availability: {
-    state: 'available',
-    lastCheckedAt: '2026-08-08T09:00:00.000Z',
-    lastSuccessAt: '2026-08-08T09:00:00.000Z',
-    consecutiveFailures: 0,
-    category: null,
-  },
-  schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
-  readingSource: 'original-webpage',
-  subscribedDate: '2026-08-08',
-  cadence: cadenceWindow({ '2026-08-08': 1 }),
+const LIBRARY = library({
   items: [
-    {
-      feedItemId: 3,
-      title: 'First light',
-      link: 'https://journal.example/first-light',
-      publishedAt: '2026-08-08T07:15:00.000Z',
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      date: '2026-08-08',
-      displayTime: '07:15',
-      saved: false,
-    },
-  ],
-}
-
-const ITEM = {
-  feedItemId: 3,
-  title: 'First light',
-  feedId: 1,
-  feedTitle: 'Field Notes',
-  link: 'https://journal.example/first-light',
-  publishedAt: '2026-08-08T07:15:00.000Z',
-  firstSeenAt: '2026-08-08T09:00:00.000Z',
-  displayDate: 'saturday, 8 august',
-  summary: 'A clear morning over the valley.',
-  saved: false,
-  readingSource: 'original-webpage',
-  feedContent: null,
-  nextInDigest: null,
-}
-
-const LIBRARY = {
-  today: '2026-08-08',
-  total: 2,
-  items: [
-    {
-      feedItemId: 3,
-      title: 'First light',
-      feedId: 1,
-      feedTitle: 'Field Notes',
-      subscribed: true,
-      link: 'https://journal.example/first-light',
-      publishedAt: '2026-08-08T07:15:00.000Z',
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      savedAt: '2026-08-08T09:05:00.000Z',
-      savedDate: '2026-08-08',
-    },
-    {
+    libraryItem(),
+    libraryItem({
       feedItemId: 1,
       title: 'A June letter',
       feedId: 2,
@@ -112,19 +23,16 @@ const LIBRARY = {
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       savedAt: '2026-08-01T08:00:00.000Z',
       savedDate: '2026-08-01',
-    },
+    }),
   ],
-  nextCursor: null,
-}
+})
 
 function reading(path: string): StubbedApi {
   const api = stubApi()
-    .on('GET /api/digest', { body: DIGEST })
+    .on('GET /api/digest', { body: digest() })
     .on('GET /api/feeds/1', { body: DETAIL })
-    .on('GET /api/items/3', { body: ITEM })
-    .on('GET /api/items/3/reader', {
-      body: { feedItemId: 3, markdown: 'The valley turns from grey to gold.', wordCount: 8, readingTimeMinutes: 1 },
-    })
+    .on('GET /api/items/3', { body: readerItem() })
+    .on('GET /api/items/3/reader', { body: readerArticle() })
     .on('GET /api/library', { body: LIBRARY })
   window.history.replaceState(null, '', path)
   return api
@@ -178,7 +86,7 @@ describe('a Feed Item’s attribution', () => {
   it('returns an article opened from a Digest started from a day to that same day', async () => {
     reading('/digest?from=2026-08-07')
       .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 1 } })
-      .on('GET /api/digest?from=2026-08-07', { body: DIGEST })
+      .on('GET /api/digest?from=2026-08-07', { body: digest() })
     render(<App />)
     const user = userEvent.setup()
 
@@ -196,20 +104,9 @@ describe('a Feed Item’s attribution', () => {
     reading('/digest').on('GET /api/search?q=light', {
       body: {
         scope: 'everywhere',
+        today: '2026-08-08',
         subscriptions: [],
-        results: [
-          {
-            feedItemId: 3,
-            title: 'First light',
-            feedId: 1,
-            feedTitle: 'Field Notes',
-            publishedAt: '2026-08-08T07:15:00.000Z',
-            firstSeenAt: '2026-08-08T09:00:00.000Z',
-            displayDate: 'today, 07:15',
-            saved: false,
-            snippet: null,
-          },
-        ],
+        results: [searchResult()],
       },
     })
     render(<App />)
@@ -388,7 +285,7 @@ describe('the way back out of an opened screen', () => {
   })
 
   it('leaves for the feeds list once the Feed is unsubscribed, whatever led here', async () => {
-    reading('/digest').on('DELETE /api/feeds/1', { body: { feedId: 1, unsubscribed: true } })
+    reading('/digest').on('DELETE /api/feeds/1', { status: 204 })
     render(<App />)
     const user = userEvent.setup()
     await user.click(await screen.findByRole('link', { name: 'Field Notes' }))
@@ -448,20 +345,13 @@ describe('the section an open article reads under', () => {
 })
 
 describe('the scope a search takes from its screen', () => {
-  const found = (...titles: string[]) =>
-    titles.map((title, index) => ({
-      feedItemId: 3 + index,
-      title,
-      feedId: 1,
-      feedTitle: 'Field Notes',
-      publishedAt: '2026-08-08T07:15:00.000Z',
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      displayDate: 'today, 07:15',
-      saved: false,
-      snippet: null,
-    }))
-  const withinFeed = { body: { scope: 'feed', feed: { title: 'Field Notes' }, results: found('First light') } }
-  const everywhere = { body: { scope: 'everywhere', subscriptions: [], results: found('First light', 'Coast light') } }
+  const found = (...titles: string[]) => titles.map((title, index) => searchResult({ feedItemId: 3 + index, title }))
+  const withinFeed = {
+    body: { scope: 'feed', today: '2026-08-08', feed: { title: 'Field Notes' }, results: found('First light') },
+  } satisfies Reply<SearchResults>
+  const everywhere = {
+    body: { scope: 'everywhere', today: '2026-08-08', subscriptions: [], results: found('First light', 'Coast light') },
+  } satisfies Reply<SearchResults>
 
   it('from an opened Feed, answers within it and names it; everywhere steps out, and clearing lands back on the Feed', async () => {
     const api = reading('/feeds/1')
@@ -511,7 +401,9 @@ describe('the scope a search takes from its screen', () => {
   })
 
   it('from the Library, answers within it and says so when nothing matches', async () => {
-    reading('/saved').on('GET /api/search?q=light&in=saved', { body: { scope: 'saved', results: [] } })
+    reading('/saved').on('GET /api/search?q=light&in=saved', {
+      body: { scope: 'saved', today: '2026-08-08', results: [] },
+    })
     render(<App />)
     const user = userEvent.setup()
     await screen.findByRole('link', { name: 'First light' })
@@ -526,6 +418,7 @@ describe('the scope a search takes from its screen', () => {
     reading('/feeds').on('GET /api/search?q=field&in=subscriptions', {
       body: {
         scope: 'subscriptions',
+        today: '2026-08-08',
         subscriptions: [
           {
             feedId: 1,

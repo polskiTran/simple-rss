@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyAddress, isPublicAddress } from '../../../src/server/upstream/addresses.js'
+import { classifyAddress } from '../../../src/server/upstream/addresses.js'
 
 describe('classifyAddress', () => {
   it('accepts ordinary public addresses', () => {
@@ -84,13 +84,5 @@ describe('classifyAddress', () => {
     expect(classifyAddress('[::1]')).toBe('invalid')
     expect(classifyAddress('0x7f000001')).toBe('invalid')
     expect(classifyAddress('127.1')).toBe('invalid')
-  })
-})
-
-describe('isPublicAddress', () => {
-  it('is true only for an address a retrieval may connect to', () => {
-    expect(isPublicAddress('93.184.216.34')).toBe(true)
-    expect(isPublicAddress('127.0.0.1')).toBe(false)
-    expect(isPublicAddress('not-an-address')).toBe(false)
   })
 })

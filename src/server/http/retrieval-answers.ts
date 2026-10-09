@@ -1,10 +1,11 @@
 import type { Context } from 'hono'
+import type { ApiErrorCode } from '../../shared/api.js'
 import { RETRIEVAL_PROFILES, type RetrievalFailureCode, type RetrievalProfile } from '../upstream/retrieval.js'
-import { NO_STORE } from './responses.js'
+import { apiError } from './requests.js'
 
 export interface FailureAnswer {
   readonly status: 400 | 413 | 415 | 502 | 504
-  readonly code: string
+  readonly code: ApiErrorCode
   readonly message: string
 }
 
@@ -19,19 +20,18 @@ interface RetrievalSubject {
   readonly unsafeDestination: FailureAnswer
   readonly unsupportedContent: FailureAnswer
   readonly unreachable: FailureAnswer
-  readonly tooLargeCode: string
-  readonly timeoutCode: string
-  readonly bodyTimeoutCode: string
+  readonly tooLargeCode: ApiErrorCode
+  readonly timeoutCode: ApiErrorCode
+  readonly bodyTimeoutCode: ApiErrorCode
 }
 
 /**
- * Sixteen transport outcomes collapse into the six a User can act on. Adding a
+ * Fifteen transport outcomes collapse into the six a User can act on. Adding a
  * `RetrievalFailureCode` fails to compile here and nowhere else.
  */
 function retrievalAnswers(subject: RetrievalSubject) {
   const { noun, profile, unsafeDestination, unsupportedContent, unreachable } = subject
   return {
-    invalid_request: unsafeDestination,
     invalid_url: unsafeDestination,
     blocked_destination: unsafeDestination,
     invalid_redirect: unsafeDestination,
@@ -77,7 +77,7 @@ export const FEED_ANSWERS = retrievalAnswers({
   bodyTimeoutCode: 'feed_body_timeout',
 })
 
-export const ARTICLE_ANSWERS = retrievalAnswers({
+export const ORIGINAL_WEBPAGE_ANSWERS = retrievalAnswers({
   noun: 'The original page',
   profile: RETRIEVAL_PROFILES.reader,
   unsafeDestination: {
@@ -93,5 +93,5 @@ export const ARTICLE_ANSWERS = retrievalAnswers({
 })
 
 export function answer(c: Context, failure: FailureAnswer): Response {
-  return c.json({ error: { code: failure.code, message: failure.message } }, failure.status, NO_STORE)
+  return apiError(c, failure.status, failure.code, failure.message)
 }

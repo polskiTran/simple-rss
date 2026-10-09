@@ -8,20 +8,19 @@ import {
 } from '../../shared/api.js'
 import { useScreenTitle } from '../arrival.js'
 import { ApiError, fetchSearchResults } from '../api.js'
-import { CadenceStrip } from '../components/cadence-strip.js'
 import { FeedFilter } from '../components/feed-filter.js'
 import { Choice } from '../components/choice.js'
+import { FeedRow } from '../components/feed-row.js'
 import { Group } from '../components/group.js'
-import { HomePageLink } from '../components/home-page-link.js'
 import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { routedClick } from '../routed-link.js'
-import { feedPathOf } from '../routing.js'
+import { withSaved } from '../components/save-toggle.js'
+import { counted, dayAndTime } from '../day-names.js'
 import { SEARCH_SCOPE_COPY } from '../search-scope.js'
 import { useResource, valueInView } from '../use-resource.js'
 
-export interface SearchResultsViewProps {
+interface SearchResultsViewProps {
   settledQuery: string
   scope: SearchScope
   sort: SearchSort
@@ -45,21 +44,14 @@ export function SearchResultsView({
 }: SearchResultsViewProps) {
   const line = settledQuery.trim()
   const request = searchParamsOf(line, scope, sort).toString()
-  const [found, { retry, set }] = useResource((signal) => fetchSearchResults(line, scope, sort, signal), [request])
+  const [found, { retry, set }] = useResource(request, (signal) => fetchSearchResults(line, scope, sort, signal))
   const [shownFeeds, setShownFeeds] = useState<ReadonlySet<number>>(new Set())
   useScreenTitle('Search')
   const answer = valueInView(found)
 
   const setSaved = (feedItemId: number, saved: boolean) =>
     set((current) =>
-      'results' in current
-        ? {
-            ...current,
-            results: current.results.map((result) =>
-              result.feedItemId === feedItemId ? { ...result, saved } : result,
-            ),
-          }
-        : current,
+      'results' in current ? { ...current, results: withSaved(current.results, feedItemId, saved) } : current,
     )
 
   const scoped = scope.kind !== 'everywhere' ? scope : originScope.kind !== 'everywhere' ? originScope : undefined
@@ -67,8 +59,8 @@ export function SearchResultsView({
     <Choice
       label="Search in"
       options={[
-        { value: 'scoped', label: SCOPE_LABELS[scoped.kind] },
-        { value: 'everywhere', label: 'Everywhere' },
+        { value: 'scoped', label: SEARCH_SCOPE_COPY[scoped.kind].label },
+        { value: 'everywhere', label: SEARCH_SCOPE_COPY.everywhere.label },
       ]}
       value={scope.kind === 'everywhere' ? 'everywhere' : 'scoped'}
       onChange={(chosen) => onScope(chosen === 'everywhere' ? { kind: 'everywhere' } : scoped)}
@@ -104,8 +96,8 @@ export function SearchResultsView({
           {answer ? (
             <span className="page-title-companion">
               {answer.scope === 'subscriptions'
-                ? countOf(subscriptions.length, 'feed')
-                : countOf(results.length, 'result')}
+                ? counted(subscriptions.length, 'feed')
+                : counted(results.length, 'result')}
               {answer.scope === 'feed' ? ` in ${answer.feed.title}` : null}
             </span>
           ) : null}
@@ -133,7 +125,7 @@ export function SearchResultsView({
           Nothing in {place} matches “{line}”.
         </p>
       ) : (
-        <div className="with-aside" role="region" aria-label="search results" aria-busy={found.kind === 'loading'}>
+        <section className="with-aside" aria-label="search results" aria-busy={found.kind === 'loading'}>
           <div>
             <MatchingFeeds subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
             {filtered.length > 0 ? (
@@ -151,7 +143,10 @@ export function SearchResultsView({
                         ? undefined
                         : { feedId: result.feedId, title: result.feedTitle, onOpen: onOpenFeed }
                     }
-                    when={{ label: result.displayDate, dateTime: result.publishedAt ?? result.firstSeenAt }}
+                    when={{
+                      label: dayAndTime(result.date, result.displayTime, answer.today),
+                      dateTime: result.publishedAt ?? result.firstSeenAt,
+                    }}
                     onOpen={onOpenItem}
                     onSaved={(saved) => setSaved(result.feedItemId, saved)}
                   />
@@ -162,20 +157,10 @@ export function SearchResultsView({
           {feeds.length > 1 ? (
             <FeedFilter id="search-feeds" title="Feeds" feeds={feeds} shown={shownFeeds} onChange={setShownFeeds} />
           ) : null}
-        </div>
+        </section>
       )}
     </div>
   )
-}
-
-const SCOPE_LABELS = {
-  saved: 'Saved',
-  subscriptions: 'Feeds',
-  feed: 'This feed',
-} as const satisfies Record<Exclude<SearchScope['kind'], 'everywhere'>, string>
-
-function countOf(count: number, noun: string): string {
-  return count === 1 ? `1 ${noun}` : `${count} ${noun}s`
 }
 
 /** The Feeds the results came from, most results first. */
@@ -200,20 +185,7 @@ function MatchingFeeds({
       <Group id="search-matching-feeds" title="Feeds" count={subscriptions.length}>
         <div className="feed-rows">
           {subscriptions.map((subscription) => (
-            <article className="feed-row" key={subscription.feedId}>
-              <div className="feed-row-head">
-                <h3 className="feed-row-name">
-                  <a
-                    href={feedPathOf(subscription.feedId)}
-                    onClick={routedClick(() => onOpenFeed(subscription.feedId))}
-                  >
-                    {subscription.title}
-                  </a>
-                </h3>
-                <CadenceStrip counts={subscription.cadence} title={subscription.title} />
-              </div>
-              <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
-            </article>
+            <FeedRow key={subscription.feedId} feed={subscription} onOpen={onOpenFeed} />
           ))}
         </div>
       </Group>

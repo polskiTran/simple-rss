@@ -64,10 +64,6 @@ _Avoid_: Subtitle, blurb, about text
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch
 
-**Declared Feed**:
-A Feed a web page names in its own markup, so that pasting the page finds the Feed. A page may declare several; the first in the page is its default.
-_Avoid_: Alternative feed, autodiscovered feed, link-rel
-
 **Cadence**:
 A Feed's publishing record, drawn from retained Feed Items as per-day counts in the installation timezone — a 30-day strip on the Feeds list, a 26-week grid on an opened Feed.
 _Avoid_: Activity graph, contribution graph, frequency chart
@@ -75,6 +71,10 @@ _Avoid_: Activity graph, contribution graph, frequency chart
 **Rhythm**:
 How often a Feed publishes, read from the last 30 days of its Cadence by counting the days with at least one Feed Item: Daily from 15 days, Weekly from 4, Monthly from 1, and Inactive with none. It describes the Feed's publishing, not its retrieval — an Inactive Feed may be perfectly available.
 _Avoid_: Frequency, tier, activity level
+
+**Quiet Spell**:
+At least seven installation-timezone days between a Feed's Feed Item and the one before it. The Digest marks the day a Feed comes back from one with how long it was quiet and its Cadence.
+_Avoid_: Hiatus, gap, dormancy
 
 **Digest**:
 The time-grouped collection of Feed Items from the User's Subscriptions.
@@ -94,7 +94,7 @@ _Avoid_: Stored article, cached content
 
 **Reader View**:
 A distraction-reduced rendering of a Feed Item's chosen Reading Source, with the other used as a fallback when needed.
-_Avoid_: Stored article, cached content
+_Avoid_: Reader mode, article view, reading pane
 
 **Reading Source**:
 Which of a Feed Item's readings Reader View renders: its Original webpage or its Feed Content. Each Subscription holds a preferred Reading Source, Original webpage by default; choosing the other inside a Reader View lasts only for that view and never changes the preference.

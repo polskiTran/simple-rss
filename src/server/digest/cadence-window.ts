@@ -2,7 +2,7 @@ import { inArray, sql, type SQL } from 'drizzle-orm'
 import { CADENCE_GRID_WEEKS, CADENCE_STRIP_DAYS } from '../../shared/api.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems, subscriptions } from '../persistence/schema.js'
-import { dayAfter, dateKey, dayStartUtc } from './chronology.js'
+import { dayAfter, dateKey, dayStartUtc } from '../calendar.js'
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 

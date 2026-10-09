@@ -1,20 +1,29 @@
 export interface HttpTimings {
   readonly connectionReused: boolean
-  readonly socketDnsMs?: number
   readonly connectMs?: number
   readonly tlsMs?: number
   readonly ttfbMs?: number
 }
 
+export interface HttpConnection {
+  /**
+   * The addresses `validateDestination` approved for this hop's host. The
+   * adapter connects only to these and never resolves the name itself.
+   */
+  readonly addresses: readonly string[]
+  /** Reported once, when the headers arrive, by an adapter that can time its connection. */
+  readonly onTimings?: (timings: HttpTimings) => void
+}
+
 /**
  * Internal transport seam; feature modules depend on `Retrieval`, never this.
- * An adapter must validate resolved socket addresses, follow no redirects,
- * honour the signal, and fully decode declared encodings. An adapter that can
- * time its connection reports `onTimings` once, when the headers arrive.
+ * Requests are body-less GETs. An adapter must connect only to
+ * `connection.addresses`, follow no redirects, honour the signal, and fully
+ * decode declared encodings.
  */
-export type HttpClient = (request: Request, onTimings?: (timings: HttpTimings) => void) => Promise<Response>
+export type HttpClient = (request: Request, connection: HttpConnection) => Promise<Response>
 
-export type HttpClientFailureCode = 'blocked_destination' | 'unresolvable_host' | 'unsupported_content_encoding'
+export type HttpClientFailureCode = 'blocked_destination' | 'unsupported_content_encoding'
 
 export class HttpClientError extends Error {
   readonly code: HttpClientFailureCode

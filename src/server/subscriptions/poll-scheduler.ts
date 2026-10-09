@@ -1,4 +1,4 @@
-import { errorForLog, type Logger } from '../logger.js'
+import type { Logger } from '../logger.js'
 import type { FeedRefresh } from './feed-refresh.js'
 import type { SubscriptionService } from './subscription-service.js'
 
@@ -11,13 +11,12 @@ export const WAKE_INTERVAL_MS = 60_000
 
 const DEFAULT_BATCH_LIMIT = 25
 
-const DEFAULT_CONCURRENCY = 4
+const CONCURRENCY = 4
 
 const MAX_BATCHES_PER_WAKE = 20
 
 export interface PollSchedulerLimits {
   readonly batchLimit?: number
-  readonly concurrency?: number
   readonly nudges?: boolean
 }
 
@@ -41,7 +40,6 @@ export class PollScheduler {
   readonly #retention: RetentionSweeper
   readonly #logger: Logger
   readonly #batchLimit: number
-  readonly #concurrency: number
   readonly #nudges: boolean
   #timer: NodeJS.Timeout | undefined
   #current: Promise<void> | undefined
@@ -53,7 +51,6 @@ export class PollScheduler {
     this.#retention = options.retention
     this.#logger = options.logger.child({ component: 'scheduler' })
     this.#batchLimit = options.batchLimit ?? DEFAULT_BATCH_LIMIT
-    this.#concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
     this.#nudges = options.nudges ?? true
   }
 
@@ -108,7 +105,7 @@ export class PollScheduler {
               await this.#poll(feedId)
             }
           }
-          await Promise.all(Array.from({ length: Math.min(this.#concurrency, due.length) }, worker))
+          await Promise.all(Array.from({ length: Math.min(CONCURRENCY, due.length) }, worker))
           this.#logger.info('scheduler.tick_completed', { due: due.length })
         }
         if (due.length < this.#batchLimit && !this.#nudged) break
@@ -116,7 +113,7 @@ export class PollScheduler {
 
       this.#retention.sweep()
     } catch (error) {
-      this.#logger.error('scheduler.tick_failed', { error: errorForLog(error) })
+      this.#logger.error('scheduler.tick_failed', { error })
     }
   }
 
@@ -125,7 +122,7 @@ export class PollScheduler {
       const outcome = await this.#refresh.refresh(feedId)
       this.#logger.debug('scheduler.feed_polled', { feedId, outcome: outcome.kind })
     } catch (error) {
-      this.#logger.error('scheduler.feed_poll_failed', { feedId, error: errorForLog(error) })
+      this.#logger.error('scheduler.feed_poll_failed', { feedId, error: error })
     }
   }
 }

@@ -1,17 +1,13 @@
 import { Hono } from 'hono'
-import {
-  feedItemIdParameterSchema,
-  READER_CACHE_SECONDS,
-  type ReaderArticle,
-  type ReaderItem,
-} from '../../shared/api.js'
+import { READER_CACHE_SECONDS, type ApiErrorBody, type ReaderArticle, type ReaderItem } from '../../shared/api.js'
+import type { ReaderItems } from '../reader/reader-items.js'
 import type { ReaderService } from '../reader/reader-service.js'
-import { readIdParam } from './id-param.js'
-import { NO_STORE, notFound, retryAfter } from './responses.js'
-import { answer, ARTICLE_ANSWERS } from './retrieval-answers.js'
+import { apiError, notFound, readId } from './requests.js'
+import { answer, ORIGINAL_WEBPAGE_ANSWERS } from './retrieval-answers.js'
 
 export interface ReaderRouteDependencies {
-  readonly reader: Pick<ReaderService, 'item' | 'article'>
+  readonly readerItems: Pick<ReaderItems, 'item'>
+  readonly reader: Pick<ReaderService, 'article'>
 }
 
 /**
@@ -24,16 +20,16 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
   const app = new Hono()
 
   app.get('/items/:feedItemId', (c) => {
-    const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
+    const feedItemId = readId(c, 'feedItemId')
     if (!feedItemId.ok) return feedItemId.response
 
-    const item = deps.reader.item(feedItemId.value)
+    const item = deps.readerItems.item(feedItemId.value)
     if (!item) return notFound(c)
-    return c.json<ReaderItem>(item, 200, NO_STORE)
+    return c.json<ReaderItem>(item)
   })
 
   app.get('/items/:feedItemId/reader', async (c) => {
-    const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
+    const feedItemId = readId(c, 'feedItemId')
     if (!feedItemId.ok) return feedItemId.response
 
     const outcome = await deps.reader.article(feedItemId.value, c.req.raw.signal)
@@ -45,19 +41,11 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
       case 'missing':
         return notFound(c)
       case 'no-link':
-        return c.json(
-          { error: { code: 'no_original_link', message: 'The Feed Item has no original link to read' } },
-          422,
-          NO_STORE,
-        )
+        return apiError(c, 422, 'no_original_link', 'The Feed Item has no original link to read')
       case 'unreadable':
-        return c.json(
-          { error: { code: 'article_unreadable', message: 'The original page did not yield a readable article' } },
-          422,
-          NO_STORE,
-        )
+        return apiError(c, 422, 'article_unreadable', 'The original page did not yield a readable article')
       case 'deadline':
-        return c.json(
+        return c.json<ApiErrorBody>(
           {
             error: {
               code: 'article_deadline_exceeded',
@@ -66,16 +54,13 @@ export function readerRoutes(deps: ReaderRouteDependencies): Hono {
             },
           },
           504,
-          NO_STORE,
         )
       case 'rate-limited':
-        return c.json(
-          { error: { code: 'reader_retry_rate_limited', message: 'Wait before retrying this article' } },
-          429,
-          retryAfter(outcome.retryAfterSeconds),
-        )
+        return apiError(c, 429, 'reader_retry_rate_limited', 'Wait before retrying this article', {
+          'Retry-After': String(outcome.retryAfterSeconds),
+        })
       case 'retrieval-failed':
-        return answer(c, ARTICLE_ANSWERS[outcome.failure.code])
+        return answer(c, ORIGINAL_WEBPAGE_ANSWERS[outcome.failure.code])
     }
   })
 

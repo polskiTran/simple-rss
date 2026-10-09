@@ -317,6 +317,15 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX feed_items_feed_chronology ON feed_items (feed_id, chronology_at DESC, id DESC);
     `,
   },
+  {
+    version: 17,
+    name: 'drop-subscription-last-failure-at',
+    sql: `
+      -- Written on every failure and never read: Feed Availability is the
+      -- failure run and its category, and lastCheckedAt already dates a failure.
+      ALTER TABLE subscriptions DROP COLUMN last_failure_at;
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

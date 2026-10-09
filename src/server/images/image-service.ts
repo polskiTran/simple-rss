@@ -28,19 +28,17 @@ export class ImageService {
       .all()[0]
     if (!row?.imageUrl) return { kind: 'missing' }
 
-    return this.#fetch(row.imageUrl, signal)
+    return this.image(row.imageUrl, signal)
   }
 
-  /** An embedded Reader image whose URL the caller has already proven signed. */
-  async readerImage(url: string, signal?: AbortSignal): Promise<ImageOutcome> {
-    return this.#fetch(url, signal)
-  }
-
-  async #fetch(url: string, signal?: AbortSignal): Promise<ImageOutcome> {
+  /**
+   * An image by URL. Callers pass only URLs the installation vouches for (a Feed
+   * Item's stored image, or a Reader image whose signature they checked), so
+   * this is never an open proxy.
+   */
+  async image(url: string, signal?: AbortSignal): Promise<ImageOutcome> {
     const result = await this.#retrieval.retrieve({ url, operation: 'image', ...(signal ? { signal } : {}) })
     if (!result.ok) return { kind: 'retrieval-failed', failure: result }
-
-    if (result.notModified) return { kind: 'not-image' }
 
     const sniffed = await sniffImage(result.contentType, result.body)
     if (!sniffed.ok) {

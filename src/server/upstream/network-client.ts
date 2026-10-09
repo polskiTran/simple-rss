@@ -1,4 +1,4 @@
-import { lookup as systemLookup, type LookupAddress } from 'node:dns'
+import type { LookupAddress } from 'node:dns'
 import {
   Agent as HttpAgent,
   request as httpRequest,
@@ -9,10 +9,9 @@ import {
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { elapsedMs } from '../monotonic.js'
-import { isPublicAddress, unbracket } from './addresses.js'
+import { unbracket } from './addresses.js'
 import { HttpClientError, type HttpClient, type HttpTimings } from './http-client.js'
 
 const ACCEPT_ENCODING = 'gzip, deflate, br'
@@ -20,20 +19,20 @@ const ACCEPT_ENCODING = 'gzip, deflate, br'
 /** Statuses defined to carry no body; `Response` throws if given one. */
 const BODILESS_STATUSES = new Set([204, 205, 304])
 
-export interface NetworkHttpClientOptions {
-  readonly isAllowedAddress?: (address: string) => boolean
-  readonly lookup?: LookupFunction
-}
-
 const MAX_FREE_SOCKETS_PER_PROTOCOL = 4
 
-export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}): HttpClient {
-  const isAllowed = options.isAllowedAddress ?? isPublicAddress
-  const lookup = guardedLookup(isAllowed, options.lookup ?? systemLookup)
+/**
+ * The Node `http`/`https` adapter behind `Retrieval`. Each socket connects to
+ * the addresses the caller passes in, never to a fresh DNS answer; the URL's
+ * host still names the TLS server and the `Host` header.
+ */
+export function createNetworkHttpClient(): HttpClient {
   // Concurrency lives in the Retrieval gates; the agents only pool keep-alive
   // sockets. A socket cap here would make the agent queue requests, and a
   // queued ClientRequest defers destroy() until a socket frees — an abort
   // would then hang until some unrelated retrieval lets go of its socket.
+  // A pooled socket stays connected to an address an earlier validation of
+  // the same host approved.
   const agentOptions = {
     keepAlive: true,
     maxFreeSockets: MAX_FREE_SOCKETS_PER_PROTOCOL,
@@ -41,18 +40,18 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
   const httpAgent = new HttpAgent(agentOptions)
   const httpsAgent = new HttpsAgent(agentOptions)
 
-  return async (request, onTimings) => {
+  return async (request, { addresses, onTimings }) => {
     const url = new URL(request.url)
     const secure = url.protocol === 'https:'
     if (!secure && url.protocol !== 'http:') {
       throw new Error(`refusing to retrieve over ${url.protocol}`)
     }
 
-    // An address literal never reaches the resolver, so it is judged here;
-    // names are judged inside `lookup`, below.
+    // Node connects to an address literal without calling `lookup`, so the
+    // pin is enforced here instead: the literal must be an approved address.
     const host = unbracket(url.hostname)
-    if (isIP(host) !== 0 && !isAllowed(host)) {
-      throw new HttpClientError('blocked_destination', 'socket address is not globally reachable')
+    if (isIP(host) !== 0 && !addresses.includes(host)) {
+      throw new HttpClientError('blocked_destination', 'address literal was not approved for this connection')
     }
 
     const headers: OutgoingHttpHeaders = {}
@@ -64,7 +63,7 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
     const outbound = (secure ? httpsRequest : httpRequest)(url, {
       method: request.method,
       headers,
-      lookup,
+      lookup: pinnedLookup(addresses),
       agent: secure ? httpsAgent : httpAgent,
     })
     const connectionTimings = observeConnection(outbound)
@@ -93,62 +92,44 @@ export function createNetworkHttpClient(options: NetworkHttpClientOptions = {}):
     })
     outbound.on('error', reject)
 
-    if (request.body) {
-      // SAFETY: Node's global `Request` body and `Readable.fromWeb` use the same
-      // WHATWG stream; `@types/node` and `lib.dom` declare separate types.
-      Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>).pipe(outbound)
-    } else {
-      outbound.end()
-    }
-    const response = await promise
-
-    return toResponse(request, response)
+    // Retrieval only sends body-less GETs.
+    outbound.end()
+    return toResponse(await promise)
   }
 }
 
 /**
- * Checks addresses inside the lookup the socket itself performs, closing the
- * re-resolution window between check and connect; one refused address refuses
- * the whole name.
+ * A socket `lookup` that answers with the given addresses and never resolves:
+ * whatever the name would answer now, the socket can only reach an address
+ * that was approved before it. Honours the `family` and `all` options Node
+ * passes, so dual-stack connection attempts see the same set.
  */
-export function guardedLookup(
-  isAllowed: (address: string) => boolean = isPublicAddress,
-  lookup: LookupFunction = systemLookup,
-): LookupFunction {
-  return (hostname, options, callback) => {
-    lookup(hostname, { ...options, all: true }, (error, answer, family) => {
-      if (error) {
-        callback(new HttpClientError('unresolvable_host', 'host did not resolve'), '', 0)
-        return
-      }
+export function pinnedLookup(addresses: readonly string[]): LookupFunction {
+  const pinned = addresses.flatMap((address): LookupAddress[] => {
+    const family = isIP(address)
+    return family === 0 ? [] : [{ address, family }]
+  })
 
-      const answers: LookupAddress[] = Array.isArray(answer)
-        ? answer
-        : [{ address: answer, family: family === 6 ? 6 : 4 }]
-      const refused = answers.find((entry) => !isAllowed(entry.address))
-      if (refused) {
-        callback(new HttpClientError('blocked_destination', 'host resolves to a non-global address'), '', 0)
-        return
-      }
-      const first = answers[0]
-      if (!first) {
-        callback(new HttpClientError('unresolvable_host', 'host did not resolve'), '', 0)
-        return
-      }
-
-      if (options.all) callback(null, answers, 0)
+  return (_hostname, options, callback) => {
+    const family = options.family === 'IPv4' ? 4 : options.family === 'IPv6' ? 6 : options.family
+    const answers = family === 4 || family === 6 ? pinned.filter((entry) => entry.family === family) : pinned
+    const first = answers[0]
+    // `net` is written against `dns.lookup`, which never calls back synchronously.
+    process.nextTick(() => {
+      if (!first) callback(new HttpClientError('blocked_destination', 'no approved address for this connection'), '', 0)
+      else if (options.all) callback(null, answers, 0)
       else callback(null, first.address, first.family)
     })
   }
 }
 
-function toResponse(request: Request, response: IncomingMessage): Response {
+function toResponse(response: IncomingMessage): Response {
   const status = response.statusCode ?? 0
   if (status < 200 || status > 599) {
     throw new Error(`upstream answered with the unusable status ${status}`)
   }
 
-  const bodiless = BODILESS_STATUSES.has(status) || request.method === 'HEAD'
+  const bodiless = BODILESS_STATUSES.has(status)
   let encodings: readonly string[] = []
   if (!bodiless) {
     try {
@@ -234,7 +215,6 @@ function observeConnection(outbound: ClientRequest): () => HttpTimings {
   const startedAt = performance.now()
   let reused = false
   let socketAt: number | undefined
-  let lookupAt: number | undefined
   let connectAt: number | undefined
   let secureAt: number | undefined
 
@@ -243,11 +223,8 @@ function observeConnection(outbound: ClientRequest): () => HttpTimings {
     reused = outbound.reusedSocket
     // A pooled socket finished these phases before this request existed. A
     // `once` for an event that never fires stays on the socket, and every
-    // later request borrowing it would leave three more behind.
+    // later request borrowing it would leave two more behind.
     if (reused) return
-    socket.once('lookup', () => {
-      lookupAt = performance.now()
-    })
     socket.once('connect', () => {
       connectAt = performance.now()
     })
@@ -260,8 +237,7 @@ function observeConnection(outbound: ClientRequest): () => HttpTimings {
     const readyAt = secureAt ?? connectAt ?? socketAt ?? startedAt
     return {
       connectionReused: reused,
-      ...(lookupAt !== undefined ? { socketDnsMs: elapsedMs(socketAt ?? startedAt, lookupAt) } : {}),
-      ...(connectAt !== undefined ? { connectMs: elapsedMs(lookupAt ?? socketAt ?? startedAt, connectAt) } : {}),
+      ...(connectAt !== undefined ? { connectMs: elapsedMs(socketAt ?? startedAt, connectAt) } : {}),
       ...(secureAt !== undefined && connectAt !== undefined ? { tlsMs: elapsedMs(connectAt, secureAt) } : {}),
       ttfbMs: elapsedMs(readyAt),
     }

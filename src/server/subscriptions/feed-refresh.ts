@@ -24,14 +24,8 @@ export class FeedRefresh {
     if (inFlight) return inFlight
 
     const now = this.#clock.now().getTime()
-    for (const [candidateFeedId, startedAt] of this.#lastStartedAt) {
-      if (now - startedAt >= REFRESH_COOLDOWN_MS && !this.#inFlight.has(candidateFeedId)) {
-        this.#lastStartedAt.delete(candidateFeedId)
-      }
-    }
-
     const lastStartedAt = this.#lastStartedAt.get(feedId)
-    if (lastStartedAt !== undefined) {
+    if (lastStartedAt !== undefined && now - lastStartedAt < REFRESH_COOLDOWN_MS) {
       return Promise.resolve({
         kind: 'rate-limited',
         retryAfterSeconds: Math.ceil((REFRESH_COOLDOWN_MS - (now - lastStartedAt)) / 1_000),

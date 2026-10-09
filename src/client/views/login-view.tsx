@@ -1,12 +1,12 @@
 import { Button } from '@base-ui/react/button'
-import { useState, type FormEvent } from 'react'
+import { useState, useTransition, type FormEvent } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { signIn } from '../api.js'
 import { Field } from '../components/field.js'
-import { describeFailure } from './failure.js'
+import { describeFailure } from './password-failure.js'
 
-export interface LoginViewProps {
+interface LoginViewProps {
   onSignedIn(status: AuthStatus): void
 }
 
@@ -14,22 +14,21 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
   useScreenTitle('Sign in')
   const [password, setPassword] = useState('')
   const [notice, setNotice] = useState('')
-  const [signingIn, setSigningIn] = useState(false)
+  const [signingIn, startSigningIn] = useTransition()
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault()
     if (signingIn || password === '') return
 
-    setSigningIn(true)
     setNotice('')
-    try {
-      onSignedIn(await signIn(password))
-    } catch (error) {
-      setNotice(describeFailure(error))
-      setPassword('')
-    } finally {
-      setSigningIn(false)
-    }
+    startSigningIn(async () => {
+      try {
+        onSignedIn(await signIn(password))
+      } catch (error) {
+        setNotice(describeFailure(error))
+        setPassword('')
+      }
+    })
   }
 
   return (

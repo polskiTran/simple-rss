@@ -2,7 +2,7 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-**This repo is single-context:** one `CONTEXT.md` and one `docs/adr/` at the root. If `simple-rss` grows into the planned pnpm workspace (`app/core`, `app/mobile`) and those packages develop genuinely distinct vocabularies, switch to the multi-context layout below by adding a root `CONTEXT-MAP.md`.
+**This repo is single-context:** one `CONTEXT.md` and one `docs/adr/` at the root. It stays one pnpm package until a real second deployable needs another boundary (`README.md`); if that package develops a genuinely distinct vocabulary, switch to the multi-context layout below by adding a root `CONTEXT-MAP.md`.
 
 ## Before exploring, read these
 

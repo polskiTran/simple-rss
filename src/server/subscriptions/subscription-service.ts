@@ -1,23 +1,19 @@
-import { and, desc, eq, isNull, lte } from 'drizzle-orm'
-import {
-  DEFAULT_POLLING_INTERVAL_MINUTES,
-  DEFAULT_READING_SOURCE,
-  pollingIntervalMinutesSchema,
-  type FeedDetail,
-  type FeedDetailsUpdate,
-  type PollingIntervalMinutes,
-  type PollingSchedule,
-  type ReadingSource,
-  type ReadingSourcePreference,
-  type SubscriptionSummary,
-  type UpdateFeedDetailsRequest,
+import { and, desc, eq, isNull, lte, or } from 'drizzle-orm'
+import type {
+  FeedDetail,
+  FeedDetailsUpdate,
+  PollingIntervalMinutes,
+  PollingSchedule,
+  ReadingSource,
+  SubscriptionSummary,
+  UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn } from '../digest/chronology.js'
-import { feedItemRowOf } from '../digest/digest-service.js'
+import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import {
   effectiveFeedDescription,
   effectiveFeedTitle,
@@ -27,8 +23,8 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
-import { gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
-import { availabilityOf, type PolledFeed, type RecordedAvailability } from './feed-availability.js'
+import { cadenceByFeed, gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
+import { availabilityOf, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
 import { nextPollTime } from './polling-schedule.js'
@@ -46,20 +42,6 @@ export type ImportOpmlOutcome =
       readonly alreadySubscribed: number
       readonly unusable: readonly string[]
     }
-
-export type SetPollingIntervalOutcome =
-  | { readonly kind: 'updated'; readonly schedule: PollingSchedule }
-  | { readonly kind: 'missing' }
-
-export type SetReadingSourceOutcome =
-  | { readonly kind: 'updated'; readonly preference: ReadingSourcePreference }
-  | { readonly kind: 'missing' }
-
-export type UnsubscribeOutcome = { readonly kind: 'unsubscribed' } | { readonly kind: 'missing' }
-
-export type SetFeedDetailsOutcome =
-  | { readonly kind: 'updated'; readonly details: FeedDetailsUpdate }
-  | { readonly kind: 'missing' }
 
 interface FeedRecord {
   readonly feedId: number
@@ -98,7 +80,10 @@ const SUBSCRIBED_FEED_COLUMNS = {
   subscribedAt: subscriptions.createdAt,
 }
 
-/** Subscribing, unsubscribing, and the reads the UI is built from. Every write to a Subscription row is here. */
+/**
+ * The User's Subscription changes — subscribing, OPML, preferences, unsubscribing —
+ * and the reads the UI is built from. Poll outcomes are written by `FeedPoll`.
+ */
 export class SubscriptionService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -126,91 +111,51 @@ export class SubscriptionService {
     if (existing) return { kind: 'duplicate', subscription: this.#withCadence(existing) }
 
     const now = this.#clock.now().toISOString()
+    const dormant = this.#dormantFeed(requestedUrl, enteredUrl)
+    if (dormant) this.#resubscribe(dormant, requestedUrl, now)
+    else this.#subscribe(enteredUrl, requestedUrl, offeredTitle, now)
 
-    const dormant = this.#dormantFeedByUrl(requestedUrl)
-    if (dormant) return this.#resubscribe(dormant, now)
+    // Read back rather than restated: the row's defaults are the only defaults.
+    const recorded = this.#feedByCanonicalUrl(requestedUrl)
+    if (!recorded) throw new Error('A Subscription just recorded did not read back')
+    return { kind: 'created', subscription: this.#withCadence(recorded) }
+  }
 
+  #subscribe(enteredUrl: string, requestedUrl: string, offeredTitle: string | null | undefined, now: string): void {
     // Both stand in for what the Feed document will say: nothing has been
     // retrieved yet (ADR 0007), so the Feed URL is all there is to go on.
     const domain = new URL(requestedUrl).hostname
     const title = offeredTitle?.trim() || domain
-    let created: SubscribedFeedRecord
-    try {
-      created = this.#db.transaction((tx) => {
-        const inserted = tx
-          .insert(feeds)
-          .values({
-            enteredUrl,
-            resolvedUrl: requestedUrl,
-            title,
-            domain,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run()
-        const feedId = Number(inserted.lastInsertRowid)
-
-        tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).run()
-        tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
-        return {
-          feedId,
-          title,
-          description: null,
-          domain,
-          homePageUrl: null,
-          enteredUrl,
-          resolvedUrl: requestedUrl,
-          lastPolledAt: null,
-          lastSuccessAt: null,
-          consecutiveFailures: 0,
-          lastFailureCategory: null,
-          readingSource: DEFAULT_READING_SOURCE,
-          subscribedAt: now,
-        }
-      })
-    } catch (error) {
-      const raced = this.#feedByCanonicalUrl(requestedUrl)
-      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
-      throw error
-    }
-
-    this.#logger.info('subscriptions.subscription_created', {
-      feedId: created.feedId,
-      enteredUrl: loggableUrl(enteredUrl),
+    const feedId = this.#db.transaction((tx) => {
+      const inserted = tx
+        .insert(feeds)
+        .values({ enteredUrl, resolvedUrl: requestedUrl, title, domain, createdAt: now, updatedAt: now })
+        .run()
+      const feedId = Number(inserted.lastInsertRowid)
+      tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).run()
+      tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
+      return feedId
     })
-    return { kind: 'created', subscription: this.#withCadence(created) }
+
+    this.#logger.info('subscriptions.subscription_created', { feedId, enteredUrl: loggableUrl(enteredUrl) })
   }
 
   /**
    * Revives a retained Feed under the same row — so Library items keep the
-   * identity they were saved from — with a fresh default schedule.
+   * identity they were saved from — with a fresh default schedule, reclaiming
+   * the requested URL's alias if a merge had moved it away.
    */
-  #resubscribe(feed: FeedRecord, now: string): CreateSubscriptionOutcome {
-    try {
-      this.#db.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
-    } catch (error) {
-      const raced = this.#feedByCanonicalUrl(feed.resolvedUrl) ?? this.#feedByCanonicalUrl(feed.enteredUrl)
-      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
-      throw error
-    }
+  #resubscribe(feed: FeedRecord, requestedUrl: string, now: string): void {
+    this.#db.transaction((tx) => {
+      tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId: feed.feedId }).onConflictDoNothing().run()
+      tx.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
+    })
 
     this.#logger.info('subscriptions.subscription_created', {
       feedId: feed.feedId,
       enteredUrl: loggableUrl(feed.enteredUrl),
       revived: true,
     })
-    return {
-      kind: 'created',
-      subscription: this.#withCadence({
-        ...feed,
-        lastPolledAt: null,
-        lastSuccessAt: null,
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-        readingSource: DEFAULT_READING_SOURCE,
-        subscribedAt: now,
-      }),
-    }
   }
 
   importOpml(opml: string): ImportOpmlOutcome {
@@ -246,60 +191,17 @@ export class SubscriptionService {
   }
 
   /**
-   * Folds a duplicate Subscription into the Feed its retrieval revealed (ADR 0007).
-   * Called by `FeedPoll`, which then writes the retrieved Feed Window to the survivor:
-   * the poll discovers the duplicate, but the Subscription writes belong here.
-   */
-  mergeInto(duplicate: PolledFeed & { readonly readingSource: ReadingSource }, existingFeedId: number): void {
-    const now = this.#clock.now().toISOString()
-    this.#db.transaction((tx) => {
-      const existingSubscribed = tx
-        .select({ feedId: subscriptions.feedId })
-        .from(subscriptions)
-        .where(eq(subscriptions.feedId, existingFeedId))
-        .limit(1)
-        .all()[0]
-      const hasItems = tx
-        .select({ id: feedItems.id })
-        .from(feedItems)
-        .where(eq(feedItems.feedId, duplicate.feedId))
-        .limit(1)
-        .all()[0]
-
-      tx.update(feedUrlAliases).set({ feedId: existingFeedId }).where(eq(feedUrlAliases.feedId, duplicate.feedId)).run()
-
-      if (hasItems) {
-        tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
-      } else {
-        tx.delete(feeds).where(eq(feeds.id, duplicate.feedId)).run()
-      }
-
-      if (!existingSubscribed) {
-        tx.insert(subscriptions)
-          .values({
-            ...newSubscription(existingFeedId, now),
-            pollingIntervalMinutes: duplicate.pollingIntervalMinutes,
-            readingSource: duplicate.readingSource,
-          })
-          .run()
-      }
-    })
-
-    this.#logger.info('subscriptions.feeds_merged', { feedId: duplicate.feedId, intoFeedId: existingFeedId })
-  }
-
-  /**
    * The next due time is recomputed from the last completed poll: a shorter,
    * already-overdue interval becomes due at the next wake; a longer one waits it out.
    */
-  setPollingInterval(feedId: number, pollingIntervalMinutes: PollingIntervalMinutes): SetPollingIntervalOutcome {
+  setPollingInterval(feedId: number, pollingIntervalMinutes: PollingIntervalMinutes): PollingSchedule | undefined {
     const row = this.#db
       .select({ lastPolledAt: subscriptions.lastPolledAt, createdAt: subscriptions.createdAt })
       .from(subscriptions)
       .where(eq(subscriptions.feedId, feedId))
       .limit(1)
       .all()[0]
-    if (!row) return { kind: 'missing' }
+    if (!row) return undefined
 
     const anchor = new Date(row.lastPolledAt ?? row.createdAt)
     const nextPollAt = nextPollTime(feedId, pollingIntervalMinutes, anchor)
@@ -314,19 +216,20 @@ export class SubscriptionService {
       pollingIntervalMinutes,
       nextPollAt,
     })
-    return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
+    return { pollingIntervalMinutes, nextPollAt }
   }
 
-  setReadingSource(feedId: number, readingSource: ReadingSource): SetReadingSourceOutcome {
+  /** False when there is no Subscription to change. */
+  setReadingSource(feedId: number, readingSource: ReadingSource): boolean {
     const updated = this.#db.update(subscriptions).set({ readingSource }).where(eq(subscriptions.feedId, feedId)).run()
-    if (updated.changes === 0) return { kind: 'missing' }
+    if (updated.changes === 0) return false
 
     this.#logger.info('subscriptions.reading_source_changed', { feedId, readingSource })
-    return { kind: 'updated', preference: { readingSource } }
+    return true
   }
 
   /** Replaces both overrides; the Feed's reported title and description keep being tracked underneath. */
-  setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): SetFeedDetailsOutcome {
+  setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): FeedDetailsUpdate | undefined {
     const row = this.#db
       .select({ reportedTitle: feeds.title, reportedDescription: feeds.description })
       .from(subscriptions)
@@ -334,7 +237,7 @@ export class SubscriptionService {
       .where(eq(subscriptions.feedId, feedId))
       .limit(1)
       .all()[0]
-    if (!row) return { kind: 'missing' }
+    if (!row) return undefined
 
     const { customTitle, customDescription } = overrides
     this.#db.update(subscriptions).set({ customTitle, customDescription }).where(eq(subscriptions.feedId, feedId)).run()
@@ -345,25 +248,23 @@ export class SubscriptionService {
       customDescription: customDescription !== null,
     })
     return {
-      kind: 'updated',
-      details: {
-        title: customTitle ?? row.reportedTitle,
-        customTitle,
-        description: customDescription ?? row.reportedDescription,
-        customDescription,
-      },
+      title: customTitle ?? row.reportedTitle,
+      customTitle,
+      description: customDescription ?? row.reportedDescription,
+      customDescription,
     }
   }
 
   /**
    * Deletes only the Subscription row — polling and Digest membership hinge on it.
    * Retained rows wait for the retention sweep, which keeps saves and their attribution.
+   * False when there was no Subscription.
    */
-  unsubscribe(feedId: number): UnsubscribeOutcome {
+  unsubscribe(feedId: number): boolean {
     const deleted = this.#db.delete(subscriptions).where(eq(subscriptions.feedId, feedId)).run()
-    if (deleted.changes === 0) return { kind: 'missing' }
+    if (deleted.changes === 0) return false
     this.#logger.info('subscriptions.unsubscribed', { feedId })
-    return { kind: 'unsubscribed' }
+    return true
   }
 
   dueFeedIds(limit: number): readonly number[] {
@@ -381,7 +282,8 @@ export class SubscriptionService {
   list(): readonly SubscriptionSummary[] {
     const records = this.#subscribedFeeds()
     const cadenceOf = this.#stripCadence(records.map((record) => record.feedId))
-    return records.map((record) => summaryOf(record, cadenceOf))
+    const timezone = this.#settings.effectiveTimezone()
+    return records.map((record) => summaryOf(record, cadenceOf, timezone))
   }
 
   /** Days and labels use the installation timezone, so the cadence grid reads in the User's own calendar. */
@@ -406,27 +308,21 @@ export class SubscriptionService {
     const timezone = this.#settings.effectiveTimezone()
     const today = dateKey(this.#clock.now(), timezone)
     const dayOf = dayKeysIn(timezone)
-    const counts = new Map<string, number>()
+    const days = gridDayKeys(today)
+    const counts = cadenceByFeed(this.#db, timezone, days, [feedId])(feedId)
     const items = this.#db
-      .select({
-        feedItemId: feedItems.id,
-        title: feedItems.title,
-        link: feedItems.link,
-        publishedAt: feedItems.publishedAt,
-        firstSeenAt: feedItems.firstSeenAt,
-        chronologyAt: feedItems.chronologyAt,
-        savedAt: libraryItems.savedAt,
-      })
+      .select({ ...LISTED_ITEM_COLUMNS, link: feedItems.link })
       .from(feedItems)
       .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(eq(feedItems.feedId, feedId))
       .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
       .all()
-      .map((row) => {
-        const date = dayOf(row.chronologyAt)
-        counts.set(date, (counts.get(date) ?? 0) + 1)
-        return feedItemRowOf(row, date, timezone)
-      })
+      .map((row) => ({
+        ...listedItemOf(row),
+        link: row.link,
+        date: dayOf(row.chronologyAt),
+        displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+      }))
 
     return {
       feedId: record.feedId,
@@ -440,14 +336,11 @@ export class SubscriptionService {
       homePageUrl: record.homePageUrl,
       enteredUrl: record.enteredUrl,
       resolvedUrl: record.resolvedUrl,
-      availability: availabilityOf(record),
-      schedule: {
-        pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(record.pollingIntervalMinutes),
-        nextPollAt: record.nextPollAt,
-      },
+      availability: availabilityOf(record, timezone),
+      schedule: { pollingIntervalMinutes: record.pollingIntervalMinutes, nextPollAt: record.nextPollAt },
       readingSource: record.readingSource,
       subscribedDate: dateKey(new Date(record.subscribedAt), timezone),
-      cadence: gridDayKeys(today).map((date) => ({ date, count: counts.get(date) ?? 0 })),
+      cadence: days.map((date, index) => ({ date, count: counts[index] ?? 0 })),
       items,
     }
   }
@@ -463,7 +356,7 @@ export class SubscriptionService {
   }
 
   #withCadence(feed: SubscribedFeedRecord): SubscriptionSummary {
-    return summaryOf(feed, this.#stripCadence([feed.feedId]))
+    return summaryOf(feed, this.#stripCadence([feed.feedId]), this.#settings.effectiveTimezone())
   }
 
   #feedByCanonicalUrl(url: string): SubscribedFeedRecord | undefined {
@@ -477,15 +370,30 @@ export class SubscriptionService {
       .all()[0]
   }
 
-  #dormantFeedByUrl(url: string): FeedRecord | undefined {
-    return this.#db
-      .select(FEED_RECORD_COLUMNS)
-      .from(feedUrlAliases)
-      .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
-      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .where(and(eq(feedUrlAliases.url, url), isNull(subscriptions.feedId)))
-      .limit(1)
-      .all()[0]
+  /**
+   * An unsubscribed Feed holding a URL a new Feed would claim. Its aliases come
+   * first; a duplicate whose aliases a merge moved away is still found by its
+   * own URLs, which stay reserved until Retention retires the row.
+   */
+  #dormantFeed(requestedUrl: string, enteredUrl: string): FeedRecord | undefined {
+    const unsubscribed = isNull(subscriptions.feedId)
+    return (
+      this.#db
+        .select(FEED_RECORD_COLUMNS)
+        .from(feedUrlAliases)
+        .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
+        .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+        .where(and(eq(feedUrlAliases.url, requestedUrl), unsubscribed))
+        .limit(1)
+        .all()[0] ??
+      this.#db
+        .select(FEED_RECORD_COLUMNS)
+        .from(feeds)
+        .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+        .where(and(or(eq(feeds.enteredUrl, enteredUrl), eq(feeds.resolvedUrl, requestedUrl)), unsubscribed))
+        .limit(1)
+        .all()[0]
+    )
   }
 
   #stripCadence(feedIds: readonly number[]): (feedId: number) => number[] {
@@ -493,17 +401,19 @@ export class SubscriptionService {
   }
 }
 
-/** Shared by first subscription and revival: due immediately — the first retrieval is scheduler work (ADR 0007). */
+/**
+ * Shared by first subscription and revival: due immediately — the first retrieval
+ * is scheduler work (ADR 0007) — with every preference left to the column defaults.
+ */
 function newSubscription(feedId: number, now: string) {
-  return {
-    feedId,
-    pollingIntervalMinutes: DEFAULT_POLLING_INTERVAL_MINUTES,
-    nextPollAt: now,
-    createdAt: now,
-  }
+  return { feedId, nextPollAt: now, createdAt: now }
 }
 
-function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => number[]): SubscriptionSummary {
+function summaryOf(
+  record: SubscribedFeedRecord,
+  cadenceOf: (feedId: number) => number[],
+  timezone: string,
+): SubscriptionSummary {
   return {
     feedId: record.feedId,
     title: record.title,
@@ -515,7 +425,7 @@ function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => 
     readingSource: record.readingSource,
     subscribedAt: record.subscribedAt,
     cadence: cadenceOf(record.feedId),
-    availability: availabilityOf(record),
+    availability: availabilityOf(record, timezone),
   }
 }
 

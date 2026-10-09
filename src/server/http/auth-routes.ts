@@ -9,16 +9,8 @@ import type { Authentication } from '../auth/authentication.js'
 import type { Clock } from '../clock.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { clientAddress } from './client-address.js'
-import { readJsonBody } from './json-body.js'
-import { invalidCredentials, NO_STORE, retryAfter } from './responses.js'
+import { apiError, readJsonBody } from './requests.js'
 import { clearSessionCookie, readSessionCookie, writeSessionCookie } from './session-cookie.js'
-
-/** Reachable without a Session because they are how a Session is obtained. */
-export const PUBLIC_API_PATHS: ReadonlySet<string> = new Set([
-  '/api/auth/status',
-  '/api/auth/setup',
-  '/api/auth/session',
-])
 
 export interface AuthRouteDependencies {
   readonly authentication: Authentication
@@ -27,7 +19,10 @@ export interface AuthRouteDependencies {
   readonly trustProxyHeaders: boolean
 }
 
-/** Setup, sign-in, sign-out, and the password change. Mounted at `/api/auth`. */
+/**
+ * Setup, sign-in, sign-out, and the password change. Mounted at `/api/auth`;
+ * which of these answer without a Session is `require-session.ts`'s call.
+ */
 export function authRoutes(deps: AuthRouteDependencies): Hono {
   const app = new Hono()
 
@@ -44,17 +39,14 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
 
     switch (outcome.kind) {
       case 'claimed':
-        seedTimezone(deps.settings, body.value.timezone, deps.clock.now())
+        // The browser's zone seeds the Digest calendar; one the server cannot resolve leaves it on UTC.
+        if (body.value.timezone) deps.settings.setTimezone(body.value.timezone, deps.clock.now())
         writeSessionCookie(c, outcome.session, deps.clock.now())
         return status(c, { claimed: true, authenticated: true }, 201)
       case 'already-claimed':
-        return c.json(
-          { error: { code: 'already_claimed', message: 'This installation already has a User' } },
-          409,
-          NO_STORE,
-        )
+        return apiError(c, 409, 'already_claimed', 'This installation already has a User')
       case 'unavailable':
-        return c.json({ error: { code: 'setup_unavailable', message: outcome.reason } }, 503, NO_STORE)
+        return apiError(c, 503, 'setup_unavailable', outcome.reason)
       case 'rate-limited':
         return tooManyAttempts(c, outcome.retryAfterSeconds)
       case 'rejected':
@@ -85,7 +77,7 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   app.delete('/session', (c) => {
     deps.authentication.signOut(readSessionCookie(c))
     clearSessionCookie(c)
-    return c.body(null, 204, NO_STORE)
+    return c.body(null, 204)
   })
 
   app.post('/password', async (c) => {
@@ -111,21 +103,14 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
   return app
 }
 
-function seedTimezone(settings: InstallationSettingsStore, timezone: string | undefined, now: Date) {
-  if (!timezone) return
-  try {
-    settings.setTimezone(timezone, now)
-  } catch {}
-}
-
 function status(c: Context, body: AuthStatus, code: 200 | 201 = 200) {
-  return c.json<AuthStatus>(body, code, NO_STORE)
+  return c.json<AuthStatus>(body, code)
 }
 
 function tooManyAttempts(c: Context, retryAfterSeconds: number) {
-  return c.json(
-    { error: { code: 'too_many_attempts', message: 'Too many attempts' } },
-    429,
-    retryAfter(retryAfterSeconds),
-  )
+  return apiError(c, 429, 'too_many_attempts', 'Too many attempts', { 'Retry-After': String(retryAfterSeconds) })
+}
+
+function invalidCredentials(c: Context) {
+  return apiError(c, 401, 'invalid_credentials', 'Invalid credentials')
 }

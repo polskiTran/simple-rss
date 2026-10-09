@@ -1,12 +1,16 @@
+import type { LookupAddress } from 'node:dns'
+import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createServer as createHttpsServer } from 'node:https'
 import { createServer as createTcpServer, type AddressInfo, type LookupFunction, type Socket } from 'node:net'
+import { getCACertificates, setDefaultCACertificates, type TLSSocket } from 'node:tls'
 import { promisify } from 'node:util'
 import { brotliCompress, createGzip, gzip } from 'node:zlib'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createLogger } from '../../../src/server/logger.js'
-import type { HttpClient, HttpTimings } from '../../../src/server/upstream/http-client.js'
-import { createNetworkHttpClient, guardedLookup } from '../../../src/server/upstream/network-client.js'
-import { createRetrieval } from '../../../src/server/upstream/retrieval.js'
+import type { HttpConnection, HttpTimings } from '../../../src/server/upstream/http-client.js'
+import { createNetworkHttpClient, pinnedLookup } from '../../../src/server/upstream/network-client.js'
+import { createRetrieval, RETRIEVAL_PROFILES } from '../../../src/server/upstream/retrieval.js'
 
 const compressGzip = promisify(gzip)
 const compressBrotli = promisify(brotliCompress)
@@ -40,18 +44,11 @@ async function origin(handler: Handler): Promise<Origin> {
   }
 }
 
-function clientReachingTheTestServer(): HttpClient {
-  return createNetworkHttpClient({ isAllowedAddress: () => true })
-}
+/** Every test origin listens here; the adapter is handed it as the approved address. */
+const TEST_SERVER: HttpConnection = { addresses: ['127.0.0.1'] }
 
-// Answers on a later tick the way real DNS does; a synchronous callback would
-// emit the socket's `lookup` event before any request-level listener attaches.
-const testServerLookup: LookupFunction = (_hostname, options, callback) => {
-  const answer = { address: '127.0.0.1', family: 4 as const }
-  setImmediate(() => {
-    if (options.all) callback(null, [answer] as never, 0)
-    else callback(null, answer.address, answer.family)
-  })
+function send(request: Request): Promise<Response> {
+  return createNetworkHttpClient()(request, TEST_SERVER)
 }
 
 describe('createNetworkHttpClient', () => {
@@ -68,7 +65,7 @@ describe('createNetworkHttpClient', () => {
       response.end('<rss></rss>')
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('application/xml')
@@ -82,9 +79,7 @@ describe('createNetworkHttpClient', () => {
     })
 
     const url = new URL(`${running.url}/feed.xml`)
-    await clientReachingTheTestServer()(
-      new Request(url, { headers: { 'user-agent': 'simple-rss/test', 'if-none-match': '"v1"' } }),
-    )
+    await send(new Request(url, { headers: { 'user-agent': 'simple-rss/test', 'if-none-match': '"v1"' } }))
 
     const [received] = running.requests
     expect(received?.headers['user-agent']).toBe('simple-rss/test')
@@ -104,7 +99,7 @@ describe('createNetworkHttpClient', () => {
       response.end(compressed)
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
 
     await expect(response.text()).resolves.toBe('<rss>compressed</rss>')
     expect(response.headers.get('content-encoding')).toBeNull()
@@ -112,7 +107,7 @@ describe('createNetworkHttpClient', () => {
   })
 
   it('aborts when a small compressed body expands past the decoded ceiling', async () => {
-    const decoded = 'x'.repeat(1024 * 1024)
+    const decoded = 'x'.repeat(RETRIEVAL_PROFILES.feed.maxBytes + 1)
     const compressed = await compressGzip(Buffer.from(decoded))
     expect(compressed.byteLength).toBeLessThan(decoded.length / 100)
     running = await origin((_request, response) => {
@@ -124,11 +119,11 @@ describe('createNetworkHttpClient', () => {
       response.end(compressed)
     })
     const port = new URL(running.url).port
+    const network = createNetworkHttpClient()
     const retrieval = createRetrieval({
-      httpClient: createNetworkHttpClient({
-        isAllowedAddress: () => true,
-        lookup: testServerLookup,
-      }),
+      // Validation approves the public answer; the test then re-pins the
+      // socket to its own loopback origin, which no validation would approve.
+      httpClient: (request, connection) => network(request, { ...connection, ...TEST_SERVER }),
       logger: createLogger({ level: 'error', sink: () => {} }),
       resolve: async () => ['93.184.216.34'],
       self: new URL('https://reader.test'),
@@ -138,7 +133,6 @@ describe('createNetworkHttpClient', () => {
       retrieval.retrieveBytes({
         url: `http://publisher.example:${port}/feed.xml`,
         operation: 'feed',
-        limits: { maxBytes: 1_000 },
       }),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
@@ -150,7 +144,7 @@ describe('createNetworkHttpClient', () => {
       response.end(compressed)
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
 
     await expect(response.text()).resolves.toBe('<rss>brotli</rss>')
   })
@@ -163,7 +157,7 @@ describe('createNetworkHttpClient', () => {
       response.end(compressed)
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
 
     await expect(response.text()).resolves.toBe(decoded.toString())
     expect(response.headers.get('content-encoding')).toBeNull()
@@ -175,7 +169,7 @@ describe('createNetworkHttpClient', () => {
       response.end('encoded bytes')
     })
 
-    await expect(clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))).rejects.toMatchObject({
+    await expect(send(new Request(`${running.url}/feed.xml`))).rejects.toMatchObject({
       code: 'unsupported_content_encoding',
     })
   })
@@ -186,7 +180,7 @@ describe('createNetworkHttpClient', () => {
       response.end('<rss></rss>')
     })
 
-    await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    await send(new Request(`${running.url}/feed.xml`))
 
     expect(running.requests[0]?.headers['accept-encoding']).toBe('gzip, deflate, br')
   })
@@ -202,7 +196,7 @@ describe('createNetworkHttpClient', () => {
       response.end('<rss></rss>')
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed`))
+    const response = await send(new Request(`${running.url}/feed`))
 
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe('/feeds/main.xml')
@@ -215,7 +209,7 @@ describe('createNetworkHttpClient', () => {
       response.end()
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
 
     expect(response.status).toBe(304)
     expect(response.body).toBeNull()
@@ -227,7 +221,7 @@ describe('createNetworkHttpClient', () => {
       response.end('<rss></rss>')
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
 
     expect(response.headers.get('set-cookie')).toBeNull()
   })
@@ -244,9 +238,7 @@ describe('createNetworkHttpClient', () => {
     })
 
     const controller = new AbortController()
-    const response = await clientReachingTheTestServer()(
-      new Request(`${running.url}/feed.xml`, { signal: controller.signal }),
-    )
+    const response = await send(new Request(`${running.url}/feed.xml`, { signal: controller.signal }))
     const reading = new Response(response.body).text()
     controller.abort()
 
@@ -268,7 +260,7 @@ describe('createNetworkHttpClient', () => {
       compressing.flush()
     })
 
-    const response = await clientReachingTheTestServer()(new Request(`${running.url}/feed.xml`))
+    const response = await send(new Request(`${running.url}/feed.xml`))
     await response.body?.cancel()
 
     await expect(connectionClosed).resolves.toBeUndefined()
@@ -281,24 +273,23 @@ describe('createNetworkHttpClient', () => {
     })
     const port = new URL(running.url).port
     const url = `http://publisher.example:${port}/feed.xml`
-    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup })
+    const client = createNetworkHttpClient()
     const observed: HttpTimings[] = []
+    const connection: HttpConnection = { ...TEST_SERVER, onTimings: (timings) => observed.push(timings) }
 
-    const first = await client(new Request(url), (timings) => observed.push(timings))
+    const first = await client(new Request(url), connection)
     await first.text()
-    const second = await client(new Request(url), (timings) => observed.push(timings))
+    const second = await client(new Request(url), connection)
     await second.text()
 
     const fresh = observed[0]
     expect(fresh?.connectionReused).toBe(false)
-    expect(fresh?.socketDnsMs).toBeGreaterThanOrEqual(0)
     expect(fresh?.connectMs).toBeGreaterThanOrEqual(0)
     expect(fresh?.ttfbMs).toBeGreaterThanOrEqual(0)
     expect(fresh?.tlsMs).toBeUndefined()
 
     const reused = observed[1]
     expect(reused?.connectionReused).toBe(true)
-    expect(reused?.socketDnsMs).toBeUndefined()
     expect(reused?.connectMs).toBeUndefined()
     expect(reused?.ttfbMs).toBeGreaterThanOrEqual(0)
   })
@@ -310,7 +301,7 @@ describe('createNetworkHttpClient', () => {
     })
     const port = new URL(running.url).port
     const url = `http://publisher.example:${port}/feed.xml`
-    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup })
+    const client = createNetworkHttpClient()
     const warnings: Error[] = []
     const onWarning = (warning: Error): void => {
       if (warning.name === 'MaxListenersExceededWarning') warnings.push(warning)
@@ -322,7 +313,10 @@ describe('createNetworkHttpClient', () => {
       // Node warns at the eleventh listener for one event on one emitter;
       // a leak of one listener per request crosses that on the twelfth request.
       for (let sent = 0; sent < 12; sent += 1) {
-        const response = await client(new Request(url), (timings) => observed.push(timings))
+        const response = await client(new Request(url), {
+          ...TEST_SERVER,
+          onTimings: (timings) => observed.push(timings),
+        })
         await response.text()
       }
       await new Promise<void>((resolve) => setImmediate(resolve))
@@ -342,16 +336,19 @@ describe('createNetworkHttpClient', () => {
     })
     await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', () => resolve()))
     const { port } = silent.address() as AddressInfo
-    const client = createNetworkHttpClient({ isAllowedAddress: () => true, lookup: testServerLookup })
+    const client = createNetworkHttpClient()
 
     const occupants = Array.from({ length: 8 }, (_, index) =>
-      client(new Request(`http://occupant-${index}.example:${port}/feed`)).catch(() => {}),
+      client(new Request(`http://occupant-${index}.example:${port}/feed`), TEST_SERVER).catch(() => {}),
     )
     try {
       await expect.poll(() => held.length).toBe(8)
 
       const controller = new AbortController()
-      const reading = client(new Request(`http://article.example:${port}/post`, { signal: controller.signal }))
+      const reading = client(
+        new Request(`http://article.example:${port}/post`, { signal: controller.signal }),
+        TEST_SERVER,
+      )
       controller.abort(new Error('the Reader gave up'))
 
       await expect(reading).rejects.toThrow('the Reader gave up')
@@ -362,39 +359,105 @@ describe('createNetworkHttpClient', () => {
     }
   })
 
-  it('refuses a private address by default, before anything is connected to', async () => {
+  it('connects a name to the address it was handed, without resolving the name', async () => {
+    running = await origin((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/xml' })
+      response.end('<rss></rss>')
+    })
+    const port = new URL(running.url).port
+
+    // `.invalid` never resolves: reaching the origin proves no DNS query ran.
+    const response = await send(new Request(`http://publisher.invalid:${port}/feed.xml`))
+
+    await expect(response.text()).resolves.toBe('<rss></rss>')
+    expect(running.requests[0]?.headers.host).toBe(`publisher.invalid:${port}`)
+  })
+
+  it('refuses an address literal it was not handed, before anything is connected to', async () => {
     running = await origin((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/xml' })
       response.end('<rss></rss>')
     })
 
-    await expect(createNetworkHttpClient()(new Request(`${running.url}/feed.xml`))).rejects.toThrow(/refus|address/i)
+    await expect(
+      createNetworkHttpClient()(new Request(`${running.url}/feed.xml`), { addresses: ['93.184.216.34'] }),
+    ).rejects.toMatchObject({ code: 'blocked_destination' })
     expect(running.requests).toHaveLength(0)
   })
 })
 
-describe('guardedLookup', () => {
-  it('refuses a name that answers with an address no retrieval may reach', async () => {
-    const lookup = guardedLookup()
+describe('pinnedLookup', () => {
+  const pinned = ['93.184.216.34', '2606:2800:220:1::248']
 
-    await expect(resolveWith(lookup, 'localhost')).rejects.toMatchObject({ code: 'blocked_destination' })
+  it('answers any name with exactly the addresses it was handed', async () => {
+    await expect(lookupWith(pinnedLookup(pinned), 'localhost', { all: true })).resolves.toEqual([
+      { address: '93.184.216.34', family: 4 },
+      { address: '2606:2800:220:1::248', family: 6 },
+    ])
   })
 
-  it('passes a name whose addresses are all allowed through to the connection', async () => {
-    const lookup = guardedLookup(() => true)
+  it('narrows to the family the socket asks for', async () => {
+    await expect(lookupWith(pinnedLookup(pinned), 'localhost', { family: 6 })).resolves.toEqual({
+      address: '2606:2800:220:1::248',
+      family: 6,
+    })
+  })
 
-    await expect(resolveWith(lookup, 'localhost')).resolves.not.toHaveLength(0)
+  it('fails rather than resolving when no handed address fits', async () => {
+    await expect(lookupWith(pinnedLookup(['93.184.216.34']), 'localhost', { family: 6 })).rejects.toMatchObject({
+      code: 'blocked_destination',
+    })
   })
 })
 
-function resolveWith(
-  lookup: ReturnType<typeof guardedLookup>,
+function lookupWith(
+  lookup: LookupFunction,
   hostname: string,
-): Promise<{ address: string; family: number }[]> {
+  options: { readonly all?: boolean; readonly family?: number },
+): Promise<LookupAddress | LookupAddress[]> {
   return new Promise((resolve, reject) => {
-    lookup(hostname, { all: true }, (error, addresses) => {
+    lookup(hostname, { ...options }, (error, address, family) => {
       if (error) reject(error)
-      else resolve(addresses as { address: string; family: number }[])
+      else resolve(typeof address === 'string' ? { address, family: family ?? 0 } : address)
     })
   })
 }
+
+describe('TLS to a pinned address', () => {
+  const cert = readFileSync('tests/fixtures/tls/publisher.invalid.cert.pem', 'utf8')
+  const key = readFileSync('tests/fixtures/tls/publisher.invalid.key.pem', 'utf8')
+  const trusted = getCACertificates('default')
+  const servernames: TLSSocket['servername'][] = []
+  const server = createHttpsServer({ cert, key }, (request, response) => {
+    // SAFETY: an `https` server's request socket is always a `TLSSocket`.
+    servernames.push((request.socket as TLSSocket).servername)
+    response.writeHead(200, { 'content-type': 'application/xml' })
+    response.end('<rss></rss>')
+  })
+  let port = 0
+
+  beforeAll(async () => {
+    setDefaultCACertificates([...trusted, cert])
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    port = (server.address() as AddressInfo).port
+  })
+
+  afterAll(async () => {
+    setDefaultCACertificates(trusted)
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  })
+
+  it('names the URL host to the server and verifies the certificate against it', async () => {
+    const response = await send(new Request(`https://publisher.invalid:${port}/feed.xml`))
+
+    await expect(response.text()).resolves.toBe('<rss></rss>')
+    expect(servernames).toEqual(['publisher.invalid'])
+  })
+
+  it('refuses a certificate that does not name the URL host, though the address is the same', async () => {
+    await expect(send(new Request(`https://impostor.invalid:${port}/feed.xml`))).rejects.toMatchObject({
+      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+    })
+  })
+})

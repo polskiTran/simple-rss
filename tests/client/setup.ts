@@ -20,5 +20,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
 })
 
-// jsdom lays nothing out, so its `scrollTo` only reports itself unimplemented.
+// jsdom lays nothing out, so its `scrollTo` only reports itself unimplemented
+// and it has no `scrollIntoView` at all.
 window.scrollTo = () => {}
+Element.prototype.scrollIntoView = () => {}

@@ -1,18 +1,22 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
+import type { AuthStatus } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
-import { UserAuthStore } from './user-auth.js'
+import { CredentialStore, type IssuedSession } from './credentials.js'
 import { argon2idHasher, type PasswordHasher } from './password.js'
 import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
-import { SessionStore, type IssuedSession } from './sessions.js'
-import { realSleeper, type Sleeper } from './sleeper.js'
 
 export const MIN_SETUP_SECRET_LENGTH = 16
 
+/** How Authentication waits out a delay; the harness records instead of waiting. */
+export type Sleeper = (milliseconds: number) => Promise<void>
+
+const realSleeper: Sleeper = (milliseconds) =>
+  milliseconds <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, milliseconds))
+
 export interface AuthenticationOptions {
-  readonly user: UserAuthStore
-  readonly sessions: SessionStore
+  readonly credentials: CredentialStore
   readonly hasher: PasswordHasher
   readonly limiter: LoginRateLimiter
   readonly sleep: Sleeper
@@ -45,13 +49,6 @@ interface Attempt {
   readonly client: string
 }
 
-export interface AuthenticationStatus {
-  /** Whether a User has claimed this installation. */
-  readonly claimed: boolean
-  /** Whether the caller presented a live session. */
-  readonly authenticated: boolean
-}
-
 export class Authentication {
   readonly #deps: AuthenticationOptions
 
@@ -59,13 +56,13 @@ export class Authentication {
     this.#deps = options
   }
 
-  status(token: string | undefined): AuthenticationStatus {
-    return { claimed: this.#deps.user.isClaimed(), authenticated: this.authenticate(token) }
+  status(token: string | undefined): AuthStatus {
+    return { claimed: this.#isClaimed(), authenticated: this.authenticate(token) }
   }
 
   /** Why claiming is blocked, or `undefined`. */
   setupBlocker(): string | undefined {
-    if (this.#deps.user.isClaimed()) return undefined
+    if (this.#isClaimed()) return undefined
 
     const secret = this.#deps.setupSecret
     if (!secret) return 'setup secret is not configured'
@@ -80,10 +77,10 @@ export class Authentication {
       return { kind: 'unavailable', reason: blocker }
     }
 
-    if (this.#deps.user.isClaimed()) return { kind: 'already-claimed' }
+    if (this.#isClaimed()) return { kind: 'already-claimed' }
 
     const attempt = await this.#beginAttempt(input.client, 'auth.claim_throttled')
-    if ('kind' in attempt) return attempt
+    if (attempt.kind === 'rate-limited') return attempt
 
     try {
       if (!matches(this.#deps.setupSecret, input.setupSecret)) {
@@ -92,19 +89,12 @@ export class Authentication {
       }
 
       const passwordHash = await this.#deps.hasher.hash(input.password)
-      if (!this.#deps.user.claim(passwordHash, this.#deps.clock.now())) {
-        await this.#delaySuccess(attempt)
-        attempt.recordSuccess()
-        this.#deps.logger.warn('auth.claim_lost_race')
-        return { kind: 'already-claimed' }
-      }
-
       await this.#delaySuccess(attempt)
-      const session = this.#deps.sessions.issueForPasswordHash(passwordHash, this.#deps.clock.now())
+      const session = this.#deps.credentials.claim(passwordHash, this.#deps.clock.now())
       attempt.recordSuccess()
 
       if (!session) {
-        this.#deps.logger.warn('auth.claim_session_stale')
+        this.#deps.logger.warn('auth.claim_lost_race')
         return { kind: 'already-claimed' }
       }
 
@@ -118,7 +108,7 @@ export class Authentication {
 
   async signIn(input: Attempt & { readonly password: string }): Promise<SignInOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.sign_in_throttled')
-    if ('kind' in attempt) return attempt
+    if (attempt.kind === 'rate-limited') return attempt
 
     try {
       const passwordHash = await this.#verifiedPasswordHash(input.password)
@@ -129,8 +119,8 @@ export class Authentication {
 
       await this.#delaySuccess(attempt)
       const now = this.#deps.clock.now()
-      this.#deps.sessions.prune(now)
-      const session = this.#deps.sessions.issueForPasswordHash(passwordHash, now)
+      this.#deps.credentials.prune(now)
+      const session = this.#deps.credentials.issueSession(passwordHash, now)
 
       if (!session) {
         attempt.cancel()
@@ -149,13 +139,13 @@ export class Authentication {
 
   /** Whether this token is a live session, sliding its idle deadline. */
   authenticate(token: string | undefined): boolean {
-    return token ? this.#deps.sessions.touch(token, this.#deps.clock.now()) : false
+    return token ? this.#deps.credentials.touch(token, this.#deps.clock.now()) : false
   }
 
   /** Ends this device's session and leaves every other device alone. */
   signOut(token: string | undefined): void {
     if (!token) return
-    this.#deps.sessions.revoke(token)
+    this.#deps.credentials.revoke(token)
     this.#deps.logger.info('auth.signed_out')
   }
 
@@ -164,7 +154,7 @@ export class Authentication {
     input: Attempt & { readonly currentPassword: string; readonly newPassword: string },
   ): Promise<PasswordChangeOutcome> {
     const attempt = await this.#beginAttempt(input.client, 'auth.password_change_throttled')
-    if ('kind' in attempt) return attempt
+    if (attempt.kind === 'rate-limited') return attempt
 
     try {
       const currentHash = await this.#verifiedPasswordHash(input.currentPassword)
@@ -175,7 +165,7 @@ export class Authentication {
 
       const passwordHash = await this.#deps.hasher.hash(input.newPassword)
       await this.#delaySuccess(attempt)
-      const outcome = this.#deps.user.changePassword(currentHash, passwordHash, this.#deps.clock.now())
+      const outcome = this.#deps.credentials.changePassword(currentHash, passwordHash, this.#deps.clock.now())
 
       if (outcome.kind === 'stale-verifier') {
         attempt.cancel()
@@ -194,20 +184,24 @@ export class Authentication {
 
   async resetPassword(newPassword: string): Promise<number> {
     const passwordHash = await this.#deps.hasher.hash(newPassword)
-    const revoked = this.#deps.user.resetPassword(passwordHash, this.#deps.clock.now())
+    const revoked = this.#deps.credentials.resetPassword(passwordHash, this.#deps.clock.now())
     this.#deps.logger.warn('auth.password_reset', { sessionsRevoked: revoked })
     return revoked
   }
 
   async #verifiedPasswordHash(password: string): Promise<string | undefined> {
-    const record = this.#deps.user.read()
-    if (!record) return undefined
-    return (await this.#deps.hasher.verify(record.passwordHash, password)) ? record.passwordHash : undefined
+    const passwordHash = this.#deps.credentials.passwordHash()
+    if (!passwordHash) return undefined
+    return (await this.#deps.hasher.verify(passwordHash, password)) ? passwordHash : undefined
+  }
+
+  #isClaimed(): boolean {
+    return this.#deps.credentials.passwordHash() !== undefined
   }
 
   async #beginAttempt(client: string, event: string): Promise<AllowedAttempt | Throttled> {
     const verdict = this.#deps.limiter.begin(client)
-    if (verdict.allowed) return verdict
+    if (verdict.kind === 'allowed') return verdict
 
     this.#deps.logger.warn(event, { client, retryAfterSeconds: verdict.retryAfterSeconds })
     await this.#deps.sleep(verdict.delayMs)
@@ -234,13 +228,12 @@ export interface AuthenticationDependencies {
 }
 
 export function createAuthentication(deps: AuthenticationDependencies): Authentication {
-  const sessions = new SessionStore(deps.db)
+  const credentials = new CredentialStore(deps.db)
 
-  sessions.prune(deps.clock.now())
+  credentials.prune(deps.clock.now())
 
   return new Authentication({
-    user: new UserAuthStore(deps.db),
-    sessions,
+    credentials,
     hasher: argon2idHasher(),
     limiter: new LoginRateLimiter(deps.clock),
     sleep: deps.sleep ?? realSleeper,

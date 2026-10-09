@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { useRef } from 'react'
 import { useScreenTitle } from '../arrival.js'
-import type { DigestCalendar, DigestFilter } from '../../shared/api.js'
+import type { DigestCalendar, DigestStart } from '../../shared/api.js'
 import { fetchDigestCalendar } from '../api.js'
 import { Icon } from '../components/icon.js'
 import { shortDay } from '../day-names.js'
@@ -10,9 +10,9 @@ import { AddFeedDialog } from './add-feed-dialog.js'
 import { DigestMonth } from './digest-month.js'
 import { DigestList } from './digest-list.js'
 
-export interface DigestViewProps {
-  readonly filter: DigestFilter
-  onFilter(filter: DigestFilter): void
+interface DigestViewProps {
+  readonly start: DigestStart
+  onStart(start: DigestStart): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
@@ -24,17 +24,17 @@ export interface DigestViewProps {
  * offers only the way to the first; until the calendar answers, the Digest is
  * drawn as begun.
  */
-export function DigestView({ filter, onFilter, onOpenItem, onOpenFeed }: DigestViewProps) {
+export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestViewProps) {
   useScreenTitle('Digest')
-  const [calendar, { retry: retryCalendar }] = useResource(fetchDigestCalendar, [])
+  const [calendar, { retry: retryCalendar }] = useResource('calendar', fetchDigestCalendar)
   const shown = valueInView(calendar)
   const firstRun = shown?.subscriptions === 0
   const stream = useRef<HTMLDivElement>(null)
 
   const readFrom = (from: string | undefined) => {
-    onFilter({ from: from === shown?.today ? undefined : from })
+    onStart({ from: from === shown?.today ? undefined : from })
     // Picked below the fold, the day starts the list back at its top.
-    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo(0, 0)
+    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   return (
@@ -44,7 +44,7 @@ export function DigestView({ filter, onFilter, onOpenItem, onOpenFeed }: DigestV
           Digest
           {shown ? <span className="page-title-companion">{shortDay(shown.today)}</span> : null}
         </h1>
-        {shown && !firstRun ? <DayPicker calendar={shown} from={filter.from} onFrom={readFrom} /> : null}
+        {shown && !firstRun ? <DayPicker calendar={shown} from={start.from} onFrom={readFrom} /> : null}
       </header>
 
       {firstRun ? (
@@ -55,7 +55,7 @@ export function DigestView({ filter, onFilter, onOpenItem, onOpenFeed }: DigestV
       ) : (
         <div className="with-aside">
           <div ref={stream}>
-            {filter.from ? (
+            {start.from ? (
               <div className="newer">
                 <Button className="button" onClick={() => readFrom(undefined)}>
                   Back to today
@@ -63,16 +63,16 @@ export function DigestView({ filter, onFilter, onOpenItem, onOpenFeed }: DigestV
               </div>
             ) : null}
             <DigestList
-              filter={filter}
+              start={start}
               onRetry={retryCalendar}
               empty={
-                filter.from ? 'Nothing on or before this day.' : 'Nothing yet. Items arrive here as your feeds publish.'
+                start.from ? 'Nothing on or before this day.' : 'Nothing yet. Items arrive here as your feeds publish.'
               }
               onOpenItem={onOpenItem}
               onOpenFeed={onOpenFeed}
             />
           </div>
-          {shown ? <DigestMonth calendar={shown} selected={filter.from ?? shown.today} onPick={readFrom} /> : null}
+          {shown ? <DigestMonth calendar={shown} selected={start.from ?? shown.today} onPick={readFrom} /> : null}
         </div>
       )}
     </div>

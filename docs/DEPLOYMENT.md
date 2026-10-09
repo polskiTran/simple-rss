@@ -53,8 +53,8 @@ version, and nothing ever updates it automatically. A published version is
 never overwritten; the release workflow refuses to push a tag that already
 exists.
 
-A release is cut by pushing a Git tag `v<version>` matching `package.json`
-and `src/shared/version.ts`. The workflow
+A release is cut by pushing a Git tag `v<version>` matching the `package.json`
+version, which the server reads at start and reports. The workflow
 ([`.github/workflows/release.yml`](../.github/workflows/release.yml)) runs the
 release smoke test — deploy, claim, persist state, back up, replace the
 container, restore onto a fresh volume — against the exact image it then
@@ -103,9 +103,8 @@ raw copy of the live database file.
 
 ## Railway
 
-The supported shape is in [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md#supported-railway-shape):
-one Hobby-plan service, one replica, sleep disabled, restart policy `Always`,
-and one volume mounted at `/app/data`.
+The supported shape is one Hobby-plan service, one replica, sleep disabled,
+restart policy `Always`, and one volume mounted at `/app/data`.
 
 ### The template
 

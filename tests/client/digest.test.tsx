@@ -3,36 +3,18 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow } from './cadence-window.js'
+import type { Digest } from '../../src/shared/api.js'
+import { digest, digestGroup, digestItem } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
-const item = (feedItemId: number, title: string, displayTime: string, feedId = 1, feedTitle = 'Field Notes') => ({
-  feedItemId,
-  title,
-  feedId,
-  feedTitle,
-  link: `https://journal.example/${feedItemId}`,
-  publishedAt: '2026-08-08T07:15:00.000Z',
-  displayTime,
-  imageUrl: null,
-  summary: null,
-  firstSeenAt: '2026-08-08T09:00:00.000Z',
-  saved: false,
-})
+const item = (feedItemId: number, title: string, displayTime: string, feedId = 1, feedTitle = 'Field Notes') =>
+  digestItem({ feedItemId, title, displayTime, feedId, feedTitle, link: `https://journal.example/${feedItemId}` })
 
-const DIGEST = {
-  today: '2026-08-08',
-  groups: [
-    {
-      date: '2026-08-08',
-      label: 'Today',
-      items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')],
-      returns: [],
-    },
-    { date: '2026-08-07', label: 'Yesterday', items: [item(1, 'Evening notes', '09:31')], returns: [] },
-    { date: '2026-06-03', label: 'Wednesday 3 June', items: [item(4, 'A June letter', '12:00')], returns: [] },
-  ],
-  nextFrom: null,
-}
+const TODAY = digestGroup({ items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')] })
+const YESTERDAY = digestGroup({ date: '2026-08-07', items: [item(1, 'Evening notes', '09:31')] })
+const JUNE = digestGroup({ date: '2026-06-03', items: [item(4, 'A June letter', '12:00')] })
+
+const DIGEST = digest({ groups: [TODAY, YESTERDAY, JUNE] })
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -63,10 +45,9 @@ describe('the chronological Digest', () => {
   })
 
   it('shows more from the day the page names, under the days already shown', async () => {
-    const [today, yesterday, june] = DIGEST.groups
     const api = stubApi()
-      .on('GET /api/digest', { body: { ...DIGEST, groups: [today, yesterday], nextFrom: '2026-06-03' } })
-      .on('GET /api/digest?from=2026-06-03', { body: { ...DIGEST, groups: [june] } })
+      .on('GET /api/digest', { body: digest({ groups: [TODAY, YESTERDAY], nextFrom: '2026-06-03' }) })
+      .on('GET /api/digest?from=2026-06-03', { body: digest({ groups: [JUNE] }) })
     window.history.replaceState(null, '', '/')
     render(<App />)
     const user = userEvent.setup()
@@ -83,17 +64,9 @@ describe('the chronological Digest', () => {
   it('shows a Feed past five items in a day folded to its newest three, unfolds it, and folds it again', async () => {
     const titles = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven']
     stubApi().on('GET /api/digest', {
-      body: {
-        ...DIGEST,
-        groups: [
-          {
-            date: '2026-08-08',
-            label: 'Today',
-            items: titles.map((title, index) => item(20 - index, title, `0${9 - index}:00`)),
-            returns: [],
-          },
-        ],
-      },
+      body: digest({
+        groups: [digestGroup({ items: titles.map((title, index) => item(20 - index, title, `0${9 - index}:00`)) })],
+      }),
     })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -125,17 +98,9 @@ describe('the chronological Digest', () => {
 
   it('shows one Feed of the day alone while its chip is pressed', async () => {
     stubApi().on('GET /api/digest', {
-      body: {
-        ...DIGEST,
-        groups: [
-          {
-            date: '2026-08-08',
-            label: 'Today',
-            items: [item(3, 'First light', '07:15'), item(5, 'A letter', '06:00', 2, 'Letters')],
-            returns: [],
-          },
-        ],
-      },
+      body: digest({
+        groups: [digestGroup({ items: [item(3, 'First light', '07:15'), item(5, 'A letter', '06:00', 2, 'Letters')] })],
+      }),
     })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -155,15 +120,11 @@ describe('the chronological Digest', () => {
   })
 
   it('says when a Feed is back after a quiet spell', async () => {
-    const [today] = DIGEST.groups
     stubApi().on('GET /api/digest', {
-      body: {
-        ...DIGEST,
+      body: digest({
         groups: [
-          {
-            date: '2026-08-08',
-            label: 'Today',
-            items: [item(5, 'A letter', '06:00', 2, 'Letters'), ...(today?.items ?? [])],
+          digestGroup({
+            items: [item(5, 'A letter', '06:00', 2, 'Letters'), ...TODAY.items],
             returns: [
               {
                 feedId: 2,
@@ -171,9 +132,9 @@ describe('the chronological Digest', () => {
                 cadence: Array.from({ length: 30 }, (_, day) => (day === 17 || day === 29 ? 1 : 0)),
               },
             ],
-          },
+          }),
         ],
-      },
+      }),
     })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -258,7 +219,7 @@ describe('the chronological Digest', () => {
   })
 
   it('blames the reader, not the connection, when the answer fails its schema', async () => {
-    stubApi().on('GET /api/digest', { body: { unexpected: true } })
+    stubApi().malformed('GET /api/digest')
     window.history.replaceState(null, '', '/')
     render(<App />)
 
@@ -284,18 +245,10 @@ const CALENDAR = {
   subscriptions: 1,
 }
 
-const dayDigest = (date: string, label: string, titles: readonly string[]) => ({
-  today: '2026-08-08',
-  groups: [
-    {
-      date,
-      label,
-      items: titles.map((title, index) => item(10 + index, title, '09:00')),
-      returns: [],
-    },
-  ],
-  nextFrom: null,
-})
+const dayDigest = (date: string, titles: readonly string[]) =>
+  digest({
+    groups: [digestGroup({ date, items: titles.map((title, index) => item(10 + index, title, '09:00')) })],
+  })
 
 const digestWithCalendar = () =>
   stubApi().on('GET /api/digest', { body: DIGEST }).on('GET /api/digest/days', { body: CALENDAR })
@@ -303,7 +256,7 @@ const digestWithCalendar = () =>
 describe('the Digest from a day', () => {
   it('starts from a day picked on the month, and goes back to today', async () => {
     digestWithCalendar().on('GET /api/digest?from=2026-08-03', {
-      body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']),
+      body: dayDigest('2026-08-03', ['Four letters']),
     })
     window.history.replaceState(null, '', '/digest')
     render(<App />)
@@ -331,7 +284,7 @@ describe('the Digest from a day', () => {
 
   it('starts from a day chosen in the date picker, and from today when today is chosen', async () => {
     digestWithCalendar().on('GET /api/digest?from=2026-08-07', {
-      body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']),
+      body: dayDigest('2026-08-07', ['Evening notes']),
     })
     window.history.replaceState(null, '', '/digest')
     render(<App />)
@@ -348,7 +301,7 @@ describe('the Digest from a day', () => {
   })
 
   it('keeps the list on show while the day it starts from loads', async () => {
-    const picked = Promise.withResolvers<{ body: ReturnType<typeof dayDigest> }>()
+    const picked = Promise.withResolvers<{ body: Digest }>()
     const api = digestWithCalendar().on('GET /api/digest?from=2026-08-03', () => picked.promise)
     window.history.replaceState(null, '', '/digest')
     render(<App />)
@@ -361,7 +314,7 @@ describe('the Digest from a day', () => {
     expect(screen.getByText('First light')).toBeDefined()
     expect(screen.queryByText('Loading the digest')).toBeNull()
 
-    picked.resolve({ body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']) })
+    picked.resolve({ body: dayDigest('2026-08-03', ['Four letters']) })
     expect(await screen.findByText('Four letters')).toBeDefined()
     expect(screen.queryByText('First light')).toBeNull()
   })

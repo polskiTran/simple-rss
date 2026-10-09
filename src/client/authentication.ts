@@ -6,7 +6,7 @@ import { fetchAuthStatus, onSessionEnded } from './api.js'
  * `locked` asks for the password, `unclaimed` for the deployment's setup
  * secret; the server says which — nothing is inferred here.
  */
-export type Access =
+type Access =
   | { readonly kind: 'checking' }
   | { readonly kind: 'unclaimed' }
   | { readonly kind: 'locked' }

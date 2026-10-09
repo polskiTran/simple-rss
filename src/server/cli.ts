@@ -35,10 +35,21 @@ export interface CliContext {
   readonly logger?: Logger
 }
 
+/** A command against the live database, its arguments already validated. */
+type LiveCommand =
+  | { readonly name: 'migrate' }
+  | { readonly name: 'show' }
+  | { readonly name: 'set-timezone'; readonly timezone: string }
+  | { readonly name: 'rebuild-search' }
+  | { readonly name: 'reset-password'; readonly password: string }
+  | { readonly name: 'invalid'; readonly problem: string }
+
 /**
  * Operational commands over the mounted volume — the emergency-recovery shape
- * in `docs/ARCHITECTURE.md`: no HTTP surface, no Session. Returns the exit
- * code so tests can drive it without spawning.
+ * in `docs/ARCHITECTURE.md`: no HTTP surface, no Session. Arguments are
+ * validated before the live database is touched; every command that touches
+ * it then opens it and brings it to the current schema exactly once. Returns
+ * the exit code so tests can drive it without spawning.
  */
 export async function runCli(argv: readonly string[], context: CliContext): Promise<number> {
   const [command, ...rest] = argv
@@ -53,46 +64,92 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
   if (command === 'backup') return backup(rest[0], context)
   if (command === 'restore') return restore(rest[0], context)
 
+  const live = liveCommand(command, rest[0], context.env)
+  if (live.name === 'invalid') {
+    context.out(live.problem)
+    return 1
+  }
+
   const db = openDatabase(context.config.databasePath)
   try {
-    switch (command) {
-      case 'migrate': {
-        const applied = applyMigrations(db, context.clock)
-        context.out(JSON.stringify({ applied, versions: appliedVersions(db) }))
-        return 0
-      }
-      case 'show': {
-        context.out(JSON.stringify(new InstallationSettingsStore(db).read() ?? null))
-        return 0
-      }
-      case 'set-timezone': {
-        const timezone = rest[0]
-        if (!timezone) {
-          context.out('set-timezone needs an IANA timezone, e.g. Europe/Berlin')
-          return 1
-        }
-        applyMigrations(db, context.clock)
-        const store = new InstallationSettingsStore(db)
-        store.setTimezone(timezone, context.clock.now())
-        context.out(JSON.stringify(store.read()))
-        return 0
-      }
-      case 'rebuild-search': {
-        applyMigrations(db, context.clock)
-        const indexedItems = rebuildSearchIndex(db)
-        context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems }))
-        return 0
-      }
-      case 'reset-password': {
-        return await resetPassword(db, rest[0], context)
-      }
-      default: {
-        context.out(`Unknown command: ${command}\n\n${USAGE}`)
-        return 1
-      }
-    }
+    const applied = applyMigrations(db, context.clock)
+    return await runLive(live, db, applied, context)
   } finally {
     db.$client.close()
+  }
+}
+
+function liveCommand(command: string, argument: string | undefined, env: NodeJS.ProcessEnv | undefined): LiveCommand {
+  switch (command) {
+    case 'migrate':
+    case 'show':
+    case 'rebuild-search':
+      return { name: command }
+    case 'set-timezone':
+      return argument
+        ? { name: 'set-timezone', timezone: argument }
+        : { name: 'invalid', problem: 'set-timezone needs an IANA timezone, e.g. Europe/Berlin' }
+    case 'reset-password': {
+      const password = argument ?? env?.[NEW_PASSWORD_VARIABLE]
+      if (!password) {
+        return {
+          name: 'invalid',
+          problem: `reset-password needs a new password, as an argument or in ${NEW_PASSWORD_VARIABLE}`,
+        }
+      }
+      if (!newPasswordSchema.safeParse(password).success) {
+        return {
+          name: 'invalid',
+          problem: `The new password must be at least ${MIN_PASSWORD_LENGTH} characters and at most ${MAX_PASSWORD_BYTES} UTF-8 bytes`,
+        }
+      }
+      return { name: 'reset-password', password }
+    }
+    default:
+      return { name: 'invalid', problem: `Unknown command: ${command}\n\n${USAGE}` }
+  }
+}
+
+async function runLive(
+  command: Exclude<LiveCommand, { name: 'invalid' }>,
+  db: DrizzleDatabase,
+  applied: readonly number[],
+  context: CliContext,
+): Promise<number> {
+  switch (command.name) {
+    case 'migrate':
+      context.out(JSON.stringify({ applied, versions: appliedVersions(db) }))
+      return 0
+    case 'show':
+      context.out(JSON.stringify(new InstallationSettingsStore(db).read() ?? null))
+      return 0
+    case 'set-timezone': {
+      const store = new InstallationSettingsStore(db)
+      if (!store.setTimezone(command.timezone, context.clock.now())) {
+        context.out(
+          `${command.timezone} is not a timezone this platform recognizes; use an IANA name, e.g. Europe/Berlin`,
+        )
+        return 1
+      }
+      context.out(JSON.stringify(store.read()))
+      return 0
+    }
+    case 'rebuild-search':
+      context.out(JSON.stringify({ searchIndexRebuilt: true, indexedItems: rebuildSearchIndex(db) }))
+      return 0
+    case 'reset-password': {
+      const authentication = createAuthentication({
+        db,
+        clock: context.clock,
+        // Audit output goes to stderr: stdout is this command's result channel,
+        // and a log line interleaved with the JSON report would break piping to `jq`.
+        logger: context.logger ?? createLogger({ level: context.config.logLevel, stream: process.stderr }),
+        setupSecret: context.config.setupSecret,
+      })
+      const revoked = await authentication.resetPassword(command.password)
+      context.out(JSON.stringify({ passwordReset: true, sessionsRevoked: revoked }))
+      return 0
+    }
   }
 }
 
@@ -134,35 +191,4 @@ function restore(backupPath: string | undefined, context: CliContext): number {
 
 function reasonOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
-}
-
-async function resetPassword(db: DrizzleDatabase, argument: string | undefined, context: CliContext): Promise<number> {
-  const password = argument ?? context.env?.[NEW_PASSWORD_VARIABLE]
-
-  if (!password) {
-    context.out(`reset-password needs a new password, as an argument or in ${NEW_PASSWORD_VARIABLE}`)
-    return 1
-  }
-
-  if (!newPasswordSchema.safeParse(password).success) {
-    context.out(
-      `The new password must be at least ${MIN_PASSWORD_LENGTH} characters and at most ${MAX_PASSWORD_BYTES} UTF-8 bytes`,
-    )
-    return 1
-  }
-
-  applyMigrations(db, context.clock)
-
-  const authentication = createAuthentication({
-    db,
-    clock: context.clock,
-    // Audit output goes to stderr: stdout is this command's result channel,
-    // and a log line interleaved with the JSON report would break piping to `jq`.
-    logger: context.logger ?? createLogger({ level: context.config.logLevel, stream: process.stderr }),
-    setupSecret: context.config.setupSecret,
-  })
-
-  const revoked = await authentication.resetPassword(password)
-  context.out(JSON.stringify({ passwordReset: true, sessionsRevoked: revoked }))
-  return 0
 }

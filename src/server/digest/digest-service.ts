@@ -1,22 +1,24 @@
-import { and, count, desc, eq, gte, lt, max, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gte, lt, max, or, type SQL } from 'drizzle-orm'
 import {
   CADENCE_STRIP_DAYS,
   QUIET_SPELL_DAYS,
   type Digest,
   type DigestCalendar,
-  type DigestFilter,
+  type DigestStart,
   type DigestGroup,
   type DigestItem,
   type DigestReturn,
-  type FeedItemRow,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { dateKey, dayAfter, dayBefore, dayKeysIn, daysBetween, dayStartUtc, longDate, timeLabel } from './chronology.js'
-import { beyondCursorSql, LIST_PAGE_SIZE } from './list-page.js'
+import { dateKey, dayAfter, dayKeysIn, daysBetween, dayStartUtc, timeLabel } from '../calendar.js'
+
+/** Items a Digest page reaches before completing the day the last one falls on (ADR 0011). */
+const DIGEST_PAGE_SIZE = 50
 
 export class DigestService {
   readonly #db: DrizzleDatabase
@@ -31,19 +33,19 @@ export class DigestService {
 
   /**
    * One page of the Digest `from` a day, or from today: whole days, newest
-   * first, as many as it takes to reach `LIST_PAGE_SIZE` items. A busy day
+   * first, as many as it takes to reach `DIGEST_PAGE_SIZE` items. A busy day
    * comes whole however long it runs, so no Feed's day is split across pages.
    */
-  read({ from }: DigestFilter): Digest {
+  read({ from }: DigestStart): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const dayOf = dayKeysIn(timezone)
     const before = from ? lt(feedItems.chronologyAt, dayStartUtc(dayAfter(from), timezone).toISOString()) : undefined
 
-    const head = this.#newestFirst(before).limit(LIST_PAGE_SIZE).all()
+    const head = this.#newestFirst(before).limit(DIGEST_PAGE_SIZE).all()
     const last = head.at(-1)
     let fetched = head
     let nextFrom: string | null = null
-    if (last && head.length === LIST_PAGE_SIZE) {
+    if (last && head.length === DIGEST_PAGE_SIZE) {
       const opening = dayStartUtc(dayOf(last.chronologyAt), timezone).toISOString()
       fetched = this.#newestFirst(before, gte(feedItems.chronologyAt, opening)).all()
       const older = this.#newestFirst(lt(feedItems.chronologyAt, opening)).limit(1).get()
@@ -51,19 +53,12 @@ export class DigestService {
     }
 
     const today = dateKey(this.#clock.now(), timezone)
-    const yesterday = dayBefore(today)
     const groups = new Map<string, Omit<DigestGroup, 'returns'>>()
     for (const row of fetched) {
       const date = dayOf(row.chronologyAt)
       let group = groups.get(date)
       if (!group) {
-        const label =
-          date === today
-            ? 'Today'
-            : date === yesterday
-              ? 'Yesterday'
-              : longDate(new Date(row.chronologyAt), today, timezone)
-        group = { date, label, items: [] }
+        group = { date, items: [] }
         groups.set(date, group)
       }
       group.items.push(digestItemOf(row, timezone))
@@ -100,8 +95,12 @@ export class DigestService {
       .all()[0]
     if (!current) return undefined
 
+    const { chronologyAt } = current
     const next = this.#newestFirst(
-      beyondCursorSql(feedItems.chronologyAt, { instant: current.chronologyAt, feedItemId }),
+      or(
+        lt(feedItems.chronologyAt, chronologyAt),
+        and(eq(feedItems.chronologyAt, chronologyAt), lt(feedItems.id, feedItemId)),
+      ),
     )
       .limit(1)
       .all()[0]
@@ -147,63 +146,30 @@ export class DigestService {
 }
 
 const DIGEST_ROW_COLUMNS = {
-  feedItemId: feedItems.id,
-  title: feedItems.title,
+  ...LISTED_ITEM_COLUMNS,
   feedId: feeds.id,
   feedTitle: effectiveFeedTitle,
   link: feedItems.link,
-  publishedAt: feedItems.publishedAt,
   imageUrl: feedItems.imageUrl,
   summary: feedItems.summary,
-  firstSeenAt: feedItems.firstSeenAt,
-  chronologyAt: feedItems.chronologyAt,
-  savedAt: libraryItems.savedAt,
 }
 
-interface DigestRow {
-  readonly feedItemId: number
-  readonly title: string | null
+interface DigestRow extends ListedItemRow {
   readonly feedId: number
   readonly feedTitle: string
   readonly link: string | null
-  readonly publishedAt: string | null
   readonly imageUrl: string | null
   readonly summary: string | null
-  readonly firstSeenAt: string
-  readonly chronologyAt: string
-  readonly savedAt: string | null
 }
 
 function digestItemOf(row: DigestRow, timezone: string): DigestItem {
   return {
-    feedItemId: row.feedItemId,
-    title: row.title ?? 'Untitled',
+    ...listedItemOf(row),
     feedId: row.feedId,
     feedTitle: row.feedTitle,
     link: row.link,
-    publishedAt: row.publishedAt,
     displayTime: timeLabel(new Date(row.chronologyAt), timezone),
     imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
     summary: row.summary,
-    firstSeenAt: row.firstSeenAt,
-    saved: row.savedAt !== null,
-  }
-}
-
-/** A Feed Item as its own Feed lists it, on its chronology `date`. */
-export function feedItemRowOf(
-  row: Pick<DigestRow, 'feedItemId' | 'title' | 'link' | 'publishedAt' | 'firstSeenAt' | 'chronologyAt' | 'savedAt'>,
-  date: string,
-  timezone: string,
-): FeedItemRow {
-  return {
-    feedItemId: row.feedItemId,
-    title: row.title ?? 'Untitled',
-    link: row.link,
-    publishedAt: row.publishedAt,
-    firstSeenAt: row.firstSeenAt,
-    date,
-    displayTime: timeLabel(new Date(row.chronologyAt), timezone),
-    saved: row.savedAt !== null,
   }
 }

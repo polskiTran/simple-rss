@@ -1,12 +1,11 @@
-import { useState } from 'react'
-import { fetchInstallationPreferences, updateInstallationTimezone } from '../../api.js'
+import { useState, useTransition } from 'react'
+import { ApiError, fetchInstallationPreferences, updateInstallationTimezone } from '../../api.js'
 import { NativeSelect } from '../../components/native-select.js'
 import { useResource } from '../../use-resource.js'
-import { describeFailure } from '../failure.js'
 
 export function TimezoneChoice() {
-  const [preferences, { set }] = useResource((signal) => fetchInstallationPreferences(signal), [])
-  const [saving, setSaving] = useState(false)
+  const [preferences, { set }] = useResource('preferences', fetchInstallationPreferences)
+  const [saving, startSaving] = useTransition()
   const [notice, setNotice] = useState('')
 
   if (preferences.kind === 'loading') return <span className="note">Loading…</span>
@@ -14,20 +13,20 @@ export function TimezoneChoice() {
 
   const held = preferences.value.timezone
 
-  async function change(chosen: string) {
+  function change(chosen: string) {
     if (saving) return
-    setSaving(true)
+    // Shown at once, outside the transition; a refusal puts the held timezone back.
     setNotice('')
     set((current) => ({ ...current, timezone: chosen }))
-    try {
-      const updated = await updateInstallationTimezone(chosen)
-      set(() => updated)
-    } catch (error) {
-      set((current) => ({ ...current, timezone: held }))
-      setNotice(describeFailure(error, { 400: 'That timezone isn’t recognized.' }))
-    } finally {
-      setSaving(false)
-    }
+    startSaving(async () => {
+      try {
+        const updated = await updateInstallationTimezone(chosen)
+        set(() => updated)
+      } catch (error) {
+        set((current) => ({ ...current, timezone: held }))
+        setNotice(timezoneFailure(error))
+      }
+    })
   }
 
   return (
@@ -37,13 +36,18 @@ export function TimezoneChoice() {
         value={held}
         options={timezoneOptions(held).map((zone) => ({ value: zone, label: zone }))}
         disabled={saving}
-        onChange={(zone) => void change(zone)}
+        onChange={change}
       />
       <p className="note note-error" role="status">
         {notice}
       </p>
     </div>
   )
+}
+
+function timezoneFailure(cause: unknown): string {
+  if (!(cause instanceof ApiError)) return 'The reader is unavailable. Try again in a moment.'
+  return cause.code === 'unknown_timezone' ? 'That timezone isn’t recognized.' : 'The timezone couldn’t be changed.'
 }
 
 function timezoneOptions(current: string): string[] {

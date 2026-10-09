@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { useResource } from '../../src/client/use-resource.js'
 
 function Reading({ load }: { load: (signal: AbortSignal) => Promise<string> }) {
-  const [state] = useResource(load, [])
+  const [state] = useResource('once', load)
   return <p>{state.kind === 'loaded' ? state.value : state.kind}</p>
 }
 

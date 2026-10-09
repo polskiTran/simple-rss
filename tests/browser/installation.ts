@@ -4,14 +4,11 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test as base, type Page } from '@playwright/test'
-import { loadConfig } from '../../src/server/config.js'
 import { createLogger } from '../../src/server/logger.js'
-import { startService, type RunningService } from '../../src/server/server.js'
-import { createRetrieval } from '../../src/server/upstream/retrieval.js'
+import { bootService, type BootedService } from '../support/boot-service.js'
 import { UpstreamFixtures } from '../support/upstream-fixtures.js'
 
-export const SETUP_SECRET = 'a-deployment-setup-secret'
-export const USER_PASSWORD = 'a-calm-reading-password'
+export { SETUP_SECRET, USER_PASSWORD } from '../support/boot-service.js'
 
 export const READER_DEADLINE_BUDGET_MS = 2_000
 const SLOW_RIDGE_DELAY_MS = 2 * READER_DEADLINE_BUDGET_MS
@@ -193,27 +190,14 @@ export const test = base.extend<InstallationOptions & { installation: Installati
         ? { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML, delayMs: SLOW_RIDGE_DELAY_MS }
         : { headers: { 'content-type': 'text/html; charset=utf-8' }, body: ARTICLE_HTML }
     })
-    let service: RunningService | undefined
+    let service: BootedService | undefined
 
     try {
-      const config = loadConfig({
-        DATA_DIR: dataDir,
-        SETUP_SECRET,
-        PUBLIC_ORIGIN: 'https://reader.test',
-        CLIENT_DIR: 'dist/client',
-        LOG_LEVEL: 'warn',
-      })
-      const logger = createLogger({ level: 'warn' })
-      service = await startService({
-        config,
-        port: 0,
-        logger,
-        retrieval: createRetrieval({
-          httpClient: upstream.client,
-          resolve: upstream.resolve,
-          logger,
-          self: new URL(config.publicOrigin),
-        }),
+      service = await bootService({
+        dataDir,
+        env: { CLIENT_DIR: 'dist/client' },
+        upstream,
+        logger: createLogger({ level: 'warn' }),
         ...(readerBudgetMs === undefined ? {} : { readerBudgetMs }),
       })
       await use({ url: service.url, feedUrl, brokenArticleFeedUrl, slowArticleFeedUrl, longFeedUrl, imageOnlyFeedUrl })

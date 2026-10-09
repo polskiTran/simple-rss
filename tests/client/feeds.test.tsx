@@ -1,91 +1,41 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FeedAvailability } from '../../src/shared/api.js'
+import type { FeedAvailability, FeedDetail, SubscriptionList } from '../../src/shared/api.js'
 import { App } from '../../src/client/app.js'
+import { availability, feedDetail, feedItemRow, subscription, UNCHECKED } from './fixtures.js'
 import { stubApi, type Reply } from './stub-api.js'
 
-const AVAILABLE = {
-  state: 'available',
-  lastCheckedAt: '2026-08-08T09:00:00.000Z',
-  lastSuccessAt: '2026-08-08T09:00:00.000Z',
-  consecutiveFailures: 0,
-  category: null,
-} satisfies FeedAvailability
+const FEED = subscription()
 
-const UNCHECKED = {
-  state: 'unchecked',
-  lastCheckedAt: null,
-  lastSuccessAt: null,
-  consecutiveFailures: 0,
-  category: null,
-} satisfies FeedAvailability
-
-const FEED = {
-  feedId: 1,
-  title: 'Field Notes',
-  description: null,
-  domain: 'journal.example',
-  homePageUrl: 'https://journal.example/',
-  enteredUrl: 'https://journal.example/feed',
-  resolvedUrl: 'https://feeds.example/journal.xml',
-  readingSource: 'original-webpage',
-  subscribedAt: '2026-08-01T09:00:00.000Z',
-  cadence: Array.from({ length: 30 }, () => 0),
-  availability: AVAILABLE,
-}
-
-const UNCHECKED_FEED = {
-  ...FEED,
+const UNCHECKED_FEED = subscription({
   title: 'journal.example',
   homePageUrl: null,
   resolvedUrl: FEED.enteredUrl,
   availability: UNCHECKED,
-}
+})
 
-const UNAVAILABLE_FEED = {
-  ...FEED,
-  availability: {
+const UNAVAILABLE_FEED = subscription({
+  availability: availability({
     state: 'unavailable',
-    lastCheckedAt: '2026-08-08T09:00:00.000Z',
-    lastSuccessAt: '2026-08-05T09:00:00.000Z',
+    lastSuccessDate: '2026-08-05',
     consecutiveFailures: 3,
     category: 'http_error',
-  } satisfies FeedAvailability,
-}
+  }),
+})
 
-function feedDetail(availability: FeedAvailability, itemCount: number) {
-  return {
-    feedId: FEED.feedId,
-    title: FEED.title,
-    description: null,
-    reportedTitle: FEED.title,
-    customTitle: null,
-    reportedDescription: null,
-    customDescription: null,
-    domain: FEED.domain,
-    homePageUrl: FEED.homePageUrl,
-    enteredUrl: FEED.enteredUrl,
-    resolvedUrl: FEED.resolvedUrl,
+/** The opened Feed a first check answers with: its Availability, and `itemCount` items. */
+function checked(availability: FeedAvailability, itemCount: number): FeedDetail {
+  return feedDetail({
     availability,
-    schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
-    readingSource: 'original-webpage',
-    subscribedDate: '2026-08-01',
-    cadence: [],
-    items: Array.from({ length: itemCount }, (_, index) => ({
-      feedItemId: index + 1,
-      title: `Item ${index + 1}`,
-      link: null,
-      publishedAt: null,
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      date: '2026-08-08',
-      displayTime: '09:00',
-      saved: false,
-    })),
-  }
+    items: Array.from({ length: itemCount }, (_, index) =>
+      feedItemRow({ feedItemId: index + 1, title: `Item ${index + 1}` }),
+    ),
+  })
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -111,8 +61,8 @@ function activeOn(active: number): number[] {
 
 describe('Feeds', () => {
   it('shows the recorded Subscription immediately and the first check outcome as it lands', async () => {
-    let releaseDetail: ((reply: Reply) => void) | undefined
-    const firstCheck = new Promise<Reply>((resolve) => {
+    let releaseDetail: ((reply: Reply<FeedDetail>) => void) | undefined
+    const firstCheck = new Promise<Reply<FeedDetail>>((resolve) => {
       releaseDetail = resolve
     })
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
@@ -132,11 +82,35 @@ describe('Feeds', () => {
     expect(screen.getByText('Waiting for first check')).toBeDefined()
 
     api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
-    releaseDetail?.({ body: feedDetail(AVAILABLE, 1) })
+    releaseDetail?.({ body: checked(availability(), 1) })
     expect(await screen.findByText('Subscribed. 1 item in the digest.')).toBeDefined()
     expect(await screen.findByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+  })
+
+  it('stops watching for the first check once the Feeds screen is left', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const api = stubApi().on('GET /api/feeds/1', { body: checked(UNCHECKED, 0) })
+    api.on('POST /api/subscriptions', () => {
+      api.on('GET /api/feeds', { body: { subscriptions: [UNCHECKED_FEED] } })
+      return { status: 201, body: { subscription: UNCHECKED_FEED } }
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    await addByAddress(user, FEED.enteredUrl)
+    await screen.findByText('Subscribed. Checking the feed…')
+    await user.click(screen.getByRole('link', { name: 'Digest' }))
+    await screen.findByRole('heading', { level: 1, name: /^Digest/ })
+    const watched = api.requestsTo('GET /api/feeds/1').length
+    const listed = api.requestsTo('GET /api/feeds').length
+
+    await act(() => vi.advanceTimersByTimeAsync(60_000))
+
+    expect(api.requestsTo('GET /api/feeds/1')).toHaveLength(watched)
+    expect(api.requestsTo('GET /api/feeds')).toHaveLength(listed)
   })
 
   it('links the domain to the Feed’s home page in a new tab, and leaves it plain text without one', async () => {
@@ -159,7 +133,7 @@ describe('Feeds', () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [] } })
     api.on('POST /api/subscriptions', () => {
       api.on('GET /api/feeds/1', {
-        body: feedDetail({ ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' }, 0),
+        body: checked({ ...UNCHECKED, consecutiveFailures: 1, category: 'unreachable' }, 0),
       })
       api.on('GET /api/feeds', {
         body: {
@@ -215,7 +189,7 @@ describe('Feeds', () => {
     const api = stubApi()
       .on('GET /api/feeds', { body: { subscriptions: [] } })
       .on('POST /api/subscriptions', { status: 201, body: { subscription: FEED } })
-      .on('GET /api/feeds/1', { body: feedDetail(AVAILABLE, 0) })
+      .on('GET /api/feeds/1', { body: checked(availability(), 0) })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
     const user = userEvent.setup()
@@ -228,8 +202,8 @@ describe('Feeds', () => {
   })
 
   it('does not let a stale initial list replace a Subscription that just completed', async () => {
-    let release: ((reply: Reply) => void) | undefined
-    const staleList = new Promise<Reply>((resolve) => {
+    let release: ((reply: Reply<SubscriptionList>) => void) | undefined
+    const staleList = new Promise<Reply<SubscriptionList>>((resolve) => {
       release = resolve
     })
     const api = stubApi()
@@ -237,7 +211,7 @@ describe('Feeds', () => {
         api.on('GET /api/feeds', { body: { subscriptions: [FEED] } })
         return staleList
       })
-      .on('GET /api/feeds/1', { body: feedDetail(AVAILABLE, 1) })
+      .on('GET /api/feeds/1', { body: checked(availability(), 1) })
       .on('POST /api/subscriptions', {
         status: 201,
         body: { subscription: FEED },

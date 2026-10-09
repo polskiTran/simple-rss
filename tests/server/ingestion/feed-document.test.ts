@@ -93,6 +93,36 @@ describe('parseFeedDocument', () => {
     ])
   })
 
+  it('normalizes an RDF-shaped RSS 1.0 document to the same shape', () => {
+    const xml = `<?xml version="1.0"?>
+      <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+               xmlns="http://purl.org/rss/1.0/"
+               xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <channel rdf:about="${RESOLVED_URL}">
+          <title>RDF Notes</title>
+          <link>https://rdf.example/journal</link>
+        </channel>
+        <item rdf:about="https://rdf.example/one">
+          <title>RDF item</title>
+          <link>https://rdf.example/one</link>
+          <dc:date>2026-08-08T06:00:00Z</dc:date>
+        </item>
+      </rdf:RDF>`
+    const parsed = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL)
+
+    expect(parsed.title).toBe('RDF Notes')
+    expect(parsed.homePageUrl).toBe('https://rdf.example/journal')
+    expect(parsed.items).toMatchObject([
+      {
+        dedupeKey: 'link:https://rdf.example/one',
+        identityKind: 'link',
+        title: 'RDF item',
+        link: 'https://rdf.example/one',
+        publishedAt: '2026-08-08T06:00:00.000Z',
+      },
+    ])
+  })
+
   it.each(['rss-missing-optional.xml', 'atom-missing-optional.xml'])(
     'keeps %s usable when every optional field is missing',
     (name) => {

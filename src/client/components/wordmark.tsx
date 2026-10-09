@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
-import { routedClick } from '../routed-link.js'
-import { pathOf } from '../routing.js'
+import { sectionPath } from '../routing.js'
+import { RoutedLink } from './routed-link.js'
 
 const TILE = [
   [4, 1, 3, 0],
@@ -35,7 +35,7 @@ export function MarkTile() {
   )
 }
 
-export interface WordmarkProps {
+interface WordmarkProps {
   readonly onNavigate?: (() => void) | undefined
 }
 
@@ -50,8 +50,8 @@ export function Wordmark({ onNavigate }: WordmarkProps) {
   if (onNavigate === undefined) return <span className="wordmark">{mark}</span>
 
   return (
-    <a className="wordmark" href={pathOf('digest')} onClick={routedClick(onNavigate)}>
+    <RoutedLink className="wordmark" href={sectionPath('digest')} onNavigate={onNavigate}>
       {mark}
-    </a>
+    </RoutedLink>
   )
 }

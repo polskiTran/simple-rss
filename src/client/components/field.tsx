@@ -2,7 +2,7 @@ import { Field as BaseField } from '@base-ui/react/field'
 import { useState } from 'react'
 import { Icon } from './icon.js'
 
-export interface FieldProps {
+interface FieldProps {
   readonly label: string
   readonly value: string
   /** `url` keeps a text input — a bare host is a fine answer — with the URL keyboard. */

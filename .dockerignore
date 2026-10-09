@@ -1,12 +1,11 @@
-node_modules
-dist
-.data
-.git
-.github
-.playwright-mcp
-agent-traces
-coverage
-docs
-tests
-*.md
+# An allowlist: the build context is exactly what the Dockerfile COPYs.
+# A new COPY needs its path added here.
+*
 !package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!patches
+!tsconfig.json
+!tsconfig.server.json
+!vite.config.ts
+!src

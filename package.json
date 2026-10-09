@@ -23,7 +23,7 @@
     "lint": "biome check --error-on-warnings . && pnpm lint:anti-slop",
     "lint:anti-slop": "node --import=tsx node_modules/oxlint/bin/oxlint --config oxlint.config.mjs .",
     "format": "biome format --write .",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tools/oxlint/anti-slop",
     "cli": "tsx src/server/cli-main.ts"
   },
   "dependencies": {
@@ -32,7 +32,7 @@
     "@node-rs/argon2": "^2.0.2",
     "@streamdown/math": "^1.0.2",
     "better-sqlite3": "^11.8.1",
-    "defuddle": "^0.19.3",
+    "defuddle": "0.19.3",
     "drizzle-orm": "^0.39.3",
     "fast-xml-parser": "^5.10.1",
     "hono": "^4.7.2",

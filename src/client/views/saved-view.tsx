@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { LibraryItem, LibraryOrder } from '../../shared/api.js'
 import { fetchLibrary, saveToLibrary } from '../api.js'
@@ -8,11 +8,11 @@ import { Group } from '../components/group.js'
 import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { OlderItems, type OlderState } from '../components/older-items.js'
-import { dayBefore, dayOfYear, monthName } from '../day-names.js'
-import { useResource, valueInView } from '../use-resource.js'
+import { OlderItems } from '../components/older-items.js'
+import { dayOfYear, monthName, relativeDay } from '../day-names.js'
+import { usePagedResource, valueInView } from '../use-resource.js'
 
-export interface SavedViewProps {
+interface SavedViewProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
@@ -30,20 +30,13 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   const [order, setOrder] = useState<Order>('newest')
   // By feed groups the newest-first pages; only the two save orders ask anew.
   const fetchOrder = order === 'feed' ? 'newest' : order
-  const [state, { retry, set }] = useResource((signal) => fetchLibrary(fetchOrder, undefined, signal), [fetchOrder])
-  const [older, setOlder] = useState<OlderState>('idle')
+  const [state, { retry, loadMore, older }] = usePagedResource(
+    fetchOrder,
+    (cursor, signal) => fetchLibrary(fetchOrder, cursor, signal),
+    (shown, page) => ({ ...page, items: [...shown.items, ...page.items] }),
+  )
   // Unsaved here but kept in place as an undo line until the Library is read again.
   const [unsaved, setUnsaved] = useState<ReadonlySet<number>>(new Set())
-
-  const loadOlder = (cursor: string) => {
-    setOlder('loading')
-    void fetchLibrary(fetchOrder, cursor)
-      .then((page) => {
-        setOlder('idle')
-        set((library) => ({ ...page, items: [...library.items, ...page.items] }))
-      })
-      .catch(() => setOlder('failed'))
-  }
 
   const mark = (feedItemId: number, saved: boolean) =>
     setUnsaved((current) => {
@@ -68,7 +61,6 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
             value={order}
             onChange={(next) => {
               setOrder(next)
-              setOlder('idle')
               if ((next === 'feed' ? 'newest' : next) !== fetchOrder) setUnsaved(new Set())
             }}
           />
@@ -81,14 +73,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
     return (
       <div className="view">
         {head}
-        <LoadFailure
-          subject="Your saves"
-          kind={state.kind}
-          onRetry={() => {
-            setOlder('idle')
-            retry()
-          }}
-        />
+        <LoadFailure subject="Your saves" kind={state.kind} onRetry={retry} />
       </div>
     )
   }
@@ -162,34 +147,31 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
           </Group>
         ))
       )}
-      <OlderItems nextCursor={library.nextCursor} older={older} noun="saves" onLoadOlder={loadOlder} />
+      <OlderItems nextCursor={library.nextCursor} older={older} noun="saves" onLoadOlder={loadMore} />
     </div>
   )
 }
 
 /** `Saved today`, `Saved yesterday`, then `Saved 27 August`. */
 function savedLabel(savedDate: string, today: string): string {
-  if (savedDate === today) return 'Saved today'
-  if (savedDate === dayBefore(today)) return 'Saved yesterday'
-  return `Saved ${dayOfYear(savedDate, today)}`
+  return `Saved ${relativeDay(savedDate, today)?.toLowerCase() ?? dayOfYear(savedDate, today)}`
 }
 
 /** What an unsave leaves in the list: what happened, and the way back. */
 function UndoLine({ item, onResaved }: { item: LibraryItem; onResaved: () => void }) {
-  const [pending, setPending] = useState(false)
+  const [pending, startUndo] = useTransition()
   const [failed, setFailed] = useState(false)
 
-  async function undo() {
+  function undo() {
     if (pending) return
-    setPending(true)
     setFailed(false)
-    try {
-      if ((await saveToLibrary(item.feedItemId)).saved) onResaved()
-    } catch {
-      setFailed(true)
-    } finally {
-      setPending(false)
-    }
+    startUndo(async () => {
+      try {
+        if ((await saveToLibrary(item.feedItemId)).saved) onResaved()
+      } catch {
+        setFailed(true)
+      }
+    })
   }
 
   return (

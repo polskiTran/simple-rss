@@ -1,6 +1,5 @@
 import { MAX_FEED_SIZE_MIB } from '../../shared/api.js'
-import { VERSION } from '../../shared/version.js'
-import { hasOwn } from '../../shared/record.js'
+import { VERSION } from '../version.js'
 import type { LogFields, Logger } from '../logger.js'
 import {
   ResolutionCapacityError,
@@ -13,7 +12,8 @@ import { elapsedMs } from '../monotonic.js'
 import { HttpClientError, type HttpClient, type HttpTimings } from './http-client.js'
 import { createNetworkHttpClient } from './network-client.js'
 
-export const MAX_REDIRECTS = 5
+/** Every operation follows at most this many redirects. */
+const MAX_REDIRECTS = 5
 
 const DEFAULT_CAPACITY: RetrievalCapacity = { maxConcurrent: 6, maxQueued: 32 }
 
@@ -31,7 +31,6 @@ export interface RetrievalProfile {
   readonly timeoutMs: number
   /** Separate from timeoutMs: a slow large body is not an unreachable host. */
   readonly bodyTimeoutMs: number
-  readonly maxRedirects: number
   readonly capacity: RetrievalCapacity
 }
 
@@ -41,7 +40,6 @@ export const RETRIEVAL_PROFILES = {
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
     timeoutMs: 10_000,
     bodyTimeoutMs: 60_000,
-    maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 24 },
   },
   reader: {
@@ -49,7 +47,6 @@ export const RETRIEVAL_PROFILES = {
     maxBytes: 5 * 1024 * 1024,
     timeoutMs: 10_000,
     bodyTimeoutMs: 30_000,
-    maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
   image: {
@@ -57,31 +54,15 @@ export const RETRIEVAL_PROFILES = {
     maxBytes: 5 * 1024 * 1024,
     timeoutMs: 10_000,
     bodyTimeoutMs: 30_000,
-    maxRedirects: MAX_REDIRECTS,
     capacity: { maxConcurrent: 4, maxQueued: 16 },
   },
 } satisfies Readonly<Record<RetrievalOperation, RetrievalProfile>>
-
-/** Can only tighten the operation profile; non-finite values are rejected. */
-export interface RetrievalLimits {
-  readonly maxBytes?: number
-  readonly timeoutMs?: number
-  readonly bodyTimeoutMs?: number
-  readonly maxRedirects?: number
-}
-
-const FORWARDABLE_HEADERS = {
-  'accept-language': true,
-  'if-modified-since': true,
-  'if-none-match': true,
-} as const satisfies Readonly<Record<string, true>>
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 const USER_AGENT = `simple-rss/${VERSION}`
 
 export type RetrievalFailureCode =
-  | 'invalid_request'
   | 'invalid_url'
   | 'blocked_destination'
   | 'unresolvable_host'
@@ -103,26 +84,11 @@ export type RetrievalFailureCode =
 export interface RetrievalRequest {
   readonly url: string | URL
   readonly operation: RetrievalOperation
-  /** Filtered to `FORWARDABLE_HEADERS`; anything else is dropped. */
-  readonly headers?: Readonly<Record<string, string>>
+  /** Validators kept from an earlier answer, null when it sent none; a match is answered `notModified`. */
+  readonly conditional?: { readonly etag: string | null; readonly lastModified: string | null }
   readonly signal?: AbortSignal
-  /** Optional stricter limits; values above the profile are clamped. */
-  readonly limits?: RetrievalLimits
+  /** Joins this retrieval's `upstream.retrieval_*` log to the caller's own. */
   readonly trace?: string
-}
-
-export interface RetrievalTimings {
-  readonly queueMs?: number
-  readonly dnsMs?: number
-  readonly connectionReused?: boolean
-  readonly socketDnsMs?: number
-  readonly connectMs?: number
-  readonly tlsMs?: number
-  readonly ttfbMs?: number
-  readonly bodyMs?: number
-  readonly bytes?: number
-  readonly redirects: number
-  readonly totalMs?: number
 }
 
 export interface RetrievalSuccess {
@@ -132,11 +98,11 @@ export interface RetrievalSuccess {
   readonly url: string
   readonly contentType: string
   readonly charset: string | undefined
-  readonly etag: string | undefined
-  readonly lastModified: string | undefined
+  /** Validators as the response sent them, in the shape `conditional` takes back. */
+  readonly etag: string | null
+  readonly lastModified: string | null
   /** True when a conditional request was answered `304` and there is no body. */
   readonly notModified: boolean
-  readonly timings: RetrievalTimings
   /** Reading past the profile's byte ceiling errors the stream with a `RetrievalError`. */
   readonly body: ReadableStream<Uint8Array>
 }
@@ -148,13 +114,13 @@ export interface RetrievalFailure {
   readonly reason: string
   /** Present for `http_error`, so a caller can tell 404 from 503. */
   readonly status?: number
-  readonly timings?: RetrievalTimings
 }
 
 export type RetrievalResult = RetrievalSuccess | RetrievalFailure
 
 export interface RetrievalBytes extends Omit<RetrievalSuccess, 'body'> {
-  readonly bytes: Uint8Array
+  /** The bytes own their buffer: freshly allocated, offset 0, nothing else on it, so a caller may transfer `bytes.buffer`. */
+  readonly bytes: Uint8Array<ArrayBuffer>
 }
 
 export type RetrievalBytesResult = RetrievalBytes | RetrievalFailure
@@ -192,14 +158,14 @@ export class RetrievalError extends Error {
  */
 export function createRetrieval(options: RetrievalOptions): Retrieval {
   const logger = options.logger.child({ component: 'upstream' })
-  const sharedCapacity = validCapacity(options.capacity ?? DEFAULT_CAPACITY)
+  const sharedCapacity = options.capacity ?? DEFAULT_CAPACITY
   const resolver = new BoundedResolver(options.resolve ?? systemResolver, sharedCapacity)
   const policy: DestinationPolicy = { resolve: resolver.resolve, self: options.self }
-  const shared = new ConcurrencyGate(sharedCapacity.maxConcurrent, sharedCapacity.maxQueued)
+  const shared = new ConcurrencyGate(sharedCapacity)
   const operationGates = {
-    feed: gateFor(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
-    reader: gateFor(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
-    image: gateFor(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
+    feed: new ConcurrencyGate(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
+    reader: new ConcurrencyGate(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
+    image: new ConcurrencyGate(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
   } satisfies Record<RetrievalOperation, ConcurrencyGate>
 
   const retrieve = (request: RetrievalRequest): Promise<RetrievalResult> =>
@@ -239,18 +205,24 @@ interface RunContext {
   readonly gates: readonly ConcurrencyGate[]
 }
 
-type MutableTimings = { -readonly [Phase in keyof RetrievalTimings]: RetrievalTimings[Phase] }
+/** Where the time went, for the `upstream.retrieval_*` log only. */
+interface Phases {
+  queueMs?: number
+  dnsMs?: number
+  connectionReused?: boolean
+  connectMs?: number
+  tlsMs?: number
+  ttfbMs?: number
+  bodyMs?: number
+  bytes?: number
+}
 
 async function run(request: RetrievalRequest, context: RunContext): Promise<RetrievalResult> {
   const startedAt = performance.now()
-  const timings: MutableTimings = { redirects: 0 }
-  const profile = RETRIEVAL_PROFILES[request.operation]
-  const limits = stricterLimits(profile, request.limits)
-  const maxRedirects = limits?.maxRedirects ?? profile.maxRedirects
-  const maxBytes = limits?.maxBytes ?? profile.maxBytes
-  const timeoutMs = limits?.timeoutMs ?? profile.timeoutMs
-  const bodyTimeoutMs = limits?.bodyTimeoutMs ?? profile.bodyTimeoutMs
-  const headers = forwardableHeaders(request.headers, profile.accept)
+  const phases: Phases = {}
+  let redirects = 0
+  const { maxBytes, timeoutMs, bodyTimeoutMs, accept } = RETRIEVAL_PROFILES[request.operation]
+  const headers = requestHeaders(accept, request.conditional)
 
   const controller = new AbortController()
   let abandoned: Abandonment | undefined
@@ -275,7 +247,6 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const settle = (): void => {
     if (settled) return
     settled = true
-    timings.totalMs = elapsedMs(startedAt)
     clearTimeout(timer)
     request.signal?.removeEventListener('abort', onCancel)
     for (let index = entered - 1; index >= 0; index -= 1) context.gates[index]?.leave()
@@ -283,11 +254,11 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
   const log = (event: string, fields: LogFields): void => {
     const level = event === 'upstream.retrieval_completed' ? 'debug' : 'warn'
-    const { totalMs: _totalMs, ...phases } = timings
     context.logger[level](event, {
       operation: request.operation,
       ...(request.trace === undefined ? {} : { trace: request.trace }),
       ...phases,
+      redirects,
       ...fields,
       durationMs: elapsedMs(startedAt),
     })
@@ -301,53 +272,46 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   ): RetrievalFailure => {
     settle()
     log('upstream.retrieval_failed', { code, reason, ...fields })
-    return { ok: false, code, reason, timings, ...(status === undefined ? {} : { status }) }
+    return { ok: false, code, reason, ...(status === undefined ? {} : { status }) }
   }
-
-  if (!limits) return fail('invalid_request', 'retrieval limits must be finite numbers')
 
   if (request.signal?.aborted) return fail('cancelled', 'caller abandoned the retrieval')
 
   const queueStartedAt = performance.now()
   for (const gate of context.gates) {
     if (!(await gate.enter(controller.signal))) {
-      timings.queueMs = elapsedMs(queueStartedAt)
+      phases.queueMs = elapsedMs(queueStartedAt)
       return abandoned
         ? fail(abandoned, `gave up waiting for a retrieval slot`)
         : fail('busy', 'no retrieval slot available')
     }
     entered += 1
   }
-  timings.queueMs = elapsedMs(queueStartedAt)
+  phases.queueMs = elapsedMs(queueStartedAt)
 
   let target: string | URL = request.url
   const visited = new Set<string>()
 
   const recordConnection = (connection: HttpTimings): void => {
-    delete timings.socketDnsMs
-    delete timings.connectMs
-    delete timings.tlsMs
-    delete timings.ttfbMs
-    timings.connectionReused = connection.connectionReused
-    if (connection.socketDnsMs !== undefined) timings.socketDnsMs = connection.socketDnsMs
-    if (connection.connectMs !== undefined) timings.connectMs = connection.connectMs
-    if (connection.tlsMs !== undefined) timings.tlsMs = connection.tlsMs
-    if (connection.ttfbMs !== undefined) timings.ttfbMs = connection.ttfbMs
+    delete phases.connectMs
+    delete phases.tlsMs
+    delete phases.ttfbMs
+    phases.connectionReused = connection.connectionReused
+    if (connection.connectMs !== undefined) phases.connectMs = connection.connectMs
+    if (connection.tlsMs !== undefined) phases.tlsMs = connection.tlsMs
+    if (connection.ttfbMs !== undefined) phases.ttfbMs = connection.ttfbMs
   }
 
-  for (let redirects = 0; ; redirects += 1) {
-    timings.redirects = redirects
+  for (; ; redirects += 1) {
     const dnsStartedAt = performance.now()
     const destination = await validateDestination(target, context.policy, controller.signal)
-    timings.dnsMs = (timings.dnsMs ?? 0) + elapsedMs(dnsStartedAt)
+    phases.dnsMs = (phases.dnsMs ?? 0) + elapsedMs(dnsStartedAt)
     if (abandoned) return fail(abandoned, abandonmentReason(abandoned))
-    if (!destination.ok) {
-      return fail(destination.code, destination.reason, { redirects })
-    }
+    if (!destination.ok) return fail(destination.code, destination.reason)
 
-    const { url } = destination
+    const { url, addresses } = destination
     if (visited.has(url.href)) {
-      return fail('redirect_loop', 'redirect returned to a URL already visited', { host: url.host, redirects })
+      return fail('redirect_loop', 'redirect returned to a URL already visited', { host: url.host })
     }
     visited.add(url.href)
 
@@ -355,7 +319,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     try {
       response = await context.httpClient(
         new Request(url, { method: 'GET', headers, redirect: 'manual', signal: controller.signal }),
-        recordConnection,
+        { addresses, onTimings: recordConnection },
       )
     } catch (error) {
       if (abandoned) return fail(abandoned, abandonmentReason(abandoned), { host: url.host })
@@ -367,22 +331,22 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       await discard(response)
       const location = response.headers.get('location')
       if (!location) {
-        return fail('invalid_redirect', `${response.status} without a location`, { host: url.host, redirects })
+        return fail('invalid_redirect', `${response.status} without a location`, { host: url.host })
       }
-      if (redirects >= maxRedirects) {
+      if (redirects >= MAX_REDIRECTS) {
         controller.abort(new RetrievalError('too_many_redirects', 'redirect limit reached'))
-        return fail('too_many_redirects', `more than ${maxRedirects} redirects`, { host: url.host, redirects })
+        return fail('too_many_redirects', `more than ${MAX_REDIRECTS} redirects`, { host: url.host })
       }
 
       try {
         target = new URL(location, url)
       } catch {
-        return fail('invalid_redirect', 'unparseable redirect location', { host: url.host, redirects })
+        return fail('invalid_redirect', 'unparseable redirect location', { host: url.host })
       }
       continue
     }
 
-    const answered = { host: url.host, path: url.pathname, status: response.status, redirects }
+    const answered = { host: url.host, path: url.pathname, status: response.status }
 
     if (response.status === 304) {
       await discard(response)
@@ -394,10 +358,9 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
         url: url.href,
         contentType: '',
         charset: undefined,
-        etag: response.headers.get('etag') ?? undefined,
-        lastModified: response.headers.get('last-modified') ?? undefined,
+        etag: response.headers.get('etag'),
+        lastModified: response.headers.get('last-modified'),
         notModified: true,
-        timings,
         body: emptyStream(),
       }
     }
@@ -409,7 +372,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     }
 
     const contentType = mediaType(response.headers.get('content-type'))
-    if (!accepted(contentType, profile.accept)) {
+    if (!accepted(contentType, accept)) {
       await discard(response)
       controller.abort(new RetrievalError('unsupported_content_type', 'unusable content type'))
       return fail('unsupported_content_type', contentType ? `content type ${contentType}` : 'no content type', answered)
@@ -430,18 +393,17 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       url: url.href,
       contentType,
       charset: charsetOf(response.headers.get('content-type')),
-      etag: response.headers.get('etag') ?? undefined,
-      lastModified: response.headers.get('last-modified') ?? undefined,
+      etag: response.headers.get('etag'),
+      lastModified: response.headers.get('last-modified'),
       notModified: false,
-      timings,
       body: boundedBody(response, {
         maxBytes,
         signal: controller.signal,
         abandonedKind: () => abandoned,
         abort: (error) => controller.abort(error),
         finish: (bytes, error) => {
-          timings.bodyMs = elapsedMs(bodyStartedAt)
-          timings.bytes = bytes
+          phases.bodyMs = elapsedMs(bodyStartedAt)
+          phases.bytes = bytes
           settle()
           if (error) log('upstream.retrieval_failed', { ...answered, code: error.code, reason: error.message, bytes })
           else log('upstream.retrieval_completed', { ...answered, bytes, notModified: false })
@@ -549,7 +511,7 @@ async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
     }
   } catch (error) {
     const code = error instanceof RetrievalError ? error.code : 'unavailable'
-    return { ok: false, code, reason: describe(error), timings: result.timings }
+    return { ok: false, code, reason: describe(error) }
   }
 
   const bytes = new Uint8Array(total)
@@ -563,19 +525,10 @@ async function collect(result: RetrievalResult): Promise<RetrievalBytesResult> {
   return { ...rest, bytes }
 }
 
-function forwardableHeaders(
-  supplied: Readonly<Record<string, string>> | undefined,
-  acceptedTypes: readonly string[],
-): Headers {
-  const headers = new Headers()
-
-  for (const [name, value] of Object.entries(supplied ?? {})) {
-    const normalizedName = name.toLowerCase()
-    if (hasOwn(FORWARDABLE_HEADERS, normalizedName)) headers.set(name, value)
-  }
-  headers.set('accept', acceptedTypes.join(', '))
-  headers.set('user-agent', USER_AGENT)
-
+function requestHeaders(accept: readonly string[], conditional: RetrievalRequest['conditional']): Headers {
+  const headers = new Headers({ accept: accept.join(', '), 'user-agent': USER_AGENT })
+  if (conditional?.etag) headers.set('if-none-match', conditional.etag)
+  if (conditional?.lastModified) headers.set('if-modified-since', conditional.lastModified)
   return headers
 }
 
@@ -618,12 +571,17 @@ class ConcurrencyGate {
   readonly #waiting: Array<(granted: boolean) => void> = []
   #active = 0
 
-  constructor(limit: number, queueLimit: number) {
-    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(queueLimit) || queueLimit < 0) {
+  constructor({ maxConcurrent, maxQueued }: RetrievalCapacity) {
+    if (
+      !Number.isSafeInteger(maxConcurrent) ||
+      maxConcurrent < 1 ||
+      !Number.isSafeInteger(maxQueued) ||
+      maxQueued < 0
+    ) {
       throw new Error('retrieval capacity must use finite non-negative integers')
     }
-    this.#limit = limit
-    this.#queueLimit = queueLimit
+    this.#limit = maxConcurrent
+    this.#queueLimit = maxQueued
   }
 
   /** Resolves true holding a slot; false when full or the caller aborted. */
@@ -655,48 +613,6 @@ class ConcurrencyGate {
   }
 }
 
-interface ResolvedLimits {
-  readonly maxBytes: number
-  readonly timeoutMs: number
-  readonly bodyTimeoutMs: number
-  readonly maxRedirects: number
-}
-
-function stricterLimits(profile: RetrievalProfile, requested: RetrievalLimits | undefined): ResolvedLimits | undefined {
-  const values = [requested?.maxBytes, requested?.timeoutMs, requested?.bodyTimeoutMs, requested?.maxRedirects]
-  if (values.some((value) => value !== undefined && !Number.isFinite(value))) return undefined
-
-  return {
-    maxBytes: Math.max(1, Math.min(Math.floor(requested?.maxBytes ?? profile.maxBytes), profile.maxBytes)),
-    timeoutMs: Math.max(1, Math.min(Math.floor(requested?.timeoutMs ?? profile.timeoutMs), profile.timeoutMs)),
-    bodyTimeoutMs: Math.max(
-      1,
-      Math.min(Math.floor(requested?.bodyTimeoutMs ?? profile.bodyTimeoutMs), profile.bodyTimeoutMs),
-    ),
-    maxRedirects: Math.max(
-      0,
-      Math.min(Math.floor(requested?.maxRedirects ?? profile.maxRedirects), profile.maxRedirects),
-    ),
-  }
-}
-
-function validCapacity(capacity: RetrievalCapacity): RetrievalCapacity {
-  if (
-    !Number.isSafeInteger(capacity.maxConcurrent) ||
-    capacity.maxConcurrent < 1 ||
-    !Number.isSafeInteger(capacity.maxQueued) ||
-    capacity.maxQueued < 0
-  ) {
-    throw new Error('retrieval capacity must use finite non-negative integers')
-  }
-  return capacity
-}
-
-function gateFor(capacity: RetrievalCapacity): ConcurrencyGate {
-  const valid = validCapacity(capacity)
-  return new ConcurrencyGate(valid.maxConcurrent, valid.maxQueued)
-}
-
 /**
  * The DNS gate stays occupied until the OS lookup settles, even after the
  * caller's deadline: a broken resolver cannot pile up unbounded lookups.
@@ -707,24 +623,23 @@ class BoundedResolver {
 
   constructor(resolve: ResolveAddresses, capacity: RetrievalCapacity) {
     this.#resolve = resolve
-    this.#gate = gateFor(capacity)
+    this.#gate = new ConcurrencyGate(capacity)
   }
 
   readonly resolve: ResolveAddresses = async (hostname, signal) => {
-    const activeSignal = signal ?? new AbortController().signal
-    if (!(await this.#gate.enter(activeSignal))) {
-      if (activeSignal.aborted) throw activeSignal.reason
+    if (!(await this.#gate.enter(signal))) {
+      if (signal.aborted) throw signal.reason
       throw new ResolutionCapacityError()
     }
 
-    const resolution = Promise.resolve().then(() => this.#resolve(hostname, activeSignal))
+    const resolution = Promise.resolve().then(() => this.#resolve(hostname, signal))
     void resolution.finally(() => this.#gate.leave()).catch(() => {})
 
-    if (activeSignal.aborted) throw activeSignal.reason
+    if (signal.aborted) throw signal.reason
     return new Promise<readonly string[]>((resolve, reject) => {
-      const onAbort = (): void => reject(activeSignal.reason)
-      activeSignal.addEventListener('abort', onAbort, { once: true })
-      resolution.then(resolve, reject).finally(() => activeSignal.removeEventListener('abort', onAbort))
+      const onAbort = (): void => reject(signal.reason)
+      signal.addEventListener('abort', onAbort, { once: true })
+      resolution.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
     })
   }
 }

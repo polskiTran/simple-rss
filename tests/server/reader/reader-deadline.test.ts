@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { apiErrorSchema, readerItemSchema } from '../../../src/shared/api.js'
-import { RETRIEVAL_PROFILES } from '../../../src/server/upstream/retrieval.js'
+import { createLogger } from '../../../src/server/logger.js'
+import { createRetrieval } from '../../../src/server/upstream/retrieval.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { ReaderWorkerFixtures } from '../../support/reader-worker-fixtures.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
-import { pacedBody } from '../../support/upstream-fixtures.js'
+import { pacedBody, UpstreamFixtures } from '../../support/upstream-fixtures.js'
 
 const FEED_URL = 'https://journal.example/feed'
 
@@ -111,9 +112,17 @@ describe('the Reader budget', () => {
   })
 
   it('expires an operation still queued for a retrieval slot with the same contract', async () => {
-    const slots = RETRIEVAL_PROFILES.reader.capacity.maxConcurrent
-    const guids = Array.from({ length: slots + 1 }, (_, index) => `item-${index}`)
-    const service = await startTestService({ readerBudgetMs: 400 })
+    // One Reader slot, so the second Original webpage waits in the queue.
+    const upstream = new UpstreamFixtures()
+    const retrieval = createRetrieval({
+      httpClient: upstream.client,
+      resolve: upstream.resolve,
+      logger: createLogger({ level: 'error', sink: () => {} }),
+      self: new URL('https://reader.test'),
+      operationCapacity: { reader: { maxConcurrent: 1, maxQueued: 4 } },
+    })
+    const guids = ['item-held', 'item-queued']
+    const service = await startTestService({ upstream, retrieval, readerBudgetMs: 400 })
     const { user, ids } = await readingSetup(service, guids)
     for (const guid of guids) {
       service.upstream.stub(articleUrl(guid), { headers: HTML_HEADERS, body: ARTICLE_HTML, delayMs: 60_000 })

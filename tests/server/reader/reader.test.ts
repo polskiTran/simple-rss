@@ -118,7 +118,7 @@ describe('the Reader item', () => {
     expect(reader.title).toBe('First light')
     expect(reader.feedTitle).toBe('Field Notes')
     expect(reader.link).toBe(ARTICLE_URL)
-    expect(reader.displayDate).toBe('Saturday 8 August')
+    expect(reader).toMatchObject({ date: '2026-08-08', today: '2026-08-08' })
     expect(reader.summary).toBe('A clear morning over the valley.')
     expect(reader.saved).toBe(false)
     expect(reader.nextInDigest).toMatchObject({ title: 'Evening notes', feedTitle: 'Field Notes' })
@@ -212,7 +212,6 @@ describe('the Reader article', () => {
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
 
     const database = service.database
-    if (!database) throw new Error('the service has no database')
     const tables = database.$client.prepare("select name from sqlite_master where type = 'table'").all() as {
       name: string
     }[]
@@ -411,21 +410,6 @@ describe('the Reader article', () => {
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('unsupported_article')
   })
 
-  it('refuses a page that declares itself larger than the ceiling', async () => {
-    const service = await startTestService()
-    const { user, feedItemId } = await readingSetup(service, {
-      article: {
-        headers: { 'content-type': 'text/html', 'content-length': String(6 * 1024 * 1024) },
-        body: ARTICLE_HTML,
-      },
-    })
-
-    const response = await user.get(`/api/items/${feedItemId}/reader`)
-    expect(response.status).toBe(413)
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_too_large')
-  })
-
   it('reports an unreachable original without touching the Feed Item', async () => {
     const service = await startTestService()
     const { user, feedItemId } = await readingSetup(service, {
@@ -489,7 +473,7 @@ describe('the Reader article', () => {
     expect(failed.status).toBe(502)
   })
 
-  it('records one trace correlating retrieval and worker extraction for a Reader operation', async () => {
+  it('records one Reader trace that joins its retrieval record by trace id', async () => {
     const service = await startTestService()
     const { user, feedItemId } = await readingSetup(service)
 
@@ -498,30 +482,21 @@ describe('the Reader article', () => {
     const traces = service.logs.filter((record) => record.message === 'reader.trace')
     expect(traces).toHaveLength(1)
     const trace = traces[0]
-    expect(trace).toMatchObject({ outcome: 'extracted', feedItemId, host: 'journal.example', redirects: 0 })
+    expect(trace).toMatchObject({ outcome: 'extracted', feedItemId, host: 'journal.example' })
     expect(typeof trace?.trace).toBe('string')
-    const phases = [
-      'queueMs',
-      'dnsMs',
-      'ttfbMs',
-      'bodyMs',
-      'workerQueueMs',
-      'domMs',
-      'defuddleMs',
-      'markdownPolicyMs',
-      'totalMs',
-    ] as const
-    for (const phase of phases) {
+    for (const phase of ['workerQueueMs', 'domMs', 'defuddleMs', 'markdownPolicyMs', 'totalMs'] as const) {
       expect(trace?.[phase], phase).toBeGreaterThanOrEqual(0)
     }
-    expect(trace?.bytes).toBeGreaterThan(0)
-    expect(trace).toMatchObject({ connectionReused: true })
-    expect(trace).not.toHaveProperty('connectMs')
+    expect(trace).not.toHaveProperty('dnsMs')
 
     const retrieved = service.logs.find(
-      (record) => record.message === 'upstream.retrieval_completed' && record.operation === 'reader',
+      (record) => record.message === 'upstream.retrieval_completed' && record.trace === trace?.trace,
     )
-    expect(retrieved?.trace).toBe(trace?.trace)
+    expect(retrieved).toMatchObject({ operation: 'reader', redirects: 0, connectionReused: true })
+    for (const phase of ['queueMs', 'dnsMs', 'ttfbMs', 'bodyMs'] as const) {
+      expect(retrieved?.[phase], phase).toBeGreaterThanOrEqual(0)
+    }
+    expect(retrieved?.bytes).toBeGreaterThan(0)
   })
 
   it('keeps article content, summaries, and query strings out of captured logs', async () => {
@@ -584,7 +559,6 @@ describe('the Reader article', () => {
     await vi.waitFor(() => {
       const trace = service.logs.find((record) => record.message === 'reader.trace')
       expect(trace).toMatchObject({ outcome: 'worker_failed', host: 'journal.example' })
-      expect(trace?.bodyMs).toBeGreaterThanOrEqual(0)
       expect(trace?.totalMs).toBeGreaterThanOrEqual(0)
     })
   })

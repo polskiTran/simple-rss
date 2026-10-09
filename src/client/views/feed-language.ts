@@ -1,8 +1,14 @@
-import { MAX_FEED_SIZE_MIB, type FeedAvailability, type FeedAvailabilityCategory } from '../../shared/api.js'
+import {
+  MAX_FEED_SIZE_MIB,
+  type ApiErrorCode,
+  type FeedAvailability,
+  type FeedAvailabilityCategory,
+} from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError } from '../api.js'
+import { dayAndMonth } from '../day-names.js'
 
-export const AVAILABILITY_COPY = {
+const AVAILABILITY_COPY = {
   unreachable: 'The feed can’t be reached',
   timeout: 'The feed is taking too long to respond',
   too_large: `The feed has grown past the ${MAX_FEED_SIZE_MIB} MiB limit`,
@@ -11,7 +17,7 @@ export const AVAILABILITY_COPY = {
   invalid_feed: 'The feed is returning unusable XML',
 } satisfies Readonly<Record<FeedAvailabilityCategory, string>>
 
-export const SUBSCRIPTION_FAILURE_COPY = {
+const SUBSCRIPTION_FAILURE_COPY = {
   duplicate_subscription: 'Already subscribed.',
   invalid_feed_url: 'Enter a site or feed address, like lowtechmagazine.com.',
   feed_too_large: `That feed is larger than ${MAX_FEED_SIZE_MIB} MiB.`,
@@ -20,7 +26,7 @@ export const SUBSCRIPTION_FAILURE_COPY = {
   feed_timeout: 'That feed took too long to respond.',
   feed_body_timeout: 'That feed took too long to download.',
   feed_unreachable: 'That feed couldn’t be reached.',
-} as const satisfies Readonly<Record<string, string>>
+} as const satisfies Partial<Record<ApiErrorCode, string>>
 
 export function subscriptionFailure(cause: unknown): string {
   if (!(cause instanceof ApiError)) return 'That feed couldn’t be reached.'
@@ -35,13 +41,10 @@ const FIRST_CHECK_FAILURE_CODE = {
   unsupported_content: 'unsupported_feed',
   http_error: 'feed_unreachable',
   invalid_feed: 'malformed_feed',
-} satisfies Readonly<Record<FeedAvailabilityCategory, string>>
+} satisfies Readonly<Record<FeedAvailabilityCategory, keyof typeof SUBSCRIPTION_FAILURE_COPY>>
 
 export function firstCheckFailure(category: FeedAvailabilityCategory | null): string {
-  const code = category ? FIRST_CHECK_FAILURE_CODE[category] : undefined
-  return code && hasOwn(SUBSCRIPTION_FAILURE_COPY, code)
-    ? SUBSCRIPTION_FAILURE_COPY[code]
-    : 'That feed couldn’t be added.'
+  return category ? SUBSCRIPTION_FAILURE_COPY[FIRST_CHECK_FAILURE_CODE[category]] : 'That feed couldn’t be added.'
 }
 
 export function retryFailure(cause: unknown): string {
@@ -56,21 +59,16 @@ export function retryFailure(cause: unknown): string {
 /** Why checking fails, when it last worked, and what stays: `… Last reached 5 Aug. Its items stay in your digest.` */
 export function unavailableNote(availability: FeedAvailability): string {
   const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'Checking isn’t working'
-  const lastSuccess = availability.lastSuccessAt
-    ? `Last reached ${noteDate(availability.lastSuccessAt)}.`
+  const lastSuccess = availability.lastSuccessDate
+    ? `Last reached ${dayAndMonth(availability.lastSuccessDate)}.`
     : 'Not reached since subscribing.'
 
   return `${reason}. ${lastSuccess} Its items stay in your digest.`
 }
 
-export function noteDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-}
-
 /**
  * What the Add feed field sends: the address as typed, or a bare host given
- * `https://` — the server finds a site's Declared Feed. Anything else is no
- * address at all, and is refused before any request.
+ * `https://`. Anything else is no address at all, and is refused before any request.
  */
 export function feedAddressOf(line: string): string | undefined {
   const address = line.trim()

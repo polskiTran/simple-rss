@@ -43,23 +43,7 @@ There is one process, one service replica, and one persistent volume. The HTTP s
 
 ## Deployment
 
-### Supported Railway shape
-
-The Railway template provisions:
-
-- One Hobby-plan service and one replica
-- Serverless/sleep behavior disabled
-- Restart policy set to `Always`
-- 1 vCPU limit
-- 1 GB memory limit
-- One volume mounted at `/app/data`, with `RAILWAY_RUN_UID=0` so the container can write to it
-- Railway-managed HTTPS domain, with custom domains optional
-- Required setup and session secrets
-- Liveness and readiness health checks
-
-Railway bills actual usage rather than configured limits. Expected consumption should remain near the Hobby plan's minimum for this workload. The 1 GB limit provides headroom without reserving or billing 1 GB when unused.
-
-The generated Railway domain is fully supported. A custom domain is not required.
+The supported Railway shape — the template's settings, the volume, and the first claim — is in [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md#railway).
 
 ### Portability
 
@@ -87,14 +71,14 @@ A future requirement for concurrent replicas, separate worker services, or high 
 - **Client:** React and Vite
 - **HTTP server:** Hono on Node
 - **Validation:** shared Zod schemas at API boundaries
-- **UI foundation:** native HTML elements with manual ARIA, Tailwind CSS, and application-owned design tokens/components
+- **UI foundation:** Base UI for interactive behavior, Tailwind CSS, and application-owned semantic classes and design tokens
 - **Database:** SQLite through `better-sqlite3` and Drizzle
 - **Search:** SQLite FTS5
 - **Reader extraction:** Defuddle on the server
 
 Next.js is intentionally absent. The private client does not need SSR, SEO, React Server Components, or framework-managed caching. Vite produces static assets that the same Hono process serves alongside `/api` routes.
 
-The interface uses no visually prescriptive component suite and no headless-component library. Every interactive control is a native element — `<button aria-pressed>` for toggles, `<a aria-current="page">` inside a labelled `<nav>` for the sections, `role="group"` around related choices — with accessible behavior hand-built rather than supplied. Typography, spacing, color, density, and motion are owned entirely by Simple RSS.
+The interface uses no visually prescriptive component suite. Interactive behavior — buttons, fields, toggles, toggle groups, the dialog — comes from Base UI, which ships no CSS; styling is the client's own semantic classes keyed on the library's `data-*` state (ADR 0008). Elements the platform already does well stay native, such as the tab bar's `<a href>` links and the timezone `<select>`. Typography, spacing, color, density, and motion are owned entirely by Simple RSS (ADR 0010).
 
 ## Application boundaries
 
@@ -103,7 +87,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Client:** views, interactions, browser caching, and same-origin API calls
 - **HTTP:** routing, cookies, request validation, rate limiting, and response policy
 - **Authentication:** setup, credentials, sessions, and emergency reset
-- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` owns every Subscription write (create, OPML, unsubscribe, polling interval), `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailabilityLedger` owns every Feed Availability write (`record` settles a poll outcome, and `recordSuccess` covers the merge survivor)
+- **Subscriptions:** Feed lifecycle and preferences, with writes split by who causes them — `SubscriptionService` writes the User's Subscription changes (subscribe, OPML, unsubscribe, preferences), and `FeedPoll` writes everything a poll earns (the Feed Window, a merge the retrieval reveals, and Feed Availability) in one transaction per poll; the Feed Availability rule itself is the pure `settle` in `feed-availability.ts`
 - **Retrieval:** the one hardened boundary every outbound request passes through — destination and redirect validation, deadlines, decoded-size ceilings, and retrieval budgets
 - **Ingestion:** parsing, normalization, identity, and polling state
 - **Digest:** chronology and date grouping
@@ -116,7 +100,7 @@ The single package should still expose clear modules rather than mixing concerns
 
 These are source-code boundaries, not separate packages or services — and the ones the folder tree can express are enforced rather than remembered. `biome.jsonc` refuses the imports a path can identify: nothing but `app.ts` reaching into `http/`, and no raw `fetch` or `undici` under `src/server/`. `tests/server/architecture.test.ts` walks the folder graph for what a path cannot see — import cycles, and `upstream/` depending on any other server folder. Root-level modules are not nodes in that graph, so the composition root can import freely in one direction and a shared interface belongs where it is consumed.
 
-`src/server/service.ts` is the composition root: it builds every domain service once, inside a single `try`/`catch`. A startup failure — the database won't open, or migrations fail — is recorded on `Readiness` rather than thrown, so the process stays up to report the reason on `/health/live` while `/health/ready` closes. On success the built instances are bundled into one `Services` value and handed to `createApp` (`src/server/app.ts`), which branches on that bundle exactly once, at construction: with services, every route module is wired with real instances; without them, all of `/api` answers 503 and no route has to ask again. A domain service is either fully constructed or the installation is not serving `/api`.
+`src/server/service.ts` is the composition root and the only startup module: `startService` builds every domain service once, inside a single `try`/`catch`, then listens. A startup failure — the database won't open, migrations fail, or any service fails to build — is handed to `createApp` as a reason rather than thrown, so the process stays up and `/health/live` stays green while `/health/ready` answers 503 with that reason. On success the built instances, scheduler included, are bundled into one `Services` value and handed to `createApp` (`src/server/app.ts`), which branches on that bundle exactly once, at construction: with services, every route module is wired with real instances; without them, all of `/api` answers 503 and no route has to ask again. A domain service is either fully constructed or the installation is not serving `/api`.
 
 ## Persistence model
 
@@ -204,7 +188,7 @@ The additive migration leaves existing metadata, identity, first-seen time and L
 
 Timestamps are stored in UTC. One installation timezone, detected during setup and editable later, defines Digest calendar groups across devices.
 
-Items order by a valid publication time and fall back to first-seen time. A publication time more than a day past the item's first sighting is implausible and uses first-seen ordering; the rule never reads the clock, so an item's place is stored with it and does not move. The Digest groups items under Today, Yesterday, and then calendar dates, with no read/unread partition.
+Items order by a valid publication time and fall back to first-seen time. A publication time more than a day past the item's first sighting is implausible and uses first-seen ordering; the rule never reads the clock, so an item's place is stored with it and does not move. The Digest groups items under Today, Yesterday, and then calendar dates, with no read/unread partition. The server places every day in the installation timezone and sends its key; the client alone words it (`src/client/day-names.ts`).
 
 ### Retention and unsubscribe
 
@@ -306,7 +290,7 @@ The client an attempt counts against is the **rightmost** `X-Forwarded-For` entr
 - Restrictive CSP and standard security headers
 - Render-time output escaping and Reader sanitization
 - Fetch destination and redirect validation to reduce SSRF, in one boundary every retrieval passes through — see [ADR 0005](adr/0005-one-hardened-outbound-retrieval-boundary.md)
-- Destination addresses validated inside the lookup the connection itself uses, so a name cannot resolve differently for the check and for the socket
+- Each hop resolved once and its socket pinned to the addresses validation approved, so a name cannot resolve differently for the check and for the socket
 - `PUBLIC_ORIGIN` refused as a destination, so the reader cannot be steered into its own API
 - Body, timeout, concurrency, and content-type limits
 - No secrets, sessions, Feed summaries, Reader content, or full query strings in logs

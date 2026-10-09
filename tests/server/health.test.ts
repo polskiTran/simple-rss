@@ -1,7 +1,10 @@
+import { existsSync } from 'node:fs'
 import { chmod, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { livenessSchema, readinessSchema } from '../../src/shared/api.js'
+import { DATABASE_FILE } from '../../src/server/config.js'
 import { startTestService } from '../support/service-harness.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
@@ -24,7 +27,7 @@ describe('health endpoints', () => {
     expect(readinessSchema.parse(await response.json())).toEqual({ status: 'ready' })
   })
 
-  it('keeps readiness closed when startup could not migrate the database', async () => {
+  it('keeps readiness closed with the step that failed when the database cannot be opened', async () => {
     const parent = await makeTempDataDir()
     const unwritable = join(parent, 'readonly')
     await mkdir(unwritable)
@@ -39,12 +42,27 @@ describe('health endpoints', () => {
     expect(ready.status).toBe(503)
     expect(readinessSchema.parse(await ready.json())).toEqual({
       status: 'unready',
-      reason: 'migrations failed',
+      reason: 'database could not be opened',
     })
     await chmod(unwritable, 0o700)
   })
 
-  it('refuses API requests when startup could not migrate the database', async () => {
+  it('keeps readiness closed and lets go of the database when migrations fail', async () => {
+    const dataDir = await makeTempDataDir()
+    const databasePath = join(dataDir, DATABASE_FILE)
+    const squatter = new Database(databasePath)
+    squatter.exec('CREATE TABLE installation_settings (squatter TEXT)')
+    squatter.close()
+
+    const service = await startTestService({ dataDir })
+    const ready = await service.fetch('/health/ready')
+
+    expect(readinessSchema.parse(await ready.json())).toEqual({ status: 'unready', reason: 'migrations failed' })
+    // SQLite removes the WAL when its last connection closes.
+    expect(existsSync(`${databasePath}-wal`)).toBe(false)
+  })
+
+  it('refuses API requests when startup failed', async () => {
     const parent = await makeTempDataDir()
     const unwritable = join(parent, 'readonly')
     await mkdir(unwritable)
@@ -59,7 +77,7 @@ describe('health endpoints', () => {
     await chmod(unwritable, 0o700)
   })
 
-  it('logs a failed startup with the reason instead of exiting silently', async () => {
+  it('logs a failed startup with the error that stopped it instead of exiting silently', async () => {
     const parent = await makeTempDataDir()
     const unwritable = join(parent, 'readonly')
     await mkdir(unwritable)
@@ -67,7 +85,10 @@ describe('health endpoints', () => {
 
     const service = await startTestService({ dataDir: join(unwritable, 'data') })
 
-    expect(service.logs.map((record) => record.message)).toContain('startup.migrations_failed')
+    expect(service.logs.find((record) => record.message === 'startup.failed')).toMatchObject({
+      reason: 'database could not be opened',
+      error: { message: expect.stringContaining('EACCES') },
+    })
     await chmod(unwritable, 0o700)
   })
 

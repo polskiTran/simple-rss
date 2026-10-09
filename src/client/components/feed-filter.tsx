@@ -1,6 +1,6 @@
 import { Group } from './group.js'
 
-export interface FeedFilterProps {
+interface FeedFilterProps {
   /** Ties the heading to its section; unique on the page. */
   readonly id: string
   readonly title: string

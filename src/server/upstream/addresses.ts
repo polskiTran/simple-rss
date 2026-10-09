@@ -34,10 +34,6 @@ export function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 }
 
-export function isPublicAddress(address: string): boolean {
-  return classifyAddress(address) === 'public'
-}
-
 function classifyIpv4(bytes: Uint8Array): AddressClass {
   const [a = 0, b = 0, c = 0, d = 0] = bytes
 

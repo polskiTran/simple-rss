@@ -48,7 +48,7 @@ describe('InstallationSettingsStore', () => {
   })
 
   it('rejects a timezone the platform cannot resolve', () => {
-    expect(() => store.setTimezone('Mars/Olympus_Mons', AT)).toThrow(/timezone/i)
+    expect(store.setTimezone('Mars/Olympus_Mons', AT)).toBe(false)
     expect(store.read()).toBeUndefined()
   })
 

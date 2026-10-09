@@ -1,11 +1,13 @@
-import { asc, count, desc, eq } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, lt, or } from 'drizzle-orm'
 import type { Library, LibraryItem, LibraryMembership, LibraryOrder } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey } from '../digest/chronology.js'
-import { beyondCursorSql, encodeListCursor, LIST_PAGE_SIZE, type ListCursor } from '../digest/list-page.js'
+import { dateKey } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { encodeLibraryCursor, type LibraryCursor } from './library-cursor.js'
+
+const LIBRARY_PAGE_SIZE = 50
 
 export class LibraryService {
   readonly #db: DrizzleDatabase
@@ -44,12 +46,14 @@ export class LibraryService {
 
   /**
    * The Library by when each item was saved: newest save first, or oldest.
-   * Keyset pages over the saved time, ties by id (ADR 0006).
+   * Keyset pages over the saved time, ties by id (ADR 0011).
    */
-  list(order: LibraryOrder, cursor?: ListCursor): Library {
+  list(order: LibraryOrder, cursor?: LibraryCursor): Library {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const direction = order === 'oldest' ? asc : desc
+    // Strictly beyond the cursor in the page's own direction, ties broken by id the same way.
+    const beyond = order === 'oldest' ? gt : lt
 
     const fetched = this.#db
       .select({
@@ -67,12 +71,18 @@ export class LibraryService {
       .innerJoin(feedItems, eq(feedItems.id, libraryItems.feedItemId))
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
       .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .where(cursor ? beyondCursorSql(libraryItems.savedAt, cursor, order) : undefined)
+      .where(
+        cursor &&
+          or(
+            beyond(libraryItems.savedAt, cursor.savedAt),
+            and(eq(libraryItems.savedAt, cursor.savedAt), beyond(feedItems.id, cursor.feedItemId)),
+          ),
+      )
       .orderBy(direction(libraryItems.savedAt), direction(feedItems.id))
-      .limit(LIST_PAGE_SIZE + 1)
+      .limit(LIBRARY_PAGE_SIZE + 1)
       .all()
 
-    const rows = fetched.slice(0, LIST_PAGE_SIZE)
+    const rows = fetched.slice(0, LIBRARY_PAGE_SIZE)
     const last = rows.at(-1)
 
     const items: LibraryItem[] = rows.map((row) => ({
@@ -93,8 +103,8 @@ export class LibraryService {
       total: this.#db.select({ total: count() }).from(libraryItems).get()?.total ?? 0,
       items,
       nextCursor:
-        fetched.length > LIST_PAGE_SIZE && last
-          ? encodeListCursor({ instant: last.savedAt, feedItemId: last.feedItemId })
+        fetched.length > LIBRARY_PAGE_SIZE && last
+          ? encodeLibraryCursor({ savedAt: last.savedAt, feedItemId: last.feedItemId })
           : null,
     }
   }

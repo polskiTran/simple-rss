@@ -3,45 +3,15 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow as cadence } from './cadence-window.js'
+import { availability, feedDetail, feedItemRow, subscription } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
-const AVAILABLE = {
-  state: 'available',
-  lastCheckedAt: '2026-08-08T09:00:00.000Z',
-  lastSuccessAt: '2026-08-08T09:00:00.000Z',
-  consecutiveFailures: 0,
-  category: null,
-}
-
-const DETAIL = {
-  feedId: 1,
-  title: 'Field Notes',
-  description: null,
-  reportedTitle: 'Field Notes',
-  customTitle: null,
-  reportedDescription: null,
-  customDescription: null,
-  domain: 'journal.example',
-  homePageUrl: 'https://journal.example/',
-  enteredUrl: 'https://journal.example/feed',
-  resolvedUrl: 'https://feeds.example/journal.xml',
-  availability: AVAILABLE,
-  schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
-  readingSource: 'original-webpage',
+const DETAIL = feedDetail({
   subscribedDate: '2026-05-20',
   cadence: cadence({ '2026-06-03': 2, '2026-08-08': 1 }),
   items: [
-    {
-      feedItemId: 12,
-      title: 'First light',
-      link: 'https://journal.example/first-light',
-      publishedAt: '2026-08-08T07:15:00.000Z',
-      firstSeenAt: '2026-08-08T09:00:00.000Z',
-      date: '2026-08-08',
-      displayTime: '07:15',
-      saved: false,
-    },
-    {
+    feedItemRow({ feedItemId: 12 }),
+    feedItemRow({
       feedItemId: 11,
       title: 'A June letter',
       link: null,
@@ -50,23 +20,11 @@ const DETAIL = {
       date: '2026-06-03',
       displayTime: '12:00',
       saved: true,
-    },
+    }),
   ],
-}
+})
 
-const LIST_FEED = {
-  feedId: 1,
-  title: 'Field Notes',
-  description: null,
-  domain: DETAIL.domain,
-  homePageUrl: DETAIL.homePageUrl,
-  enteredUrl: DETAIL.enteredUrl,
-  resolvedUrl: DETAIL.resolvedUrl,
-  readingSource: 'original-webpage',
-  subscribedAt: '2026-05-20T09:00:00.000Z',
-  cadence: Array.from({ length: 30 }, () => 0),
-  availability: AVAILABLE,
-}
+const LIST_FEED = subscription({ subscribedAt: '2026-05-20T09:00:00.000Z' })
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -256,13 +214,12 @@ describe('managing one Feed', () => {
     stubApi().on('GET /api/feeds/1', {
       body: {
         ...DETAIL,
-        availability: {
+        availability: availability({
           state: 'unavailable',
-          lastCheckedAt: '2026-08-08T09:00:00.000Z',
-          lastSuccessAt: '2026-08-05T09:00:00.000Z',
+          lastSuccessDate: '2026-08-05',
           consecutiveFailures: 3,
           category: 'http_error',
-        },
+        }),
       },
     })
     window.history.replaceState(null, '', '/feeds/1')
@@ -310,7 +267,7 @@ describe('managing one Feed', () => {
       .on('GET /api/feeds/1', { body: DETAIL })
       .on('DELETE /api/feeds/1', {
         status: 503,
-        body: { error: { code: 'service_unavailable', message: 'Starting' } },
+        body: { error: { code: 'unavailable', message: 'Starting' } },
       })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
@@ -353,7 +310,7 @@ describe('the quiet states of one Feed', () => {
   it('says when the reader cannot answer for the Feed', async () => {
     stubApi().on('GET /api/feeds/1', {
       status: 503,
-      body: { error: { code: 'service_unavailable', message: 'Starting' } },
+      body: { error: { code: 'unavailable', message: 'Starting' } },
     })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)

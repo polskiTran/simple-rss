@@ -1,10 +1,10 @@
 import { Button } from '@base-ui/react/button'
-import { useState, type FormEvent } from 'react'
+import { useState, useTransition, type FormEvent } from 'react'
 import type { AuthStatus } from '../../../shared/api.js'
 import { changePassword } from '../../api.js'
 import { ActionDialog, DialogCancel } from '../../components/action-dialog.js'
 import { Field } from '../../components/field.js'
-import { describeFailure, reasonToHold } from '../failure.js'
+import { describeFailure, reasonToHold } from '../password-failure.js'
 
 /** Changing the password, as a dialog: it signs every device out, this one included. */
 export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): void }) {
@@ -13,7 +13,7 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
   const [newPassword, setNewPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [notice, setNotice] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, startSaving] = useTransition()
 
   function openChanged(next: boolean) {
     if (saving) return
@@ -26,7 +26,7 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
     }
   }
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault()
     if (saving) return
 
@@ -36,14 +36,14 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
       return
     }
 
-    setSaving(true)
     setNotice('')
-    try {
-      onChanged(await changePassword(currentPassword, newPassword))
-    } catch (error) {
-      setNotice(describeFailure(error))
-      setSaving(false)
-    }
+    startSaving(async () => {
+      try {
+        onChanged(await changePassword(currentPassword, newPassword))
+      } catch (error) {
+        setNotice(describeFailure(error))
+      }
+    })
   }
 
   const ready = currentPassword !== '' && newPassword !== '' && confirmation !== ''

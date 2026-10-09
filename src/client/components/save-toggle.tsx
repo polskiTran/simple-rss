@@ -1,9 +1,9 @@
 import { Toggle } from '@base-ui/react/toggle'
-import { useState } from 'react'
+import { useTransition } from 'react'
 import { saveToLibrary, unsaveFromLibrary } from '../api.js'
 import { Icon } from './icon.js'
 
-export interface SaveToggleProps {
+interface SaveToggleProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
@@ -18,18 +18,16 @@ export interface SaveToggleProps {
  * the icon-only square keeps a steady Save, leaving the state to `aria-pressed`.
  */
 export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
-  const [pending, setPending] = useState(false)
+  const [pending, startToggle] = useTransition()
 
-  async function toggle() {
+  function toggle() {
     if (pending) return
-    setPending(true)
-    try {
-      const membership = saved ? await unsaveFromLibrary(feedItemId) : await saveToLibrary(feedItemId)
-      onSaved(membership.saved)
-    } catch {
-    } finally {
-      setPending(false)
-    }
+    startToggle(async () => {
+      try {
+        const membership = saved ? await unsaveFromLibrary(feedItemId) : await saveToLibrary(feedItemId)
+        onSaved(membership.saved)
+      } catch {}
+    })
   }
 
   return (
@@ -37,10 +35,19 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
       className={labelled ? 'button save-toggle save-toggle-labelled' : 'save-toggle'}
       pressed={saved}
       aria-label={`${labelled && saved ? 'Saved' : 'Save'} ${title}`}
-      onPressedChange={() => void toggle()}
+      onPressedChange={toggle}
     >
       <Icon name="bookmark" filled={saved} />
       {labelled ? <span className="wide-only">{saved ? 'Saved' : 'Save'}</span> : null}
     </Toggle>
   )
+}
+
+/** The list after a SaveToggle answered: the one Feed Item's `saved` replaced, every other item as it was. */
+export function withSaved<Item extends { readonly feedItemId: number; readonly saved: boolean }>(
+  items: readonly Item[],
+  feedItemId: number,
+  saved: boolean,
+): Item[] {
+  return items.map((item) => (item.feedItemId === feedItemId ? { ...item, saved } : item))
 }

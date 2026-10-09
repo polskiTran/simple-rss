@@ -2,46 +2,11 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
+import { digest, searchResult } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
-const DIGEST = {
-  today: '2026-08-08',
-  groups: [
-    {
-      date: '2026-08-08',
-      label: 'Today',
-      returns: [],
-      items: [
-        {
-          feedItemId: 3,
-          title: 'First light',
-          feedId: 1,
-          feedTitle: 'Field Notes',
-          link: 'https://journal.example/first-light',
-          publishedAt: '2026-08-08T07:15:00.000Z',
-          displayTime: '07:15',
-          imageUrl: null,
-          summary: null,
-          firstSeenAt: '2026-08-08T09:00:00.000Z',
-          saved: false,
-        },
-      ],
-    },
-  ],
-  nextFrom: null,
-}
-
-const result = (feedItemId: number, title: string, displayDate: string, saved = false) => ({
-  feedItemId,
-  title,
-  feedId: 1,
-  feedTitle: 'Field Notes',
-  publishedAt: '2026-08-08T07:15:00.000Z',
-  firstSeenAt: '2026-08-08T09:00:00.000Z',
-  displayDate,
-  saved,
-  snippet: null,
-})
+const result = (feedItemId: number, title: string, date: string, saved = false) =>
+  searchResult({ feedItemId, title, date, saved })
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -50,12 +15,13 @@ afterEach(() => {
 describe('the search line in the chrome', () => {
   it('swaps the screen for results that say title, Feed, date, and saved state', async () => {
     stubApi()
-      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/digest', { body: digest() })
       .on('GET /api/search?q=chronology', {
         body: {
           scope: 'everywhere',
+          today: '2026-08-08',
           subscriptions: [],
-          results: [result(9, 'Morning chronology', 'today, 07:15'), result(8, 'Tide chronology', '3 june', true)],
+          results: [result(9, 'Morning chronology', '2026-08-08'), result(8, 'Tide chronology', '2026-06-03', true)],
         },
       })
     window.history.replaceState(null, '', '/')
@@ -69,7 +35,8 @@ describe('the search line in the chrome', () => {
     expect(window.location.pathname + window.location.search).toBe('/search?q=chronology')
     expect(results.textContent).toContain('Morning chronology')
     expect(results.textContent).toContain('Field Notes')
-    expect(results.textContent).toContain('today, 07:15')
+    expect(results.textContent).toContain('Today, 07:15')
+    expect(results.textContent).toContain('3 June')
     expect(screen.getByRole('button', { name: 'Save Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.queryByRole('heading', { name: 'Today 1' })).toBeNull()
 
@@ -82,10 +49,10 @@ describe('the search line in the chrome', () => {
   it('says while it is searching, and that nothing matched when nothing did', async () => {
     const answer = Promise.withResolvers<void>()
     stubApi()
-      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/digest', { body: digest() })
       .on('GET /api/search?q=driftwood', async () => {
         await answer.promise
-        return { body: { scope: 'everywhere', subscriptions: [], results: [] } }
+        return { body: { scope: 'everywhere', today: '2026-08-08', subscriptions: [], results: [] } }
       })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -103,13 +70,18 @@ describe('the search line in the chrome', () => {
   it('keeps the last results in view while the next search is answered', async () => {
     const answer = Promise.withResolvers<void>()
     const api = stubApi()
-      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/digest', { body: digest() })
       .on('GET /api/search?q=drift', {
-        body: { scope: 'everywhere', subscriptions: [], results: [result(9, 'Driftwood morning', 'today, 07:15')] },
+        body: {
+          scope: 'everywhere',
+          today: '2026-08-08',
+          subscriptions: [],
+          results: [result(9, 'Driftwood morning', '2026-08-08')],
+        },
       })
       .on('GET /api/search?q=driftwood', async () => {
         await answer.promise
-        return { body: { scope: 'everywhere', subscriptions: [], results: [] } }
+        return { body: { scope: 'everywhere', today: '2026-08-08', subscriptions: [], results: [] } }
       })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -131,7 +103,7 @@ describe('the search line in the chrome', () => {
 
   it('tells a silent network apart from a refusing server for a search too', async () => {
     const api = stubApi()
-      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/digest', { body: digest() })
       .on('GET /api/search?q=drift', () => {
         throw new TypeError('fetch failed')
       })
@@ -153,9 +125,14 @@ describe('the search line in the chrome', () => {
 
   it('answers a shared search address with the results it names', async () => {
     stubApi()
-      .on('GET /api/digest', { body: DIGEST })
+      .on('GET /api/digest', { body: digest() })
       .on('GET /api/search?q=chronology', {
-        body: { scope: 'everywhere', subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
+        body: {
+          scope: 'everywhere',
+          today: '2026-08-08',
+          subscriptions: [],
+          results: [result(9, 'Morning chronology', '2026-08-08')],
+        },
       })
     window.history.replaceState(null, '', '/search?q=chronology')
     render(<App />)
@@ -169,13 +146,23 @@ describe('the search line in the chrome', () => {
   it('ranks by newest on request, keeping the order in the address while the words change', async () => {
     const api = stubApi()
       .on('GET /api/search?q=chronology', {
-        body: { scope: 'everywhere', subscriptions: [], results: [result(9, 'Morning chronology', 'today, 07:15')] },
+        body: {
+          scope: 'everywhere',
+          today: '2026-08-08',
+          subscriptions: [],
+          results: [result(9, 'Morning chronology', '2026-08-08')],
+        },
       })
       .on('GET /api/search?q=chronology&sort=newest', {
-        body: { scope: 'everywhere', subscriptions: [], results: [result(8, 'Tide chronology', '3 june')] },
+        body: {
+          scope: 'everywhere',
+          today: '2026-08-08',
+          subscriptions: [],
+          results: [result(8, 'Tide chronology', '2026-06-03')],
+        },
       })
       .on('GET /api/search?q=chronology+notes&sort=newest', {
-        body: { scope: 'everywhere', subscriptions: [], results: [] },
+        body: { scope: 'everywhere', today: '2026-08-08', subscriptions: [], results: [] },
       })
     window.history.replaceState(null, '', '/search?q=chronology')
     render(<App />)
@@ -192,7 +179,7 @@ describe('the search line in the chrome', () => {
 
   it('offers no ranking where the answer is Subscriptions alone', async () => {
     stubApi().on('GET /api/search?q=field&in=subscriptions', {
-      body: { scope: 'subscriptions', subscriptions: [] },
+      body: { scope: 'subscriptions', today: '2026-08-08', subscriptions: [] },
     })
     window.history.replaceState(null, '', '/search?q=field&in=subscriptions')
     render(<App />)
@@ -205,8 +192,9 @@ describe('the search line in the chrome', () => {
     stubApi().on('GET /api/search?q=Tide', {
       body: {
         scope: 'everywhere',
+        today: '2026-08-08',
         subscriptions: [],
-        results: [{ ...result(9, 'Tide chronology', 'Today, 07:15'), snippet: 'Low tide came early.' }],
+        results: [{ ...result(9, 'Tide chronology', '2026-08-08'), snippet: 'Low tide came early.' }],
       },
     })
     window.history.replaceState(null, '', '/search?q=Tide')
@@ -222,11 +210,12 @@ describe('the search line in the chrome', () => {
     stubApi().on('GET /api/search?q=light', {
       body: {
         scope: 'everywhere',
+        today: '2026-08-08',
         subscriptions: [],
         results: [
-          result(9, 'Morning light', 'Today, 07:15'),
-          result(8, 'Evening light', 'Today, 06:00'),
-          { ...result(7, 'Coast light', '3 June'), feedId: 2, feedTitle: 'The Slow Press' },
+          result(9, 'Morning light', '2026-08-08'),
+          result(8, 'Evening light', '2026-08-08'),
+          { ...result(7, 'Coast light', '2026-06-03'), feedId: 2, feedTitle: 'The Slow Press' },
         ],
       },
     })
