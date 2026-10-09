@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { searchParamsOf, searchResultsSchema, type SearchResults, type SearchScope } from '../../src/shared/api.js'
+import { searchParamsOf, searchResultsSchema, type SearchResults, type SearchScope } from '../../../src/shared/api.js'
 import {
   rebuildSearchIndex,
   SEARCH_RESULT_LIMIT,
   SEARCH_SUBSCRIPTION_LIMIT,
-} from '../../src/server/search/search-service.js'
-import { claimedDevice, Device } from '../support/device.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
+} from '../../../src/server/search/search-service.js'
+import { claimedDevice, Device } from '../../support/device.js'
+import { startTestService, type TestService } from '../../support/service-harness.js'
 
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS

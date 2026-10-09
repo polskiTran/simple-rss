@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { claimedDevice } from '../support/device.js'
-import { startTestService } from '../support/service-harness.js'
+import { claimedDevice } from '../../support/device.js'
+import { startTestService } from '../../support/service-harness.js'
 
 const ENTERED_URL = 'https://journal.example/feed'
 const RESOLVED_URL = 'https://feeds.example/journal.xml'

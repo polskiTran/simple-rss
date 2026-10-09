@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { startTestService } from '../support/service-harness.js'
+import { startTestService } from '../../support/service-harness.js'
 
 const CLIENT = 'tests/fixtures/client'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { claimedDevice } from '../support/device.js'
-import { startTestService } from '../support/service-harness.js'
+import { claimedDevice } from '../../support/device.js'
+import { startTestService } from '../../support/service-harness.js'
 
 const FEED_URL = 'https://journal.example/feed'
 

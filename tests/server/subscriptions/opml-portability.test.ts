@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { digestSchema } from '../../src/shared/api.js'
-import { MAX_OPML_FEEDS } from '../../src/server/subscriptions/opml.js'
-import { Device, claimedDevice } from '../support/device.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
+import { digestSchema } from '../../../src/shared/api.js'
+import { MAX_OPML_FEEDS } from '../../../src/server/subscriptions/opml.js'
+import { Device, claimedDevice } from '../../support/device.js'
+import { startTestService, type TestService } from '../../support/service-harness.js'
 
 const RSS_URL = 'https://journal.example/feed'
 const ATOM_URL = 'https://atom.example/feed.xml'

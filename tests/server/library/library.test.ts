@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { digestSchema, feedDetailSchema, libraryMembershipSchema, librarySchema } from '../../src/shared/api.js'
-import { claimedDevice, Device } from '../support/device.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
+import { digestSchema, feedDetailSchema, libraryMembershipSchema, librarySchema } from '../../../src/shared/api.js'
+import { claimedDevice, Device } from '../../support/device.js'
+import { startTestService, type TestService } from '../../support/service-harness.js'
 
 const FEED_URL = 'https://journal.example/feed'
 

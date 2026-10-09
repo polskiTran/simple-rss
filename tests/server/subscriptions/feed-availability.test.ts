@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../src/shared/api.js'
+import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../../src/shared/api.js'
 import {
   MAX_BACKOFF_MINUTES,
   backoffMinutes,
   nextPollTime,
   nextRetryTime,
-} from '../../src/server/subscriptions/polling-schedule.js'
-import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../src/server/upstream/retrieval.js'
-import { Device, claimedDevice } from '../support/device.js'
-import { ManualClock } from '../support/manual-clock.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
-import type { FixtureResponse } from '../support/upstream-fixtures.js'
+} from '../../../src/server/subscriptions/polling-schedule.js'
+import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../../src/server/upstream/retrieval.js'
+import { Device, claimedDevice } from '../../support/device.js'
+import { ManualClock } from '../../support/manual-clock.js'
+import { startTestService, type TestService } from '../../support/service-harness.js'
+import type { FixtureResponse } from '../../support/upstream-fixtures.js'
 
 const START = '2026-08-08T09:00:00.000Z'
 

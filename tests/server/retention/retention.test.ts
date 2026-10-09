@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { digestSchema, librarySchema, subscriptionListSchema } from '../../src/shared/api.js'
-import { claimedDevice, type Device } from '../support/device.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
+import { digestSchema, librarySchema, subscriptionListSchema } from '../../../src/shared/api.js'
+import { claimedDevice, type Device } from '../../support/device.js'
+import { startTestService, type TestService } from '../../support/service-harness.js'
 
 const START = '2026-08-08T09:00:00.000Z'
 const MINUTE_MS = 60_000

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { apiErrorSchema, serviceMetaSchema } from '../../src/shared/api.js'
-import { VERSION } from '../../src/server/version.js'
-import { claimedDevice } from '../support/device.js'
-import { startTestService } from '../support/service-harness.js'
+import { apiErrorSchema, serviceMetaSchema } from '../../../src/shared/api.js'
+import { VERSION } from '../../../src/server/version.js'
+import { claimedDevice } from '../../support/device.js'
+import { startTestService } from '../../support/service-harness.js'
 
 describe('API boundary', () => {
   it('reports which build is running', async () => {

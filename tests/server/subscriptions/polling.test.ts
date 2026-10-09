@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { nextPollTime } from '../../src/server/subscriptions/polling-schedule.js'
-import { Device, claimedDevice } from '../support/device.js'
-import { startTestService, type TestService } from '../support/service-harness.js'
+import { nextPollTime } from '../../../src/server/subscriptions/polling-schedule.js'
+import { Device, claimedDevice } from '../../support/device.js'
+import { startTestService, type TestService } from '../../support/service-harness.js'
 
 const START = '2026-08-08T09:00:00.000Z'
 const HOUR_MS = 60 * 60_000
