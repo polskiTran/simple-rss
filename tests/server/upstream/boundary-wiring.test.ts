@@ -48,9 +48,9 @@ describe('the service boundary', () => {
   it('refuses to reach the network for an unstubbed upstream URL', async () => {
     const service = await startTestService()
 
-    await expect(service.upstream.client(new Request('https://example.com/feed.xml'))).rejects.toThrow(
-      /No upstream fixture/,
-    )
+    await expect(
+      service.upstream.client(new Request('https://example.com/feed.xml'), { addresses: ['93.184.216.34'] }),
+    ).rejects.toThrow(/No upstream fixture/)
   })
 
   it('refuses to start with a public origin that is not a URL', async () => {

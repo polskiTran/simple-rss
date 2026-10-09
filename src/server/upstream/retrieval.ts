@@ -115,7 +115,6 @@ export interface RetrievalTimings {
   readonly queueMs?: number
   readonly dnsMs?: number
   readonly connectionReused?: boolean
-  readonly socketDnsMs?: number
   readonly connectMs?: number
   readonly tlsMs?: number
   readonly ttfbMs?: number
@@ -324,12 +323,10 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
   const visited = new Set<string>()
 
   const recordConnection = (connection: HttpTimings): void => {
-    delete timings.socketDnsMs
     delete timings.connectMs
     delete timings.tlsMs
     delete timings.ttfbMs
     timings.connectionReused = connection.connectionReused
-    if (connection.socketDnsMs !== undefined) timings.socketDnsMs = connection.socketDnsMs
     if (connection.connectMs !== undefined) timings.connectMs = connection.connectMs
     if (connection.tlsMs !== undefined) timings.tlsMs = connection.tlsMs
     if (connection.ttfbMs !== undefined) timings.ttfbMs = connection.ttfbMs
@@ -345,7 +342,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       return fail(destination.code, destination.reason, { redirects })
     }
 
-    const { url } = destination
+    const { url, addresses } = destination
     if (visited.has(url.href)) {
       return fail('redirect_loop', 'redirect returned to a URL already visited', { host: url.host, redirects })
     }
@@ -355,7 +352,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     try {
       response = await context.httpClient(
         new Request(url, { method: 'GET', headers, redirect: 'manual', signal: controller.signal }),
-        recordConnection,
+        { addresses, onTimings: recordConnection },
       )
     } catch (error) {
       if (abandoned) return fail(abandoned, abandonmentReason(abandoned), { host: url.host })

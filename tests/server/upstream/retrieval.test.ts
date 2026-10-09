@@ -361,6 +361,27 @@ describe('redirects', () => {
     expect(upstream.requests).toHaveLength(1)
   })
 
+  it('pins each hop to the answer its own validation approved, asking the resolver once', async () => {
+    const asked: string[] = []
+    const { retrieval, upstream } = harness({
+      // Answers public to the first query and rebinds to loopback for any later one.
+      resolve: async (hostname) => {
+        asked.push(hostname)
+        return asked.length === 1 ? ['93.184.216.34'] : ['127.0.0.1']
+      },
+    })
+    upstream.stub('https://example.com/feed.xml', {
+      headers: { 'content-type': 'application/xml' },
+      body: '<rss></rss>',
+    })
+
+    await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
+      ok: true,
+    })
+    expect(asked).toEqual(['example.com'])
+    expect(upstream.requests.map((request) => request.addresses)).toEqual([['93.184.216.34']])
+  })
+
   it('refuses a redirect that leaves HTTP entirely', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/feed', { status: 302, headers: { location: 'file:///etc/passwd' } })
@@ -817,7 +838,6 @@ describe('phase timings', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.timings.connectionReused).toBe(true)
-    expect(result.timings.socketDnsMs).toBeUndefined()
     expect(result.timings.connectMs).toBeUndefined()
     expect(result.timings.tlsMs).toBeUndefined()
     const record = logs.find((entry) => entry.message === 'upstream.retrieval_completed')
@@ -828,8 +848,8 @@ describe('phase timings', () => {
   it('carries fresh-connection phases from the transport through to the result', async () => {
     const logs: LogRecord[] = []
     const retrieval = createRetrieval({
-      httpClient: async (_request, onTimings) => {
-        onTimings?.({ connectionReused: false, socketDnsMs: 2.5, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 })
+      httpClient: async (_request, { onTimings }) => {
+        onTimings?.({ connectionReused: false, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 })
         return new Response('<rss></rss>', { headers: { 'content-type': 'application/xml' } })
       },
       logger: createLogger({ level: 'debug', sink: (record) => logs.push(record) }),
@@ -841,7 +861,7 @@ describe('phase timings', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    const phases = { connectionReused: false, socketDnsMs: 2.5, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 }
+    const phases = { connectionReused: false, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 }
     expect(result.timings).toMatchObject(phases)
     expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject(phases)
   })
