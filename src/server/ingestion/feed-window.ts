@@ -1,14 +1,13 @@
-import { eq, type ExtractTablesWithRelations } from 'drizzle-orm'
-import type { BetterSQLiteTransaction } from 'drizzle-orm/better-sqlite3'
+import { eq } from 'drizzle-orm'
+import type { DatabaseTransaction } from '../persistence/database.js'
 import { feedItems, feeds, feedUrlAliases } from '../persistence/schema.js'
-import type { NormalizedFeedItem, ParsedFeedDocument } from './feed-document.js'
-
-type EmptySchema = Record<string, never>
-export type DatabaseTransaction = BetterSQLiteTransaction<EmptySchema, ExtractTablesWithRelations<EmptySchema>>
+import type { ParsedFeedDocument } from './feed-document.js'
 
 /**
  * Writes one Feed Window and the Feed metadata it reports, inside the caller's
  * transaction — the caller has already confirmed the Feed is still subscribed.
+ * Re-ingesting an item corrects its mutable metadata; identity, first-seen time,
+ * and Library membership stay untouched.
  */
 export function persistFeedWindow(
   tx: DatabaseTransaction,
@@ -48,29 +47,12 @@ export function persistFeedWindow(
     })
     .where(eq(feeds.id, feedId))
     .run()
-  for (const item of parsed.items) upsertFeedItem(tx, feedId, item, now)
-}
-
-/** Re-ingestion corrects mutable metadata; identity, first-seen time, and Library membership stay untouched. */
-export function upsertFeedItem(tx: DatabaseTransaction, feedId: number, item: NormalizedFeedItem, now: string): void {
-  tx.insert(feedItems)
-    .values({
-      feedId,
-      dedupeKey: item.dedupeKey,
-      identityKind: item.identityKind,
-      title: item.title,
-      link: item.link,
-      publishedAt: item.publishedAt,
-      imageUrl: item.imageUrl,
-      summary: item.summary,
-      feedContentMarkdown: item.feedContent?.markdown ?? null,
-      feedContentTruncated: item.feedContent?.truncated ? 1 : 0,
-      firstSeenAt: now,
-      lastObservedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [feedItems.feedId, feedItems.dedupeKey],
-      set: {
+  for (const item of parsed.items) {
+    tx.insert(feedItems)
+      .values({
+        feedId,
+        dedupeKey: item.dedupeKey,
+        identityKind: item.identityKind,
         title: item.title,
         link: item.link,
         publishedAt: item.publishedAt,
@@ -78,8 +60,22 @@ export function upsertFeedItem(tx: DatabaseTransaction, feedId: number, item: No
         summary: item.summary,
         feedContentMarkdown: item.feedContent?.markdown ?? null,
         feedContentTruncated: item.feedContent?.truncated ? 1 : 0,
+        firstSeenAt: now,
         lastObservedAt: now,
-      },
-    })
-    .run()
+      })
+      .onConflictDoUpdate({
+        target: [feedItems.feedId, feedItems.dedupeKey],
+        set: {
+          title: item.title,
+          link: item.link,
+          publishedAt: item.publishedAt,
+          imageUrl: item.imageUrl,
+          summary: item.summary,
+          feedContentMarkdown: item.feedContent?.markdown ?? null,
+          feedContentTruncated: item.feedContent?.truncated ? 1 : 0,
+          lastObservedAt: now,
+        },
+      })
+      .run()
+  }
 }
