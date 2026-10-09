@@ -19,12 +19,9 @@
       "bracketSpacing": true
     }
   },
-  // styles.css is hand-organised into the sections docs/DESIGN.md names, and
-  // tests/client/design-foundation.test.ts reads it as text — reformatting it
-  // would churn both for nothing. Linting still applies.
   "css": {
     "parser": { "tailwindDirectives": true },
-    "formatter": { "enabled": false }
+    "formatter": { "quoteStyle": "single" }
   },
   // Import order here groups type imports before value imports rather than sorting;
   // that grouping is deliberate, so nothing rewrites it.

@@ -4,7 +4,7 @@
 @import '@fontsource-variable/literata/opsz-italic.css';
 @import '@fontsource-variable/instrument-sans/wght.css';
 
-@source "../../node_modules/streamdown/dist/*.js";
+@source '../../node_modules/streamdown/dist/*.js';
 
 /* Streamdown's classes ask for `dark:`; it follows the same appearance the
    tokens do. */
@@ -312,7 +312,7 @@
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 500 14px/1 var(--font-ui);
+    font: 500 14px / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
@@ -407,7 +407,7 @@
     border-radius: 0;
     background: transparent;
     color: var(--color-ink-off);
-    font: 500 13.5px/1 var(--font-ui);
+    font: 500 13.5px / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
 
@@ -458,7 +458,7 @@
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 400 15px/1.4 var(--font-ui);
+    font: 400 15px / 1.4 var(--font-ui);
     outline: none;
 
     @media (max-width: 640px) {
@@ -538,7 +538,7 @@
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 500 14px/1 var(--font-ui);
+    font: 500 14px / 1 var(--font-ui);
     text-overflow: ellipsis;
     cursor: pointer;
     field-sizing: content;
@@ -873,7 +873,7 @@
 
   .item-title {
     margin: 0;
-    font: 400 19px/1.4 var(--font-read);
+    font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -900,7 +900,7 @@
 
   .item-snippet {
     margin: 8px 0 0;
-    font: 400 16px/1.55 var(--font-read);
+    font: 400 16px / 1.55 var(--font-read);
     color: var(--color-ink-2);
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -1050,7 +1050,7 @@
   }
 
   .wordmark-name {
-    font: italic 400 21px/1 var(--font-read);
+    font: italic 400 21px / 1 var(--font-read);
 
     @media (max-width: 640px) {
       font-size: 19px;
@@ -1193,7 +1193,7 @@
 
   .feed-row-name {
     margin: 0;
-    font: 400 19px/1.2 var(--font-read);
+    font: 400 19px / 1.2 var(--font-read);
     overflow-wrap: anywhere;
   }
 
@@ -1314,7 +1314,7 @@
 
   .feed-description {
     margin: 0;
-    font: 400 17px/1.5 var(--font-read);
+    font: 400 17px / 1.5 var(--font-read);
     color: var(--color-reader-body);
   }
 
@@ -1485,7 +1485,7 @@
 
   .reader-title {
     margin: 0;
-    font: 400 44px/1.16 var(--font-read);
+    font: 400 44px / 1.16 var(--font-read);
     letter-spacing: -0.01em;
     text-wrap: balance;
     overflow-wrap: break-word;
@@ -1569,7 +1569,7 @@
 
   .article-body,
   .reader-summary {
-    font: 400 19px/1.7 var(--font-read);
+    font: 400 19px / 1.7 var(--font-read);
     color: var(--color-reader-body);
     overflow-wrap: break-word;
 
@@ -1663,7 +1663,7 @@
   .article-table table {
     min-width: 100%;
     border-collapse: collapse;
-    font: 400 14px/1.45 var(--font-ui);
+    font: 400 14px / 1.45 var(--font-ui);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1855,7 +1855,7 @@
     border-radius: 0;
     background: var(--color-control);
     color: var(--color-ink);
-    font: 500 14px/1 var(--font-ui);
+    font: 500 14px / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
 
@@ -1941,7 +1941,7 @@
 
   .feed-day-title {
     margin: 0;
-    font: 400 19px/1.4 var(--font-read);
+    font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -2057,7 +2057,7 @@
     border-radius: 0;
     background: transparent;
     color: var(--color-ink-3);
-    font: 400 13px/1 var(--font-ui);
+    font: 400 13px / 1 var(--font-ui);
     font-variant-numeric: tabular-nums;
   }
 
@@ -2315,7 +2315,7 @@
 
   .gate-tagline {
     margin: 0;
-    font: 400 19px/1.4 var(--font-read);
+    font: 400 19px / 1.4 var(--font-read);
     color: var(--color-reader-body);
   }
 
@@ -2544,7 +2544,7 @@
     border: 0;
     background: transparent;
     color: var(--color-ink);
-    font: 400 14px/1 var(--font-ui);
+    font: 400 14px / 1 var(--font-ui);
     outline: none;
 
     @media (max-width: 640px) {
@@ -2569,7 +2569,7 @@
     height: 20px;
     background: var(--color-ground);
     color: var(--color-ink-2);
-    font: 400 12px/1 var(--font-ui);
+    font: 400 12px / 1 var(--font-ui);
 
     @media (max-width: 640px) {
       display: none;
