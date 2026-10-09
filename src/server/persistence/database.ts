@@ -13,10 +13,16 @@ export function openDatabase(path: string): DrizzleDatabase {
   mkdirSync(dirname(path), { recursive: true })
 
   const db = drizzle(path)
-  db.$client.pragma('journal_mode = WAL')
-  db.$client.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`)
-  db.$client.pragma('foreign_keys = ON')
-  db.$client.pragma('synchronous = NORMAL')
+  try {
+    db.$client.pragma('journal_mode = WAL')
+    db.$client.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`)
+    db.$client.pragma('foreign_keys = ON')
+    db.$client.pragma('synchronous = NORMAL')
+  } catch (error) {
+    // A file that is not a database opens and only fails here; the caller never sees this handle.
+    db.$client.close()
+    throw error
+  }
   return db
 }
 

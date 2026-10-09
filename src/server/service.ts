@@ -12,7 +12,7 @@ import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, errorForLog, type Logger } from './logger.js'
-import { openDatabase } from './persistence/database.js'
+import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderExtractor } from './reader/reader-extractor.js'
@@ -57,7 +57,7 @@ const IDLE_SWEEP_MS = 20
 /**
  * The composition root. A startup failure is reported rather than thrown: the
  * process listens anyway, `/health/live` stays green, `/health/ready` answers
- * 503 with the reason, and `/api` answers 503 so no traffic reaches a
+ * 503 with the step that failed, and `/api` answers 503 so no traffic reaches a
  * half-built installation. Only a socket that cannot bind rejects.
  */
 export async function startService(options: ServiceOptions): Promise<RunningService> {
@@ -106,17 +106,28 @@ export async function startService(options: ServiceOptions): Promise<RunningServ
   }
 }
 
-/** Builds every domain service once, or reports why it could not. */
+/**
+ * Builds every domain service once. The reason names the step that failed;
+ * the log carries the error itself. Whatever was opened before the failure
+ * is closed again, so a failed startup holds no database handle or worker.
+ */
 function compose(
   options: ServiceOptions,
   { logger, clock, retrieval }: { readonly logger: Logger; readonly clock: Clock; readonly retrieval: Retrieval },
 ): Startup {
   const { config } = options
+  let reason = 'database could not be opened'
+  let db: DrizzleDatabase | undefined
   let extractor: ReaderExtractor | undefined
 
   try {
-    const db = openDatabase(config.databasePath)
+    db = openDatabase(config.databasePath)
+
+    reason = 'migrations failed'
     const applied = applyMigrations(db, clock)
+    logger.info('startup.migrations_applied', { databasePath: config.databasePath, applied })
+
+    reason = 'services could not start'
     const settings = new InstallationSettingsStore(db)
     const authentication = createAuthentication({
       db,
@@ -169,14 +180,14 @@ function compose(
       imageSignature,
       scheduler: new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling }),
     } satisfies Services
-    logger.info('startup.migrations_applied', { databasePath: config.databasePath, applied })
     return { kind: 'ready', services }
   } catch (error) {
+    logger.error('startup.failed', { databasePath: config.databasePath, reason, error: errorForLog(error) })
     extractor
       ?.close()
       .catch((closeError) => logger.error('startup.reader_close_failed', { error: errorForLog(closeError) }))
-    logger.error('startup.migrations_failed', { databasePath: config.databasePath, error: errorForLog(error) })
-    return { kind: 'failed', reason: 'migrations failed' }
+    db?.$client.close()
+    return { kind: 'failed', reason }
   }
 }
 
