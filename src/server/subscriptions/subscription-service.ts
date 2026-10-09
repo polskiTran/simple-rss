@@ -6,7 +6,6 @@ import {
   type PollingIntervalMinutes,
   type PollingSchedule,
   type ReadingSource,
-  type ReadingSourcePreference,
   type SubscriptionSummary,
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
@@ -44,20 +43,6 @@ export type ImportOpmlOutcome =
       readonly alreadySubscribed: number
       readonly unusable: readonly string[]
     }
-
-export type SetPollingIntervalOutcome =
-  | { readonly kind: 'updated'; readonly schedule: PollingSchedule }
-  | { readonly kind: 'missing' }
-
-export type SetReadingSourceOutcome =
-  | { readonly kind: 'updated'; readonly preference: ReadingSourcePreference }
-  | { readonly kind: 'missing' }
-
-export type UnsubscribeOutcome = { readonly kind: 'unsubscribed' } | { readonly kind: 'missing' }
-
-export type SetFeedDetailsOutcome =
-  | { readonly kind: 'updated'; readonly details: FeedDetailsUpdate }
-  | { readonly kind: 'missing' }
 
 interface FeedRecord {
   readonly feedId: number
@@ -210,14 +195,14 @@ export class SubscriptionService {
    * The next due time is recomputed from the last completed poll: a shorter,
    * already-overdue interval becomes due at the next wake; a longer one waits it out.
    */
-  setPollingInterval(feedId: number, pollingIntervalMinutes: PollingIntervalMinutes): SetPollingIntervalOutcome {
+  setPollingInterval(feedId: number, pollingIntervalMinutes: PollingIntervalMinutes): PollingSchedule | undefined {
     const row = this.#db
       .select({ lastPolledAt: subscriptions.lastPolledAt, createdAt: subscriptions.createdAt })
       .from(subscriptions)
       .where(eq(subscriptions.feedId, feedId))
       .limit(1)
       .all()[0]
-    if (!row) return { kind: 'missing' }
+    if (!row) return undefined
 
     const anchor = new Date(row.lastPolledAt ?? row.createdAt)
     const nextPollAt = nextPollTime(feedId, pollingIntervalMinutes, anchor)
@@ -232,19 +217,20 @@ export class SubscriptionService {
       pollingIntervalMinutes,
       nextPollAt,
     })
-    return { kind: 'updated', schedule: { pollingIntervalMinutes, nextPollAt } }
+    return { pollingIntervalMinutes, nextPollAt }
   }
 
-  setReadingSource(feedId: number, readingSource: ReadingSource): SetReadingSourceOutcome {
+  /** False when there is no Subscription to change. */
+  setReadingSource(feedId: number, readingSource: ReadingSource): boolean {
     const updated = this.#db.update(subscriptions).set({ readingSource }).where(eq(subscriptions.feedId, feedId)).run()
-    if (updated.changes === 0) return { kind: 'missing' }
+    if (updated.changes === 0) return false
 
     this.#logger.info('subscriptions.reading_source_changed', { feedId, readingSource })
-    return { kind: 'updated', preference: { readingSource } }
+    return true
   }
 
   /** Replaces both overrides; the Feed's reported title and description keep being tracked underneath. */
-  setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): SetFeedDetailsOutcome {
+  setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): FeedDetailsUpdate | undefined {
     const row = this.#db
       .select({ reportedTitle: feeds.title, reportedDescription: feeds.description })
       .from(subscriptions)
@@ -252,7 +238,7 @@ export class SubscriptionService {
       .where(eq(subscriptions.feedId, feedId))
       .limit(1)
       .all()[0]
-    if (!row) return { kind: 'missing' }
+    if (!row) return undefined
 
     const { customTitle, customDescription } = overrides
     this.#db.update(subscriptions).set({ customTitle, customDescription }).where(eq(subscriptions.feedId, feedId)).run()
@@ -263,25 +249,23 @@ export class SubscriptionService {
       customDescription: customDescription !== null,
     })
     return {
-      kind: 'updated',
-      details: {
-        title: customTitle ?? row.reportedTitle,
-        customTitle,
-        description: customDescription ?? row.reportedDescription,
-        customDescription,
-      },
+      title: customTitle ?? row.reportedTitle,
+      customTitle,
+      description: customDescription ?? row.reportedDescription,
+      customDescription,
     }
   }
 
   /**
    * Deletes only the Subscription row — polling and Digest membership hinge on it.
    * Retained rows wait for the retention sweep, which keeps saves and their attribution.
+   * False when there was no Subscription.
    */
-  unsubscribe(feedId: number): UnsubscribeOutcome {
+  unsubscribe(feedId: number): boolean {
     const deleted = this.#db.delete(subscriptions).where(eq(subscriptions.feedId, feedId)).run()
-    if (deleted.changes === 0) return { kind: 'missing' }
+    if (deleted.changes === 0) return false
     this.#logger.info('subscriptions.unsubscribed', { feedId })
-    return { kind: 'unsubscribed' }
+    return true
   }
 
   dueFeedIds(limit: number): readonly number[] {

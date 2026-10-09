@@ -99,8 +99,7 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
-    const outcome = deps.subscriptions.unsubscribe(feedId.value)
-    if (outcome.kind === 'missing') return notFound(c)
+    if (!deps.subscriptions.unsubscribe(feedId.value)) return notFound(c)
     return c.body(null, 204)
   })
 
@@ -111,9 +110,9 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, updateFeedDetailsRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = deps.subscriptions.setFeedDetails(feedId.value, body.value)
-    if (outcome.kind === 'missing') return notFound(c)
-    return c.json<FeedDetailsUpdate>(outcome.details)
+    const details = deps.subscriptions.setFeedDetails(feedId.value, body.value)
+    if (!details) return notFound(c)
+    return c.json<FeedDetailsUpdate>(details)
   })
 
   app.put('/feeds/:feedId/interval', async (c) => {
@@ -123,9 +122,9 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, updatePollingIntervalRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = deps.subscriptions.setPollingInterval(feedId.value, body.value.pollingIntervalMinutes)
-    if (outcome.kind === 'missing') return notFound(c)
-    return c.json<PollingSchedule>(outcome.schedule)
+    const schedule = deps.subscriptions.setPollingInterval(feedId.value, body.value.pollingIntervalMinutes)
+    if (!schedule) return notFound(c)
+    return c.json<PollingSchedule>(schedule)
   })
 
   app.put('/feeds/:feedId/reading-source', async (c) => {
@@ -135,9 +134,9 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, readingSourcePreferenceSchema)
     if (!body.ok) return body.response
 
-    const outcome = deps.subscriptions.setReadingSource(feedId.value, body.value.readingSource)
-    if (outcome.kind === 'missing') return notFound(c)
-    return c.json<ReadingSourcePreference>(outcome.preference)
+    const { readingSource } = body.value
+    if (!deps.subscriptions.setReadingSource(feedId.value, readingSource)) return notFound(c)
+    return c.json<ReadingSourcePreference>({ readingSource })
   })
 
   app.get('/digest', (c) => {
