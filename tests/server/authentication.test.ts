@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest'
-import { ABSOLUTE_TIMEOUT_MS, IDLE_TIMEOUT_MS } from '../../src/server/auth/sessions.js'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+import { Authentication } from '../../src/server/auth/authentication.js'
+import type { PasswordHasher } from '../../src/server/auth/password.js'
+import { LoginRateLimiter } from '../../src/server/auth/rate-limit.js'
+import { ABSOLUTE_TIMEOUT_MS, IDLE_TIMEOUT_MS, SessionStore } from '../../src/server/auth/sessions.js'
+import { UserAuthStore } from '../../src/server/auth/user-auth.js'
 import { SESSION_COOKIE } from '../../src/server/http/session-cookie.js'
+import { createLogger } from '../../src/server/logger.js'
+import { type DrizzleDatabase, openDatabase } from '../../src/server/persistence/database.js'
+import { applyMigrations } from '../../src/server/persistence/migrations.js'
 import { apiErrorSchema, authStatusSchema } from '../../src/shared/api.js'
 import { claimedDevice, Device } from '../support/device.js'
+import { ManualClock } from '../support/manual-clock.js'
 import { USER_PASSWORD, SETUP_SECRET, startTestService, type TestService } from '../support/service-harness.js'
+import { makeTempDataDir } from '../support/temp-dir.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MINUTE_MS = 60 * 1000
@@ -673,5 +683,58 @@ describe('what authentication reveals', () => {
 
     expect(response.status).toBe(400)
     expect(await errorCode(response)).toBe('invalid_request')
+  })
+})
+
+describe('credential rotation races', () => {
+  // Built by hand: the race needs a hasher that holds verification open, which no request can arrange.
+  let database: DrizzleDatabase | undefined
+
+  afterEach(() => database?.$client.close())
+
+  it('does not issue a session after the verifier that accepted it was reset', async () => {
+    const dataDir = await makeTempDataDir()
+    database = openDatabase(join(dataDir, 'simple-rss.db'))
+    const clock = new ManualClock('2026-08-08T09:00:00.000Z')
+    applyMigrations(database, clock)
+
+    const user = new UserAuthStore(database)
+    const sessions = new SessionStore(database)
+    user.claim('hash:old-password', clock.now())
+
+    let verificationStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      verificationStarted = resolve
+    })
+    let finishVerification!: () => void
+    const held = new Promise<void>((resolve) => {
+      finishVerification = resolve
+    })
+    const hasher: PasswordHasher = {
+      hash: async (password) => `hash:${password}`,
+      verify: async (storedHash, password) => {
+        verificationStarted()
+        await held
+        return storedHash === `hash:${password}`
+      },
+    }
+    const authentication = new Authentication({
+      user,
+      sessions,
+      hasher,
+      limiter: new LoginRateLimiter(clock),
+      sleep: async () => {},
+      clock,
+      logger: createLogger({ level: 'error', sink: () => {} }),
+      setupSecret: 'a-long-enough-setup-secret',
+    })
+
+    const staleSignIn = authentication.signIn({ client: '203.0.113.7', password: 'old-password' })
+    await started
+    await authentication.resetPassword('new-password')
+    finishVerification()
+
+    expect(await staleSignIn).toEqual({ kind: 'rejected' })
+    expect(user.read()?.passwordHash).toBe('hash:new-password')
   })
 })
