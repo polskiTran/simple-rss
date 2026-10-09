@@ -25,13 +25,12 @@ interface RetrievalSubject {
 }
 
 /**
- * Sixteen transport outcomes collapse into the six a User can act on. Adding a
+ * Fifteen transport outcomes collapse into the six a User can act on. Adding a
  * `RetrievalFailureCode` fails to compile here and nowhere else.
  */
 function retrievalAnswers(subject: RetrievalSubject) {
   const { noun, profile, unsafeDestination, unsupportedContent, unreachable } = subject
   return {
-    invalid_request: unsafeDestination,
     invalid_url: unsafeDestination,
     blocked_destination: unsafeDestination,
     invalid_redirect: unsafeDestination,

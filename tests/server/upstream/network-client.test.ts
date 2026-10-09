@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createLogger } from '../../../src/server/logger.js'
 import type { HttpConnection, HttpTimings } from '../../../src/server/upstream/http-client.js'
 import { createNetworkHttpClient, pinnedLookup } from '../../../src/server/upstream/network-client.js'
-import { createRetrieval } from '../../../src/server/upstream/retrieval.js'
+import { createRetrieval, RETRIEVAL_PROFILES } from '../../../src/server/upstream/retrieval.js'
 
 const compressGzip = promisify(gzip)
 const compressBrotli = promisify(brotliCompress)
@@ -107,7 +107,7 @@ describe('createNetworkHttpClient', () => {
   })
 
   it('aborts when a small compressed body expands past the decoded ceiling', async () => {
-    const decoded = 'x'.repeat(1024 * 1024)
+    const decoded = 'x'.repeat(RETRIEVAL_PROFILES.feed.maxBytes + 1)
     const compressed = await compressGzip(Buffer.from(decoded))
     expect(compressed.byteLength).toBeLessThan(decoded.length / 100)
     running = await origin((_request, response) => {
@@ -133,7 +133,6 @@ describe('createNetworkHttpClient', () => {
       retrieval.retrieveBytes({
         url: `http://publisher.example:${port}/feed.xml`,
         operation: 'feed',
-        limits: { maxBytes: 1_000 },
       }),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })

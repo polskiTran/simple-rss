@@ -340,7 +340,6 @@ describe('congestion at the retrieval boundary', () => {
       etag: undefined,
       lastModified: undefined,
       notModified: false,
-      timings: { redirects: 0 },
       bytes: new TextEncoder().encode(rss('Field Notes')),
     }
   }

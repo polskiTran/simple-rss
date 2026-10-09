@@ -17,7 +17,7 @@ import { readingInformation } from '../markdown/reading-information.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import type { Retrieval, RetrievalFailure, RetrievalFailureCode, RetrievalTimings } from '../upstream/retrieval.js'
+import type { Retrieval, RetrievalFailure, RetrievalFailureCode } from '../upstream/retrieval.js'
 import type { ReaderExtractionTimings, ReaderExtractor } from './reader-extractor.js'
 
 type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed'
@@ -204,6 +204,8 @@ export class ReaderService {
   }
 
   async #extract(feedItemId: number, link: string, extraction: InFlightExtraction): Promise<ReaderArticleOutcome> {
+    // `reader.trace` carries the Reader's phases; the upstream phases are on
+    // the `upstream.retrieval_*` record with the same `trace`.
     const trace = randomUUID()
     const signal = extraction.controller.signal
     const startedAt = performance.now()
@@ -228,14 +230,13 @@ export class ReaderService {
       const fields = {
         ...hostField(link),
         ...(result.status === undefined ? {} : { status: result.status }),
-        ...definedFields(result.timings),
       }
       if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
       return finish(result.code, fields, { kind: 'retrieval-failed', failure: result })
     }
 
     extraction.stage = 'parsing'
-    const answered = { ...hostField(result.url), ...definedFields(result.timings) }
+    const answered = hostField(result.url)
     const bytes = ownedArrayBuffer(result.bytes)
     const parsed = await this.#extractor.extract({ bytes, charset: result.charset, url: result.url }, signal)
     if (parsed.kind === 'cancelled') {
@@ -333,8 +334,7 @@ function hostField(url: string): LogFields {
   }
 }
 
-function definedFields(timings: RetrievalTimings | ReaderExtractionTimings | undefined): LogFields {
-  if (!timings) return {}
+function definedFields(timings: ReaderExtractionTimings): LogFields {
   const fields: Record<string, LogField> = {}
   for (const [phase, value] of Object.entries(timings)) {
     if (value !== undefined) fields[phase] = value

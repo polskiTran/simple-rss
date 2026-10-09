@@ -9,7 +9,6 @@ import {
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
 import { Readable, type Duplex } from 'node:stream'
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { elapsedMs } from '../monotonic.js'
 import { unbracket } from './addresses.js'
@@ -93,16 +92,9 @@ export function createNetworkHttpClient(): HttpClient {
     })
     outbound.on('error', reject)
 
-    if (request.body) {
-      // SAFETY: Node's global `Request` body and `Readable.fromWeb` use the same
-      // WHATWG stream; `@types/node` and `lib.dom` declare separate types.
-      Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>).pipe(outbound)
-    } else {
-      outbound.end()
-    }
-    const response = await promise
-
-    return toResponse(request, response)
+    // Retrieval only sends body-less GETs.
+    outbound.end()
+    return toResponse(await promise)
   }
 }
 
@@ -131,13 +123,13 @@ export function pinnedLookup(addresses: readonly string[]): LookupFunction {
   }
 }
 
-function toResponse(request: Request, response: IncomingMessage): Response {
+function toResponse(response: IncomingMessage): Response {
   const status = response.statusCode ?? 0
   if (status < 200 || status > 599) {
     throw new Error(`upstream answered with the unusable status ${status}`)
   }
 
-  const bodiless = BODILESS_STATUSES.has(status) || request.method === 'HEAD'
+  const bodiless = BODILESS_STATUSES.has(status)
   let encodings: readonly string[] = []
   if (!bodiless) {
     try {

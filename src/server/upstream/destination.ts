@@ -2,7 +2,7 @@ import { lookup } from 'node:dns/promises'
 import { classifyAddress, unbracket } from './addresses.js'
 
 /** The signal lets bounded adapters stop waiting at the retrieval deadline. */
-export type ResolveAddresses = (hostname: string, signal?: AbortSignal) => Promise<readonly string[]>
+export type ResolveAddresses = (hostname: string, signal: AbortSignal) => Promise<readonly string[]>
 
 export interface DestinationPolicy {
   readonly resolve: ResolveAddresses
@@ -54,7 +54,7 @@ const BLOCKED_SUFFIXES = ['localhost', 'local', 'internal', 'arpa']
 export async function validateDestination(
   candidate: string | URL,
   policy: DestinationPolicy,
-  signal?: AbortSignal,
+  signal: AbortSignal,
 ): Promise<DestinationVerdict> {
   let url: URL
   try {
@@ -93,7 +93,7 @@ export async function validateDestination(
 
   let addresses: readonly string[]
   try {
-    addresses = signal ? await policy.resolve(hostname, signal) : await policy.resolve(hostname)
+    addresses = await policy.resolve(hostname, signal)
   } catch (error) {
     if (error instanceof ResolutionCapacityError) {
       return { ok: false, code: 'busy', reason: 'DNS lookup capacity is full' }

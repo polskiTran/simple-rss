@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createLogger, type LogRecord } from '../../../src/server/logger.js'
 import type { ResolveAddresses } from '../../../src/server/upstream/destination.js'
 import {
@@ -6,7 +6,6 @@ import {
   RETRIEVAL_PROFILES,
   type Retrieval,
   type RetrievalCapacity,
-  type RetrievalLimits,
   type RetrievalOperation,
   type RetrievalRequest,
 } from '../../../src/server/upstream/retrieval.js'
@@ -46,25 +45,22 @@ function harness(options: HarnessOptions = {}): Harness {
   return { retrieval, upstream, logs }
 }
 
-type RequestOverrides = Partial<Omit<RetrievalRequest, 'url' | 'limits'>> & RetrievalLimits
+const FEED = RETRIEVAL_PROFILES.feed
+const IMAGE = RETRIEVAL_PROFILES.image
 
-function feedRequest(url: string, overrides: RequestOverrides = {}): RetrievalRequest {
-  const { maxBytes, timeoutMs, bodyTimeoutMs, maxRedirects, ...request } = overrides
-  const limits: RetrievalLimits = {
-    ...(maxBytes === undefined ? {} : { maxBytes }),
-    ...(timeoutMs === undefined ? {} : { timeoutMs }),
-    ...(bodyTimeoutMs === undefined ? {} : { bodyTimeoutMs }),
-    ...(maxRedirects === undefined ? {} : { maxRedirects }),
-  }
-  const hasLimits = Object.keys(limits).length > 0
-
-  return {
-    url,
-    operation: 'feed',
-    ...request,
-    ...(hasLimits ? { limits } : {}),
-  }
+function feedRequest(url: string, overrides: Partial<Omit<RetrievalRequest, 'url'>> = {}): RetrievalRequest {
+  return { url, operation: 'feed', ...overrides }
 }
+
+/** Runs fake time forward, then settles what was already started. */
+async function settledAfter<T>(ms: number, pending: Promise<T>): Promise<T> {
+  await vi.advanceTimersByTimeAsync(ms)
+  return pending
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 function decode(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes)
@@ -104,34 +100,6 @@ describe('retrieveBytes', () => {
     expect(result.charset).toBeUndefined()
   })
 
-  it('sends only the headers the caller is allowed to set', async () => {
-    const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/feed.xml', {
-      headers: { 'content-type': 'application/xml' },
-      body: '<rss></rss>',
-    })
-
-    await retrieval.retrieveBytes(
-      feedRequest('https://example.com/feed.xml', {
-        headers: {
-          'if-none-match': '"v1"',
-          cookie: 'session=user-token',
-          authorization: 'Bearer user-token',
-          'x-setup-secret': 'the-setup-secret',
-          referer: 'https://reader.example.com/digest',
-        },
-      }),
-    )
-
-    const [sent] = upstream.requestsTo('https://example.com/feed.xml')
-    expect(sent?.headers['if-none-match']).toBe('"v1"')
-    expect(sent?.headers['user-agent']).toMatch(/simple-rss/)
-    expect(sent?.headers).not.toHaveProperty('cookie')
-    expect(sent?.headers).not.toHaveProperty('authorization')
-    expect(sent?.headers).not.toHaveProperty('x-setup-secret')
-    expect(sent?.headers).not.toHaveProperty('referer')
-  })
-
   it('refuses a private destination before connecting', async () => {
     const { retrieval, upstream } = harness({ addresses: { 'intranet.example.com': ['10.1.2.3'] } })
 
@@ -161,14 +129,6 @@ describe('retrieveBytes', () => {
     expect(upstream.requests).toHaveLength(1)
   })
 
-  it('rejects non-finite stricter limits instead of disabling the profile', async () => {
-    const { retrieval, upstream } = harness()
-
-    await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: Number.NaN })),
-    ).resolves.toMatchObject({ ok: false, code: 'invalid_request' })
-    expect(upstream.requests).toHaveLength(0)
-  })
   it('refuses a malformed URL', async () => {
     const { retrieval } = harness()
 
@@ -203,73 +163,52 @@ describe('retrieveBytes', () => {
 
   it('refuses a declared length beyond the ceiling without reading the body', async () => {
     const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/feed.xml', {
-      headers: { 'content-type': 'application/xml', 'content-length': '5000' },
-      body: 'x'.repeat(5000),
+    upstream.stub('https://example.com/photo.jpg', {
+      headers: { 'content-type': 'image/jpeg', 'content-length': String(IMAGE.maxBytes + 1) },
+      body: 'x',
     })
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: 1000 })),
+      retrieval.retrieveBytes(feedRequest('https://example.com/photo.jpg', { operation: 'image' })),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
-    expect(upstream.aborted).toContain('https://example.com/feed.xml')
+    expect(upstream.aborted).toContain('https://example.com/photo.jpg')
   })
 
   it('stops a body that passes the ceiling while streaming, with no length declared', async () => {
     const { retrieval, upstream } = harness()
-    const chunk = new Uint8Array(256)
-    upstream.stubDynamic('https://example.com/feed.xml', () => ({
-      headers: { 'content-type': 'application/xml' },
-      body: chunkedBody([chunk, chunk, chunk, chunk, chunk, chunk]),
+    upstream.stubDynamic('https://example.com/photo.jpg', () => ({
+      headers: { 'content-type': 'image/jpeg' },
+      body: chunkedBody([new Uint8Array(IMAGE.maxBytes), new Uint8Array(1)]),
     }))
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: 1000 })),
+      retrieval.retrieveBytes(feedRequest('https://example.com/photo.jpg', { operation: 'image' })),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
 
   it('stops a body that lied about its length', async () => {
     const { retrieval, upstream } = harness()
-    const chunk = new Uint8Array(256)
-    upstream.stubDynamic('https://example.com/feed.xml', () => ({
-      headers: { 'content-type': 'application/xml', 'content-length': '10' },
-      body: chunkedBody([chunk, chunk, chunk, chunk, chunk, chunk]),
+    upstream.stubDynamic('https://example.com/photo.jpg', () => ({
+      headers: { 'content-type': 'image/jpeg', 'content-length': '10' },
+      body: chunkedBody([new Uint8Array(IMAGE.maxBytes), new Uint8Array(1)]),
     }))
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: 1000 })),
+      retrieval.retrieveBytes(feedRequest('https://example.com/photo.jpg', { operation: 'image' })),
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
 
   it('accepts a body exactly at the ceiling', async () => {
     const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/feed.xml', {
-      headers: { 'content-type': 'application/xml' },
-      body: 'x'.repeat(1000),
-    })
+    upstream.stubDynamic('https://example.com/photo.jpg', () => ({
+      headers: { 'content-type': 'image/jpeg' },
+      body: chunkedBody([new Uint8Array(IMAGE.maxBytes)]),
+    }))
 
-    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { maxBytes: 1000 }))
+    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/photo.jpg', { operation: 'image' }))
 
     expect(result.ok).toBe(true)
-    expect(result.ok && result.bytes.byteLength).toBe(1000)
-  })
-
-  it('holds a caller to the boundary ceiling, however much it asked for', async () => {
-    const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/feed.xml', {
-      headers: {
-        'content-type': 'application/xml',
-        'content-length': String(RETRIEVAL_PROFILES.feed.maxBytes + 1),
-      },
-      body: '<rss></rss>',
-    })
-
-    await expect(
-      retrieval.retrieveBytes(
-        feedRequest('https://example.com/feed.xml', {
-          maxBytes: RETRIEVAL_PROFILES.feed.maxBytes * 256,
-        }),
-      ),
-    ).resolves.toMatchObject({ ok: false, code: 'too_large' })
+    expect(result.ok && result.bytes.byteLength).toBe(IMAGE.maxBytes)
   })
 
   it('reports an upstream error status without treating it as a body', async () => {
@@ -302,13 +241,18 @@ describe('retrieveBytes', () => {
   it('answers a conditional request that was not modified with no body', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/feed.xml', { status: 304, headers: { etag: '"v1"' } })
+    const lastModified = 'Fri, 08 Aug 2026 07:00:00 GMT'
 
     const result = await retrieval.retrieveBytes(
-      feedRequest('https://example.com/feed.xml', { headers: { 'if-none-match': '"v1"' } }),
+      feedRequest('https://example.com/feed.xml', { conditional: { etag: '"v1"', lastModified } }),
     )
 
     expect(result).toMatchObject({ ok: true, status: 304, notModified: true, etag: '"v1"' })
     expect(result.ok && result.bytes.byteLength).toBe(0)
+    expect(upstream.requestsTo('https://example.com/feed.xml')[0]?.headers).toMatchObject({
+      'if-none-match': '"v1"',
+      'if-modified-since': lastModified,
+    })
   })
 })
 
@@ -408,19 +352,6 @@ describe('redirects', () => {
     expect(upstream.requests).toHaveLength(6)
   })
 
-  it('honours a caller that will follow fewer hops', async () => {
-    const { retrieval, upstream } = harness()
-    upstream.stub('https://example.com/feed', { status: 301, headers: { location: 'https://example.com/other' } })
-    upstream.stub('https://example.com/other', {
-      headers: { 'content-type': 'application/xml' },
-      body: '<rss></rss>',
-    })
-
-    await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed', { maxRedirects: 0 })),
-    ).resolves.toMatchObject({ ok: false, code: 'too_many_redirects' })
-  })
-
   it('breaks a redirect loop instead of walking it to the limit', async () => {
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/a', { status: 302, headers: { location: 'https://example.com/b' } })
@@ -446,42 +377,40 @@ describe('redirects', () => {
 
 describe('giving up', () => {
   it('abandons a host that answers too slowly and closes the connection', async () => {
+    vi.useFakeTimers()
     const { retrieval, upstream } = harness()
     upstream.stub('https://example.com/feed.xml', {
-      delayMs: 2_000,
+      delayMs: FEED.timeoutMs * 2,
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
     })
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 })),
+      settledAfter(FEED.timeoutMs, retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))),
     ).resolves.toMatchObject({ ok: false, code: 'timeout' })
     expect(upstream.aborted).toContain('https://example.com/feed.xml')
   })
 
   it('returns at the deadline while a DNS lookup remains stuck and bounds further DNS work', async () => {
     vi.useFakeTimers()
-    try {
-      let resolutions = 0
-      const { retrieval } = harness({
-        maxConcurrent: 1,
-        maxQueued: 0,
-        resolve: async () => {
-          resolutions += 1
-          return new Promise<readonly string[]>(() => {})
-        },
-      })
+    let resolutions = 0
+    const { retrieval } = harness({
+      maxConcurrent: 1,
+      maxQueued: 0,
+      resolve: async () => {
+        resolutions += 1
+        return new Promise<readonly string[]>(() => {})
+      },
+    })
 
-      const timedOut = retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 }))
-      await vi.advanceTimersByTimeAsync(20)
-      await expect(timedOut).resolves.toMatchObject({ ok: false, code: 'timeout' })
-      await expect(
-        retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 })),
-      ).resolves.toMatchObject({ ok: false, code: 'busy' })
-      expect(resolutions).toBe(1)
-    } finally {
-      vi.useRealTimers()
-    }
+    await expect(
+      settledAfter(FEED.timeoutMs, retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))),
+    ).resolves.toMatchObject({ ok: false, code: 'timeout' })
+    await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
+      ok: false,
+      code: 'busy',
+    })
+    expect(resolutions).toBe(1)
   })
 
   it('cancels while DNS resolution is still pending', async () => {
@@ -531,21 +460,22 @@ describe('giving up', () => {
   })
 
   it('lets a large body take longer to arrive than the publisher had to answer', async () => {
+    vi.useFakeTimers()
     const { retrieval, upstream } = harness()
+    const gapMs = FEED.timeoutMs / 2
     upstream.stubDynamic('https://example.com/feed.xml', () => ({
       headers: { 'content-type': 'application/xml' },
-      body: pacedBody([new Uint8Array(8), new Uint8Array(8), new Uint8Array(8)], { gapMs: 25 }),
+      body: pacedBody([new Uint8Array(8), new Uint8Array(8), new Uint8Array(8)], { gapMs }),
     }))
 
-    const result = await retrieval.retrieveBytes(
-      feedRequest('https://example.com/feed.xml', { timeoutMs: 20, bodyTimeoutMs: 2_000 }),
-    )
+    const result = await settledAfter(gapMs * 4, retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml')))
 
     expect(result).toMatchObject({ ok: true })
     if (result.ok) expect(result.bytes.byteLength).toBe(24)
   })
 
   it('reports a body that stops arriving as a body timeout rather than an unanswered request', async () => {
+    vi.useFakeTimers()
     const { retrieval, upstream } = harness()
     upstream.stubDynamic('https://example.com/feed.xml', () => ({
       headers: { 'content-type': 'application/xml' },
@@ -553,21 +483,23 @@ describe('giving up', () => {
     }))
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { bodyTimeoutMs: 30 })),
+      settledAfter(FEED.bodyTimeoutMs, retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))),
     ).resolves.toMatchObject({ ok: false, code: 'body_timeout' })
     expect(upstream.aborted).toContain('https://example.com/feed.xml')
   })
 
   it('counts the deadline across redirects rather than restarting it each hop', async () => {
+    vi.useFakeTimers()
     const { retrieval, upstream } = harness()
+    const hopMs = FEED.timeoutMs * 0.6
     upstream.stub('https://example.com/a', {
       status: 302,
-      delayMs: 30,
+      delayMs: hopMs,
       headers: { location: 'https://example.com/b' },
     })
     upstream.stub('https://example.com/b', {
       status: 302,
-      delayMs: 30,
+      delayMs: hopMs,
       headers: { location: 'https://example.com/c' },
     })
     upstream.stub('https://example.com/c', {
@@ -576,7 +508,7 @@ describe('giving up', () => {
     })
 
     await expect(
-      retrieval.retrieveBytes(feedRequest('https://example.com/a', { timeoutMs: 40 })),
+      settledAfter(FEED.timeoutMs, retrieval.retrieveBytes(feedRequest('https://example.com/a'))),
     ).resolves.toMatchObject({ ok: false, code: 'timeout' })
   })
 })
@@ -680,18 +612,16 @@ describe('capacity', () => {
   })
 
   it('releases the slot when a streamed body is abandoned without being read', async () => {
+    vi.useFakeTimers()
     const { retrieval, upstream } = harness({ maxConcurrent: 1, maxQueued: 0 })
     upstream.stubDynamic('https://example.com/photo.jpg', () => ({
       headers: { 'content-type': 'image/jpeg' },
       body: chunkedBody([new Uint8Array(8), new Uint8Array(8)]),
     }))
-    const imageRequest = feedRequest('https://example.com/photo.jpg', {
-      operation: 'image',
-      bodyTimeoutMs: 20,
-    })
+    const imageRequest = feedRequest('https://example.com/photo.jpg', { operation: 'image' })
 
     expect(await retrieval.retrieve(imageRequest)).toMatchObject({ ok: true })
-    await new Promise((resolve) => setTimeout(resolve, 60))
+    await vi.advanceTimersByTimeAsync(IMAGE.bodyTimeoutMs)
 
     await expect(retrieval.retrieveBytes(imageRequest)).resolves.toMatchObject({ ok: true })
   })
@@ -735,15 +665,10 @@ describe('streaming', () => {
     const { retrieval, upstream } = harness()
     upstream.stubDynamic('https://example.com/photo.jpg', () => ({
       headers: { 'content-type': 'image/jpeg' },
-      body: chunkedBody([new Uint8Array(64), new Uint8Array(64)]),
+      body: chunkedBody([new Uint8Array(IMAGE.maxBytes), new Uint8Array(1)]),
     }))
 
-    const result = await retrieval.retrieve(
-      feedRequest('https://example.com/photo.jpg', {
-        operation: 'image',
-        maxBytes: 100,
-      }),
-    )
+    const result = await retrieval.retrieve(feedRequest('https://example.com/photo.jpg', { operation: 'image' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -803,27 +728,25 @@ describe('logging', () => {
   })
 })
 
-describe('phase timings', () => {
-  it('reports non-negative phases where they occurred, on the result and the record', async () => {
+describe('phase log', () => {
+  const completed = (logs: readonly LogRecord[]) =>
+    logs.find((entry) => entry.message === 'upstream.retrieval_completed')
+  const failed = (logs: readonly LogRecord[]) => logs.find((entry) => entry.message === 'upstream.retrieval_failed')
+
+  it('records non-negative phases where they occurred', async () => {
     const { retrieval, upstream, logs } = harness()
     upstream.stub('https://example.com/feed.xml', {
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
     })
 
-    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+    await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    for (const phase of ['queueMs', 'dnsMs', 'ttfbMs', 'bodyMs', 'totalMs'] as const) {
-      expect(result.timings[phase], phase).toBeGreaterThanOrEqual(0)
+    const record = completed(logs)
+    for (const phase of ['queueMs', 'dnsMs', 'ttfbMs', 'bodyMs', 'durationMs'] as const) {
+      expect(record?.[phase], phase).toBeGreaterThanOrEqual(0)
     }
-    expect(result.timings.bytes).toBe(11)
-    expect(result.timings.redirects).toBe(0)
-    expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject({
-      queueMs: result.timings.queueMs ?? Number.NaN,
-      dnsMs: result.timings.dnsMs ?? Number.NaN,
-    })
+    expect(record).toMatchObject({ bytes: 11, redirects: 0 })
   })
 
   it('represents a reused connection as skipped phases, not zero elapsed time', async () => {
@@ -833,19 +756,15 @@ describe('phase timings', () => {
       body: '<rss></rss>',
     })
 
-    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+    await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.timings.connectionReused).toBe(true)
-    expect(result.timings.connectMs).toBeUndefined()
-    expect(result.timings.tlsMs).toBeUndefined()
-    const record = logs.find((entry) => entry.message === 'upstream.retrieval_completed')
+    const record = completed(logs)
     expect(record).toMatchObject({ connectionReused: true })
     expect(record).not.toHaveProperty('connectMs')
+    expect(record).not.toHaveProperty('tlsMs')
   })
 
-  it('carries fresh-connection phases from the transport through to the result', async () => {
+  it('carries fresh-connection phases from the transport into the record', async () => {
     const logs: LogRecord[] = []
     const retrieval = createRetrieval({
       httpClient: async (_request, { onTimings }) => {
@@ -857,35 +776,32 @@ describe('phase timings', () => {
       self: new URL('https://reader.test'),
     })
 
-    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+    await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    const phases = { connectionReused: false, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 }
-    expect(result.timings).toMatchObject(phases)
-    expect(logs.find((entry) => entry.message === 'upstream.retrieval_completed')).toMatchObject(phases)
+    expect(completed(logs)).toMatchObject({ connectionReused: false, connectMs: 8, tlsMs: 12.25, ttfbMs: 40 })
   })
 
   it('closes a timeout with a terminal record and no invented body phase', async () => {
-    const { retrieval, upstream } = harness()
+    vi.useFakeTimers()
+    const { retrieval, upstream, logs } = harness()
     upstream.stub('https://example.com/feed.xml', {
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
-      delayMs: 1_000,
+      delayMs: FEED.timeoutMs * 2,
     })
 
-    const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml', { timeoutMs: 20 }))
+    await settledAfter(FEED.timeoutMs, retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml')))
 
-    expect(result).toMatchObject({ ok: false, code: 'timeout' })
-    if (result.ok) return
-    expect(result.timings?.queueMs).toBeGreaterThanOrEqual(0)
-    expect(result.timings?.totalMs).toBeGreaterThanOrEqual(0)
-    expect(result.timings?.bodyMs).toBeUndefined()
-    expect(result.timings?.bytes).toBeUndefined()
+    const record = failed(logs)
+    expect(record).toMatchObject({ code: 'timeout' })
+    expect(record?.queueMs).toBeGreaterThanOrEqual(0)
+    expect(record?.durationMs).toBeGreaterThanOrEqual(0)
+    expect(record).not.toHaveProperty('bodyMs')
+    expect(record).not.toHaveProperty('bytes')
   })
 
   it('closes a capacity refusal with a terminal record', async () => {
-    const { retrieval, upstream } = harness({ operationCapacity: { feed: { maxConcurrent: 1, maxQueued: 0 } } })
+    const { retrieval, upstream, logs } = harness({ operationCapacity: { feed: { maxConcurrent: 1, maxQueued: 0 } } })
     upstream.stub('https://example.com/feed.xml', {
       headers: { 'content-type': 'application/xml' },
       body: '<rss></rss>',
@@ -893,12 +809,15 @@ describe('phase timings', () => {
     })
 
     const holding = retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
-    const refused = await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
+    await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
+      ok: false,
+      code: 'busy',
+    })
     await holding
 
-    expect(refused).toMatchObject({ ok: false, code: 'busy' })
-    if (refused.ok) return
-    expect(refused.timings?.queueMs).toBeGreaterThanOrEqual(0)
-    expect(refused.timings?.totalMs).toBeGreaterThanOrEqual(0)
+    const record = failed(logs)
+    expect(record).toMatchObject({ code: 'busy' })
+    expect(record?.queueMs).toBeGreaterThanOrEqual(0)
+    expect(record?.durationMs).toBeGreaterThanOrEqual(0)
   })
 })

@@ -68,14 +68,10 @@ export class FeedPoll {
   }
 
   async #poll(feed: PollableFeed): Promise<IngestFeedOutcome> {
-    const headers: Record<string, string> = {}
-    if (feed.etag) headers['if-none-match'] = feed.etag
-    if (feed.lastModified) headers['if-modified-since'] = feed.lastModified
-
     const retrieved = await this.#retrieval.retrieveBytes({
       url: feed.resolvedUrl,
       operation: 'feed',
-      headers,
+      conditional: { etag: feed.etag, lastModified: feed.lastModified },
     })
     if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
 

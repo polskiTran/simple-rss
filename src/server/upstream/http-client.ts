@@ -17,8 +17,9 @@ export interface HttpConnection {
 
 /**
  * Internal transport seam; feature modules depend on `Retrieval`, never this.
- * An adapter must connect only to `connection.addresses`, follow no
- * redirects, honour the signal, and fully decode declared encodings.
+ * Requests are body-less GETs. An adapter must connect only to
+ * `connection.addresses`, follow no redirects, honour the signal, and fully
+ * decode declared encodings.
  */
 export type HttpClient = (request: Request, connection: HttpConnection) => Promise<Response>
 

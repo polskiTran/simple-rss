@@ -11,7 +11,6 @@ describe('the service boundary', () => {
     const result = await service.retrieval.retrieveBytes({
       url: FEED,
       operation: 'feed',
-      limits: { timeoutMs: 1_000 },
     })
 
     expect(result).toMatchObject({ ok: true, status: 200 })
@@ -25,7 +24,6 @@ describe('the service boundary', () => {
     const result = await service.retrieval.retrieveBytes({
       url: 'https://reader.example.com/api/meta',
       operation: 'reader',
-      limits: { maxBytes: 1024, timeoutMs: 1_000 },
     })
 
     expect(result).toMatchObject({ ok: false, code: 'blocked_destination' })
@@ -38,7 +36,6 @@ describe('the service boundary', () => {
     const result = await service.retrieval.retrieveBytes({
       url: 'http://169.254.169.254/latest/meta-data/',
       operation: 'feed',
-      limits: { maxBytes: 1024, timeoutMs: 1_000 },
     })
 
     expect(result).toMatchObject({ ok: false, code: 'blocked_destination' })
