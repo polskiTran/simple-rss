@@ -45,6 +45,14 @@ describe('the service boundary', () => {
     expect(service.upstream.requests).toHaveLength(0)
   })
 
+  it('refuses to reach the network for an unstubbed upstream URL', async () => {
+    const service = await startTestService()
+
+    await expect(service.upstream.client(new Request('https://example.com/feed.xml'))).rejects.toThrow(
+      /No upstream fixture/,
+    )
+  })
+
   it('refuses to start with a public origin that is not a URL', async () => {
     await expect(startTestService({ env: { PUBLIC_ORIGIN: 'reader.example.com' } })).rejects.toThrow(/PUBLIC_ORIGIN/)
   })
