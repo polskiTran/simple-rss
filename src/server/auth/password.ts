@@ -1,4 +1,4 @@
-import { MAX_PASSWORD_BYTES } from '../../shared/api.js'
+import { fitsPasswordBytes } from '../../shared/api.js'
 import { hash, verify, type Algorithm } from '@node-rs/argon2'
 
 // `2` is `Algorithm.Argon2id`: the binding's ambient `const enum` cannot be
@@ -29,7 +29,7 @@ export function argon2idHasher(): PasswordHasher {
     },
 
     async verify(storedHash, password) {
-      if (Buffer.byteLength(password) > MAX_PASSWORD_BYTES) return false
+      if (!fitsPasswordBytes(password)) return false
       try {
         return await verify(storedHash, password)
       } catch {
@@ -40,7 +40,7 @@ export function argon2idHasher(): PasswordHasher {
 }
 
 function assertHashable(password: string): void {
-  if (Buffer.byteLength(password) > MAX_PASSWORD_BYTES) {
+  if (!fitsPasswordBytes(password)) {
     throw new Error('Password is too long to hash')
   }
 }

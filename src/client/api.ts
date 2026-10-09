@@ -21,17 +21,21 @@ import {
   subscriptionListSchema,
   serviceMetaSchema,
   type AuthStatus,
+  type ClaimRequest,
+  type CreateSubscriptionRequest,
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
   type DigestFilter,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type ImportOpmlRequest,
   type InstallationPreferences,
   type Library,
   type LibraryOrder,
   type LibraryMembership,
   type OpmlImportReport,
+  type PasswordChangeRequest,
   type PollingIntervalMinutes,
   type PollingSchedule,
   type ReadingSource,
@@ -43,9 +47,12 @@ import {
   type SearchResults,
   type SearchScope,
   type SearchSort,
+  type SignInRequest,
   type SubscriptionList,
   type ServiceMeta,
   type UpdateFeedDetailsRequest,
+  type UpdatePollingIntervalRequest,
+  type UpdateTimezoneRequest,
 } from '../shared/api.js'
 import type { JsonValue } from '../shared/json.js'
 
@@ -129,7 +136,11 @@ export async function fetchAuthStatus(): Promise<AuthStatus> {
 export async function claimInstallation(setupSecret: string, password: string): Promise<AuthStatus> {
   const timezone = detectedTimezone()
   return status(
-    await post('/api/auth/setup', { setupSecret, password, ...(timezone === undefined ? {} : { timezone }) }),
+    await post('/api/auth/setup', {
+      setupSecret,
+      password,
+      ...(timezone === undefined ? {} : { timezone }),
+    } satisfies ClaimRequest),
   )
 }
 
@@ -142,7 +153,7 @@ function detectedTimezone(): string | undefined {
 }
 
 export async function signIn(password: string): Promise<AuthStatus> {
-  return status(await post('/api/auth/session', { password }))
+  return status(await post('/api/auth/session', { password } satisfies SignInRequest))
 }
 
 export async function signOut(): Promise<void> {
@@ -150,16 +161,16 @@ export async function signOut(): Promise<void> {
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthStatus> {
-  return status(await post('/api/auth/password', { currentPassword, newPassword }))
+  return status(await post('/api/auth/password', { currentPassword, newPassword } satisfies PasswordChangeRequest))
 }
 
 export async function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
-  const response = await post('/api/subscriptions', { url })
+  const response = await post('/api/subscriptions', { url } satisfies CreateSubscriptionRequest)
   return createSubscriptionResponseSchema.parse(await response.json())
 }
 
 export async function importOpml(opml: string): Promise<OpmlImportReport> {
-  const response = await post('/api/subscriptions/import', { opml })
+  const response = await post('/api/subscriptions/import', { opml } satisfies ImportOpmlRequest)
   return opmlImportReportSchema.parse(await response.json())
 }
 
@@ -194,7 +205,7 @@ export async function updatePollingInterval(
   const response = await request(`/api/feeds/${feedId}/interval`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pollingIntervalMinutes }),
+    body: JSON.stringify({ pollingIntervalMinutes } satisfies UpdatePollingIntervalRequest),
   })
   return pollingScheduleSchema.parse(await response.json())
 }
@@ -206,7 +217,7 @@ export async function updateReadingSource(
   const response = await request(`/api/feeds/${feedId}/reading-source`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ readingSource }),
+    body: JSON.stringify({ readingSource } satisfies ReadingSourcePreference),
   })
   return readingSourcePreferenceSchema.parse(await response.json())
 }
@@ -279,7 +290,7 @@ export async function updateInstallationTimezone(timezone: string): Promise<Inst
   const response = await request('/api/settings/timezone', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ timezone }),
+    body: JSON.stringify({ timezone } satisfies UpdateTimezoneRequest),
   })
   return installationPreferencesSchema.parse(await response.json())
 }
