@@ -1,6 +1,6 @@
 import { Icon } from './icon.js'
 
-export interface NativeSelectProps<Value extends string> {
+interface NativeSelectProps<Value extends string> {
   readonly label: string
   readonly value: NoInfer<Value>
   readonly options: readonly { readonly value: Value; readonly label: string }[]

@@ -1,6 +1,6 @@
 import { Button } from '@base-ui/react/button'
 
-export interface LoadFailureProps {
+interface LoadFailureProps {
   /** What failed to load, as a sentence opens: `The digest`, `Your saves` — the verbs agree with either. */
   readonly subject: string
   readonly kind: 'unreachable' | 'unavailable'

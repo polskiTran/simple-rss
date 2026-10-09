@@ -10,7 +10,7 @@ import { PasswordChange } from './settings/password-change.js'
 import { TimezoneChoice } from './settings/timezone-choice.js'
 import { VersionNote } from './settings/version-note.js'
 
-export interface SettingsViewProps {
+interface SettingsViewProps {
   onAccessChanged(status: AuthStatus): void
 }
 

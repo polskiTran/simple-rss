@@ -1,6 +1,6 @@
 import { Icon } from './icon.js'
 
-export interface HomePageLinkProps {
+interface HomePageLinkProps {
   readonly domain: string
   /** Null when the Feed has not been retrieved yet, or declares no site of its own. */
   readonly homePageUrl: string | null

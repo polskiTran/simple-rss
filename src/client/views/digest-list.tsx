@@ -7,7 +7,7 @@ import { withSaved } from '../components/save-toggle.js'
 import { usePagedResource, valueInView } from '../use-resource.js'
 import { DigestDay } from './digest-day.js'
 
-export interface DigestListProps {
+interface DigestListProps {
   readonly start: DigestStart
   /** Said when the Digest has nothing from its start. */
   readonly empty: string

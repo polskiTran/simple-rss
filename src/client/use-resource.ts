@@ -12,7 +12,7 @@ export type Resource<T> =
   | { readonly kind: 'unavailable'; readonly error: unknown }
   | { readonly kind: 'unreachable'; readonly error: unknown }
 
-export interface ResourceControls<T> {
+interface ResourceControls<T> {
   /** Loads again, keeping the value in view until the answer; the way back from a failed load. */
   retry(): void
   /** Patches the value in view — loaded, or still showing while the next load answers. */
@@ -22,7 +22,7 @@ export interface ResourceControls<T> {
 /** How asking for the next page went: not yet, under way, or refused. */
 export type OlderState = 'idle' | 'loading' | 'failed'
 
-export interface PagedControls<T> extends ResourceControls<T> {
+interface PagedControls<T> extends ResourceControls<T> {
   /** Asks for the page at `cursor` and appends it to the value it was asked from. */
   loadMore(cursor: string): void
   /** How the latest `loadMore` on the value in view went. */

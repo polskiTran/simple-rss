@@ -1,6 +1,6 @@
 import { MarkTile } from './wordmark.js'
 
-export interface LoadingNoteProps {
+interface LoadingNoteProps {
   readonly className?: string | undefined
   readonly announce?: boolean | undefined
   readonly children: string

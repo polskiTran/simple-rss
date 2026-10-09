@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { cadenceDayLabel, type CadenceGrid as Grid } from '../cadence.js'
 
-export interface CadenceGridProps {
+interface CadenceGridProps {
   readonly grid: Grid
   readonly title: string
   /** The day on show, ringed. */

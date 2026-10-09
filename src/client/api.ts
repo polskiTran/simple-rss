@@ -59,7 +59,7 @@ import type { z } from 'zod'
 import type { JsonValue } from '../shared/json.js'
 
 /** An API refusal's `error.code`, or `unknown` when the answer carried no error body the client could read. */
-export type FailureCode = ApiErrorCode | 'unknown'
+type FailureCode = ApiErrorCode | 'unknown'
 
 export class ApiError extends Error {
   readonly status: number

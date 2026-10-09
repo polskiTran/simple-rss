@@ -3,7 +3,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import type { ReactElement, ReactNode } from 'react'
 import { Icon } from './icon.js'
 
-export interface ActionDialogProps {
+interface ActionDialogProps {
   readonly open: boolean
   readonly title: string
   readonly description?: string | undefined
