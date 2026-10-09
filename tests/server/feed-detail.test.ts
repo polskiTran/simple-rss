@@ -84,7 +84,7 @@ describe('one opened Feed', () => {
       body: rss(item('one', 'Crossing midnight', '2026-08-07T20:00:00.000Z')),
     })
     const user = await claimedDevice(service)
-    service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
+    service.settings.setTimezone('Pacific/Auckland', service.clock.now())
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
     await service.wakeScheduler()
 

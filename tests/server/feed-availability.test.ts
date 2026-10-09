@@ -56,7 +56,6 @@ interface StoredAvailability {
 }
 
 function storedAvailability(service: TestService, feedId: number): StoredAvailability {
-  if (!service.database) throw new Error('the service started without a database')
   return storedAvailabilityIn(service.database, feedId)
 }
 
@@ -145,7 +144,7 @@ describe('Feed Availability', () => {
       groups: { items: { title: string }[] }[]
     }
     expect(digest.groups.flatMap((group) => group.items.map((item) => item.title))).toEqual(['First light'])
-    expect(service.database?.$client.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 1 })
+    expect(service.database.$client.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 1 })
   })
 
   it('resets the failure state the moment a later scheduled poll succeeds', async () => {

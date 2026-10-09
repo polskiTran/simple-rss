@@ -212,7 +212,6 @@ describe('the Reader article', () => {
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
 
     const database = service.database
-    if (!database) throw new Error('the service has no database')
     const tables = database.$client.prepare("select name from sqlite_master where type = 'table'").all() as {
       name: string
     }[]

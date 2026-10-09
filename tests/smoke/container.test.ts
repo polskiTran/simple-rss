@@ -1,10 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { authStatusSchema, readinessSchema } from '../../src/shared/api.js'
 import { migrations } from '../../src/server/persistence/migrations.js'
+import { SETUP_SECRET, USER_PASSWORD } from '../support/boot-service.js'
 import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type Container } from './docker.js'
-
-const SETUP_SECRET = 'a-deployment-setup-secret'
-const USER_PASSWORD = 'a-calm-reading-password'
 
 async function claim(container: Container, password = USER_PASSWORD): Promise<string> {
   const response = await container.fetch('/api/auth/setup', {

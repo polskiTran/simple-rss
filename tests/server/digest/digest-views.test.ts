@@ -54,7 +54,7 @@ describe('the Digest from a day', () => {
   it('from one installation-timezone day, and every day before it', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
-    service.settings?.setTimezone('Pacific/Auckland', service.clock.now())
+    service.settings.setTimezone('Pacific/Auckland', service.clock.now())
     await subscribe(service, user, 'Field Notes', [
       item('before-midnight', '2026-08-06T11:59:00.000Z'),
       item('after-midnight', '2026-08-06T12:00:00.000Z'),

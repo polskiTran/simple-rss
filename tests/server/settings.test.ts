@@ -27,7 +27,7 @@ describe('installation timezone detection at claim', () => {
     })
 
     expect(claimed.status).toBe(201)
-    expect(service.settings?.read()?.timezone).toBe('Pacific/Auckland')
+    expect(service.settings.read()?.timezone).toBe('Pacific/Auckland')
     expect(await (await device.get('/api/settings')).json()).toEqual({ timezone: 'Pacific/Auckland' })
   })
 
@@ -42,7 +42,7 @@ describe('installation timezone detection at claim', () => {
     })
 
     expect(claimed.status).toBe(201)
-    expect(service.settings?.read()).toBeUndefined()
+    expect(service.settings.read()).toBeUndefined()
     expect(await (await device.get('/api/settings')).json()).toEqual({ timezone: 'UTC' })
   })
 
@@ -57,7 +57,7 @@ describe('installation timezone detection at claim', () => {
     })
 
     expect(refused.status).toBe(401)
-    expect(service.settings?.read()).toBeUndefined()
+    expect(service.settings.read()).toBeUndefined()
   })
 })
 
@@ -98,7 +98,7 @@ describe('the Settings preferences API', () => {
 
     await service.restart()
 
-    expect(service.settings?.read()?.timezone).toBe('Europe/Warsaw')
+    expect(service.settings.read()?.timezone).toBe('Europe/Warsaw')
   })
 
   it('refuses a timezone the runtime cannot resolve', async () => {
@@ -109,7 +109,7 @@ describe('the Settings preferences API', () => {
 
     expect(refused.status).toBe(400)
     expect(await refused.json()).toMatchObject({ error: { code: 'unknown_timezone' } })
-    expect(service.settings?.read()).toBeUndefined()
+    expect(service.settings.read()).toBeUndefined()
   })
 
   it('refuses a body that is not a timezone at all', async () => {

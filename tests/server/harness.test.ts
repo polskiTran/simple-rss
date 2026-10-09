@@ -8,11 +8,11 @@ describe('the test harness', () => {
     const clock = new ManualClock('2026-08-08T09:00:00.000Z')
     const service = await startTestService({ clock })
 
-    service.settings?.setTimezone('Europe/Berlin', service.clock.now())
+    service.settings.setTimezone('Europe/Berlin', service.clock.now())
     clock.advance(36 * 60 * 60 * 1000)
-    service.settings?.setTimezone('Asia/Ho_Chi_Minh', service.clock.now())
+    service.settings.setTimezone('Asia/Ho_Chi_Minh', service.clock.now())
 
-    expect(service.settings?.read()).toMatchObject({
+    expect(service.settings.read()).toMatchObject({
       createdAt: '2026-08-08T09:00:00.000Z',
       updatedAt: '2026-08-09T21:00:00.000Z',
     })
