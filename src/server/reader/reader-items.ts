@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { DEFAULT_READING_SOURCE, type ReaderItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, longDate } from '../digest/chronology.js'
+import { dateKey, longDate } from '../calendar.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'

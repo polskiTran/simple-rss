@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateKey, dayKeysIn } from '../../../src/server/digest/chronology.js'
+import { dateKey, dayKeysIn } from '../../src/server/calendar.js'
 
 describe('dateKey', () => {
   it('names the calendar day in the installation timezone, not UTC', () => {

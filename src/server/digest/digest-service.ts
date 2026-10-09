@@ -15,7 +15,7 @@ import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { dateKey, dayAfter, dayBefore, dayKeysIn, daysBetween, dayStartUtc, longDate, timeLabel } from './chronology.js'
+import { dateKey, dayAfter, dayBefore, dayKeysIn, daysBetween, dayStartUtc, longDate, timeLabel } from '../calendar.js'
 import { beyondCursorSql, LIST_PAGE_SIZE } from './list-page.js'
 
 export class DigestService {

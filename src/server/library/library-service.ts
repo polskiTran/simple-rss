@@ -1,7 +1,7 @@
 import { asc, count, desc, eq } from 'drizzle-orm'
 import type { Library, LibraryItem, LibraryMembership, LibraryOrder } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey } from '../digest/chronology.js'
+import { dateKey } from '../calendar.js'
 import { beyondCursorSql, encodeListCursor, LIST_PAGE_SIZE, type ListCursor } from '../digest/list-page.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'

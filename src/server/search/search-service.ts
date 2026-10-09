@@ -1,7 +1,7 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
 import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn, metaRowDate } from '../digest/chronology.js'
+import { dateKey, dayKeysIn, metaRowDate } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'

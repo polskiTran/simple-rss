@@ -10,7 +10,7 @@ import {
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn } from '../digest/chronology.js'
+import { dateKey, dayKeysIn } from '../calendar.js'
 import { feedItemRowOf } from '../digest/digest-service.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
