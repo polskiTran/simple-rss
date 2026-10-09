@@ -266,6 +266,43 @@ describe('Subscriptions', () => {
     expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(409)
   })
 
+  it('revives a merged-away Feed kept for its saves once the Feed it merged into is retired', async () => {
+    const service = await startTestService()
+    const otherUrl = 'https://elsewhere.example/feed'
+    service.upstream
+      .stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+      .stub(otherUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>Elsewhere</title>
+            <item><guid>kept</guid><title>Kept essay</title><pubDate>Fri, 08 Aug 2026 06:00:00 GMT</pubDate></item>
+          </channel></rss>`,
+      })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(201)
+    await service.wakeScheduler()
+    const digest = await (await user.get('/api/digest')).json()
+    const essay = digest.groups
+      .flatMap((group: { items: { feedItemId: number; title: string }[] }) => group.items)
+      .find((item: { title: string }) => item.title === 'Kept essay')
+    expect((await user.put(`/api/library/${essay.feedItemId}`)).status).toBe(200)
+
+    service.upstream.stub(otherUrl, { status: 301, headers: { location: ENTERED_URL, 'content-type': 'text/plain' } })
+    service.clock.advance(3 * 60 * 60 * 1_000)
+    await service.wakeScheduler()
+    expect((await user.delete('/api/feeds/1')).status).toBe(204)
+    await service.wakeScheduler()
+    expect(service.database.$client.prepare('SELECT id FROM feeds ORDER BY id').all()).toEqual([{ id: 2 }])
+
+    const revived = await user.post('/api/subscriptions', { url: otherUrl })
+    expect(revived.status).toBe(201)
+    expect(await revived.json()).toMatchObject({ subscription: { feedId: 2, title: 'Elsewhere' } })
+    expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(409)
+    const library = await (await user.get('/api/library')).json()
+    expect(library.items).toMatchObject([{ feedItemId: essay.feedItemId, feedId: 2, subscribed: true }])
+  })
+
   it('refuses only what recording itself can see: a URL that is not a Feed endpoint', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

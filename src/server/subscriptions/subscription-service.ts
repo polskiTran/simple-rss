@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lte } from 'drizzle-orm'
+import { and, desc, eq, isNull, lte, or } from 'drizzle-orm'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   DEFAULT_READING_SOURCE,
@@ -127,52 +127,45 @@ export class SubscriptionService {
 
     const now = this.#clock.now().toISOString()
 
-    const dormant = this.#dormantFeedByUrl(requestedUrl)
-    if (dormant) return this.#resubscribe(dormant, now)
+    const dormant = this.#dormantFeed(requestedUrl, enteredUrl)
+    if (dormant) return this.#resubscribe(dormant, requestedUrl, now)
 
     // Both stand in for what the Feed document will say: nothing has been
     // retrieved yet (ADR 0007), so the Feed URL is all there is to go on.
     const domain = new URL(requestedUrl).hostname
     const title = offeredTitle?.trim() || domain
-    let created: SubscribedFeedRecord
-    try {
-      created = this.#db.transaction((tx) => {
-        const inserted = tx
-          .insert(feeds)
-          .values({
-            enteredUrl,
-            resolvedUrl: requestedUrl,
-            title,
-            domain,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run()
-        const feedId = Number(inserted.lastInsertRowid)
-
-        tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).run()
-        tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
-        return {
-          feedId,
-          title,
-          description: null,
-          domain,
-          homePageUrl: null,
+    const created: SubscribedFeedRecord = this.#db.transaction((tx) => {
+      const inserted = tx
+        .insert(feeds)
+        .values({
           enteredUrl,
           resolvedUrl: requestedUrl,
-          lastPolledAt: null,
-          lastSuccessAt: null,
-          consecutiveFailures: 0,
-          lastFailureCategory: null,
-          readingSource: DEFAULT_READING_SOURCE,
-          subscribedAt: now,
-        }
-      })
-    } catch (error) {
-      const raced = this.#feedByCanonicalUrl(requestedUrl)
-      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
-      throw error
-    }
+          title,
+          domain,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+      const feedId = Number(inserted.lastInsertRowid)
+
+      tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId }).run()
+      tx.insert(subscriptions).values(newSubscription(feedId, now)).run()
+      return {
+        feedId,
+        title,
+        description: null,
+        domain,
+        homePageUrl: null,
+        enteredUrl,
+        resolvedUrl: requestedUrl,
+        lastPolledAt: null,
+        lastSuccessAt: null,
+        consecutiveFailures: 0,
+        lastFailureCategory: null,
+        readingSource: DEFAULT_READING_SOURCE,
+        subscribedAt: now,
+      }
+    })
 
     this.#logger.info('subscriptions.subscription_created', {
       feedId: created.feedId,
@@ -183,16 +176,14 @@ export class SubscriptionService {
 
   /**
    * Revives a retained Feed under the same row — so Library items keep the
-   * identity they were saved from — with a fresh default schedule.
+   * identity they were saved from — with a fresh default schedule, reclaiming
+   * the requested URL's alias if a merge had moved it away.
    */
-  #resubscribe(feed: FeedRecord, now: string): CreateSubscriptionOutcome {
-    try {
-      this.#db.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
-    } catch (error) {
-      const raced = this.#feedByCanonicalUrl(feed.resolvedUrl) ?? this.#feedByCanonicalUrl(feed.enteredUrl)
-      if (raced) return { kind: 'duplicate', subscription: this.#withCadence(raced) }
-      throw error
-    }
+  #resubscribe(feed: FeedRecord, requestedUrl: string, now: string): CreateSubscriptionOutcome {
+    this.#db.transaction((tx) => {
+      tx.insert(feedUrlAliases).values({ url: requestedUrl, feedId: feed.feedId }).onConflictDoNothing().run()
+      tx.insert(subscriptions).values(newSubscription(feed.feedId, now)).run()
+    })
 
     this.#logger.info('subscriptions.subscription_created', {
       feedId: feed.feedId,
@@ -258,20 +249,8 @@ export class SubscriptionService {
         .where(eq(subscriptions.feedId, existingFeedId))
         .limit(1)
         .all()[0]
-      const hasItems = tx
-        .select({ id: feedItems.id })
-        .from(feedItems)
-        .where(eq(feedItems.feedId, duplicate.feedId))
-        .limit(1)
-        .all()[0]
-
       tx.update(feedUrlAliases).set({ feedId: existingFeedId }).where(eq(feedUrlAliases.feedId, duplicate.feedId)).run()
-
-      if (hasItems) {
-        tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
-      } else {
-        tx.delete(feeds).where(eq(feeds.id, duplicate.feedId)).run()
-      }
+      tx.delete(subscriptions).where(eq(subscriptions.feedId, duplicate.feedId)).run()
 
       if (!existingSubscribed) {
         tx.insert(subscriptions)
@@ -476,15 +455,30 @@ export class SubscriptionService {
       .all()[0]
   }
 
-  #dormantFeedByUrl(url: string): FeedRecord | undefined {
-    return this.#db
-      .select(FEED_RECORD_COLUMNS)
-      .from(feedUrlAliases)
-      .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
-      .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .where(and(eq(feedUrlAliases.url, url), isNull(subscriptions.feedId)))
-      .limit(1)
-      .all()[0]
+  /**
+   * An unsubscribed Feed holding a URL a new Feed would claim. Its aliases come
+   * first; a duplicate whose aliases a merge moved away is still found by its
+   * own URLs, which stay reserved until Retention retires the row.
+   */
+  #dormantFeed(requestedUrl: string, enteredUrl: string): FeedRecord | undefined {
+    const unsubscribed = isNull(subscriptions.feedId)
+    return (
+      this.#db
+        .select(FEED_RECORD_COLUMNS)
+        .from(feedUrlAliases)
+        .innerJoin(feeds, eq(feeds.id, feedUrlAliases.feedId))
+        .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+        .where(and(eq(feedUrlAliases.url, requestedUrl), unsubscribed))
+        .limit(1)
+        .all()[0] ??
+      this.#db
+        .select(FEED_RECORD_COLUMNS)
+        .from(feeds)
+        .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
+        .where(and(or(eq(feeds.enteredUrl, enteredUrl), eq(feeds.resolvedUrl, requestedUrl)), unsubscribed))
+        .limit(1)
+        .all()[0]
+    )
   }
 
   #stripCadence(feedIds: readonly number[]): (feedId: number) => number[] {
