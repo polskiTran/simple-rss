@@ -1,6 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { useState, type FormEvent } from 'react'
-import type { CreateSubscriptionResponse, OpmlImportReport } from '../../shared/api.js'
+import type { ApiErrorCode, CreateSubscriptionResponse, OpmlImportReport } from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError, importOpml, subscribeToFeed } from '../api.js'
 import { ActionDialog, DialogCancel } from '../components/action-dialog.js'
@@ -152,7 +152,7 @@ const IMPORT_FAILURE_COPY = {
   unsupported_opml: 'That file isn’t an OPML subscription list.',
   too_many_feeds: 'That file lists more feeds than one import can take.',
   invalid_request: 'That file is too large to import.',
-} as const satisfies Readonly<Record<string, string>>
+} as const satisfies Partial<Record<ApiErrorCode, string>>
 
 function importFailure(cause: unknown): string {
   if (!(cause instanceof ApiError)) return 'The reader is unavailable.'

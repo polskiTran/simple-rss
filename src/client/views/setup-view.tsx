@@ -4,7 +4,7 @@ import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { ApiError, claimInstallation } from '../api.js'
 import { Field } from '../components/field.js'
-import { describeFailure, reasonToHold } from './failure.js'
+import { describeFailure, reasonToHold } from './password-failure.js'
 
 export interface SetupViewProps {
   onClaimed(status: AuthStatus): void
@@ -35,14 +35,14 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
     try {
       onClaimed(await claimInstallation(setupSecret, password))
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.code === 'already_claimed') {
         onAlreadyClaimed()
         return
       }
       setNotice(
         describeFailure(error, {
-          401: 'That setup secret isn’t right.',
-          503: 'This installation has no setup secret configured.',
+          invalid_credentials: 'That setup secret isn’t right.',
+          setup_unavailable: 'This installation has no setup secret configured.',
         }),
       )
     } finally {

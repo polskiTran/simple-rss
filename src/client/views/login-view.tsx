@@ -4,7 +4,7 @@ import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { signIn } from '../api.js'
 import { Field } from '../components/field.js'
-import { describeFailure } from './failure.js'
+import { describeFailure } from './password-failure.js'
 
 export interface LoginViewProps {
   onSignedIn(status: AuthStatus): void

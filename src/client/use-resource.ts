@@ -1,5 +1,4 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { failureKind } from './views/failure.js'
 
 /**
  * What a view has of one server read. Loading after a load carries the value it is
@@ -88,6 +87,11 @@ export function usePagedResource<T>(
       older: older.load === held.load ? older.state : 'idle',
     },
   ]
+}
+
+/** A request that never reached the server fails with a TypeError; any other failure is the server's answer. */
+function failureKind(cause: unknown): 'unreachable' | 'unavailable' {
+  return cause instanceof TypeError ? 'unreachable' : 'unavailable'
 }
 
 /** The value a view can show right now: the loaded one, or the one a reload is replacing. */

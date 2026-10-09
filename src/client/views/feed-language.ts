@@ -1,4 +1,9 @@
-import { MAX_FEED_SIZE_MIB, type FeedAvailability, type FeedAvailabilityCategory } from '../../shared/api.js'
+import {
+  MAX_FEED_SIZE_MIB,
+  type ApiErrorCode,
+  type FeedAvailability,
+  type FeedAvailabilityCategory,
+} from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError } from '../api.js'
 
@@ -20,7 +25,7 @@ export const SUBSCRIPTION_FAILURE_COPY = {
   feed_timeout: 'That feed took too long to respond.',
   feed_body_timeout: 'That feed took too long to download.',
   feed_unreachable: 'That feed couldn’t be reached.',
-} as const satisfies Readonly<Record<string, string>>
+} as const satisfies Partial<Record<ApiErrorCode, string>>
 
 export function subscriptionFailure(cause: unknown): string {
   if (!(cause instanceof ApiError)) return 'That feed couldn’t be reached.'
@@ -35,13 +40,10 @@ const FIRST_CHECK_FAILURE_CODE = {
   unsupported_content: 'unsupported_feed',
   http_error: 'feed_unreachable',
   invalid_feed: 'malformed_feed',
-} satisfies Readonly<Record<FeedAvailabilityCategory, string>>
+} satisfies Readonly<Record<FeedAvailabilityCategory, keyof typeof SUBSCRIPTION_FAILURE_COPY>>
 
 export function firstCheckFailure(category: FeedAvailabilityCategory | null): string {
-  const code = category ? FIRST_CHECK_FAILURE_CODE[category] : undefined
-  return code && hasOwn(SUBSCRIPTION_FAILURE_COPY, code)
-    ? SUBSCRIPTION_FAILURE_COPY[code]
-    : 'That feed couldn’t be added.'
+  return category ? SUBSCRIPTION_FAILURE_COPY[FIRST_CHECK_FAILURE_CODE[category]] : 'That feed couldn’t be added.'
 }
 
 export function retryFailure(cause: unknown): string {

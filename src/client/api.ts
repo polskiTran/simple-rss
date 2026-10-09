@@ -20,6 +20,7 @@ import {
   searchResultsSchema,
   subscriptionListSchema,
   serviceMetaSchema,
+  type ApiErrorCode,
   type AuthStatus,
   type ClaimRequest,
   type CreateSubscriptionRequest,
@@ -57,13 +58,16 @@ import {
 import type { z } from 'zod'
 import type { JsonValue } from '../shared/json.js'
 
+/** An API refusal's `error.code`, or `unknown` when the answer carried no error body the client could read. */
+export type FailureCode = ApiErrorCode | 'unknown'
+
 export class ApiError extends Error {
   readonly status: number
-  readonly code: string
+  readonly code: FailureCode
   readonly retryAfterSeconds: number | undefined
   readonly stage: ReaderDeadlineStage | undefined
 
-  constructor(status: number, code: string, retryAfterSeconds?: number, stage?: ReaderDeadlineStage) {
+  constructor(status: number, code: FailureCode, retryAfterSeconds?: number, stage?: ReaderDeadlineStage) {
     super(`Request failed with ${status}`)
     this.name = 'ApiError'
     this.status = status
@@ -85,8 +89,6 @@ export function onSessionEnded(handler: SessionEndedHandler): () => void {
 }
 
 const STATUS_PATH = '/api/auth/status'
-
-const UNAUTHENTICATED = 'unauthenticated'
 
 const REQUEST_TIMEOUT_MS = 30_000
 const READER_REQUEST_TIMEOUT_MS = 60_000
@@ -112,7 +114,7 @@ async function request(path: string, options: ApiRequestOptions = {}): Promise<R
 
   const failure = await failureOf(response)
 
-  if (failure.code === UNAUTHENTICATED && path !== STATUS_PATH) sessionEnded?.()
+  if (failure.code === 'unauthenticated' && path !== STATUS_PATH) sessionEnded?.()
 
   throw new ApiError(response.status, failure.code, retryAfterOf(response), failure.stage)
 }
@@ -305,7 +307,7 @@ export function fetchServiceMeta(signal?: AbortSignal): Promise<ServiceMeta> {
   return getJson('/api/meta', serviceMetaSchema, { signal })
 }
 
-async function failureOf(response: Response): Promise<{ code: string; stage?: ReaderDeadlineStage }> {
+async function failureOf(response: Response): Promise<{ code: FailureCode; stage?: ReaderDeadlineStage }> {
   try {
     const { error } = apiErrorSchema.parse(await response.json())
     return { code: error.code, ...(error.stage === undefined ? {} : { stage: error.stage }) }
