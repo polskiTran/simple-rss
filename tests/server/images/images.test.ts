@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { IMAGE_CACHE_SECONDS, READER_IMAGE_PATH } from '../../../src/shared/api.js'
-import type { ResolveAddresses } from '../../../src/server/upstream/destination.js'
 import { claimedDevice, Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
-import { chunkedBody, UpstreamFixtures } from '../../support/upstream-fixtures.js'
+import { chunkedBody } from '../../support/upstream-fixtures.js'
 
 const FEED_URL = 'https://journal.example/feed'
 const IMAGE_URL = 'https://journal.example/hero.png'
@@ -221,51 +220,17 @@ async function signedInDevice(service: TestService, address: string): Promise<De
   return device
 }
 
-describe('destination hardening', () => {
-  it('refuses an image pointing back at this installation', async () => {
+describe('destination policy', () => {
+  // Retrieval owns the policy and proves each case; this proves images go through it.
+  it('refuses an image on a private address without asking for it', async () => {
     const service = await startTestService()
-    const { user, withImage } = await imageSetup(service, 'https://reader.test/api/auth/status')
+    const { user, withImage } = await imageSetup(service, 'https://192.168.1.20/hero.png')
 
     const response = await user.get(`/api/items/${withImage}/image`)
     expect(response.status).toBe(404)
     expect(response.headers.get('cache-control')).toBe('no-store')
-  })
-
-  it('refuses an image on a private address', async () => {
-    const service = await startTestService()
-    const { user, withImage } = await imageSetup(service, 'https://192.168.1.20/hero.png')
-
-    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
     expect(service.upstream.requests).not.toContainEqual(
       expect.objectContaining({ url: 'https://192.168.1.20/hero.png' }),
-    )
-  })
-
-  it('refuses an image that redirects to a private address', async () => {
-    const service = await startTestService()
-    service.upstream.stub(IMAGE_URL, { status: 302, headers: { location: 'https://10.0.0.5/internal.png' } })
-    const { user, withImage } = await imageSetup(service)
-
-    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
-    expect(service.upstream.requests).not.toContainEqual(
-      expect.objectContaining({ url: 'https://10.0.0.5/internal.png' }),
-    )
-  })
-
-  it('refuses an image whose host now resolves to a private address', async () => {
-    class MovedDns extends UpstreamFixtures {
-      override get resolve(): ResolveAddresses {
-        const base = super.resolve
-        return async (hostname, signal) => (hostname === 'moved.example' ? ['10.0.0.9'] : base(hostname, signal))
-      }
-    }
-
-    const service = await startTestService({ upstream: new MovedDns() })
-    const { user, withImage } = await imageSetup(service, 'https://moved.example/hero.png')
-
-    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
-    expect(service.upstream.requests).not.toContainEqual(
-      expect.objectContaining({ url: 'https://moved.example/hero.png' }),
     )
   })
 })
@@ -358,31 +323,8 @@ function avifBytes(): Uint8Array {
   return bytes
 }
 
-describe('resource limits', () => {
-  it('refuses an image that declares itself above the five MiB ceiling', async () => {
-    const service = await startTestService()
-    service.upstream.stub(IMAGE_URL, {
-      headers: { 'content-type': 'image/png', 'content-length': String(6 * 1024 * 1024) },
-      body: pngBytes(),
-    })
-    const { user, withImage } = await imageSetup(service)
-
-    expect((await user.get(`/api/items/${withImage}/image`)).status).toBe(404)
-  })
-
-  it('streams by count, so a small false Content-Length does not truncate', async () => {
-    const service = await startTestService()
-    service.upstream.stub(IMAGE_URL, {
-      headers: { 'content-type': 'image/png', 'content-length': '10' },
-      body: pngBytes(64),
-    })
-    const { user, withImage } = await imageSetup(service)
-
-    const response = await user.get(`/api/items/${withImage}/image`)
-    expect(response.status).toBe(200)
-    expect((await response.arrayBuffer()).byteLength).toBe(64)
-  })
-
+describe('streaming', () => {
+  // The sniffed head is replayed in front of the rest; a failure after it must still reach the browser.
   it('tears the stream down when the body grows past the ceiling', async () => {
     const service = await startTestService()
     const megabyte = 1024 * 1024

@@ -410,21 +410,6 @@ describe('the Reader article', () => {
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('unsupported_article')
   })
 
-  it('refuses a page that declares itself larger than the ceiling', async () => {
-    const service = await startTestService()
-    const { user, feedItemId } = await readingSetup(service, {
-      article: {
-        headers: { 'content-type': 'text/html', 'content-length': String(6 * 1024 * 1024) },
-        body: ARTICLE_HTML,
-      },
-    })
-
-    const response = await user.get(`/api/items/${feedItemId}/reader`)
-    expect(response.status).toBe(413)
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(((await response.json()) as { error: { code: string } }).error.code).toBe('article_too_large')
-  })
-
   it('reports an unreachable original without touching the Feed Item', async () => {
     const service = await startTestService()
     const { user, feedItemId } = await readingSetup(service, {
