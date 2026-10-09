@@ -2,6 +2,7 @@ import {
   FEED_UNAVAILABLE_AFTER_FAILURES,
   type FeedAvailability,
   type FeedAvailabilityCategory,
+  type PollingIntervalMinutes,
 } from '../../shared/api.js'
 import type { FeedDocumentError } from '../ingestion/feed-document.js'
 import type { LogFields } from '../logger.js'
@@ -14,7 +15,7 @@ import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 export interface PolledFeed {
   readonly feedId: number
   readonly resolvedUrl: string
-  readonly pollingIntervalMinutes: number
+  readonly pollingIntervalMinutes: PollingIntervalMinutes
   readonly consecutiveFailures: number
 }
 

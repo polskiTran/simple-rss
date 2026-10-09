@@ -1,13 +1,12 @@
 import { and, desc, eq, isNull, lte, or } from 'drizzle-orm'
-import {
-  pollingIntervalMinutesSchema,
-  type FeedDetail,
-  type FeedDetailsUpdate,
-  type PollingIntervalMinutes,
-  type PollingSchedule,
-  type ReadingSource,
-  type SubscriptionSummary,
-  type UpdateFeedDetailsRequest,
+import type {
+  FeedDetail,
+  FeedDetailsUpdate,
+  PollingIntervalMinutes,
+  PollingSchedule,
+  ReadingSource,
+  SubscriptionSummary,
+  UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
@@ -337,10 +336,7 @@ export class SubscriptionService {
       enteredUrl: record.enteredUrl,
       resolvedUrl: record.resolvedUrl,
       availability: availabilityOf(record),
-      schedule: {
-        pollingIntervalMinutes: pollingIntervalMinutesSchema.parse(record.pollingIntervalMinutes),
-        nextPollAt: record.nextPollAt,
-      },
+      schedule: { pollingIntervalMinutes: record.pollingIntervalMinutes, nextPollAt: record.nextPollAt },
       readingSource: record.readingSource,
       subscribedDate: dateKey(new Date(record.subscribedAt), timezone),
       cadence: days.map((date, index) => ({ date, count: counts[index] ?? 0 })),

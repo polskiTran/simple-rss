@@ -1,6 +1,10 @@
 import { desc, sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
-import { DEFAULT_POLLING_INTERVAL_MINUTES, DEFAULT_READING_SOURCE } from '../../shared/api.js'
+import {
+  DEFAULT_POLLING_INTERVAL_MINUTES,
+  DEFAULT_READING_SOURCE,
+  type PollingIntervalMinutes,
+} from '../../shared/api.js'
 
 /**
  * Typed mirror of the tables the server queries; migrations remain the source of
@@ -103,7 +107,11 @@ export const subscriptions = sqliteTable(
     customTitle: text('custom_title'),
     /** The Custom Description; null means the Feed Description stands. */
     customDescription: text('custom_description'),
-    pollingIntervalMinutes: integer('polling_interval_minutes').notNull().default(DEFAULT_POLLING_INTERVAL_MINUTES),
+    // The CHECK below is what makes the narrowed type true on read.
+    pollingIntervalMinutes: integer('polling_interval_minutes')
+      .$type<PollingIntervalMinutes>()
+      .notNull()
+      .default(DEFAULT_POLLING_INTERVAL_MINUTES),
     // Keep in step with READING_SOURCES (shared/api.ts).
     readingSource: text('reading_source', { enum: ['original-webpage', 'feed-content'] })
       .notNull()
