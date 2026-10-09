@@ -25,9 +25,6 @@ export default defineConfig({
   ignorePatterns: ignoredTooling,
   jsPlugins: [{ name: 'anti-slop', specifier: './tools/oxlint/anti-slop/index.ts' }],
   rules: {
-    // Conditional spreads keep exact optional properties immutable; mutation
-    // after construction would add code without adding type evidence.
-    'anti-slop/no-conditional-empty-object-spread': 'off',
     'anti-slop/no-chained-type-assertions': 'error',
     'anti-slop/no-known-value-widening': 'error',
     'anti-slop/no-module-mocking': 'error',
@@ -35,8 +32,6 @@ export default defineConfig({
     'anti-slop/no-reflect-apply': 'error',
     'anti-slop/no-reflect-get': 'error',
     'anti-slop/no-unknown-type-aliases': 'error',
-    // `shape` remains useful when a test names an intentionally malformed value.
-    'anti-slop/no-shape-in-symbol-names': 'off',
     'anti-slop/no-widen-then-assert': 'error',
   },
   overrides: [

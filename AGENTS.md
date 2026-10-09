@@ -21,7 +21,7 @@ pnpm only, Node ≥ 22.
 | `pnpm start` | Run the built server from `dist/` |
 | `pnpm lint` | `biome check --error-on-warnings .` (formatting and the import boundaries, `biome.jsonc`), then oxlint with the anti-slop rules (`oxlint.config.mjs`); a warning fails it |
 | `pnpm format` | `biome format --write .` |
-| `pnpm typecheck` | `tsc --noEmit` over `tsconfig.json` (everything) and `tsconfig.server.json` (the server build) |
+| `pnpm typecheck` | `tsc --noEmit` over `tsconfig.json` (the app and tests), `tsconfig.server.json` (the server build) and the vendored anti-slop plugin's own `tsconfig.json` |
 | `pnpm test` / `pnpm test:watch` | Vitest — both projects: `tests/server/` in node, `tests/client/` in jsdom |
 | `pnpm test:browser` | Builds the client, runs Playwright in real Chromium |
 | `pnpm test:smoke` | Container smoke tests (needs Docker) |
