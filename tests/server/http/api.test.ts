@@ -36,6 +36,27 @@ describe('API boundary', () => {
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
   })
 
+  it('keeps an unknown API route out of every cache', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+
+    const response = await user.get('/api/does-not-exist')
+
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('answers an unexpected failure with an uncached JSON 500', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    service.database.$client.exec('DROP TABLE subscriptions')
+
+    const response = await user.get('/api/feeds')
+
+    expect(response.status).toBe(500)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(apiErrorSchema.parse(await response.json()).error.code).toBe('internal_error')
+  })
+
   it('does not confirm which API routes exist to a caller with no session', async () => {
     const service = await startTestService({ clientDir: 'tests/fixtures/client' })
     await claimedDevice(service)
