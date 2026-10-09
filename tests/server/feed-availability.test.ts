@@ -1,23 +1,14 @@
-import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { MAX_FEED_SIZE_MIB, type FeedAvailability } from '../../src/shared/api.js'
-import { createLogger } from '../../src/server/logger.js'
-import { type DrizzleDatabase, openDatabase } from '../../src/server/persistence/database.js'
-import { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
-import { applyMigrations } from '../../src/server/persistence/migrations.js'
 import {
   MAX_BACKOFF_MINUTES,
   backoffMinutes,
   nextPollTime,
   nextRetryTime,
 } from '../../src/server/subscriptions/polling-schedule.js'
-import { FeedAvailabilityLedger } from '../../src/server/subscriptions/feed-availability.js'
-import { FeedPoll } from '../../src/server/subscriptions/feed-poll.js'
-import { SubscriptionService } from '../../src/server/subscriptions/subscription-service.js'
 import type { Retrieval, RetrievalBytesResult, RetrievalFailureCode } from '../../src/server/upstream/retrieval.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { ManualClock } from '../support/manual-clock.js'
-import { makeTempDataDir } from '../support/temp-dir.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
 import type { FixtureResponse } from '../support/upstream-fixtures.js'
 
@@ -56,11 +47,7 @@ interface StoredAvailability {
 }
 
 function storedAvailability(service: TestService, feedId: number): StoredAvailability {
-  return storedAvailabilityIn(service.database, feedId)
-}
-
-function storedAvailabilityIn(database: DrizzleDatabase, feedId: number): StoredAvailability {
-  const row = database.$client
+  const row = service.database.$client
     .prepare(`SELECT next_poll_at          AS nextPollAt,
           last_polled_at        AS lastPolledAt,
           last_success_at       AS lastSuccessAt,
@@ -333,6 +320,15 @@ function scriptedRetrieval(script: RetrievalBytesResult[]): Retrieval {
   }
 }
 
+/** Subscribes without polling, so each scheduler wake spends the next scripted answer. */
+async function subscribedOnScript(service: TestService, url: string): Promise<number> {
+  const user = await claimedDevice(service)
+  const response = await user.post('/api/subscriptions', { url })
+  expect(response.status).toBe(201)
+  const body = (await response.json()) as { subscription: { feedId: number } }
+  return body.subscription.feedId
+}
+
 describe('congestion at the retrieval boundary', () => {
   function feedBytes(url: string): RetrievalBytesResult {
     return {
@@ -350,60 +346,38 @@ describe('congestion at the retrieval boundary', () => {
   }
 
   it('defers the attempt without blaming the Feed when no retrieval slot was available', async () => {
-    const clock = new ManualClock(START)
-    const db = openDatabase(join(await makeTempDataDir(), 'availability.db'))
-    applyMigrations(db, clock)
     const url = 'https://one.example/feed'
-    const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
-    const subscriptions = new SubscriptionService({
-      db,
-      clock,
-      settings: new InstallationSettingsStore(db),
-      logger,
-    })
-    const poll = new FeedPoll({
-      db,
+    const service = await startTestService({
+      clock: new ManualClock(START),
       retrieval: scriptedRetrieval([
         feedBytes(url),
         { ok: false, code: 'http_error', reason: 'upstream answered 500', status: 500 },
         { ok: false, code: 'busy', reason: 'no retrieval slot available' },
         feedBytes(url),
       ]),
-      clock,
-      logger,
-      subscriptions,
-      availability: new FeedAvailabilityLedger({ db, clock, logger }),
+    })
+    const feedId = await subscribedOnScript(service, url)
+    await service.wakeScheduler()
+
+    await pollWhenDue(service, feedId)
+    expect(storedAvailability(service, feedId)).toMatchObject({
+      consecutiveFailures: 1,
+      lastFailureCategory: 'http_error',
     })
 
-    try {
-      expect(subscriptions.create(url).kind).toBe('created')
-      await poll.ingest(1)
+    await pollWhenDue(service, feedId)
+    expect(storedAvailability(service, feedId)).toMatchObject({
+      consecutiveFailures: 1,
+      lastFailureCategory: 'http_error',
+      lastPolledAt: service.clock.now().toISOString(),
+      nextPollAt: nextPollTime(feedId, 120, service.clock.now()),
+    })
 
-      clock.advance(60_000)
-      await poll.ingest(1)
-      expect(storedAvailabilityIn(db, 1)).toMatchObject({
-        consecutiveFailures: 1,
-        lastFailureCategory: 'http_error',
-      })
-
-      clock.advance(60_000)
-      await poll.ingest(1)
-      expect(storedAvailabilityIn(db, 1)).toMatchObject({
-        consecutiveFailures: 1,
-        lastFailureCategory: 'http_error',
-        lastPolledAt: clock.now().toISOString(),
-        nextPollAt: nextPollTime(1, 120, clock.now()),
-      })
-
-      clock.advance(60_000)
-      await poll.ingest(1)
-      expect(storedAvailabilityIn(db, 1)).toMatchObject({
-        consecutiveFailures: 0,
-        lastFailureCategory: null,
-      })
-    } finally {
-      db.$client.close()
-    }
+    await pollWhenDue(service, feedId)
+    expect(storedAvailability(service, feedId)).toMatchObject({
+      consecutiveFailures: 0,
+      lastFailureCategory: null,
+    })
   })
 })
 
@@ -420,34 +394,14 @@ describe('availability categories', () => {
       ['unavailable', 'unreachable'],
     ]
 
-    const clock = new ManualClock(START)
-    const db = openDatabase(join(await makeTempDataDir(), 'categories.db'))
-    applyMigrations(db, clock)
-    const logger = createLogger({ level: 'debug', now: () => clock.now(), sink: () => {} })
-    const subscriptions = new SubscriptionService({
-      db,
-      clock,
-      settings: new InstallationSettingsStore(db),
-      logger,
-    })
-    const poll = new FeedPoll({
-      db,
+    const service = await startTestService({
       retrieval: scriptedRetrieval(verdicts.map(([code]) => ({ ok: false, code, reason: '' }))),
-      clock,
-      logger,
-      subscriptions,
-      availability: new FeedAvailabilityLedger({ db, clock, logger }),
     })
+    const feedId = await subscribedOnScript(service, 'https://one.example/feed')
 
-    try {
-      expect(subscriptions.create('https://one.example/feed').kind).toBe('created')
-      for (const [code, category] of verdicts) {
-        await poll.ingest(1)
-        expect(storedAvailabilityIn(db, 1).lastFailureCategory, code).toBe(category)
-        clock.advance(60_000)
-      }
-    } finally {
-      db.$client.close()
+    for (const [code, category] of verdicts) {
+      await pollWhenDue(service, feedId)
+      expect(storedAvailability(service, feedId).lastFailureCategory, code).toBe(category)
     }
   })
 })
