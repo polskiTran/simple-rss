@@ -24,7 +24,7 @@ import {
   libraryItems,
   subscriptions,
 } from '../persistence/schema.js'
-import { gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
+import { cadenceByFeed, gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
 import { availabilityOf, type RecordedAvailability } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
@@ -308,7 +308,8 @@ export class SubscriptionService {
     const timezone = this.#settings.effectiveTimezone()
     const today = dateKey(this.#clock.now(), timezone)
     const dayOf = dayKeysIn(timezone)
-    const counts = new Map<string, number>()
+    const days = gridDayKeys(today)
+    const counts = cadenceByFeed(this.#db, timezone, days, [feedId])(feedId)
     const items = this.#db
       .select({ ...LISTED_ITEM_COLUMNS, link: feedItems.link })
       .from(feedItems)
@@ -316,16 +317,12 @@ export class SubscriptionService {
       .where(eq(feedItems.feedId, feedId))
       .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
       .all()
-      .map((row) => {
-        const date = dayOf(row.chronologyAt)
-        counts.set(date, (counts.get(date) ?? 0) + 1)
-        return {
-          ...listedItemOf(row),
-          link: row.link,
-          date,
-          displayTime: timeLabel(new Date(row.chronologyAt), timezone),
-        }
-      })
+      .map((row) => ({
+        ...listedItemOf(row),
+        link: row.link,
+        date: dayOf(row.chronologyAt),
+        displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+      }))
 
     return {
       feedId: record.feedId,
@@ -346,7 +343,7 @@ export class SubscriptionService {
       },
       readingSource: record.readingSource,
       subscribedDate: dateKey(new Date(record.subscribedAt), timezone),
-      cadence: gridDayKeys(today).map((date) => ({ date, count: counts.get(date) ?? 0 })),
+      cadence: days.map((date, index) => ({ date, count: counts[index] ?? 0 })),
       items,
     }
   }
