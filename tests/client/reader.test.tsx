@@ -157,7 +157,7 @@ describe('Reader View', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'First light' })).toBeDefined()
     expect(screen.getAllByText('Field Notes').length).toBeGreaterThan(0)
-    expect(screen.getByText('saturday, 8 august')).toBeDefined()
+    expect(screen.getByText('Saturday 8 August')).toBeDefined()
     await screen.findByText('4 min read')
 
     const original = screen.getByRole('link', { name: 'Open original' })
@@ -180,7 +180,7 @@ describe('Reader View', () => {
     reading().on('GET /api/items/3', { body: { ...ITEM, feedContent } })
     render(<App />)
 
-    const meta = (await screen.findByText('saturday, 8 august')).closest('p')
+    const meta = (await screen.findByText('Saturday 8 August')).closest('p')
     const [header] = screen.getAllByRole('banner')
     if (!header) throw new Error('the chrome did not render')
     const chrome = within(header)

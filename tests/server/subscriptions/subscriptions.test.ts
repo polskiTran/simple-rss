@@ -54,7 +54,7 @@ describe('Subscriptions', () => {
         availability: {
           state: 'unchecked',
           lastCheckedAt: null,
-          lastSuccessAt: null,
+          lastSuccessDate: null,
           consecutiveFailures: 0,
           category: null,
         },
@@ -87,7 +87,7 @@ describe('Subscriptions', () => {
           availability: {
             state: 'available',
             lastCheckedAt: '2026-08-08T09:00:00.000Z',
-            lastSuccessAt: '2026-08-08T09:00:00.000Z',
+            lastSuccessDate: '2026-08-08',
             consecutiveFailures: 0,
             category: null,
           },
@@ -102,7 +102,6 @@ describe('Subscriptions', () => {
       groups: [
         {
           date: '2026-08-08',
-          label: 'Today',
           items: [
             {
               feedItemId: 1,
@@ -324,7 +323,7 @@ describe('Subscriptions', () => {
     expect(feeds.subscriptions[0].availability).toMatchObject({
       state: 'unavailable',
       consecutiveFailures: 3,
-      lastSuccessAt: null,
+      lastSuccessDate: null,
     })
   })
 

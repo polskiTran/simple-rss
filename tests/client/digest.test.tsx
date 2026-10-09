@@ -11,8 +11,8 @@ const item = (feedItemId: number, title: string, displayTime: string, feedId = 1
   digestItem({ feedItemId, title, displayTime, feedId, feedTitle, link: `https://journal.example/${feedItemId}` })
 
 const TODAY = digestGroup({ items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')] })
-const YESTERDAY = digestGroup({ date: '2026-08-07', label: 'Yesterday', items: [item(1, 'Evening notes', '09:31')] })
-const JUNE = digestGroup({ date: '2026-06-03', label: 'Wednesday 3 June', items: [item(4, 'A June letter', '12:00')] })
+const YESTERDAY = digestGroup({ date: '2026-08-07', items: [item(1, 'Evening notes', '09:31')] })
+const JUNE = digestGroup({ date: '2026-06-03', items: [item(4, 'A June letter', '12:00')] })
 
 const DIGEST = digest({ groups: [TODAY, YESTERDAY, JUNE] })
 
@@ -245,9 +245,9 @@ const CALENDAR = {
   subscriptions: 1,
 }
 
-const dayDigest = (date: string, label: string, titles: readonly string[]) =>
+const dayDigest = (date: string, titles: readonly string[]) =>
   digest({
-    groups: [digestGroup({ date, label, items: titles.map((title, index) => item(10 + index, title, '09:00')) })],
+    groups: [digestGroup({ date, items: titles.map((title, index) => item(10 + index, title, '09:00')) })],
   })
 
 const digestWithCalendar = () =>
@@ -256,7 +256,7 @@ const digestWithCalendar = () =>
 describe('the Digest from a day', () => {
   it('starts from a day picked on the month, and goes back to today', async () => {
     digestWithCalendar().on('GET /api/digest?from=2026-08-03', {
-      body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']),
+      body: dayDigest('2026-08-03', ['Four letters']),
     })
     window.history.replaceState(null, '', '/digest')
     render(<App />)
@@ -284,7 +284,7 @@ describe('the Digest from a day', () => {
 
   it('starts from a day chosen in the date picker, and from today when today is chosen', async () => {
     digestWithCalendar().on('GET /api/digest?from=2026-08-07', {
-      body: dayDigest('2026-08-07', 'Yesterday', ['Evening notes']),
+      body: dayDigest('2026-08-07', ['Evening notes']),
     })
     window.history.replaceState(null, '', '/digest')
     render(<App />)
@@ -314,7 +314,7 @@ describe('the Digest from a day', () => {
     expect(screen.getByText('First light')).toBeDefined()
     expect(screen.queryByText('Loading the digest')).toBeNull()
 
-    picked.resolve({ body: dayDigest('2026-08-03', 'Monday 3 August', ['Four letters']) })
+    picked.resolve({ body: dayDigest('2026-08-03', ['Four letters']) })
     expect(await screen.findByText('Four letters')).toBeDefined()
     expect(screen.queryByText('First light')).toBeNull()
   })

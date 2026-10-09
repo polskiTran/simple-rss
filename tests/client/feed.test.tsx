@@ -216,7 +216,7 @@ describe('managing one Feed', () => {
         ...DETAIL,
         availability: availability({
           state: 'unavailable',
-          lastSuccessAt: '2026-08-05T09:00:00.000Z',
+          lastSuccessDate: '2026-08-05',
           consecutiveFailures: 3,
           category: 'http_error',
         }),

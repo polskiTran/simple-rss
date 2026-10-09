@@ -1,10 +1,9 @@
 import { Button } from '@base-ui/react/button'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   MAX_FEED_DESCRIPTION_LENGTH,
   MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
-  READING_SOURCES,
   type FeedDetail,
   type FeedDetailsUpdate,
   type PollingIntervalMinutes,
@@ -20,13 +19,13 @@ import {
   updateReadingSource,
 } from '../api.js'
 import { useScreenTitle } from '../arrival.js'
-import { cadenceGrid, counted } from '../cadence.js'
+import { cadenceGrid } from '../cadence.js'
 import { ActionDialog, DialogCancel } from '../components/action-dialog.js'
 import { BackButton } from '../components/back-button.js'
 import { CadenceGrid } from '../components/cadence-grid.js'
 import { Choice } from '../components/choice.js'
 import { Field } from '../components/field.js'
-import { Group } from '../components/group.js'
+import { enterSection, Group } from '../components/group.js'
 import { HomePageLink } from '../components/home-page-link.js'
 import { Icon } from '../components/icon.js'
 import { ItemBox } from '../components/item-box.js'
@@ -35,13 +34,13 @@ import { LoadingNote } from '../components/loading-note.js'
 import { NativeSelect } from '../components/native-select.js'
 import { Row } from '../components/row.js'
 import { withSaved } from '../components/save-toggle.js'
-import { READING_SOURCE_LABELS } from '../reading-source.js'
-import { dayBefore, dayOfYear, longDay } from '../day-names.js'
+import { counted, dayOfYear, dayTitle, longDay } from '../day-names.js'
+import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS } from '../reading-source.js'
 import type { Origin } from '../routing.js'
 import { useResource, valueInView } from '../use-resource.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
 
-export interface FeedViewProps {
+interface FeedViewProps {
   readonly feedId: number
   readonly origin: Origin
   onBack(origin: Origin): void
@@ -58,53 +57,52 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   const detail = inView?.feedId === feedId ? inView : undefined
   useScreenTitle(detail?.title)
   const [notice, setNotice] = useState('')
-  const [refreshing, setRefreshing] = useState(false)
-  const [changing, setChanging] = useState(false)
+  const [refreshing, startRefresh] = useTransition()
+  const [changing, startChange] = useTransition()
 
-  async function refresh() {
+  // Each action clears the notice before its transition starts, so the clearing
+  // shows at once and an answer repeated word for word is announced again.
+  function refresh() {
     if (refreshing) return
-    setRefreshing(true)
     setNotice('')
-    try {
-      const { observedItems } = await refreshFeed(feedId)
-      setNotice(`Refreshed. The feed shows ${counted(observedItems, 'item')}.`)
-    } catch (error) {
-      setNotice(retryFailure(error))
-    } finally {
-      setRefreshing(false)
-    }
-    // Read again in place: the detail stays in view, and a Feed opened meanwhile cancels it.
-    retry()
+    startRefresh(async () => {
+      try {
+        const { observedItems } = await refreshFeed(feedId)
+        setNotice(`Refreshed. The feed shows ${counted(observedItems, 'item')}.`)
+      } catch (error) {
+        setNotice(retryFailure(error))
+      }
+      // Read again in place: the detail stays in view, and a Feed opened meanwhile cancels it.
+      retry()
+    })
   }
 
-  async function changeInterval(pollingIntervalMinutes: PollingIntervalMinutes) {
+  function changeInterval(pollingIntervalMinutes: PollingIntervalMinutes) {
     if (changing) return
-    setChanging(true)
     setNotice('')
-    try {
-      const schedule = await updatePollingInterval(feedId, pollingIntervalMinutes)
-      set((detail) => ({ ...detail, schedule }))
-      setNotice(`Now checked ${INTERVAL_PHRASES[pollingIntervalMinutes]}.`)
-    } catch {
-      setNotice('The interval couldn’t be changed.')
-    } finally {
-      setChanging(false)
-    }
+    startChange(async () => {
+      try {
+        const schedule = await updatePollingInterval(feedId, pollingIntervalMinutes)
+        set((detail) => ({ ...detail, schedule }))
+        setNotice(`Now checked ${INTERVALS[pollingIntervalMinutes].phrase}.`)
+      } catch {
+        setNotice('The interval couldn’t be changed.')
+      }
+    })
   }
 
-  async function changeReadingSource(readingSource: ReadingSource) {
+  function changeReadingSource(readingSource: ReadingSource) {
     if (changing) return
-    setChanging(true)
     setNotice('')
-    try {
-      const preference = await updateReadingSource(feedId, readingSource)
-      set((detail) => ({ ...detail, ...preference }))
-      setNotice(`Items now open with the ${READING_SOURCE_LABELS[readingSource].toLowerCase()}.`)
-    } catch {
-      setNotice('The reading source couldn’t be changed.')
-    } finally {
-      setChanging(false)
-    }
+    startChange(async () => {
+      try {
+        const preference = await updateReadingSource(feedId, readingSource)
+        set((detail) => ({ ...detail, ...preference }))
+        setNotice(`Items now open with the ${READING_SOURCE_LABELS[readingSource].toLowerCase()}.`)
+      } catch {
+        setNotice('The reading source couldn’t be changed.')
+      }
+    })
   }
 
   const back = <BackButton className="view-back" origin={origin} onBack={onBack} />
@@ -167,7 +165,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
 
       <div className="feed-panels">
         <Group id="feed-cadence" title="Cadence" className="panel">
-          <CadenceGrid grid={grid} title={detail.title} onShowDay={(date) => showDay(feedId, date)} />
+          <CadenceGrid grid={grid} title={detail.title} onShowDay={(date) => enterSection(dayAnchor(feedId, date))} />
         </Group>
         <Group id="feed-info" title="Info" className="panel">
           <dl className="rows">
@@ -193,12 +191,12 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
                 value={String(detail.schedule.pollingIntervalMinutes)}
                 options={POLLING_INTERVAL_MINUTES.map((minutes) => ({
                   value: String(minutes),
-                  label: INTERVAL_LABELS[minutes],
+                  label: INTERVALS[minutes].label,
                 }))}
                 disabled={changing}
                 onChange={(chosen) => {
                   const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen)
-                  if (minutes !== undefined) void changeInterval(minutes)
+                  if (minutes !== undefined) changeInterval(minutes)
                 }}
               />
             </div>
@@ -206,9 +204,9 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
               <span className="row-label">Open items with</span>
               <Choice
                 label="Open items with"
-                options={READING_SOURCES.map((source) => ({ value: source, label: READING_SOURCE_LABELS[source] }))}
+                options={READING_SOURCE_OPTIONS}
                 value={detail.readingSource}
-                onChange={(source) => void changeReadingSource(source)}
+                onChange={changeReadingSource}
               />
             </div>
           </div>
@@ -275,7 +273,7 @@ function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: 
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, startSaving] = useTransition()
   const [error, setError] = useState('')
 
   function openChanged(next: boolean) {
@@ -288,23 +286,22 @@ function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: 
     }
   }
 
-  async function save() {
+  function save() {
     if (saving) return
-    setSaving(true)
     setError('')
-    try {
-      onSaved(
-        await updateFeedDetails(detail.feedId, {
-          customTitle: overrideOf(title),
-          customDescription: overrideOf(description),
-        }),
-      )
-      setOpen(false)
-    } catch {
-      setError('The changes couldn’t be saved.')
-    } finally {
-      setSaving(false)
-    }
+    startSaving(async () => {
+      try {
+        onSaved(
+          await updateFeedDetails(detail.feedId, {
+            customTitle: overrideOf(title),
+            customDescription: overrideOf(description),
+          }),
+        )
+        setOpen(false)
+      } catch {
+        setError('The changes couldn’t be saved.')
+      }
+    })
   }
 
   const changed = overrideOf(title) !== detail.customTitle || overrideOf(description) !== detail.customDescription
@@ -324,7 +321,7 @@ function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: 
         className="dialog-body"
         onSubmit={(event) => {
           event.preventDefault()
-          void save()
+          save()
         }}
       >
         <Field
@@ -370,19 +367,19 @@ function Unsubscribe({
   onFailed: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [working, setWorking] = useState(false)
+  const [working, startWorking] = useTransition()
 
-  async function unsubscribe() {
+  function unsubscribe() {
     if (working) return
-    setWorking(true)
-    try {
-      await unsubscribeFromFeed(feedId)
-      onUnsubscribed()
-    } catch {
-      setWorking(false)
-      setOpen(false)
-      onFailed()
-    }
+    startWorking(async () => {
+      try {
+        await unsubscribeFromFeed(feedId)
+        onUnsubscribed()
+      } catch {
+        setOpen(false)
+        onFailed()
+      }
+    })
   }
 
   return (
@@ -405,25 +402,8 @@ function Unsubscribe({
   )
 }
 
-function showDay(feedId: number, date: string) {
-  const day = document.getElementById(dayAnchor(feedId, date))?.closest('section')
-  if (!day) return
-  day.tabIndex = -1
-  day.focus({ preventScroll: true })
-  // Quieted by hand: browsers do not quiet their own smooth scrolling under
-  // `prefers-reduced-motion`.
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-  day.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
-}
-
 function dayAnchor(feedId: number, date: string): string {
   return `feed-${feedId}-day-${date}`
-}
-
-function dayTitle(date: string, today: string): string {
-  if (date === today) return 'Today'
-  if (date === dayBefore(today)) return 'Yesterday'
-  return date.slice(0, 4) === today.slice(0, 4) ? longDay(date) : `${longDay(date)} ${date.slice(0, 4)}`
 }
 
 function overrideOf(draft: string): string | null {
@@ -447,20 +427,12 @@ const AGO_UNITS = [
   ['second', 1],
 ] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]
 
-const INTERVAL_PHRASES = {
-  30: 'every 30 minutes',
-  60: 'every hour',
-  120: 'every 2 hours',
-  360: 'every 6 hours',
-  720: 'every 12 hours',
-  1440: 'once a day',
-} satisfies Readonly<Record<PollingIntervalMinutes, string>>
-
-const INTERVAL_LABELS = {
-  30: '30 minutes',
-  60: '1 hour',
-  120: '2 hours',
-  360: '6 hours',
-  720: '12 hours',
-  1440: '1 day',
-} satisfies Readonly<Record<PollingIntervalMinutes, string>>
+/** Each Polling Interval as the select names it, and as the notice says it is now checked. */
+const INTERVALS = {
+  30: { label: '30 minutes', phrase: 'every 30 minutes' },
+  60: { label: '1 hour', phrase: 'every hour' },
+  120: { label: '2 hours', phrase: 'every 2 hours' },
+  360: { label: '6 hours', phrase: 'every 6 hours' },
+  720: { label: '12 hours', phrase: 'every 12 hours' },
+  1440: { label: '1 day', phrase: 'once a day' },
+} as const satisfies Readonly<Record<PollingIntervalMinutes, { label: string; phrase: string }>>

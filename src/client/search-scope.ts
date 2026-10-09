@@ -1,9 +1,12 @@
 import type { SearchScope } from '../shared/api.js'
 
-/** The words of each scope: the line's placeholder, and the place the empty state and scope line name. */
+/**
+ * The words of each scope: the line's placeholder, the place the empty state
+ * names, and the scope switch's word for it.
+ */
 export const SEARCH_SCOPE_COPY = {
-  everywhere: { prompt: 'Search your reading', place: 'your reading' },
-  saved: { prompt: 'Search your saves', place: 'your saves' },
-  subscriptions: { prompt: 'Search your feeds', place: 'your feeds' },
-  feed: { prompt: 'Search this feed', place: 'this feed' },
-} as const satisfies Record<SearchScope['kind'], { prompt: string; place: string }>
+  everywhere: { prompt: 'Search your reading', place: 'your reading', label: 'Everywhere' },
+  saved: { prompt: 'Search your saves', place: 'your saves', label: 'Saved' },
+  subscriptions: { prompt: 'Search your feeds', place: 'your feeds', label: 'Feeds' },
+  feed: { prompt: 'Search this feed', place: 'this feed', label: 'This feed' },
+} as const satisfies Record<SearchScope['kind'], { prompt: string; place: string; label: string }>

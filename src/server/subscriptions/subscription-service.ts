@@ -282,7 +282,8 @@ export class SubscriptionService {
   list(): readonly SubscriptionSummary[] {
     const records = this.#subscribedFeeds()
     const cadenceOf = this.#stripCadence(records.map((record) => record.feedId))
-    return records.map((record) => summaryOf(record, cadenceOf))
+    const timezone = this.#settings.effectiveTimezone()
+    return records.map((record) => summaryOf(record, cadenceOf, timezone))
   }
 
   /** Days and labels use the installation timezone, so the cadence grid reads in the User's own calendar. */
@@ -335,7 +336,7 @@ export class SubscriptionService {
       homePageUrl: record.homePageUrl,
       enteredUrl: record.enteredUrl,
       resolvedUrl: record.resolvedUrl,
-      availability: availabilityOf(record),
+      availability: availabilityOf(record, timezone),
       schedule: { pollingIntervalMinutes: record.pollingIntervalMinutes, nextPollAt: record.nextPollAt },
       readingSource: record.readingSource,
       subscribedDate: dateKey(new Date(record.subscribedAt), timezone),
@@ -355,7 +356,7 @@ export class SubscriptionService {
   }
 
   #withCadence(feed: SubscribedFeedRecord): SubscriptionSummary {
-    return summaryOf(feed, this.#stripCadence([feed.feedId]))
+    return summaryOf(feed, this.#stripCadence([feed.feedId]), this.#settings.effectiveTimezone())
   }
 
   #feedByCanonicalUrl(url: string): SubscribedFeedRecord | undefined {
@@ -408,7 +409,11 @@ function newSubscription(feedId: number, now: string) {
   return { feedId, nextPollAt: now, createdAt: now }
 }
 
-function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => number[]): SubscriptionSummary {
+function summaryOf(
+  record: SubscribedFeedRecord,
+  cadenceOf: (feedId: number) => number[],
+  timezone: string,
+): SubscriptionSummary {
   return {
     feedId: record.feedId,
     title: record.title,
@@ -420,7 +425,7 @@ function summaryOf(record: SubscribedFeedRecord, cadenceOf: (feedId: number) => 
     readingSource: record.readingSource,
     subscribedAt: record.subscribedAt,
     cadence: cadenceOf(record.feedId),
-    availability: availabilityOf(record),
+    availability: availabilityOf(record, timezone),
   }
 }
 

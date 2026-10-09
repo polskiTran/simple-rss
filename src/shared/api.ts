@@ -263,11 +263,12 @@ const feedAvailabilityCategorySchema = z.enum(FEED_AVAILABILITY_CATEGORIES)
 
 // `unchecked`: no retrieval has succeeded yet. `unavailable` begins at
 // `FEED_UNAVAILABLE_AFTER_FAILURES` in a row; a Feed that simply publishes
-// nothing stays `available`.
+// nothing stays `available`. `lastSuccessDate` is the installation-timezone
+// day the Feed last answered, for the client to name.
 const feedAvailabilitySchema = z.object({
   state: z.enum(['unchecked', 'available', 'unavailable']),
   lastCheckedAt: z.string().nullable(),
-  lastSuccessAt: z.string().nullable(),
+  lastSuccessDate: z.string().nullable(),
   consecutiveFailures: z.number().int().nonnegative(),
   category: feedAvailabilityCategorySchema.nullable(),
 })
@@ -374,10 +375,9 @@ export type DigestReturn = z.infer<typeof digestReturnSchema>
 
 export const QUIET_SPELL_DAYS = 7
 
-/** One whole installation-timezone day of the Digest, newest item first. */
+/** One whole installation-timezone day of the Digest, newest item first; the client names the day. */
 const digestGroupSchema = z.object({
   date: z.string(),
-  label: z.string(),
   items: z.array(digestItemSchema),
   returns: z.array(digestReturnSchema),
 })
@@ -582,7 +582,9 @@ const searchResultSchema = z.object({
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  displayDate: z.string(),
+  /** The installation-timezone day it is listed under, and its time on that day. */
+  date: z.string(),
+  displayTime: z.string(),
   saved: z.boolean(),
   // Plain-text fragment of the summary around the match; null when only the
   // title or Feed title matched — both already visible in the item shape.
@@ -604,13 +606,24 @@ const searchJumpToSchema = z.array(searchSubscriptionMatchSchema)
  * The answer carries only what its scope can hold: the jump-to group
  * everywhere and on the Feeds screen, ranked Feed Items everywhere else, and
  * the effective title of the Feed a Feed-scoped search answered from, so the
- * surface can name it.
+ * surface can name it. Every answer carries the installation-timezone `today`
+ * its items' days are named against.
  */
 export const searchResultsSchema = z.discriminatedUnion('scope', [
-  z.object({ scope: z.literal('everywhere'), subscriptions: searchJumpToSchema, results: searchItemsSchema }),
-  z.object({ scope: z.literal('saved'), results: searchItemsSchema }),
-  z.object({ scope: z.literal('subscriptions'), subscriptions: searchJumpToSchema }),
-  z.object({ scope: z.literal('feed'), feed: z.object({ title: z.string() }), results: searchItemsSchema }),
+  z.object({
+    scope: z.literal('everywhere'),
+    today: z.string(),
+    subscriptions: searchJumpToSchema,
+    results: searchItemsSchema,
+  }),
+  z.object({ scope: z.literal('saved'), today: z.string(), results: searchItemsSchema }),
+  z.object({ scope: z.literal('subscriptions'), today: z.string(), subscriptions: searchJumpToSchema }),
+  z.object({
+    scope: z.literal('feed'),
+    today: z.string(),
+    feed: z.object({ title: z.string() }),
+    results: searchItemsSchema,
+  }),
 ])
 export type SearchResults = z.infer<typeof searchResultsSchema>
 
@@ -643,7 +656,9 @@ export const readerItemSchema = z.object({
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  displayDate: z.string(),
+  /** The installation-timezone day it is listed under, and that timezone's today. */
+  date: z.string(),
+  today: z.string(),
   summary: z.string().nullable(),
   saved: z.boolean(),
   readingSource: readingSourceSchema,

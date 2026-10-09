@@ -6,8 +6,9 @@ import {
 } from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError } from '../api.js'
+import { dayAndMonth } from '../day-names.js'
 
-export const AVAILABILITY_COPY = {
+const AVAILABILITY_COPY = {
   unreachable: 'The feed can’t be reached',
   timeout: 'The feed is taking too long to respond',
   too_large: `The feed has grown past the ${MAX_FEED_SIZE_MIB} MiB limit`,
@@ -16,7 +17,7 @@ export const AVAILABILITY_COPY = {
   invalid_feed: 'The feed is returning unusable XML',
 } satisfies Readonly<Record<FeedAvailabilityCategory, string>>
 
-export const SUBSCRIPTION_FAILURE_COPY = {
+const SUBSCRIPTION_FAILURE_COPY = {
   duplicate_subscription: 'Already subscribed.',
   invalid_feed_url: 'Enter a site or feed address, like lowtechmagazine.com.',
   feed_too_large: `That feed is larger than ${MAX_FEED_SIZE_MIB} MiB.`,
@@ -58,15 +59,11 @@ export function retryFailure(cause: unknown): string {
 /** Why checking fails, when it last worked, and what stays: `… Last reached 5 Aug. Its items stay in your digest.` */
 export function unavailableNote(availability: FeedAvailability): string {
   const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'Checking isn’t working'
-  const lastSuccess = availability.lastSuccessAt
-    ? `Last reached ${noteDate(availability.lastSuccessAt)}.`
+  const lastSuccess = availability.lastSuccessDate
+    ? `Last reached ${dayAndMonth(availability.lastSuccessDate)}.`
     : 'Not reached since subscribing.'
 
   return `${reason}. ${lastSuccess} Its items stay in your digest.`
-}
-
-export function noteDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
 /**

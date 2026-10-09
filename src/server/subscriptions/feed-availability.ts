@@ -4,6 +4,7 @@ import {
   type FeedAvailabilityCategory,
   type PollingIntervalMinutes,
 } from '../../shared/api.js'
+import { dateKey } from '../calendar.js'
 import type { FeedDocumentError } from '../ingestion/feed-document.js'
 import type { LogFields } from '../logger.js'
 import type { subscriptions } from '../persistence/schema.js'
@@ -127,8 +128,11 @@ function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {
   }
 }
 
-/** The presented state is derived from the stored run of failures, never stored itself. */
-export function availabilityOf(record: RecordedAvailability): FeedAvailability {
+/**
+ * The presented state is derived from the stored run of failures, never stored
+ * itself; the last success is named by its day in the installation timezone.
+ */
+export function availabilityOf(record: RecordedAvailability, timezone: string): FeedAvailability {
   return {
     state:
       record.consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES
@@ -137,7 +141,7 @@ export function availabilityOf(record: RecordedAvailability): FeedAvailability {
           ? 'unchecked'
           : 'available',
     lastCheckedAt: record.lastPolledAt,
-    lastSuccessAt: record.lastSuccessAt,
+    lastSuccessDate: record.lastSuccessAt === null ? null : dateKey(new Date(record.lastSuccessAt), timezone),
     consecutiveFailures: record.consecutiveFailures,
     category: record.lastFailureCategory,
   }

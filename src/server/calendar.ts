@@ -23,38 +23,7 @@ export function timeLabel(date: Date, timezone: string): string {
   return formatIn(timezone, 'en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
 }
 
-/**
- * Meta-row date outside the Digest's day grouping: `Today, 07:15`,
- * `Yesterday, 09:31`, then `3 August` — the year only once it is not this one.
- */
-export function metaRowDate(instant: Date, itemDate: string, today: string, timezone: string): string {
-  if (itemDate === today) return `Today, ${timeLabel(instant, timezone)}`
-  if (itemDate === dayBefore(today)) return `Yesterday, ${timeLabel(instant, timezone)}`
-
-  const sameYear = itemDate.slice(0, 4) === today.slice(0, 4)
-  return formatIn(timezone, 'en-GB', {
-    day: 'numeric',
-    month: 'long',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(instant)
-}
-
-/**
- * A day named in full — `Saturday 8 August`, the year only once it is not this
- * one — for the Reader header and the Digest's older day headings.
- */
-export function longDate(instant: Date, today: string, timezone: string): string {
-  const sameYear = dateKey(instant, timezone).slice(0, 4) === today.slice(0, 4)
-  const weekday = formatIn(timezone, 'en-GB', { weekday: 'long' }).format(instant)
-  const day = formatIn(timezone, 'en-GB', {
-    day: 'numeric',
-    month: 'long',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(instant)
-  return `${weekday} ${day}`
-}
-
-export function dayBefore(dayKey: string): string {
+function dayBefore(dayKey: string): string {
   return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - DAY_MS).toISOString().slice(0, 10)
 }
 

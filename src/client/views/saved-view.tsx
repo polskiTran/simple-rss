@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { LibraryItem, LibraryOrder } from '../../shared/api.js'
 import { fetchLibrary, saveToLibrary } from '../api.js'
@@ -9,10 +9,10 @@ import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems } from '../components/older-items.js'
-import { dayBefore, dayOfYear, monthName } from '../day-names.js'
+import { dayOfYear, monthName, relativeDay } from '../day-names.js'
 import { usePagedResource, valueInView } from '../use-resource.js'
 
-export interface SavedViewProps {
+interface SavedViewProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
@@ -154,27 +154,24 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
 
 /** `Saved today`, `Saved yesterday`, then `Saved 27 August`. */
 function savedLabel(savedDate: string, today: string): string {
-  if (savedDate === today) return 'Saved today'
-  if (savedDate === dayBefore(today)) return 'Saved yesterday'
-  return `Saved ${dayOfYear(savedDate, today)}`
+  return `Saved ${relativeDay(savedDate, today)?.toLowerCase() ?? dayOfYear(savedDate, today)}`
 }
 
 /** What an unsave leaves in the list: what happened, and the way back. */
 function UndoLine({ item, onResaved }: { item: LibraryItem; onResaved: () => void }) {
-  const [pending, setPending] = useState(false)
+  const [pending, startUndo] = useTransition()
   const [failed, setFailed] = useState(false)
 
-  async function undo() {
+  function undo() {
     if (pending) return
-    setPending(true)
     setFailed(false)
-    try {
-      if ((await saveToLibrary(item.feedItemId)).saved) onResaved()
-    } catch {
-      setFailed(true)
-    } finally {
-      setPending(false)
-    }
+    startUndo(async () => {
+      try {
+        if ((await saveToLibrary(item.feedItemId)).saved) onResaved()
+      } catch {
+        setFailed(true)
+      }
+    })
   }
 
   return (

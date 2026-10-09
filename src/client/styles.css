@@ -2556,6 +2556,14 @@
   }
 }
 
+/* A jump within a page glides; under reduced motion it cuts. A scroll that
+   restores a place asks for `instant` itself. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
    place instead of rising, and the waiting tile holds still. */
 @media (prefers-reduced-motion: reduce) {

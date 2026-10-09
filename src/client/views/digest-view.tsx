@@ -10,7 +10,7 @@ import { AddFeedDialog } from './add-feed-dialog.js'
 import { DigestMonth } from './digest-month.js'
 import { DigestList } from './digest-list.js'
 
-export interface DigestViewProps {
+interface DigestViewProps {
   readonly start: DigestStart
   onStart(start: DigestStart): void
   onOpenItem(feedItemId: number): void
@@ -34,7 +34,7 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
   const readFrom = (from: string | undefined) => {
     onStart({ from: from === shown?.today ? undefined : from })
     // Picked below the fold, the day starts the list back at its top.
-    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo(0, 0)
+    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   return (

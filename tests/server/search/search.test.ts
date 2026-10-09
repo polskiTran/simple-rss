@@ -102,7 +102,8 @@ describe('searching retained reading metadata', () => {
       feedTitle: 'Field Notes',
       publishedAt: '2026-08-08T07:15:00.000Z',
       firstSeenAt: '2026-08-08T09:00:00.000Z',
-      displayDate: 'Today, 07:15',
+      date: '2026-08-08',
+      displayTime: '07:15',
       saved: false,
       snippet: null,
     })
@@ -214,7 +215,12 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, rss('Field Notes', item('a', 'Morning light')))
 
-    expect(await search(user, 'nonexistent')).toEqual({ scope: 'everywhere', subscriptions: [], results: [] })
+    expect(await search(user, 'nonexistent')).toEqual({
+      scope: 'everywhere',
+      today: '2026-08-08',
+      subscriptions: [],
+      results: [],
+    })
   })
 
   it('follows metadata corrections: a retitled item and a renamed Feed', async () => {
@@ -478,7 +484,12 @@ describe('searching retained reading metadata', () => {
     const user = await claimedDevice(service)
     await subscribed(user, service, coastXml, COAST_URL)
 
-    expect(await search(user, 'drift')).toEqual({ scope: 'everywhere', subscriptions: [], results: [] })
+    expect(await search(user, 'drift')).toEqual({
+      scope: 'everywhere',
+      today: '2026-08-08',
+      subscriptions: [],
+      results: [],
+    })
   })
 
   it('jumps by the Custom Title while set, not the reported title', async () => {

@@ -15,7 +15,7 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { dateKey, dayAfter, dayBefore, dayKeysIn, daysBetween, dayStartUtc, longDate, timeLabel } from '../calendar.js'
+import { dateKey, dayAfter, dayKeysIn, daysBetween, dayStartUtc, timeLabel } from '../calendar.js'
 
 /** Items a Digest page reaches before completing the day the last one falls on (ADR 0011). */
 const DIGEST_PAGE_SIZE = 50
@@ -53,19 +53,12 @@ export class DigestService {
     }
 
     const today = dateKey(this.#clock.now(), timezone)
-    const yesterday = dayBefore(today)
     const groups = new Map<string, Omit<DigestGroup, 'returns'>>()
     for (const row of fetched) {
       const date = dayOf(row.chronologyAt)
       let group = groups.get(date)
       if (!group) {
-        const label =
-          date === today
-            ? 'Today'
-            : date === yesterday
-              ? 'Yesterday'
-              : longDate(new Date(row.chronologyAt), today, timezone)
-        group = { date, label, items: [] }
+        group = { date, items: [] }
         groups.set(date, group)
       }
       group.items.push(digestItemOf(row, timezone))

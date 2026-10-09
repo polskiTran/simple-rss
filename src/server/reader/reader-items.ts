@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { DEFAULT_READING_SOURCE, type ReaderItem } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, longDate } from '../calendar.js'
+import { dateKey } from '../calendar.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
@@ -65,7 +65,8 @@ export class ReaderItems {
       feedId: row.feedId,
       feedTitle: row.feedTitle,
       link: row.link,
-      displayDate: longDate(new Date(row.chronologyAt), dateKey(this.#clock.now(), timezone), timezone),
+      date: dateKey(new Date(row.chronologyAt), timezone),
+      today: dateKey(this.#clock.now(), timezone),
       summary: row.summary,
       feedContent: row.feedContentMarkdown
         ? {

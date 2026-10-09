@@ -24,7 +24,7 @@ const TODAY = '2026-08-08'
 export const availability = (overrides: Partial<FeedAvailability> = {}): FeedAvailability => ({
   state: 'available',
   lastCheckedAt: '2026-08-08T09:00:00.000Z',
-  lastSuccessAt: '2026-08-08T09:00:00.000Z',
+  lastSuccessDate: TODAY,
   consecutiveFailures: 0,
   category: null,
   ...overrides,
@@ -33,7 +33,7 @@ export const availability = (overrides: Partial<FeedAvailability> = {}): FeedAva
 export const UNCHECKED = availability({
   state: 'unchecked',
   lastCheckedAt: null,
-  lastSuccessAt: null,
+  lastSuccessDate: null,
 })
 
 const FEED = {
@@ -102,7 +102,6 @@ export const digestItem = (overrides: Partial<DigestItem> = {}): DigestItem => (
 /** A day of the Digest; Today unless told otherwise. */
 export const digestGroup = (overrides: Partial<DigestGroup> = {}): DigestGroup => ({
   date: TODAY,
-  label: 'Today',
   items: [digestItem()],
   returns: [],
   ...overrides,
@@ -124,7 +123,8 @@ export const readerItem = (overrides: Partial<ReaderItem> = {}): ReaderItem => (
   link: 'https://journal.example/first-light',
   publishedAt: '2026-08-08T07:15:00.000Z',
   firstSeenAt: '2026-08-08T09:00:00.000Z',
-  displayDate: 'saturday, 8 august',
+  date: TODAY,
+  today: TODAY,
   summary: 'A clear morning over the valley.',
   saved: false,
   readingSource: 'original-webpage',
@@ -183,7 +183,8 @@ export const searchResult = (overrides: Partial<SearchResult> = {}): SearchResul
   feedTitle: FEED.title,
   publishedAt: '2026-08-08T07:15:00.000Z',
   firstSeenAt: '2026-08-08T09:00:00.000Z',
-  displayDate: 'Today, 07:15',
+  date: TODAY,
+  displayTime: '07:15',
   saved: false,
   snippet: null,
   ...overrides,

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export interface GroupProps {
+interface GroupProps {
   /** Ties the heading to its section; unique on the page. */
   readonly id: string
   readonly title: ReactNode
@@ -30,4 +30,17 @@ export function Group({ id, title, count, aside, className, children }: GroupPro
       {children}
     </section>
   )
+}
+
+/**
+ * Takes the reader into the Group whose heading is `id`: focus lands on the
+ * section without a jump, then the page scrolls it to the top — smoothly, unless
+ * the User asks for less motion (styles.css).
+ */
+export function enterSection(id: string) {
+  const section = document.getElementById(id)?.closest('section')
+  if (!section) return
+  section.tabIndex = -1
+  section.focus({ preventScroll: true })
+  section.scrollIntoView({ block: 'start' })
 }

@@ -1,12 +1,12 @@
 import { Button } from '@base-ui/react/button'
-import { useState, type FormEvent } from 'react'
+import { useState, useTransition, type FormEvent } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { ApiError, claimInstallation } from '../api.js'
 import { Field } from '../components/field.js'
 import { describeFailure, reasonToHold } from './password-failure.js'
 
-export interface SetupViewProps {
+interface SetupViewProps {
   onClaimed(status: AuthStatus): void
   /** Called when the server says someone else got here first. */
   onAlreadyClaimed(): void
@@ -18,9 +18,9 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [notice, setNotice] = useState('')
-  const [claiming, setClaiming] = useState(false)
+  const [claiming, startClaiming] = useTransition()
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault()
     if (claiming) return
 
@@ -30,24 +30,23 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
       return
     }
 
-    setClaiming(true)
     setNotice('')
-    try {
-      onClaimed(await claimInstallation(setupSecret, password))
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'already_claimed') {
-        onAlreadyClaimed()
-        return
+    startClaiming(async () => {
+      try {
+        onClaimed(await claimInstallation(setupSecret, password))
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'already_claimed') {
+          onAlreadyClaimed()
+          return
+        }
+        setNotice(
+          describeFailure(error, {
+            invalid_credentials: 'That setup secret isn’t right.',
+            setup_unavailable: 'This installation has no setup secret configured.',
+          }),
+        )
       }
-      setNotice(
-        describeFailure(error, {
-          invalid_credentials: 'That setup secret isn’t right.',
-          setup_unavailable: 'This installation has no setup secret configured.',
-        }),
-      )
-    } finally {
-      setClaiming(false)
-    }
+    })
   }
 
   const ready = setupSecret !== '' && password !== '' && confirmation !== ''

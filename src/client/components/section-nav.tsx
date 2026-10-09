@@ -1,8 +1,8 @@
-import { routedClick } from '../routed-link.js'
-import { pathOf, ROUTE_LABELS, type Route } from '../routing.js'
+import { ROUTE_LABELS, sectionPath, type Route } from '../routing.js'
 import { Icon, type IconName } from './icon.js'
+import { RoutedLink } from './routed-link.js'
 
-export interface SectionNavProps {
+interface SectionNavProps {
   readonly active: Route
   readonly onNavigate: (route: Route) => void
 }
@@ -14,11 +14,11 @@ export interface SectionNavProps {
  */
 export function SectionNav({ active, onNavigate }: SectionNavProps) {
   const link = (route: Route, className: string, icon?: IconName) => (
-    <a
+    <RoutedLink
       className={className}
-      href={pathOf(route)}
+      href={sectionPath(route)}
       aria-current={route === active ? 'page' : undefined}
-      onClick={routedClick(() => onNavigate(route))}
+      onNavigate={() => onNavigate(route)}
     >
       {icon ? (
         <>
@@ -28,7 +28,7 @@ export function SectionNav({ active, onNavigate }: SectionNavProps) {
       ) : (
         ROUTE_LABELS[route]
       )}
-    </a>
+    </RoutedLink>
   )
 
   return (

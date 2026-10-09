@@ -104,6 +104,7 @@ describe('a Feed Item’s attribution', () => {
     reading('/digest').on('GET /api/search?q=light', {
       body: {
         scope: 'everywhere',
+        today: '2026-08-08',
         subscriptions: [],
         results: [searchResult()],
       },
@@ -346,10 +347,10 @@ describe('the section an open article reads under', () => {
 describe('the scope a search takes from its screen', () => {
   const found = (...titles: string[]) => titles.map((title, index) => searchResult({ feedItemId: 3 + index, title }))
   const withinFeed = {
-    body: { scope: 'feed', feed: { title: 'Field Notes' }, results: found('First light') },
+    body: { scope: 'feed', today: '2026-08-08', feed: { title: 'Field Notes' }, results: found('First light') },
   } satisfies Reply<SearchResults>
   const everywhere = {
-    body: { scope: 'everywhere', subscriptions: [], results: found('First light', 'Coast light') },
+    body: { scope: 'everywhere', today: '2026-08-08', subscriptions: [], results: found('First light', 'Coast light') },
   } satisfies Reply<SearchResults>
 
   it('from an opened Feed, answers within it and names it; everywhere steps out, and clearing lands back on the Feed', async () => {
@@ -400,7 +401,9 @@ describe('the scope a search takes from its screen', () => {
   })
 
   it('from the Library, answers within it and says so when nothing matches', async () => {
-    reading('/saved').on('GET /api/search?q=light&in=saved', { body: { scope: 'saved', results: [] } })
+    reading('/saved').on('GET /api/search?q=light&in=saved', {
+      body: { scope: 'saved', today: '2026-08-08', results: [] },
+    })
     render(<App />)
     const user = userEvent.setup()
     await screen.findByRole('link', { name: 'First light' })
@@ -415,6 +418,7 @@ describe('the scope a search takes from its screen', () => {
     reading('/feeds').on('GET /api/search?q=field&in=subscriptions', {
       body: {
         scope: 'subscriptions',
+        today: '2026-08-08',
         subscriptions: [
           {
             feedId: 1,

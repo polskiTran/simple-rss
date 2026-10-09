@@ -4,21 +4,20 @@ import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
-import { counted } from '../cadence.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
-import { FeedTitleLink } from '../components/feed-title-link.js'
 import { Icon } from '../components/icon.js'
 import { Group } from '../components/group.js'
 import { ItemBox } from '../components/item-box.js'
-import { ItemTitleLink } from '../components/item-title-link.js'
+import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { dayBefore, longDay } from '../day-names.js'
+import { counted, dayTitle, longDay, relativeDay } from '../day-names.js'
+import { feedPath, readerPath } from '../routing.js'
 
 /** A Feed with more items than this in one day is folded to its newest `FOLDED_ITEMS`. */
 const FOLD_OVER = 5
 const FOLDED_ITEMS = 3
 
-export interface DigestDayProps {
+interface DigestDayProps {
   readonly group: DigestGroup
   readonly today: string
   onOpenItem(feedItemId: number): void
@@ -41,18 +40,19 @@ interface FeedDay {
 export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DigestDayProps) {
   const [only, setOnly] = useState<number>()
   const feeds = feedDaysOf(group)
-  const relative = group.date === today || group.date === dayBefore(today)
+  const title = dayTitle(group.date, today)
+  const relative = relativeDay(group.date, today) !== undefined
   return (
     <Group
       id={`day-${group.date}`}
-      title={group.label}
+      title={title}
       count={group.items.length}
       aside={relative ? longDay(group.date) : undefined}
     >
       {feeds.length > 1 ? (
         <ToggleGroup
           className="day-feeds"
-          aria-label={`Feeds on ${relative ? longDay(group.date) : group.label}`}
+          aria-label={`Feeds on ${relative ? longDay(group.date) : title}`}
           value={only === undefined ? [] : [String(only)]}
           onValueChange={([chosen]) => setOnly(chosen === undefined ? undefined : Number(chosen))}
         >
@@ -133,13 +133,16 @@ function FeedDayBox({
   const folded = foldable && !unfolded
   const toggleFold = () => {
     flushSync(() => setUnfolded(!unfolded))
-    if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0) box.current?.scrollIntoView()
+    if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0)
+      box.current?.scrollIntoView({ behavior: 'instant' })
   }
   const oldest = feed.items.at(-1) ?? newest
   return (
     <article ref={box} className="item feed-day">
       <div className="item-meta">
-        <FeedTitleLink className="item-feed" feedId={feed.feedId} title={feed.title} onOpen={onOpenFeed} />
+        <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => onOpenFeed(feed.feedId)}>
+          {feed.title}
+        </RoutedLink>
         <span className="item-when">{counted(feed.items.length, 'item')}</span>
         <span className="item-when">
           {oldest.displayTime}–{newest.displayTime}
@@ -151,7 +154,9 @@ function FeedDayBox({
           {(folded ? feed.items.slice(0, FOLDED_ITEMS) : feed.items).map((item) => (
             <li key={item.feedItemId} className="feed-day-item">
               <h3 className="feed-day-title">
-                <ItemTitleLink feedItemId={item.feedItemId} title={item.title} onOpen={onOpenItem} />
+                <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpenItem(item.feedItemId)}>
+                  {item.title}
+                </RoutedLink>
               </h3>
               <time className="item-when" dateTime={item.publishedAt ?? item.firstSeenAt}>
                 {item.displayTime}

@@ -39,7 +39,7 @@ export function useArrival(arrival: Arrival | undefined, page: RefObject<HTMLEle
         focused = true
       }
       if (target !== undefined && !placed) {
-        window.scrollTo(0, target)
+        window.scrollTo({ top: target, behavior: 'instant' })
         placed = Math.abs(window.scrollY - target) < 1
       }
       if (focused && placed) stop()

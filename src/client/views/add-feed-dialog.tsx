@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { useState, type FormEvent } from 'react'
+import { useState, useTransition, type FormEvent } from 'react'
 import type { ApiErrorCode, CreateSubscriptionResponse, OpmlImportReport } from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError, importOpml, subscribeToFeed } from '../api.js'
@@ -11,7 +11,7 @@ import { feedAddressOf, subscriptionFailure } from './feed-language.js'
 
 type Way = 'address' | 'opml'
 
-export interface AddFeedDialogProps {
+interface AddFeedDialogProps {
   /** A Subscription was recorded; the page takes over watching its first check. */
   onSubscribed(created: CreateSubscriptionResponse): void
   onImported(report: OpmlImportReport): void
@@ -27,7 +27,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
   const [address, setAddress] = useState('')
   const [file, setFile] = useState<File | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
-  const [working, setWorking] = useState(false)
+  const [working, startWorking] = useTransition()
 
   function openChanged(next: boolean) {
     if (working) return
@@ -39,7 +39,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     }
   }
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault()
     if (working) return
     setError(undefined)
@@ -50,30 +50,28 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
         setError('Enter a site or feed address, like lowtechmagazine.com.')
         return
       }
-      setWorking(true)
-      try {
-        const created = await subscribeToFeed(url)
-        setOpen(false)
-        onSubscribed(created)
-      } catch (cause) {
-        setError(subscriptionFailure(cause))
-      } finally {
-        setWorking(false)
-      }
+      startWorking(async () => {
+        try {
+          const created = await subscribeToFeed(url)
+          setOpen(false)
+          onSubscribed(created)
+        } catch (cause) {
+          setError(subscriptionFailure(cause))
+        }
+      })
       return
     }
 
     if (!file) return
-    setWorking(true)
-    try {
-      const report = await importOpml(await file.text())
-      setOpen(false)
-      onImported(report)
-    } catch (cause) {
-      setError(importFailure(cause))
-    } finally {
-      setWorking(false)
-    }
+    startWorking(async () => {
+      try {
+        const report = await importOpml(await file.text())
+        setOpen(false)
+        onImported(report)
+      } catch (cause) {
+        setError(importFailure(cause))
+      }
+    })
   }
 
   const ready = way === 'address' ? address.trim() !== '' : file !== undefined

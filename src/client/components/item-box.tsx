@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { FeedTitleLink } from './feed-title-link.js'
-import { ItemTitleLink } from './item-title-link.js'
+import { feedPath, readerPath } from '../routing.js'
+import { RoutedLink } from './routed-link.js'
 import { SaveToggle } from './save-toggle.js'
 
 /**
@@ -8,13 +8,13 @@ import { SaveToggle } from './save-toggle.js'
  * page. Without `onOpen` the name is plain text — a save whose Subscription is
  * gone has no Feed to open.
  */
-export interface ItemFeed {
+interface ItemFeed {
   readonly feedId: number
   readonly title: string
   readonly onOpen?: ((feedId: number) => void) | undefined
 }
 
-export interface ItemBoxProps {
+interface ItemBoxProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
@@ -43,11 +43,14 @@ export function ItemBox({
   onOpen,
   onSaved,
 }: ItemBoxProps) {
+  const openFeed = feed?.onOpen
   return (
     <article className="item" data-saved={saved ? '' : undefined}>
       <div className="item-meta">
-        {feed === undefined ? null : feed.onOpen ? (
-          <FeedTitleLink className="item-feed" feedId={feed.feedId} title={feed.title} onOpen={feed.onOpen} />
+        {feed === undefined ? null : openFeed ? (
+          <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => openFeed(feed.feedId)}>
+            {feed.title}
+          </RoutedLink>
         ) : (
           <span className="item-feed">{feed.title}</span>
         )}
@@ -58,9 +61,9 @@ export function ItemBox({
       </div>
       <div className="item-body">
         <h3 className="item-title">
-          <ItemTitleLink feedItemId={feedItemId} title={title} onOpen={onOpen}>
-            {titleContent}
-          </ItemTitleLink>
+          <RoutedLink href={readerPath(feedItemId)} onNavigate={() => onOpen(feedItemId)}>
+            {titleContent ?? title}
+          </RoutedLink>
         </h3>
         {snippet ? <p className="item-snippet">{snippet}</p> : null}
       </div>

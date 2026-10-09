@@ -1,18 +1,16 @@
 import { Button } from '@base-ui/react/button'
-import { useEffect, useEffectEvent, useState } from 'react'
+import { useEffect, useEffectEvent, useState, useTransition } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { RHYTHM_LABELS, RHYTHMS, rhythmOf, type Rhythm } from '../../shared/rhythm.js'
 import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed } from '../api.js'
-import { CadenceStrip } from '../components/cadence-strip.js'
 import { Choice } from '../components/choice.js'
-import { Group } from '../components/group.js'
-import { HomePageLink } from '../components/home-page-link.js'
+import { FeedRow } from '../components/feed-row.js'
+import { enterSection, Group } from '../components/group.js'
 import { Icon } from '../components/icon.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { routedClick } from '../routed-link.js'
-import { feedPathOf } from '../routing.js'
+import { counted } from '../day-names.js'
 import { useResource } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
 import { firstCheckFailure, retryFailure, unavailableNote } from './feed-language.js'
@@ -34,7 +32,7 @@ interface Poll {
   readonly watching: number | undefined
 }
 
-export interface FeedsViewProps {
+interface FeedsViewProps {
   onOpenFeed(feedId: number): void
 }
 
@@ -46,7 +44,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   )
   const [notice, setNotice] = useState('')
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
-  const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
   const [poll, setPoll] = useState<Poll>({ round: 0, watching: undefined })
   const [order, setOrder] = useState<Order>('rhythm')
 
@@ -114,19 +111,16 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     void refreshList()
   }
 
+  /** Called outside the row's transition, so the notice clears at once and a repeated answer is announced again. */
   async function retry(feedId: number) {
-    if (retryingFeedId !== undefined) return
-    setRetryingFeedId(feedId)
     setNotice('')
     try {
       await refreshFeed(feedId)
       setNotice('The feed answered. Checking works again.')
     } catch (error) {
       setNotice(retryFailure(error))
-    } finally {
-      setRetryingFeedId(undefined)
     }
-    await refreshList()
+    void refreshList()
   }
 
   const subscriptions = state.kind === 'loaded' ? state.value : undefined
@@ -157,7 +151,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
             <div className="toolbar-group rhythm-jumps">
               {order === 'rhythm'
                 ? groups.map(({ rhythm, members }) => (
-                    <Button key={rhythm} className="button" onClick={() => enterGroup(rhythm)}>
+                    <Button key={rhythm} className="button" onClick={() => enterSection(rhythmAnchor(rhythm))}>
                       {RHYTHM_LABELS[rhythm]}
                       <span className="button-count">{members.length}</span>
                     </Button>
@@ -194,22 +188,10 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
       {subscriptions && subscriptions.length > 0 ? (
         order === 'rhythm' ? (
           groups.map(({ rhythm, members }) => (
-            <RhythmGroup
-              key={rhythm}
-              rhythm={rhythm}
-              subscriptions={members}
-              retryingFeedId={retryingFeedId}
-              onRetry={retry}
-              onOpen={onOpenFeed}
-            />
+            <RhythmGroup key={rhythm} rhythm={rhythm} subscriptions={members} onRetry={retry} onOpen={onOpenFeed} />
           ))
         ) : (
-          <FeedRows
-            subscriptions={ordered(subscriptions, order)}
-            retryingFeedId={retryingFeedId}
-            onRetry={retry}
-            onOpen={onOpenFeed}
-          />
+          <FeedRows subscriptions={ordered(subscriptions, order)} onRetry={retry} onOpen={onOpenFeed} />
         )
       ) : null}
     </div>
@@ -238,32 +220,15 @@ function rhythmAnchor(rhythm: Rhythm): string {
   return `rhythm-${rhythm}`
 }
 
-/** A jump takes focus into the group as well as the view, so the keyboard carries on from there. */
-function enterGroup(rhythm: Rhythm) {
-  const group = document.getElementById(rhythmAnchor(rhythm))?.closest('section')
-  if (!group) return
-  group.tabIndex = -1
-  group.focus({ preventScroll: true })
-  showGroup(rhythm)
-}
-
-function showGroup(rhythm: Rhythm) {
-  const group = document.getElementById(rhythmAnchor(rhythm))
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-  group?.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
-}
-
 function RhythmGroup({
   rhythm,
   subscriptions,
-  retryingFeedId,
   onRetry,
   onOpen,
 }: {
   rhythm: Rhythm
   subscriptions: readonly SubscriptionSummary[]
-  retryingFeedId: number | undefined
-  onRetry: (feedId: number) => void
+  onRetry: (feedId: number) => Promise<void>
   onOpen: (feedId: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -274,8 +239,8 @@ function RhythmGroup({
     setExpanded(false)
     // Folding from the foot of a long group would leave the reader in the next
     // one; bring the group back when its heading has scrolled away.
-    const top = document.getElementById(rhythmAnchor(rhythm))?.getBoundingClientRect().top ?? 0
-    if (top < 0) showGroup(rhythm)
+    const heading = document.getElementById(rhythmAnchor(rhythm))
+    if (heading && heading.getBoundingClientRect().top < 0) heading.scrollIntoView({ block: 'start' })
   }
 
   return (
@@ -286,7 +251,7 @@ function RhythmGroup({
       aside={rhythm === 'inactive' ? 'No items in 30 days' : undefined}
       className="panel"
     >
-      <FeedRows subscriptions={shown} retryingFeedId={retryingFeedId} onRetry={onRetry} onOpen={onOpen} />
+      <FeedRows subscriptions={shown} onRetry={onRetry} onOpen={onOpen} />
       {hidden.length > 0 ? (
         <div className="more">
           <Button className="button" onClick={() => setExpanded(true)}>
@@ -309,34 +274,19 @@ function RhythmGroup({
 
 function FeedRows({
   subscriptions,
-  retryingFeedId,
   onRetry,
   onOpen,
 }: {
   subscriptions: readonly SubscriptionSummary[]
-  retryingFeedId: number | undefined
-  onRetry: (feedId: number) => void
+  onRetry: (feedId: number) => Promise<void>
   onOpen: (feedId: number) => void
 }) {
   return (
     <div className="feed-rows">
       {subscriptions.map((subscription) => (
-        <article className="feed-row" key={subscription.feedId}>
-          <div className="feed-row-head">
-            <h3 className="feed-row-name">
-              <a href={feedPathOf(subscription.feedId)} onClick={routedClick(() => onOpen(subscription.feedId))}>
-                {subscription.title}
-              </a>
-            </h3>
-            <CadenceStrip counts={subscription.cadence} title={subscription.title} />
-          </div>
-          <HomePageLink domain={subscription.domain} homePageUrl={subscription.homePageUrl} />
-          <Availability
-            subscription={subscription}
-            retrying={retryingFeedId === subscription.feedId}
-            onRetry={onRetry}
-          />
-        </article>
+        <FeedRow key={subscription.feedId} feed={subscription} onOpen={onOpen}>
+          <Availability subscription={subscription} onRetry={onRetry} />
+        </FeedRow>
       ))}
     </div>
   )
@@ -345,26 +295,26 @@ function FeedRows({
 /** A row also says when a Feed has never been checked, or why checking fails, and offers the retry. */
 function Availability({
   subscription,
-  retrying,
   onRetry,
 }: {
   subscription: SubscriptionSummary
-  retrying: boolean
-  onRetry: (feedId: number) => void
+  onRetry: (feedId: number) => Promise<void>
 }) {
+  const [retrying, startRetry] = useTransition()
   const { availability } = subscription
   if (availability.state === 'unchecked') return <p className="note feed-row-note">Waiting for first check</p>
   if (availability.state !== 'unavailable') return null
 
+  const press = () => {
+    if (retrying) return
+    const retried = onRetry(subscription.feedId)
+    startRetry(() => retried)
+  }
+
   return (
     <div className="feed-row-note">
       <p className="note">{unavailableNote(availability)}</p>
-      <Button
-        className="button button-small"
-        focusableWhenDisabled
-        disabled={retrying}
-        onClick={() => onRetry(subscription.feedId)}
-      >
+      <Button className="button button-small" focusableWhenDisabled disabled={retrying} onClick={press}>
         <Icon name="refresh" />
         {retrying ? 'Retrying…' : 'Retry'}
       </Button>
@@ -402,10 +352,8 @@ async function firstCheckOutcome(feedId: number, signal: AbortSignal): Promise<s
     if (error instanceof ApiError && error.status === 404) return 'Already subscribed.'
     return undefined
   }
-  if (detail.availability.lastSuccessAt) {
-    return detail.items.length === 1
-      ? 'Subscribed. 1 item in the digest.'
-      : `Subscribed. ${detail.items.length} items in the digest.`
+  if (detail.availability.lastSuccessDate) {
+    return `Subscribed. ${counted(detail.items.length, 'item')} in the digest.`
   }
   if (detail.availability.consecutiveFailures > 0) return firstCheckFailure(detail.availability.category)
   return undefined

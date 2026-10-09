@@ -139,17 +139,23 @@ describe('presented Feed Availability', () => {
   const never = { lastPolledAt: null, lastSuccessAt: null, consecutiveFailures: 0, lastFailureCategory: null }
 
   it('is unchecked until a retrieval succeeds, failures or not', () => {
-    expect(presented(never).state).toBe('unchecked')
+    expect(presented(never, 'UTC').state).toBe('unchecked')
     expect(
-      presented({ ...never, lastPolledAt: START, consecutiveFailures: 2, lastFailureCategory: 'timeout' }).state,
+      presented({ ...never, lastPolledAt: START, consecutiveFailures: 2, lastFailureCategory: 'timeout' }, 'UTC').state,
     ).toBe('unchecked')
   })
 
   it('stays available through two failures and turns unavailable at the third', () => {
     const succeeded = { ...never, lastPolledAt: START, lastSuccessAt: START }
-    expect(presented({ ...succeeded, consecutiveFailures: 2 }).state).toBe('available')
-    expect(presented({ ...succeeded, consecutiveFailures: 3 }).state).toBe('unavailable')
-    expect(presented({ ...never, consecutiveFailures: 3 }).state).toBe('unavailable')
+    expect(presented({ ...succeeded, consecutiveFailures: 2 }, 'UTC').state).toBe('available')
+    expect(presented({ ...succeeded, consecutiveFailures: 3 }, 'UTC').state).toBe('unavailable')
+    expect(presented({ ...never, consecutiveFailures: 3 }, 'UTC').state).toBe('unavailable')
+  })
+
+  it('names the last success by its day in the installation timezone', () => {
+    const lateEvening = { ...never, lastPolledAt: START, lastSuccessAt: '2026-08-07T20:00:00.000Z' }
+    expect(presented(lateEvening, 'UTC').lastSuccessDate).toBe('2026-08-07')
+    expect(presented(lateEvening, 'Pacific/Auckland').lastSuccessDate).toBe('2026-08-08')
   })
 })
 
@@ -240,7 +246,7 @@ describe('Feed Availability', () => {
     expect(await availabilityOf(user, feedId)).toEqual({
       state: 'unavailable',
       lastCheckedAt: service.clock.now().toISOString(),
-      lastSuccessAt: START,
+      lastSuccessDate: '2026-08-08',
       consecutiveFailures: 3,
       category: 'http_error',
     })
@@ -269,7 +275,7 @@ describe('Feed Availability', () => {
     expect(await availabilityOf(user, feedId)).toEqual({
       state: 'available',
       lastCheckedAt: service.clock.now().toISOString(),
-      lastSuccessAt: service.clock.now().toISOString(),
+      lastSuccessDate: service.clock.now().toISOString().slice(0, 10),
       consecutiveFailures: 0,
       category: null,
     })
@@ -296,7 +302,7 @@ describe('Feed Availability', () => {
       state: 'unavailable',
       consecutiveFailures: 3,
       category: 'http_error',
-      lastSuccessAt: START,
+      lastSuccessDate: '2026-08-08',
     })
   })
 
@@ -324,7 +330,7 @@ describe('Feed Availability', () => {
       state: 'available',
       consecutiveFailures: 0,
       category: null,
-      lastSuccessAt: service.clock.now().toISOString(),
+      lastSuccessDate: service.clock.now().toISOString().slice(0, 10),
     })
   })
 

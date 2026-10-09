@@ -37,11 +37,7 @@ describe('the chronological Digest', () => {
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
     expect(digest.today).toBe('2026-08-08')
-    expect(digest.groups.map(({ date, label }) => [date, label])).toEqual([
-      ['2026-08-08', 'Today'],
-      ['2026-08-07', 'Yesterday'],
-      ['2026-06-03', 'Wednesday 3 June'],
-    ])
+    expect(digest.groups.map(({ date }) => date)).toEqual(['2026-08-08', '2026-08-07', '2026-06-03'])
     expect(digest.groups.map((group) => group.items.map((entry) => entry.title))).toEqual([
       ['First light'],
       ['Evening notes'],
@@ -59,7 +55,7 @@ describe('the chronological Digest', () => {
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
-    expect(digest.groups.map(({ date, label }) => [date, label])).toEqual([['2026-08-08', 'Today']])
+    expect(digest.groups.map(({ date }) => date)).toEqual(['2026-08-08'])
     expect(digest.groups[0]?.items[0]).toMatchObject({
       publishedAt: '2026-08-07T20:00:00.000Z',
       displayTime: '08:00',
@@ -88,7 +84,7 @@ describe('the chronological Digest', () => {
 
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
 
-    expect(digest.groups.map(({ label }) => label)).toEqual(['Today'])
+    expect(digest.groups.map(({ date }) => date)).toEqual(['2026-08-08'])
     expect(digest.groups[0]?.items.map((entry) => entry.title)).toEqual([
       'An undated letter',
       'From a broken clock',

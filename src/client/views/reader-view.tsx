@@ -1,26 +1,19 @@
 import { Button } from '@base-ui/react/button'
 import { Suspense, lazy, useEffect, useState } from 'react'
-import {
-  READING_SOURCES,
-  type FeedContent,
-  type ReaderArticle,
-  type ReaderDeadlineStage,
-  type ReaderItem,
-  type ReadingSource,
-} from '../../shared/api.js'
+import type { FeedContent, ReaderArticle, ReaderDeadlineStage, ReaderItem, ReadingSource } from '../../shared/api.js'
 import { useScreenTitle } from '../arrival.js'
 import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
 import { BackButton } from '../components/back-button.js'
 import { Choice } from '../components/choice.js'
 import { ChromeToolbar } from '../components/chrome-toolbar.js'
-import { FeedTitleLink } from '../components/feed-title-link.js'
 import { Icon } from '../components/icon.js'
-import { ItemTitleLink } from '../components/item-title-link.js'
+import { RoutedLink } from '../components/routed-link.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { READING_SOURCE_LABELS } from '../reading-source.js'
+import { namedDay } from '../day-names.js'
+import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS } from '../reading-source.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import type { Origin } from '../routing.js'
+import { feedPath, readerPath, type Origin } from '../routing.js'
 import { useResource } from '../use-resource.js'
 
 const preloadArticleMarkdown = () => import('../components/article-markdown.js')
@@ -50,7 +43,7 @@ const STAGE_NOTES = {
   parsing: 'Still reading the original webpage',
 } as const satisfies Record<ReaderDeadlineStage, string>
 
-export interface ReaderViewProps {
+interface ReaderViewProps {
   readonly feedItemId: number
   readonly origin: Origin
   onBack(origin: Origin): void
@@ -180,14 +173,15 @@ function OpenReader({
         <header className="reader-header">
           <h1 className="reader-title">{item.title}</h1>
           <p className="reader-meta">
-            <FeedTitleLink
+            <RoutedLink
               className="link reader-feed"
-              feedId={item.feedId}
-              title={item.feedTitle}
-              onOpen={onOpenFeed}
-            />
+              href={feedPath(item.feedId)}
+              onNavigate={() => onOpenFeed(item.feedId)}
+            >
+              {item.feedTitle}
+            </RoutedLink>
             <span className="reader-facts">
-              <span>{item.displayDate}</span>
+              <span>{namedDay(item.date, item.today)}</span>
               {displayed ? <span>{displayed.content.readingTimeMinutes} min read</span> : null}
               {displayed ? <ReadingNote shown={displayed.source} resolved={source} chosen={viewSource} /> : null}
             </span>
@@ -196,7 +190,7 @@ function OpenReader({
             <Choice
               label="Reading source"
               className="reader-source"
-              options={READING_SOURCES.map((option) => ({ value: option, label: READING_SOURCE_LABELS[option] }))}
+              options={READING_SOURCE_OPTIONS}
               value={viewSource}
               onChange={setViewSource}
             />
@@ -244,7 +238,9 @@ function OpenReader({
               </div>
               <div className="item-body">
                 <h3 className="item-title">
-                  <ItemTitleLink feedItemId={next.feedItemId} title={next.title} onOpen={onOpenItem} />
+                  <RoutedLink href={readerPath(next.feedItemId)} onNavigate={() => onOpenItem(next.feedItemId)}>
+                    {next.title}
+                  </RoutedLink>
                 </h3>
               </div>
             </article>

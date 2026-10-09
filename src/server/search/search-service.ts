@@ -1,7 +1,7 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
 import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn, metaRowDate } from '../calendar.js'
+import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
@@ -44,11 +44,13 @@ export class SearchService {
     const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
+    const today = dateKey(now, timezone)
 
     switch (scope.kind) {
       case 'everywhere':
         return {
           scope: 'everywhere',
+          today,
           subscriptions: this.#withCadence(
             this.#matchingSubscriptions(words).slice(0, SEARCH_SUBSCRIPTION_LIMIT),
             timezone,
@@ -57,16 +59,22 @@ export class SearchService {
           results: this.#itemMatches(words, scope, sort, timezone, now),
         }
       case 'saved':
-        return { scope: 'saved', results: this.#itemMatches(words, scope, sort, timezone, now) }
+        return { scope: 'saved', today, results: this.#itemMatches(words, scope, sort, timezone, now) }
       case 'subscriptions':
         return {
           scope: 'subscriptions',
+          today,
           subscriptions: this.#withCadence(this.#matchingSubscriptions(words), timezone, now),
         }
       case 'feed': {
         const title = this.#subscribedTitleOf(scope.feedId)
         if (title === undefined) return undefined
-        return { scope: 'feed', feed: { title }, results: this.#itemMatches(words, scope, sort, timezone, now) }
+        return {
+          scope: 'feed',
+          today,
+          feed: { title },
+          results: this.#itemMatches(words, scope, sort, timezone, now),
+        }
       }
     }
   }
@@ -89,7 +97,6 @@ export class SearchService {
   ): SearchResult[] {
     if (words.length === 0) return []
     const match = matchExpressionOf(words)
-    const today = dateKey(now, timezone)
 
     // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
     // the LIMIT bounds the right fifty. bm25() is more negative the better the
@@ -131,7 +138,8 @@ export class SearchService {
       ...listedItemOf(row),
       feedId: row.feedId,
       feedTitle: row.feedTitle,
-      displayDate: metaRowDate(new Date(row.chronologyAt), dayOf(row.chronologyAt), today, timezone),
+      date: dayOf(row.chronologyAt),
+      displayTime: timeLabel(new Date(row.chronologyAt), timezone),
       snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
     }))
   }
