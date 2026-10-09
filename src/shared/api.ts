@@ -405,17 +405,17 @@ export const dateKeySchema = z
  * rather than today. `digestParamsOf` and `digestRequestSchema` are the two
  * directions of one encoding.
  */
-export interface DigestFilter {
+export interface DigestStart {
   readonly from?: string | undefined
 }
 
-export function digestParamsOf({ from }: DigestFilter): URLSearchParams {
+export function digestParamsOf({ from }: DigestStart): URLSearchParams {
   return new URLSearchParams(from ? { from } : {})
 }
 
 export const digestRequestSchema = z.object({
   from: dateKeySchema.optional(),
-}) satisfies z.ZodType<DigestFilter>
+}) satisfies z.ZodType<DigestStart>
 
 /**
  * The Digest's own cadence: every day of the grid window, with `today` ending

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { digestParamsOf, type DigestFilter } from '../../shared/api.js'
+import { digestParamsOf, type DigestStart } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
@@ -8,8 +8,8 @@ import { useResource, valueInView } from '../use-resource.js'
 import { DigestDay } from './digest-day.js'
 
 export interface DigestListProps {
-  readonly filter: DigestFilter
-  /** Said when nothing matches the filter. */
+  readonly start: DigestStart
+  /** Said when the Digest has nothing from its start. */
   readonly empty: string
   /** What else to load again when the list's Retry is pressed. */
   onRetry(): void
@@ -19,13 +19,13 @@ export interface DigestListProps {
 
 /**
  * The Digest from one day, or from today, a day to a group; Show more goes on
- * from the day the page names. A new filter keeps the old list in view until
+ * from the day the page names. A new start keeps the old list in view until
  * its own first page answers.
  */
-export function DigestList({ filter, empty, onRetry, onOpenItem, onOpenFeed }: DigestListProps) {
-  const key = digestParamsOf(filter).toString()
+export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: DigestListProps) {
+  const key = digestParamsOf(start).toString()
   const [state, { retry, set }] = useResource(
-    async (signal) => ({ key, digest: await fetchDigest(filter, signal) }),
+    async (signal) => ({ key, digest: await fetchDigest(start, signal) }),
     [key],
   )
   const [older, setOlder] = useState<{ key: string; state: OlderState }>({ key, state: 'idle' })

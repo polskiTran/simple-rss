@@ -4,7 +4,7 @@ import {
   QUIET_SPELL_DAYS,
   type Digest,
   type DigestCalendar,
-  type DigestFilter,
+  type DigestStart,
   type DigestGroup,
   type DigestItem,
   type DigestReturn,
@@ -34,7 +34,7 @@ export class DigestService {
    * first, as many as it takes to reach `LIST_PAGE_SIZE` items. A busy day
    * comes whole however long it runs, so no Feed's day is split across pages.
    */
-  read({ from }: DigestFilter): Digest {
+  read({ from }: DigestStart): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const dayOf = dayKeysIn(timezone)
     const before = from ? lt(feedItems.chronologyAt, dayStartUtc(dayAfter(from), timezone).toISOString()) : undefined

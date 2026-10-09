@@ -5,7 +5,7 @@ import {
   digestParamsOf,
   searchParamsOf,
   searchRequestSchema,
-  type DigestFilter,
+  type DigestStart,
   type SearchScope,
   type SearchSort,
 } from '../shared/api.js'
@@ -58,13 +58,13 @@ function nestedIdOf(pathname: string, section: string): number | undefined {
  * The Digest's address is its API request, so the way back from the Reader
  * returns to the same day; without `from` it starts today.
  */
-export function digestPathOf(filter: DigestFilter): string {
-  const params = digestParamsOf(filter)
+export function digestPathOf(start: DigestStart): string {
+  const params = digestParamsOf(start)
   return params.size > 0 ? `/digest?${params}` : '/digest'
 }
 
 /** An unreadable day falls back to today rather than failing the screen. */
-function digestFilterOf(search: string): DigestFilter {
+function digestStartOf(search: string): DigestStart {
   const from = dateKeySchema.safeParse(new URLSearchParams(search).get('from'))
   return { from: from.success ? from.data : undefined }
 }
@@ -103,8 +103,8 @@ export interface Origin {
 
 export const DIGEST_ORIGIN: Origin = { path: pathOf('digest'), label: ROUTE_LABELS.digest, from: undefined }
 
-export function digestOrigin(filter: DigestFilter): Origin {
-  return { ...DIGEST_ORIGIN, path: digestPathOf(filter) }
+export function digestOrigin(start: DigestStart): Origin {
+  return { ...DIGEST_ORIGIN, path: digestPathOf(start) }
 }
 export const FEEDS_ORIGIN: Origin = { path: pathOf('feeds'), label: ROUTE_LABELS.feeds, from: undefined }
 export const SAVED_ORIGIN: Origin = { path: pathOf('saved'), label: ROUTE_LABELS.saved, from: undefined }
@@ -180,7 +180,7 @@ interface ScreenLocation {
   readonly origin: Origin | undefined
   readonly searchScope: SearchScope
   /** Read from the address on the Digest; today anywhere else. */
-  readonly digest: DigestFilter
+  readonly digest: DigestStart
 }
 
 interface SearchLocation {
@@ -216,7 +216,7 @@ interface NavigationActions {
   /** Re-asks the same words ranked another way, in place like `searchIn`. */
   sortSearch(sort: SearchSort): void
   /** Starts the Digest from another day, in place: a day picked is not a trail to walk back. */
-  showDigest(filter: DigestFilter): void
+  showDigest(start: DigestStart): void
 }
 
 export type Navigation = (ScreenLocation | SearchLocation) & NavigationActions
@@ -310,7 +310,7 @@ export function useNavigation(): Navigation {
     [location, place],
   )
 
-  const showDigest = useCallback((filter: DigestFilter) => place(digestPathOf(filter), undefined, 'replace'), [place])
+  const showDigest = useCallback((start: DigestStart) => place(digestPathOf(start), undefined, 'replace'), [place])
 
   return {
     ...location,
@@ -363,6 +363,6 @@ function screenLocationOf(pathname: string, search: string, origin: Origin | und
     readerItemId,
     origin,
     searchScope: searchScopeOfScreen(pathname),
-    digest: pathname === pathOf('digest') ? digestFilterOf(search) : {},
+    digest: pathname === pathOf('digest') ? digestStartOf(search) : {},
   }
 }

@@ -26,7 +26,7 @@ import {
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
-  type DigestFilter,
+  type DigestStart,
   type FeedDetail,
   type FeedDetailsUpdate,
   type ImportOpmlRequest,
@@ -227,8 +227,8 @@ export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }
 
-export async function fetchDigest(filter: DigestFilter, signal?: AbortSignal): Promise<Digest> {
-  const params = digestParamsOf(filter)
+export async function fetchDigest(start: DigestStart, signal?: AbortSignal): Promise<Digest> {
+  const params = digestParamsOf(start)
   const response = await read(params.size > 0 ? `/api/digest?${params}` : '/api/digest', signal)
   return digestSchema.parse(await response.json())
 }
