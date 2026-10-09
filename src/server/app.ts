@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type MiddlewareHandler } from 'hono'
 import type { Liveness, Readiness as ReadinessBody, ServiceMeta } from '../shared/api.js'
 import { VERSION } from './version.js'
 import type { Authentication } from './auth/authentication.js'
@@ -17,7 +17,7 @@ import type { SearchService } from './search/search-service.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
 import type { PollScheduler } from './subscriptions/poll-scheduler.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
-import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
+import { authRoutes } from './http/auth-routes.js'
 import { exportRoutes } from './http/export-routes.js'
 import { feedRoutes } from './http/feed-routes.js'
 import { imageRoutes } from './http/image-routes.js'
@@ -25,8 +25,8 @@ import { libraryRoutes } from './http/library-routes.js'
 import { readerRoutes } from './http/reader-routes.js'
 import { searchRoutes } from './http/search-routes.js'
 import { settingsRoutes } from './http/settings-routes.js'
+import { apiError } from './http/requests.js'
 import { requireSession } from './http/require-session.js'
-import { unavailable } from './http/responses.js'
 import { sameOrigin } from './http/same-origin.js'
 import { securityHeaders } from './http/security-headers.js'
 import { staticAssets } from './http/static-assets.js'
@@ -89,18 +89,14 @@ export function createApp(deps: AppDependencies): Hono {
       : c.json<ReadinessBody>({ status: 'ready' })
   })
 
-  app.all('/health/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404))
+  app.all('/health/*', (c) => apiError(c, 404, 'not_found', 'Unknown health route'))
+
+  app.use('/api/*', noStoreByDefault())
 
   if (deps.startup.kind === 'ready') {
     const { services } = deps.startup
     app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
-    app.use(
-      '/api/*',
-      requireSession({
-        authentication: services.authentication,
-        isPublic: (path) => PUBLIC_API_PATHS.has(path),
-      }),
-    )
+    app.use('/api/*', requireSession(services.authentication))
 
     app.route(
       '/api/auth',
@@ -144,18 +140,18 @@ export function createApp(deps: AppDependencies): Hono {
 
     app.get('/api/meta', (c) => c.json<ServiceMeta>({ name: 'simple-rss', version: VERSION }))
 
-    app.all('/api/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown API route' } }, 404))
+    app.all('/api/*', (c) => apiError(c, 404, 'not_found', 'Unknown API route'))
   } else {
-    app.all('/api/*', unavailable)
+    app.all('/api/*', (c) => apiError(c, 503, 'unavailable', 'Service is not ready'))
   }
 
   app.use('*', staticAssets({ root: deps.config.clientDir }))
 
-  app.notFound((c) => c.json({ error: { code: 'not_found', message: 'Not found' } }, 404))
+  app.notFound((c) => apiError(c, 404, 'not_found', 'Not found'))
 
   app.onError((error, c) => {
     deps.logger.error('request.failed', { method: c.req.method, path: c.req.path, error })
-    return c.json({ error: { code: 'internal_error', message: 'Internal error' } }, 500)
+    return apiError(c, 500, 'internal_error', 'Internal error')
   })
 
   return app
@@ -178,6 +174,18 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   }
 
   return services.authentication.setupBlocker()
+}
+
+/**
+ * Nothing the API answers may sit in a cache, shared or private — including
+ * its 404s and 500s. A route that may be cached (Reader extraction, proxied
+ * images) says so with its own `Cache-Control`, which this leaves alone.
+ */
+function noStoreByDefault(): MiddlewareHandler {
+  return async (c, next) => {
+    await next()
+    if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store')
+  }
 }
 
 /** One record per request; query strings are omitted — they carry search terms and signed image URLs. */

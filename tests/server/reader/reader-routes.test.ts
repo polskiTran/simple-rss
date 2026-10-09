@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { apiErrorSchema } from '../../../src/shared/api.js'
 import { readerRoutes } from '../../../src/server/http/reader-routes.js'
 import type { ReaderArticleOutcome } from '../../../src/server/reader/reader-service.js'
 
@@ -10,8 +11,9 @@ function appAnswering(outcome: ReaderArticleOutcome) {
 }
 
 describe('Reader failure answers', () => {
-  // The per-code answers are the article table's; this proves the route reads it.
-  it('answers a Retrieval failure from the article answers, uncached', async () => {
+  // The per-code answers are the Original webpage table's; this proves the route reads it.
+  // No-store is the app's default for every /api answer, pinned in api.test.ts.
+  it('answers a Retrieval failure from the Original webpage answers', async () => {
     const outcome: ReaderArticleOutcome = {
       kind: 'retrieval-failed',
       failure: { ok: false, code: 'blocked_destination', reason: 'scripted' },
@@ -19,26 +21,22 @@ describe('Reader failure answers', () => {
     const response = await appAnswering(outcome).request('/items/7/reader')
 
     expect(response.status).toBe(400)
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    const body = (await response.json()) as { error: { code: string } }
-    expect(body.error.code).toBe('article_link_unsafe')
+    expect(apiErrorSchema.parse(await response.json()).error.code).toBe('article_link_unsafe')
   })
 
-  it('answers the deadline as 504 article_deadline_exceeded with its stage, uncached', async () => {
+  it('answers the deadline as 504 article_deadline_exceeded with its stage', async () => {
     const response = await appAnswering({ kind: 'deadline', stage: 'publisher' }).request('/items/7/reader')
 
     expect(response.status).toBe(504)
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    const body = (await response.json()) as { error: { code: string; stage: string } }
-    expect(body.error.code).toBe('article_deadline_exceeded')
-    expect(body.error.stage).toBe('publisher')
+    const { error } = apiErrorSchema.parse(await response.json())
+    expect(error.code).toBe('article_deadline_exceeded')
+    expect(error.stage).toBe('publisher')
   })
 
-  it('never caches the rate-limited answer and names the wait', async () => {
+  it('names the wait on the rate-limited answer', async () => {
     const response = await appAnswering({ kind: 'rate-limited', retryAfterSeconds: 17 }).request('/items/7/reader')
 
     expect(response.status).toBe(429)
     expect(response.headers.get('retry-after')).toBe('17')
-    expect(response.headers.get('cache-control')).toBe('no-store')
   })
 })

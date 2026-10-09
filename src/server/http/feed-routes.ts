@@ -2,11 +2,11 @@ import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
   digestRequestSchema,
-  feedIdParameterSchema,
   importOpmlRequestSchema,
   readingSourcePreferenceSchema,
   updateFeedDetailsRequestSchema,
   updatePollingIntervalRequestSchema,
+  type ApiErrorBody,
   type CreateSubscriptionResponse,
   type Digest,
   type DigestCalendar,
@@ -23,9 +23,7 @@ import type { FeedDocumentFailureCode } from '../ingestion/feed-document.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
-import { readIdParam } from './id-param.js'
-import { readJsonBody } from './json-body.js'
-import { NO_STORE, notFound, retryAfter } from './responses.js'
+import { apiError, notFound, readId, readJsonBody } from './requests.js'
 import { answer, FEED_ANSWERS } from './retrieval-answers.js'
 
 export interface FeedRouteDependencies {
@@ -46,7 +44,7 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const outcome = deps.subscriptions.create(body.value.url)
     if (outcome.kind === 'created') {
       deps.nudgeScheduler()
-      return c.json<CreateSubscriptionResponse>({ subscription: outcome.subscription }, 201, NO_STORE)
+      return c.json<CreateSubscriptionResponse>({ subscription: outcome.subscription }, 201)
     }
     return createFailure(c, outcome)
   })
@@ -58,57 +56,56 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const outcome = deps.subscriptions.importOpml(body.value.opml)
     if (outcome.kind === 'invalid-opml') return opmlFailure(c, outcome.code)
     if (outcome.added > 0) deps.nudgeScheduler()
-    return c.json<OpmlImportReport>(
-      { added: outcome.added, alreadySubscribed: outcome.alreadySubscribed, unusable: [...outcome.unusable] },
-      200,
-      NO_STORE,
-    )
+    return c.json<OpmlImportReport>({
+      added: outcome.added,
+      alreadySubscribed: outcome.alreadySubscribed,
+      unusable: [...outcome.unusable],
+    })
   })
 
   app.get('/subscriptions/export', (c) =>
     c.body(deps.subscriptions.exportOpml(), 200, {
-      ...NO_STORE,
       'Content-Type': 'text/x-opml; charset=utf-8',
       'Content-Disposition': 'attachment; filename="subscriptions.opml"',
     }),
   )
 
-  app.get('/feeds', (c) => c.json<SubscriptionList>({ subscriptions: [...deps.subscriptions.list()] }, 200, NO_STORE))
+  app.get('/feeds', (c) => c.json<SubscriptionList>({ subscriptions: [...deps.subscriptions.list()] }))
 
   app.get('/feeds/:feedId', (c) => {
-    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
     const detail = deps.subscriptions.detail(feedId.value)
     if (!detail) return notFound(c)
-    return c.json<FeedDetail>(detail, 200, NO_STORE)
+    return c.json<FeedDetail>(detail)
   })
 
   app.post('/feeds/:feedId/refresh', async (c) => {
-    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
     const outcome = await deps.refresh.refresh(feedId.value)
     if (outcome.kind === 'updated') {
-      return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems }, 200, NO_STORE)
+      return c.json<RefreshFeedResponse>({ observedItems: outcome.observedItems })
     }
     if (outcome.kind === 'not-modified' || outcome.kind === 'merged') {
-      return c.json<RefreshFeedResponse>({ observedItems: 0 }, 200, NO_STORE)
+      return c.json<RefreshFeedResponse>({ observedItems: 0 })
     }
     return refreshFailure(c, outcome)
   })
 
   app.delete('/feeds/:feedId', (c) => {
-    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
     const outcome = deps.subscriptions.unsubscribe(feedId.value)
     if (outcome.kind === 'missing') return notFound(c)
-    return c.body(null, 204, NO_STORE)
+    return c.body(null, 204)
   })
 
   app.put('/feeds/:feedId/details', async (c) => {
-    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
     const body = await readJsonBody(c, updateFeedDetailsRequestSchema)
@@ -116,11 +113,11 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
 
     const outcome = deps.subscriptions.setFeedDetails(feedId.value, body.value)
     if (outcome.kind === 'missing') return notFound(c)
-    return c.json<FeedDetailsUpdate>(outcome.details, 200, NO_STORE)
+    return c.json<FeedDetailsUpdate>(outcome.details)
   })
 
   app.put('/feeds/:feedId/interval', async (c) => {
-    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
     const body = await readJsonBody(c, updatePollingIntervalRequestSchema)
@@ -128,11 +125,11 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
 
     const outcome = deps.subscriptions.setPollingInterval(feedId.value, body.value.pollingIntervalMinutes)
     if (outcome.kind === 'missing') return notFound(c)
-    return c.json<PollingSchedule>(outcome.schedule, 200, NO_STORE)
+    return c.json<PollingSchedule>(outcome.schedule)
   })
 
   app.put('/feeds/:feedId/reading-source', async (c) => {
-    const feedId = readIdParam(c, 'feedId', feedIdParameterSchema)
+    const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
 
     const body = await readJsonBody(c, readingSourcePreferenceSchema)
@@ -140,49 +137,31 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
 
     const outcome = deps.subscriptions.setReadingSource(feedId.value, body.value.readingSource)
     if (outcome.kind === 'missing') return notFound(c)
-    return c.json<ReadingSourcePreference>(outcome.preference, 200, NO_STORE)
+    return c.json<ReadingSourcePreference>(outcome.preference)
   })
 
   app.get('/digest', (c) => {
     const filter = digestRequestSchema.safeParse({ from: c.req.query('from') })
-    if (!filter.success) return invalidDigestRequest(c)
-    return c.json<Digest>(deps.digest.read(filter.data), 200, NO_STORE)
+    if (!filter.success) return apiError(c, 400, 'invalid_request', 'The Digest starts from a day as YYYY-MM-DD')
+    return c.json<Digest>(deps.digest.read(filter.data))
   })
 
-  app.get('/digest/days', (c) => c.json<DigestCalendar>(deps.digest.calendar(), 200, NO_STORE))
+  app.get('/digest/days', (c) => c.json<DigestCalendar>(deps.digest.calendar()))
 
   return app
-}
-
-function invalidDigestRequest(c: Context) {
-  return c.json(
-    {
-      error: {
-        code: 'invalid_request',
-        message: 'The Digest starts from a day as YYYY-MM-DD',
-      },
-    },
-    400,
-    NO_STORE,
-  )
 }
 
 function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, { kind: 'created' }>) {
   switch (outcome.kind) {
     case 'invalid-url':
-      return c.json(
-        { error: { code: 'invalid_feed_url', message: 'Enter an exact HTTP or HTTPS Feed URL' } },
-        400,
-        NO_STORE,
-      )
+      return apiError(c, 400, 'invalid_feed_url', 'Enter an exact HTTP or HTTPS Feed URL')
     case 'duplicate':
-      return c.json(
+      return c.json<ApiErrorBody & CreateSubscriptionResponse>(
         {
           error: { code: 'duplicate_subscription', message: `Already subscribed to ${outcome.subscription.title}` },
           subscription: outcome.subscription,
         },
         409,
-        NO_STORE,
       )
   }
 }
@@ -195,11 +174,9 @@ function refreshFailure(
     case 'missing':
       return notFound(c)
     case 'rate-limited':
-      return c.json(
-        { error: { code: 'refresh_rate_limited', message: 'Wait before refreshing this Feed again' } },
-        429,
-        retryAfter(outcome.retryAfterSeconds),
-      )
+      return apiError(c, 429, 'refresh_rate_limited', 'Wait before refreshing this Feed again', {
+        'Retry-After': String(outcome.retryAfterSeconds),
+      })
     case 'invalid-feed':
       return invalidFeed(c, outcome.code)
     case 'retrieval-failed':
@@ -212,16 +189,16 @@ function invalidFeed(c: Context, code: FeedDocumentFailureCode) {
     code === 'malformed_feed'
       ? 'The Feed returned malformed XML'
       : 'The URL did not return a supported RSS or Atom Feed'
-  return c.json({ error: { code, message } }, 422, NO_STORE)
+  return apiError(c, 422, code, message)
 }
 
 function opmlFailure(c: Context, code: OpmlFailureCode) {
   switch (code) {
     case 'malformed_opml':
-      return c.json({ error: { code, message: 'The OPML file is malformed XML' } }, 422, NO_STORE)
+      return apiError(c, 422, code, 'The OPML file is malformed XML')
     case 'unsupported_opml':
-      return c.json({ error: { code, message: 'The file is not an OPML subscription list' } }, 422, NO_STORE)
+      return apiError(c, 422, code, 'The file is not an OPML subscription list')
     case 'too_many_feeds':
-      return c.json({ error: { code, message: `One import processes at most ${MAX_OPML_FEEDS} Feeds` } }, 413, NO_STORE)
+      return apiError(c, 413, code, `One import processes at most ${MAX_OPML_FEEDS} Feeds`)
   }
 }

@@ -21,15 +21,66 @@ export type ServiceMeta = z.infer<typeof serviceMetaSchema>
 export const readerDeadlineStageSchema = z.enum(['publisher', 'parsing'])
 export type ReaderDeadlineStage = z.infer<typeof readerDeadlineStageSchema>
 
+/**
+ * Every `error.code` the API answers with. The server cannot emit a code that
+ * is not listed here, and the client can match on nothing else.
+ */
+export const apiErrorCodeSchema = z.enum([
+  // Anywhere under /api
+  'not_found',
+  'internal_error',
+  'unavailable',
+  'unauthenticated',
+  'forbidden_origin',
+  'invalid_request',
+  'invalid_cursor',
+  // Authentication and installation preferences
+  'already_claimed',
+  'setup_unavailable',
+  'invalid_credentials',
+  'too_many_attempts',
+  'unknown_timezone',
+  // Subscriptions and Feed retrieval
+  'invalid_feed_url',
+  'duplicate_subscription',
+  'refresh_rate_limited',
+  'unsupported_feed',
+  'malformed_feed',
+  'feed_unreachable',
+  'feed_too_large',
+  'feed_timeout',
+  'feed_body_timeout',
+  'malformed_opml',
+  'unsupported_opml',
+  'too_many_feeds',
+  // Reader View over the Original webpage
+  'no_original_link',
+  'article_unreadable',
+  'article_deadline_exceeded',
+  'reader_retry_rate_limited',
+  'article_link_unsafe',
+  'unsupported_article',
+  'article_unreachable',
+  'article_too_large',
+  'article_timeout',
+  'article_body_timeout',
+  // Image proxy
+  'image_unavailable',
+  'image_busy',
+  'image_rate_limited',
+])
+export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>
+
 export const apiErrorSchema = z.object({
   error: z.object({
-    code: z.string(),
+    code: apiErrorCodeSchema,
     message: z.string(),
     /** Carried only by `article_deadline_exceeded`. */
     stage: readerDeadlineStageSchema.optional(),
   }),
 })
-export type ApiError = z.infer<typeof apiErrorSchema>
+/** The body of every API refusal. */
+export type ApiErrorBody = z.infer<typeof apiErrorSchema>
 
 export const MIN_PASSWORD_LENGTH = 12
 
@@ -120,14 +171,12 @@ export const pollingScheduleSchema = z.object({
 })
 export type PollingSchedule = z.infer<typeof pollingScheduleSchema>
 
-const positiveIdParameterSchema = z
+/** A Feed or Feed Item identifier as it arrives in a path or query string. */
+export const idParameterSchema = z
   .string()
   .regex(/^[1-9]\d*$/)
   .transform(Number)
   .refine(Number.isSafeInteger)
-
-export const feedIdParameterSchema = positiveIdParameterSchema
-export const feedItemIdParameterSchema = positiveIdParameterSchema
 
 /** Matches the bound the feeds table enforces on reported titles. */
 export const MAX_FEED_TITLE_LENGTH = 512
@@ -500,7 +549,7 @@ export function searchParamsOf(query: string, scope: SearchScope, sort: SearchSo
 export const searchRequestSchema = z
   .object({
     q: searchQuerySchema,
-    feed: feedIdParameterSchema.optional(),
+    feed: idParameterSchema.optional(),
     in: z.enum(['saved', 'subscriptions']).optional(),
     sort: z.enum(SEARCH_SORTS).default('best'),
   })

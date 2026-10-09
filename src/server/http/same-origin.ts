@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono'
-import { NO_STORE } from './responses.js'
+import { apiError } from './requests.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -17,11 +17,7 @@ export function sameOrigin(options: SameOriginOptions): MiddlewareHandler {
     const host = c.req.header('host')
 
     if (!origin || !host || origin.host !== host || origin.protocol !== expectedProtocol(c, options)) {
-      return c.json(
-        { error: { code: 'forbidden_origin', message: 'Request must come from this application' } },
-        403,
-        NO_STORE,
-      )
+      return apiError(c, 403, 'forbidden_origin', 'Request must come from this application')
     }
 
     return next()

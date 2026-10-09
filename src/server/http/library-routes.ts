@@ -1,14 +1,7 @@
 import { Hono } from 'hono'
-import {
-  feedItemIdParameterSchema,
-  libraryRequestSchema,
-  type Library,
-  type LibraryMembership,
-} from '../../shared/api.js'
+import { libraryRequestSchema, type Library, type LibraryMembership } from '../../shared/api.js'
 import type { LibraryService } from '../library/library-service.js'
-import { readIdParam } from './id-param.js'
-import { readListCursor } from './list-cursor.js'
-import { NO_STORE, notFound } from './responses.js'
+import { apiError, notFound, readId, readListCursor } from './requests.js'
 
 export interface LibraryRouteDependencies {
   readonly library: LibraryService
@@ -21,31 +14,27 @@ export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   app.get('/library', (c) => {
     const request = libraryRequestSchema.safeParse(c.req.query())
     if (!request.success) {
-      return c.json(
-        { error: { code: 'invalid_request', message: 'The Library orders by newest or oldest save' } },
-        400,
-        NO_STORE,
-      )
+      return apiError(c, 400, 'invalid_request', 'The Library orders by newest or oldest save')
     }
     const cursor = readListCursor(c)
     if (!cursor.ok) return cursor.response
-    return c.json<Library>(deps.library.list(request.data.order, cursor.cursor), 200, NO_STORE)
+    return c.json<Library>(deps.library.list(request.data.order, cursor.value))
   })
 
   app.put('/library/:feedItemId', (c) => {
-    const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
+    const feedItemId = readId(c, 'feedItemId')
     if (!feedItemId.ok) return feedItemId.response
 
     const membership = deps.library.save(feedItemId.value)
     if (!membership) return notFound(c)
-    return c.json<LibraryMembership>(membership, 200, NO_STORE)
+    return c.json<LibraryMembership>(membership)
   })
 
   app.delete('/library/:feedItemId', (c) => {
-    const feedItemId = readIdParam(c, 'feedItemId', feedItemIdParameterSchema)
+    const feedItemId = readId(c, 'feedItemId')
     if (!feedItemId.ok) return feedItemId.response
 
-    return c.json<LibraryMembership>(deps.library.unsave(feedItemId.value), 200, NO_STORE)
+    return c.json<LibraryMembership>(deps.library.unsave(feedItemId.value))
   })
 
   return app
