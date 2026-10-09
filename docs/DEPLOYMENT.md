@@ -103,9 +103,8 @@ raw copy of the live database file.
 
 ## Railway
 
-The supported shape is in [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md#supported-railway-shape):
-one Hobby-plan service, one replica, sleep disabled, restart policy `Always`,
-and one volume mounted at `/app/data`.
+The supported shape is one Hobby-plan service, one replica, sleep disabled,
+restart policy `Always`, and one volume mounted at `/app/data`.
 
 ### The template
 

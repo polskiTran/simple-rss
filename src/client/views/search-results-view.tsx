@@ -133,7 +133,7 @@ export function SearchResultsView({
           Nothing in {place} matches “{line}”.
         </p>
       ) : (
-        <div className="with-aside" role="region" aria-label="search results" aria-busy={found.kind === 'loading'}>
+        <section className="with-aside" aria-label="search results" aria-busy={found.kind === 'loading'}>
           <div>
             <MatchingFeeds subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
             {filtered.length > 0 ? (
@@ -162,7 +162,7 @@ export function SearchResultsView({
           {feeds.length > 1 ? (
             <FeedFilter id="search-feeds" title="Feeds" feeds={feeds} shown={shownFeeds} onChange={setShownFeeds} />
           ) : null}
-        </div>
+        </section>
       )}
     </div>
   )

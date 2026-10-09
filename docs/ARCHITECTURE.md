@@ -43,23 +43,7 @@ There is one process, one service replica, and one persistent volume. The HTTP s
 
 ## Deployment
 
-### Supported Railway shape
-
-The Railway template provisions:
-
-- One Hobby-plan service and one replica
-- Serverless/sleep behavior disabled
-- Restart policy set to `Always`
-- 1 vCPU limit
-- 1 GB memory limit
-- One volume mounted at `/app/data`, with `RAILWAY_RUN_UID=0` so the container can write to it
-- Railway-managed HTTPS domain, with custom domains optional
-- Required setup and session secrets
-- Liveness and readiness health checks
-
-Railway bills actual usage rather than configured limits. Expected consumption should remain near the Hobby plan's minimum for this workload. The 1 GB limit provides headroom without reserving or billing 1 GB when unused.
-
-The generated Railway domain is fully supported. A custom domain is not required.
+The supported Railway shape — the template's settings, the volume, and the first claim — is in [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md#railway).
 
 ### Portability
 
@@ -87,14 +71,14 @@ A future requirement for concurrent replicas, separate worker services, or high 
 - **Client:** React and Vite
 - **HTTP server:** Hono on Node
 - **Validation:** shared Zod schemas at API boundaries
-- **UI foundation:** native HTML elements with manual ARIA, Tailwind CSS, and application-owned design tokens/components
+- **UI foundation:** Base UI for interactive behavior, Tailwind CSS, and application-owned semantic classes and design tokens
 - **Database:** SQLite through `better-sqlite3` and Drizzle
 - **Search:** SQLite FTS5
 - **Reader extraction:** Defuddle on the server
 
 Next.js is intentionally absent. The private client does not need SSR, SEO, React Server Components, or framework-managed caching. Vite produces static assets that the same Hono process serves alongside `/api` routes.
 
-The interface uses no visually prescriptive component suite and no headless-component library. Every interactive control is a native element — `<button aria-pressed>` for toggles, `<a aria-current="page">` inside a labelled `<nav>` for the sections, `role="group"` around related choices — with accessible behavior hand-built rather than supplied. Typography, spacing, color, density, and motion are owned entirely by Simple RSS.
+The interface uses no visually prescriptive component suite. Interactive behavior — buttons, fields, toggles, toggle groups, the dialog — comes from Base UI, which ships no CSS; styling is the client's own semantic classes keyed on the library's `data-*` state (ADR 0008). Elements the platform already does well stay native, such as the tab bar's `<a href>` links and the timezone `<select>`. Typography, spacing, color, density, and motion are owned entirely by Simple RSS (ADR 0010).
 
 ## Application boundaries
 
@@ -103,7 +87,7 @@ The single package should still expose clear modules rather than mixing concerns
 - **Client:** views, interactions, browser caching, and same-origin API calls
 - **HTTP:** routing, cookies, request validation, rate limiting, and response policy
 - **Authentication:** setup, credentials, sessions, and emergency reset
-- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` owns every Subscription write (create, OPML, unsubscribe, polling interval), `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailabilityLedger` owns every Feed Availability write (`record` settles a poll outcome, and `recordSuccess` covers the merge survivor)
+- **Subscriptions:** Feed lifecycle and preferences, held as three collaborating classes in one folder rather than one service doing all three jobs — `SubscriptionService` handles the User's Subscription changes (subscribe, OPML, unsubscribe, preferences) and the merge a poll reveals, `FeedPoll` owns the retrieve-parse-persist pipeline for one Feed, and `FeedAvailabilityLedger` writes each poll's Feed Availability (`record` settles a poll outcome, and `recordSuccess` covers the merge survivor)
 - **Retrieval:** the one hardened boundary every outbound request passes through — destination and redirect validation, deadlines, decoded-size ceilings, and retrieval budgets
 - **Ingestion:** parsing, normalization, identity, and polling state
 - **Digest:** chronology and date grouping
@@ -116,7 +100,7 @@ The single package should still expose clear modules rather than mixing concerns
 
 These are source-code boundaries, not separate packages or services — and the ones the folder tree can express are enforced rather than remembered. `biome.jsonc` refuses the imports a path can identify: nothing but `app.ts` reaching into `http/`, and no raw `fetch` or `undici` under `src/server/`. `tests/server/architecture.test.ts` walks the folder graph for what a path cannot see — import cycles, and `upstream/` depending on any other server folder. Root-level modules are not nodes in that graph, so the composition root can import freely in one direction and a shared interface belongs where it is consumed.
 
-`src/server/service.ts` is the composition root: it builds every domain service once, inside a single `try`/`catch`. A startup failure — the database won't open, or migrations fail — is recorded on `Readiness` rather than thrown, so the process stays up to report the reason on `/health/live` while `/health/ready` closes. On success the built instances are bundled into one `Services` value and handed to `createApp` (`src/server/app.ts`), which branches on that bundle exactly once, at construction: with services, every route module is wired with real instances; without them, all of `/api` answers 503 and no route has to ask again. A domain service is either fully constructed or the installation is not serving `/api`.
+`src/server/service.ts` is the composition root: it builds every domain service once, inside a single `try`/`catch`. A startup failure — the database won't open, migrations fail, or any service fails to build — is recorded on `Readiness` rather than thrown, so the process stays up and `/health/live` stays green while `/health/ready` answers 503 with the reason. On success the built instances are bundled into one `Services` value and handed to `createApp` (`src/server/app.ts`), which branches on that bundle exactly once, at construction: with services, every route module is wired with real instances; without them, all of `/api` answers 503 and no route has to ask again. A domain service is either fully constructed or the installation is not serving `/api`.
 
 ## Persistence model
 
