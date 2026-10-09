@@ -7,7 +7,7 @@ import {
   USER_EXPORT_FORMAT,
   USER_EXPORT_VERSION,
 } from '../../shared/api.js'
-import { VERSION } from '../../shared/version.js'
+import { VERSION } from '../version.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'

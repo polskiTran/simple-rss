@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { authStatusSchema, apiErrorSchema, readinessSchema, serviceMetaSchema } from '../../src/shared/api.js'
 import { migrations } from '../../src/server/persistence/migrations.js'
-import { VERSION } from '../../src/shared/version.js'
+import { VERSION } from '../../src/server/version.js'
 import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type Container } from './docker.js'
 
 const SETUP_SECRET = 'a-deployment-setup-secret'

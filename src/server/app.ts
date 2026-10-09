@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Liveness, Readiness as ReadinessBody, ServiceMeta } from '../shared/api.js'
-import { VERSION } from '../shared/version.js'
+import { VERSION } from './version.js'
 import type { Authentication } from './auth/authentication.js'
 import type { Clock } from './clock.js'
 import type { Config } from './config.js'

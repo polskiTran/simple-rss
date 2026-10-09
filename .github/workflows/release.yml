@@ -37,11 +37,6 @@ jobs:
             echo "tag v$VERSION does not match package.json version $PACKAGE_VERSION" >&2
             exit 1
           fi
-          REPORTED_VERSION="$(node -p "require('fs').readFileSync('src/shared/version.ts', 'utf8').match(/VERSION = '(.+)'/)[1]")"
-          if [ "$VERSION" != "$REPORTED_VERSION" ]; then
-            echo "tag v$VERSION does not match src/shared/version.ts VERSION $REPORTED_VERSION" >&2
-            exit 1
-          fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 

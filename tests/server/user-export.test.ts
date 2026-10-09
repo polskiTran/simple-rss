@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { USER_EXPORT_FORMAT, USER_EXPORT_VERSION, userExportSchema } from '../../src/shared/api.js'
-import { VERSION } from '../../src/shared/version.js'
+import { VERSION } from '../../src/server/version.js'
 import { Device, claimedDevice } from '../support/device.js'
 import { startTestService, type TestService } from '../support/service-harness.js'
 

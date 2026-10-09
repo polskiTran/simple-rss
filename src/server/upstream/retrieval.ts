@@ -1,5 +1,5 @@
 import { MAX_FEED_SIZE_MIB } from '../../shared/api.js'
-import { VERSION } from '../../shared/version.js'
+import { VERSION } from '../version.js'
 import { hasOwn } from '../../shared/record.js'
 import type { LogFields, Logger } from '../logger.js'
 import {
