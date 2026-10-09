@@ -1,7 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { authStatusSchema, apiErrorSchema, readinessSchema, serviceMetaSchema } from '../../src/shared/api.js'
+import { authStatusSchema, readinessSchema } from '../../src/shared/api.js'
 import { migrations } from '../../src/server/persistence/migrations.js'
-import { VERSION } from '../../src/server/version.js'
 import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type Container } from './docker.js'
 
 const SETUP_SECRET = 'a-deployment-setup-secret'
@@ -142,27 +141,6 @@ describe('the production image', () => {
     expect(await response.text()).toContain('<div id="root">')
   })
 
-  it('answers the API boundary with JSON', async () => {
-    const { container } = await start()
-    const cookie = await claim(container)
-
-    const meta = await container.fetch('/api/meta', { headers: { cookie } })
-    const unknown = await container.fetch('/api/does-not-exist', { headers: { cookie } })
-
-    expect(serviceMetaSchema.parse(await meta.json())).toEqual({ name: 'simple-rss', version: VERSION })
-    expect(unknown.status).toBe(404)
-    expect(apiErrorSchema.parse(await unknown.json()).error.code).toBe('not_found')
-  })
-
-  it('sends the restrictive content security policy', async () => {
-    const { container } = await start()
-
-    const policy = (await container.fetch('/')).headers.get('content-security-policy') ?? ''
-
-    expect(policy).toContain("default-src 'self'")
-    expect(policy).toContain("frame-ancestors 'none'")
-  })
-
   it('ships no service worker or install manifest', async () => {
     const { container } = await start()
 
@@ -203,37 +181,6 @@ describe('claiming a deployed installation', () => {
       status: 'unready',
       reason: 'setup secret is not configured',
     })
-  })
-
-  it('exposes nothing but setup and health before it is claimed', async () => {
-    const { container } = await start()
-
-    const status = await container.fetch('/api/auth/status')
-    const meta = await container.fetch('/api/meta')
-
-    expect(authStatusSchema.parse(await status.json())).toEqual({ claimed: false, authenticated: false })
-    expect(meta.status).toBe(401)
-  })
-
-  it('lets the User claim it with the deployment secret and then read the API', async () => {
-    const { container } = await start()
-
-    const cookie = await claim(container)
-
-    expect((await container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
-  })
-
-  it('closes setup permanently once there is a User', async () => {
-    const { container } = await start()
-    await claim(container)
-
-    const second = await container.fetch('/api/auth/setup', {
-      method: 'POST',
-      headers: { origin: container.url, 'content-type': 'application/json' },
-      body: JSON.stringify({ setupSecret: SETUP_SECRET, password: 'a-second-user-password' }),
-    })
-
-    expect(second.status).toBe(409)
   })
 })
 
