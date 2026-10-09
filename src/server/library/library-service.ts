@@ -44,7 +44,7 @@ export class LibraryService {
 
   /**
    * The Library by when each item was saved: newest save first, or oldest.
-   * Keyset pages over the saved time, ties by id (ADR 0006).
+   * Keyset pages over the saved time, ties by id (ADR 0011).
    */
   list(order: LibraryOrder, cursor?: ListCursor): Library {
     const timezone = this.#settings.effectiveTimezone()

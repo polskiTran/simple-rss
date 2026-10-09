@@ -7,7 +7,10 @@ import { feedItems } from '../persistence/schema.js'
 export const LIST_PAGE_SIZE = 50
 
 export interface ListCursor {
-  /** The ordering instant of the last item shown, as stored ISO: its chronology in the Digest, its save in the Library. */
+  /**
+   * The last item's ordering instant, as stored ISO: its save in the Library,
+   * its chronology in `DigestService.after()`.
+   */
   readonly instant: string
   readonly feedItemId: number
 }
