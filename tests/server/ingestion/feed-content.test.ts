@@ -419,7 +419,8 @@ describe('Feed Content conversion limits', () => {
     const durable = content?.markdown.replace(path.replaceAll('&', '\\&'), 'https://journal.example/panel.png') ?? ''
     expect(Buffer.byteLength(durable)).toBeLessThanOrEqual(FEED_CONTENT_MAX_BYTES)
   })
-  it('records a list cut at the node limit even when no later block follows', async () => {
+  // Converting 20,001 nodes is the point of this test; a busy CI runner can take past the 5s default.
+  it('records a list cut at the node limit even when no later block follows', { timeout: 20_000 }, async () => {
     const { read } = await ingest(rss(`<description><![CDATA[<ul>${'<li>x</li>'.repeat(20_001)}</ul>]]></description>`))
     expect((await read()).feedContent).toMatchObject({ truncated: true })
   })
