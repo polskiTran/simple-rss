@@ -249,15 +249,17 @@ const feedSummarySchema = z.object({
 
 export const FEED_UNAVAILABLE_AFTER_FAILURES = 3
 
-const feedAvailabilityCategorySchema = z.enum([
+export const FEED_AVAILABILITY_CATEGORIES = [
   'unreachable',
   'timeout',
   'too_large',
   'unsupported_content',
   'http_error',
   'invalid_feed',
-])
-export type FeedAvailabilityCategory = z.infer<typeof feedAvailabilityCategorySchema>
+] as const
+export type FeedAvailabilityCategory = (typeof FEED_AVAILABILITY_CATEGORIES)[number]
+
+const feedAvailabilityCategorySchema = z.enum(FEED_AVAILABILITY_CATEGORIES)
 
 // `unchecked`: no retrieval has succeeded yet. `unavailable` begins at
 // `FEED_UNAVAILABLE_AFTER_FAILURES` in a row; a Feed that simply publishes
