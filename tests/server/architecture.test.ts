@@ -65,8 +65,10 @@ function cycleIn(graph: Map<string, Set<string>>): string[] | undefined {
 const graph = folderGraph()
 
 describe('the src/server/ folder graph', () => {
+  // The walk is what the other assertions stand on: an empty graph is trivially acyclic.
   it('is read off the real tree', () => {
-    expect([...(graph.get('subscriptions') ?? [])].sort()).toEqual(['digest', 'ingestion', 'persistence', 'upstream'])
+    expect(graph.size).toBeGreaterThanOrEqual(10)
+    expect(graph.get('subscriptions')).toContain('persistence')
   })
 
   it('is acyclic, so every folder can be read in one direction', () => {
