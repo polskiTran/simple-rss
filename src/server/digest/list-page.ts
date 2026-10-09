@@ -3,7 +3,6 @@ import { sql, type SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { feedItems } from '../persistence/schema.js'
-import { plausibleHorizon } from './chronology.js'
 
 export const LIST_PAGE_SIZE = 50
 
@@ -37,18 +36,6 @@ export function decodeListCursor(value: string): ListCursor | undefined {
   } catch {
     return undefined
   }
-}
-
-/**
- * The chronology rule as SQL, so ORDER BY and the keyset filter act before the LIMIT.
- * Stored instants are normalized ISO-8601 UTC, so text comparison is time comparison.
- */
-export function chronologySql(now: Date): SQL {
-  return sql`CASE
-    WHEN ${feedItems.publishedAt} IS NOT NULL AND ${feedItems.publishedAt} <= ${plausibleHorizon(now)}
-    THEN ${feedItems.publishedAt}
-    ELSE ${feedItems.firstSeenAt}
-  END`
 }
 
 /**

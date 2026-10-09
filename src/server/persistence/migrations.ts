@@ -297,6 +297,26 @@ export const migrations: readonly Migration[] = [
         CHECK (reading_source IN ('original-webpage', 'feed-content'));
     `,
   },
+  {
+    version: 16,
+    name: 'stored-chronology',
+    sql: `
+      -- The chronology as a fact about the Feed Item: its publication time, unless
+      -- missing or more than a day past its first sighting, then first-seen.
+      -- Nothing in it reads the clock, so it is indexed and never moves.
+      ALTER TABLE feed_items ADD COLUMN chronology_at TEXT NOT NULL GENERATED ALWAYS AS (
+        CASE
+          WHEN published_at IS NOT NULL
+            AND published_at <= strftime('%Y-%m-%dT%H:%M:%fZ', first_seen_at, '+1 day')
+          THEN published_at
+          ELSE first_seen_at
+        END
+      ) VIRTUAL;
+      DROP INDEX feed_items_chronology;
+      CREATE INDEX feed_items_chronology ON feed_items (chronology_at DESC, id DESC);
+      CREATE INDEX feed_items_feed_chronology ON feed_items (feed_id, chronology_at DESC, id DESC);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

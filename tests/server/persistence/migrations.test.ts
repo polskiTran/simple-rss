@@ -158,7 +158,7 @@ describe('migrations', () => {
 
     const applied = applyMigrations(db)
 
-    expect(applied).toEqual([8, 9, 10, 11, 12, 13, 14, 15])
+    expect(applied).toEqual(migrations.filter((migration) => migration.version >= 8).map(({ version }) => version))
     expect(db.$client.prepare('SELECT domain, home_page_url, etag, last_modified FROM feeds').get()).toEqual({
       domain: 'journal.example',
       home_page_url: null,
@@ -190,10 +190,38 @@ describe('migrations', () => {
                (2, 'image', 'guid', '![drawing](https://image.example/drawing.png)', 0, '2026-01-01', '2026-01-01')`)
       .run()
 
-    expect(applyMigrations(db)).toEqual([15])
+    expect(applyMigrations(db)).toContain(15)
     expect(db.$client.prepare('SELECT reading_source FROM subscriptions ORDER BY feed_id').all()).toEqual([
       { reading_source: 'original-webpage' },
       { reading_source: 'original-webpage' },
+    ])
+    db.$client.close()
+  })
+
+  it('places Feed Items stored before the chronology column by their own first sighting, not the clock', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version < 16),
+    )
+    db.$client
+      .prepare(`INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
+        VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes', 'journal.example', '2026-01-01', '2026-01-01')`)
+      .run()
+    db.$client
+      .prepare(`INSERT INTO feed_items (feed_id, dedupe_key, identity_kind, published_at, first_seen_at, last_observed_at)
+        VALUES (1, 'drift', 'guid', '2026-08-09T09:00:00.000Z', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z'),
+               (1, 'scheduled', 'guid', '2026-08-09T09:00:00.001Z', '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z'),
+               (1, 'undated', 'guid', NULL, '2026-08-08T09:00:00.000Z', '2026-08-08T09:00:00.000Z')`)
+      .run()
+
+    applyMigrations(db)
+
+    expect(db.$client.prepare('SELECT dedupe_key, chronology_at FROM feed_items ORDER BY id').all()).toEqual([
+      { dedupe_key: 'drift', chronology_at: '2026-08-09T09:00:00.000Z' },
+      { dedupe_key: 'scheduled', chronology_at: '2026-08-08T09:00:00.000Z' },
+      { dedupe_key: 'undated', chronology_at: '2026-08-08T09:00:00.000Z' },
     ])
     db.$client.close()
   })

@@ -1,8 +1,7 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
 import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, metaRowDate } from '../digest/chronology.js'
-import { chronologySql } from '../digest/list-page.js'
+import { dateKey, dayKeysIn, metaRowDate } from '../digest/chronology.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -95,7 +94,7 @@ export class SearchService {
     // the LIMIT bounds the right fifty. bm25() is more negative the better the
     // match; dividing by the age factor shrinks it toward zero as the item ages.
     // Sorted newest, the chronology alone orders — and bounds — the matches.
-    const chronology = chronologySql(now)
+    const chronology = feedItems.chronologyAt
     const relevance = sql`bm25(${feedItemSearch}, ${ITEM_TITLE_WEIGHT}, ${SUMMARY_WEIGHT}, ${FEED_TITLE_WEIGHT})
       / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_DECAY_DAYS})`
 
@@ -105,6 +104,7 @@ export class SearchService {
         title: feedItems.title,
         publishedAt: feedItems.publishedAt,
         firstSeenAt: feedItems.firstSeenAt,
+        chronologyAt: feedItems.chronologyAt,
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
         savedAt: libraryItems.savedAt,
@@ -126,12 +126,13 @@ export class SearchService {
           scope.kind === 'feed' ? eq(feedItems.feedId, scope.feedId) : undefined,
         ),
       )
-      .orderBy(...(sort === 'best' ? [relevance] : []), sql`${chronology} DESC`, desc(feedItems.id))
+      .orderBy(...(sort === 'best' ? [relevance] : []), desc(chronology), desc(feedItems.id))
       .limit(SEARCH_RESULT_LIMIT)
       .all()
 
+    const dayOf = dayKeysIn(timezone)
     return rows.map((row) => {
-      const displayInstant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
+      const displayInstant = new Date(row.chronologyAt)
       return {
         feedItemId: row.feedItemId,
         title: row.title ?? 'Untitled',
@@ -139,7 +140,7 @@ export class SearchService {
         feedTitle: row.feedTitle,
         publishedAt: row.publishedAt,
         firstSeenAt: row.firstSeenAt,
-        displayDate: metaRowDate(displayInstant, dateKey(displayInstant, timezone), today, timezone),
+        displayDate: metaRowDate(displayInstant, dayOf(row.chronologyAt), today, timezone),
         saved: row.savedAt !== null,
         snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
       }

@@ -97,6 +97,28 @@ describe('the chronological Digest', () => {
     expect(digest.groups[0]?.items[1]?.publishedAt).toBe('2026-08-19T09:00:00.000Z')
   })
 
+  it('keeps an item dated more than a day past its first sighting on the day it arrived, once that date comes', async () => {
+    const service = await startTestService()
+    stubFeed(
+      service,
+      rss(
+        item('scheduled', 'Live from the stage', '2026-08-12T09:00:00.000Z'),
+        item('drift', 'Within a day of arriving', '2026-08-09T09:00:00.000Z'),
+      ),
+    )
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    await service.wakeScheduler()
+    service.clock.advance(5 * 24 * 60 * 60 * 1_000)
+
+    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
+
+    expect(digest.groups.map((group) => [group.date, group.items.map((entry) => entry.title)])).toEqual([
+      ['2026-08-09', ['Within a day of arriving']],
+      ['2026-08-08', ['Live from the stage']],
+    ])
+  })
+
   it('breaks publication-time ties stably, and identically across reads', async () => {
     const service = await startTestService()
     stubFeed(

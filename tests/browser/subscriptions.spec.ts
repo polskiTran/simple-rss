@@ -38,7 +38,9 @@ async function expectFeedAndDigest(page: Page, installation: Installation): Prom
   const item = page.locator('main article.item', { hasText: 'First light' })
   await expect(item.getByRole('link', { name: 'Field Notes' })).toBeVisible()
   await expect(item.getByText('07:15')).toBeVisible()
-  await expect(item.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
+  const save = item.getByRole('button', { name: 'Save First light' })
+  if (narrow(page)) await expect(save).toBeHidden()
+  else await expect(save).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('main')).not.toContainText(/unread/i)
   await expectNoHorizontalOverflow(page)
 }

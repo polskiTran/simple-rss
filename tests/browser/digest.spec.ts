@@ -171,8 +171,14 @@ test.describe('the Digest at phone width', () => {
     await openDigest(page, installation)
 
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Save First light' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
+  })
+
+  test('leaves saving to the Reader, so the title has the box', async ({ page, installation }) => {
+    await openDigest(page, installation)
+
+    await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save First light' })).toBeHidden()
   })
 
   test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {

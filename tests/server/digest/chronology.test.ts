@@ -1,32 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chronologyTime, dateKey } from '../../../src/server/digest/chronology.js'
-
-const NOW = new Date('2026-08-08T09:00:00.000Z')
-const FIRST_SEEN = '2026-08-08T06:00:00.000Z'
-
-describe('chronologyTime', () => {
-  it('orders by a valid publication time', () => {
-    expect(chronologyTime('2026-08-01T12:00:00.000Z', FIRST_SEEN, NOW)).toBe(Date.parse('2026-08-01T12:00:00.000Z'))
-  })
-
-  it('falls back to first-seen when the publication time is missing', () => {
-    expect(chronologyTime(null, FIRST_SEEN, NOW)).toBe(Date.parse(FIRST_SEEN))
-  })
-
-  it('falls back to first-seen when the publication time does not parse', () => {
-    expect(chronologyTime('last thursday, probably', FIRST_SEEN, NOW)).toBe(Date.parse(FIRST_SEEN))
-  })
-
-  it('tolerates a publication up to a day ahead, for publisher clock drift', () => {
-    const withinTolerance = new Date(NOW.getTime() + 24 * 60 * 60 * 1_000).toISOString()
-    expect(chronologyTime(withinTolerance, FIRST_SEEN, NOW)).toBe(Date.parse(withinTolerance))
-  })
-
-  it('treats a date more than a day ahead as implausible and uses first-seen', () => {
-    const implausible = new Date(NOW.getTime() + 24 * 60 * 60 * 1_000 + 1_000).toISOString()
-    expect(chronologyTime(implausible, FIRST_SEEN, NOW)).toBe(Date.parse(FIRST_SEEN))
-  })
-})
+import { dateKey, dayKeysIn } from '../../../src/server/digest/chronology.js'
 
 describe('dateKey', () => {
   it('names the calendar day in the installation timezone, not UTC', () => {
@@ -50,5 +23,37 @@ describe('dateKey', () => {
   it('turns over at the timezone midnight on a DST transition day', () => {
     expect(dateKey(new Date('2026-11-01T03:59:00.000Z'), 'America/New_York')).toBe('2026-10-31')
     expect(dateKey(new Date('2026-11-01T04:00:00.000Z'), 'America/New_York')).toBe('2026-11-01')
+  })
+})
+
+const YEAR_END = Date.parse('2027-01-01T00:00:00.000Z')
+const QUARTER_HOUR_MS = 15 * 60 * 1_000
+
+describe('dayKeysIn', () => {
+  // Half- and quarter-hour offsets, the date line, and zones whose DST turns over at midnight.
+  const zones = [
+    'UTC',
+    'America/New_York',
+    'Asia/Kolkata',
+    'Asia/Kathmandu',
+    'Pacific/Chatham',
+    'Pacific/Kiritimati',
+    'America/Santiago',
+    'America/Havana',
+  ]
+
+  it('names the same day as dateKey for every quarter hour of a year', () => {
+    const disagreements: string[] = []
+    for (const timezone of zones) {
+      const keyOf = dayKeysIn(timezone)
+      for (let time = Date.parse('2026-01-01T00:00:00.000Z'); time < YEAR_END; time += QUARTER_HOUR_MS) {
+        const instant = new Date(time)
+        if (keyOf(instant.toISOString()) !== dateKey(instant, timezone)) {
+          disagreements.push(`${timezone} ${instant.toISOString()}`)
+        }
+      }
+    }
+
+    expect(disagreements).toEqual([])
   })
 })
