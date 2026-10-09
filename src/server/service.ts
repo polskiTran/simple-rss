@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto'
+import { Server } from 'node:http'
+import { serve } from '@hono/node-server'
 import type { Hono } from 'hono'
-import { createApp, type Services } from './app.js'
+import { createApp, type Services, type Startup } from './app.js'
 import { createAuthentication } from './auth/authentication.js'
 import type { Sleeper } from './auth/sleeper.js'
 import { systemClock, type Clock } from './clock.js'
@@ -10,7 +12,7 @@ import { ImageService } from './images/image-service.js'
 import { createImageUrlSignature } from './images/image-url-signature.js'
 import { LibraryService } from './library/library-service.js'
 import { createLogger, errorForLog, type Logger } from './logger.js'
-import { openDatabase, type DrizzleDatabase } from './persistence/database.js'
+import { openDatabase } from './persistence/database.js'
 import { InstallationSettingsStore } from './persistence/installation-settings.js'
 import { applyMigrations } from './persistence/migrations.js'
 import { ReaderExtractor } from './reader/reader-extractor.js'
@@ -22,11 +24,12 @@ import { FeedPoll } from './subscriptions/feed-poll.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
-import { Readiness } from './readiness.js'
 import { createNetworkRetrieval, type Retrieval } from './upstream/retrieval.js'
 
 export interface ServiceOptions {
   readonly config: Config
+  /** Overrides `config.port`. Tests pass 0 for any free port; `config.ts` still refuses 0 from a host. */
+  readonly port?: number
   readonly logger?: Logger
   readonly clock?: Clock
   readonly retrieval?: Retrieval
@@ -37,28 +40,27 @@ export interface ServiceOptions {
   readonly readerBudgetMs?: number
 }
 
-export interface Service {
-  readonly app: Hono
-  readonly config: Config
-  readonly logger: Logger
-  readonly clock: Clock
-  readonly readiness: Readiness
-  /** The single outbound HTTP boundary (ADR 0005), shared by every retrieval. */
-  readonly retrieval: Retrieval
-  /** Undefined when startup failed. */
-  readonly database: DrizzleDatabase | undefined
-  readonly settings: InstallationSettingsStore | undefined
-  /** The in-process background poller; absent only when startup failed. */
-  readonly scheduler: PollScheduler | undefined
-  shutdown(drain: () => Promise<void>): Promise<void>
+/** A listening service. `stop()` is the only way down: it drains before closing the database. */
+export interface RunningService {
+  /** Undefined when startup failed: `/health/ready` answers 503 with the reason and `/api` answers 503. */
+  readonly services: Services | undefined
+  /** The port actually bound, which differs from the request when it was 0. */
+  readonly port: number
+  /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
+  readonly url: string
+  /** Stops accepting connections, drains in-flight work, closes the database. */
+  stop(): Promise<void>
 }
 
+const IDLE_SWEEP_MS = 20
+
 /**
- * The composition root. A startup failure is recorded on `Readiness` rather
- * than thrown: the process stays up and live, `/health/ready` answers 503 with
- * the reason, and `/api` answers 503 so no traffic reaches a half-built installation.
+ * The composition root. A startup failure is reported rather than thrown: the
+ * process listens anyway, `/health/live` stays green, `/health/ready` answers
+ * 503 with the reason, and `/api` answers 503 so no traffic reaches a
+ * half-built installation. Only a socket that cannot bind rejects.
  */
-export function createService(options: ServiceOptions): Service {
+export async function startService(options: ServiceOptions): Promise<RunningService> {
   const { config } = options
   const logger = options.logger ?? createLogger({ level: config.logLevel })
   const clock = options.clock ?? systemClock
@@ -68,11 +70,49 @@ export function createService(options: ServiceOptions): Service {
       logger,
       self: new URL(config.publicOrigin),
     })
-  const readiness = new Readiness()
 
-  let scheduler: PollScheduler | undefined
+  const startup = compose(options, { logger, clock, retrieval })
+  const services = startup.kind === 'ready' ? startup.services : undefined
+  services?.scheduler.start()
+
+  const app = createApp({ config, clock, logger, startup })
+  const { server, port } = await listen(app, options.port ?? config.port)
+  logger.info('server.started', { port, dataDir: config.dataDir })
+
+  /**
+   * Whatever outlives the grace period is cut off, because a platform that
+   * sent SIGTERM sends SIGKILL next.
+   */
+  const shutdown = async (): Promise<void> => {
+    const graceMs = config.shutdownGraceMs
+    logger.info('server.stopping', { graceMs })
+    services?.scheduler.stop()
+    await drain(server, graceMs, logger)
+    await services?.reader.close()
+    services?.db.$client.close()
+    logger.info('server.stopped')
+  }
+
+  let stopped: Promise<void> | undefined
+
+  return {
+    services,
+    port,
+    url: `http://127.0.0.1:${port}`,
+    stop() {
+      stopped ??= shutdown()
+      return stopped
+    },
+  }
+}
+
+/** Builds every domain service once, or reports why it could not. */
+function compose(
+  options: ServiceOptions,
+  { logger, clock, retrieval }: { readonly logger: Logger; readonly clock: Clock; readonly retrieval: Retrieval },
+): Startup {
+  const { config } = options
   let extractor: ReaderExtractor | undefined
-  let services: Services | undefined
 
   try {
     const db = openDatabase(config.databasePath)
@@ -114,9 +154,8 @@ export function createService(options: ServiceOptions): Service {
     })
     const search = new SearchService({ db, clock, settings })
     const retention = new RetentionService({ db, clock, logger, ...options.retention })
-    scheduler = new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling })
 
-    services = {
+    const services = {
       db,
       authentication,
       settings,
@@ -128,50 +167,58 @@ export function createService(options: ServiceOptions): Service {
       search,
       images,
       imageSignature,
-      nudgeScheduler: () => scheduler?.nudge(),
-    }
-
-    scheduler.start()
-    readiness.markReady()
-    logger.info('startup.migrations_applied', {
-      databasePath: config.databasePath,
-      applied,
-    })
+      scheduler: new PollScheduler({ subscriptions, refresh, retention, logger, ...options.scheduling }),
+    } satisfies Services
+    logger.info('startup.migrations_applied', { databasePath: config.databasePath, applied })
+    return { kind: 'ready', services }
   } catch (error) {
     extractor
       ?.close()
       .catch((closeError) => logger.error('startup.reader_close_failed', { error: errorForLog(closeError) }))
-    readiness.markFailed('migrations failed')
     logger.error('startup.migrations_failed', { databasePath: config.databasePath, error: errorForLog(error) })
+    return { kind: 'failed', reason: 'migrations failed' }
   }
+}
 
-  const app = createApp({ config, clock, logger, readiness, services })
+interface ListeningServer {
+  readonly server: Server
+  readonly port: number
+}
 
-  const shutdown = async (drain: () => Promise<void>): Promise<void> => {
-    scheduler?.stop()
-    scheduler = undefined
-    await drain()
-    await services?.reader.close()
-    services?.db.$client.close()
-    services = undefined
-  }
+/** `serve` defaults to Node's HTTP/1 server when no custom server factory is supplied. */
+function listen(app: Hono, port: number): Promise<ListeningServer> {
+  const { promise, resolve, reject } = Promise.withResolvers<ListeningServer>()
+  const candidate = serve({ fetch: app.fetch, port }, (address) => {
+    if (candidate instanceof Server) {
+      resolve({ server: candidate, port: address.port })
+    } else {
+      candidate.close()
+      reject(new Error('Hono created an unexpected HTTP/2 server'))
+    }
+  })
+  candidate.once('error', reject)
+  return promise
+}
 
-  return {
-    app,
-    config,
-    logger,
-    clock,
-    readiness,
-    retrieval,
-    get database() {
-      return services?.db
-    },
-    get settings() {
-      return services?.settings
-    },
-    get scheduler() {
-      return scheduler
-    },
-    shutdown,
-  }
+/** Resolves once every connection has closed, forcing the stragglers after `graceMs`. */
+function drain(server: Server, graceMs: number, logger: Logger): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const forceTimer = setTimeout(() => {
+      logger.warn('server.stop_forced', { graceMs })
+      server.closeAllConnections()
+    }, graceMs)
+    forceTimer.unref()
+
+    // A keep-alive socket goes idle only after its response flushes; a single
+    // sweep would miss connections still writing and wait out the full grace.
+    const sweep = setInterval(() => server.closeIdleConnections(), IDLE_SWEEP_MS)
+    sweep.unref()
+
+    server.close(() => {
+      clearTimeout(forceTimer)
+      clearInterval(sweep)
+      resolve()
+    })
+    server.closeIdleConnections()
+  })
 }

@@ -5,7 +5,7 @@ import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { DrizzleDatabase } from '../../src/server/persistence/database.js'
 import type { InstallationSettingsStore } from '../../src/server/persistence/installation-settings.js'
 import type { RetentionLimits } from '../../src/server/retention/retention-service.js'
-import { startService, type RunningService } from '../../src/server/server.js'
+import { startService, type RunningService } from '../../src/server/service.js'
 import type { PollSchedulerLimits } from '../../src/server/subscriptions/poll-scheduler.js'
 import { createRetrieval, type Retrieval } from '../../src/server/upstream/retrieval.js'
 import { ManualClock } from './manual-clock.js'
@@ -82,13 +82,14 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     ...options.env,
   })
 
+  let retrieval: Retrieval | undefined
   const boot = async () => {
     const logger = createLogger({
       level: config.logLevel,
       now: () => clock.now(),
       sink: (record) => void logs.push(record),
     })
-    const retrieval = createRetrieval({
+    retrieval = createRetrieval({
       httpClient: upstream.client,
       resolve: upstream.resolve,
       logger,
@@ -116,26 +117,25 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     get url() {
       return service.url
     },
-    get config() {
-      return service.config
-    },
+    config,
     dataDir,
     clock,
     upstream,
     get retrieval() {
-      return service.retrieval
+      if (!retrieval) throw new Error('the service has not booted')
+      return retrieval
     },
     get settings() {
-      return service.settings
+      return service.services?.settings
     },
     get database() {
-      return service.database
+      return service.services?.db
     },
     logs,
     sleeps,
     fetch: (path, init) => fetch(new URL(path, service.url), init),
     async wakeScheduler() {
-      const scheduler = service.scheduler
+      const scheduler = service.services?.scheduler
       if (!scheduler) throw new Error('the service started without a scheduler')
       await scheduler.tick()
     },

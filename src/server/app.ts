@@ -12,9 +12,9 @@ import { errorForLog, type Logger } from './logger.js'
 import { assertWritable, type DrizzleDatabase } from './persistence/database.js'
 import type { InstallationSettingsStore } from './persistence/installation-settings.js'
 import type { ReaderService } from './reader/reader-service.js'
-import type { Readiness } from './readiness.js'
 import type { SearchService } from './search/search-service.js'
 import type { FeedRefresh } from './subscriptions/feed-refresh.js'
+import type { PollScheduler } from './subscriptions/poll-scheduler.js'
 import type { SubscriptionService } from './subscriptions/subscription-service.js'
 import { authRoutes, PUBLIC_API_PATHS } from './http/auth-routes.js'
 import { exportRoutes } from './http/export-routes.js'
@@ -49,17 +49,21 @@ export interface Services {
   readonly search: SearchService
   readonly images: ImageService
   readonly imageSignature: ImageUrlSignature
-  /** Asks the scheduler for an immediate look at the due frontier. */
-  nudgeScheduler(): void
+  /** The in-process background poller; routes only ever nudge it. */
+  readonly scheduler: PollScheduler
 }
+
+/** What startup produced: the whole bundle, or the reason there is none. */
+export type Startup =
+  | { readonly kind: 'ready'; readonly services: Services }
+  | { readonly kind: 'failed'; readonly reason: string }
 
 export interface AppDependencies {
   readonly config: Config
   readonly clock: Clock
   readonly logger: Logger
-  readonly readiness: Readiness
-  /** Absent when startup failed; readiness reports that rather than crash-looping. */
-  readonly services: Services | undefined
+  /** A failed startup keeps the process live; readiness reports the reason rather than crash-looping. */
+  readonly startup: Startup
 }
 
 /**
@@ -85,8 +89,8 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.all('/health/*', (c) => c.json({ error: { code: 'not_found', message: 'Unknown health route' } }, 404))
 
-  const services = deps.services
-  if (services) {
+  if (deps.startup.kind === 'ready') {
+    const { services } = deps.startup
     app.use('/api/*', sameOrigin({ trustProxyHeaders: deps.config.trustProxyHeaders }))
     app.use(
       '/api/*',
@@ -116,7 +120,7 @@ export function createApp(deps: AppDependencies): Hono {
         subscriptions: services.subscriptions,
         refresh: services.refresh,
         digest: services.digest,
-        nudgeScheduler: services.nudgeScheduler,
+        nudgeScheduler: () => services.scheduler.nudge(),
       }),
     )
 
@@ -156,29 +160,22 @@ export function createApp(deps: AppDependencies): Hono {
 }
 
 /**
- * Startup state first, then the volume — a mounted-but-full disk only reveals
- * itself on a real write. The Setup Secret is checked last because it needs
- * the database to know whether it is still required.
+ * The startup failure first, then the volume — a mounted-but-full disk only
+ * reveals itself on a real write. The Setup Secret is checked last because it
+ * needs the database to know whether it is still required.
  */
 function readinessFailure(deps: AppDependencies): string | undefined {
-  const state = deps.readiness.state
-  if (state.kind === 'starting') return 'starting'
-  if (state.kind === 'failed') return state.reason
-
-  const db = deps.services?.db
-  if (!db) return 'database is not open'
+  if (deps.startup.kind === 'failed') return deps.startup.reason
+  const { services } = deps.startup
 
   try {
-    assertWritable(db, deps.clock.now())
+    assertWritable(services.db, deps.clock.now())
   } catch (error) {
     deps.logger.error('readiness.write_probe_failed', { error: errorForLog(error) })
     return 'database is not writable'
   }
 
-  const authentication = deps.services?.authentication
-  if (!authentication) return 'authentication is not available'
-
-  return authentication.setupBlocker()
+  return services.authentication.setupBlocker()
 }
 
 /** One record per request; query strings are omitted — they carry search terms and signed image URLs. */

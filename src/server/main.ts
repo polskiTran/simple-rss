@@ -1,6 +1,6 @@
 import { loadConfig } from './config.js'
-import { createLogger, errorForLog } from './logger.js'
-import { startService, type RunningService } from './server.js'
+import { createLogger, errorForLog, type Logger } from './logger.js'
+import { startService, type RunningService } from './service.js'
 
 async function main(): Promise<void> {
   const config = loadConfig()
@@ -8,7 +8,7 @@ async function main(): Promise<void> {
 
   const service = await startService({ config, logger })
 
-  installSignalHandlers(service)
+  installSignalHandlers(service, logger)
 
   // Monitors without replacing Node's default handler: the process must still
   // exit non-zero rather than serve potentially corrupted state as healthy.
@@ -18,22 +18,22 @@ async function main(): Promise<void> {
   })
 }
 
-function installSignalHandlers(service: RunningService): void {
+function installSignalHandlers(service: RunningService, logger: Logger): void {
   let stopping = false
 
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {
       if (stopping) {
-        service.logger.warn('process.stop_repeated', { signal })
+        logger.warn('process.stop_repeated', { signal })
         process.exit(1)
       }
       stopping = true
-      service.logger.info('process.signal_received', { signal })
+      logger.info('process.signal_received', { signal })
 
       service.stop().then(
         () => process.exit(0),
         (cause: unknown) => {
-          service.logger.error('process.stop_failed', { error: errorForLog(cause) })
+          logger.error('process.stop_failed', { error: errorForLog(cause) })
           process.exit(1)
         },
       )

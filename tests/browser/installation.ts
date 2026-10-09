@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { expect, test as base, type Page } from '@playwright/test'
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger } from '../../src/server/logger.js'
-import { startService, type RunningService } from '../../src/server/server.js'
+import { startService, type RunningService } from '../../src/server/service.js'
 import { createRetrieval } from '../../src/server/upstream/retrieval.js'
 import { UpstreamFixtures } from '../support/upstream-fixtures.js'
 
