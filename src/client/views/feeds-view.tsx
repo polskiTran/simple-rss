@@ -17,16 +17,22 @@ import { useResource } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
 import { firstCheckFailure, retryFailure, unavailableNote } from './feed-language.js'
 
-const FIRST_CHECK_ATTEMPTS = 8
-const FIRST_CHECK_INTERVAL_MS = 2_000
-
-const UNCHECKED_REFRESH_MS = 3_000
-const UNCHECKED_REFRESH_ROUNDS = 20
+/** How often the list is read again while a Subscription waits for its first check. */
+const POLL_INTERVAL_MS = 2_000
+const POLL_ROUNDS = 30
+/** Rounds a new Subscription's own first check is watched before the notice gives up on it. */
+const FIRST_CHECK_ROUNDS = 8
 
 /** Rows a Rhythm group shows before Show N more. */
 const GROUP_PREVIEW = 6
 
 type Order = 'rhythm' | 'name' | 'recent'
+
+/** Where polling is: its round, and the new Subscription whose first check the notice waits on. */
+interface Poll {
+  readonly round: number
+  readonly watching: number | undefined
+}
 
 export interface FeedsViewProps {
   onOpenFeed(feedId: number): void
@@ -41,7 +47,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   const [notice, setNotice] = useState('')
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
   const [retryingFeedId, setRetryingFeedId] = useState<number | undefined>(undefined)
-  const [refreshRound, setRefreshRound] = useState(0)
+  const [poll, setPoll] = useState<Poll>({ round: 0, watching: undefined })
   const [order, setOrder] = useState<Order>('rhythm')
 
   async function refreshList(): Promise<void> {
@@ -55,31 +61,56 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     } catch {}
   }
 
-  const pollUnchecked = useEffectEvent(async () => {
-    await refreshList()
-    setRefreshRound((round) => round + 1)
+  // One round of polling: how the watched first check went, then the list.
+  const pollRound = useEffectEvent(async (signal: AbortSignal) => {
+    let { watching } = poll
+    if (watching !== undefined) {
+      const outcome = await firstCheckOutcome(watching, signal)
+      if (signal.aborted) return
+      if (outcome !== undefined || poll.round + 1 >= FIRST_CHECK_ROUNDS) {
+        setNotice(outcome ?? 'Still checking. The feed will appear in the list.')
+        watching = undefined
+      }
+    }
+    try {
+      const { subscriptions } = await fetchSubscriptions(signal)
+      if (!signal.aborted) set(() => subscriptions)
+    } catch {}
+    if (!signal.aborted) setPoll({ round: poll.round + 1, watching })
   })
 
+  // Polls while a first check is awaited, and stops on leaving the screen.
   useEffect(() => {
-    if (state.kind !== 'loaded' || refreshRound >= UNCHECKED_REFRESH_ROUNDS) return
-    if (!state.value.some((subscription) => subscription.availability.state === 'unchecked')) return
-    const timer = window.setTimeout(pollUnchecked, UNCHECKED_REFRESH_MS)
-    return () => window.clearTimeout(timer)
-  }, [state, refreshRound])
+    if (state.kind !== 'loaded') return
+    const unchecked = state.value.some((subscription) => subscription.availability.state === 'unchecked')
+    if (poll.watching === undefined && (!unchecked || poll.round >= POLL_ROUNDS)) return
+    const round = new AbortController()
+    // A new Subscription's first round goes at once.
+    const timer = window.setTimeout(
+      () => void pollRound(round.signal),
+      poll.round === 0 && poll.watching !== undefined ? 0 : POLL_INTERVAL_MS,
+    )
+    return () => {
+      window.clearTimeout(timer)
+      round.abort()
+    }
+  }, [state, poll])
 
-  async function subscribed(feedId: number) {
+  function subscribed(created: SubscriptionSummary) {
     setReport(undefined)
     setNotice('Subscribed. Checking the feed…')
-    setRefreshRound(0)
-    await refreshList()
-    setNotice(await watchFirstCheck(feedId))
-    await refreshList()
+    if (state.kind === 'loaded') {
+      set((current) => [...current.filter((listed) => listed.feedId !== created.feedId), created])
+    } else {
+      reload()
+    }
+    setPoll({ round: 0, watching: created.feedId })
   }
 
   function imported(next: OpmlImportReport) {
     setNotice('')
     setReport(next)
-    setRefreshRound(0)
+    setPoll({ round: 0, watching: undefined })
     void refreshList()
   }
 
@@ -118,10 +149,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
                 </span>
               </a>
             )}
-            <AddFeedDialog
-              onSubscribed={(created) => void subscribed(created.subscription.feedId)}
-              onImported={imported}
-            />
+            <AddFeedDialog onSubscribed={(created) => subscribed(created.subscription)} onImported={imported} />
           </div>
         </div>
         {groups.length > 0 ? (
@@ -364,28 +392,21 @@ function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
   )
 }
 
-async function watchFirstCheck(feedId: number): Promise<string> {
-  for (let attempt = 0; attempt < FIRST_CHECK_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await wait(FIRST_CHECK_INTERVAL_MS)
-    let detail: FeedDetail
-    try {
-      detail = await fetchFeedDetail(feedId)
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) return 'Already subscribed.'
-      continue
-    }
-    if (detail.availability.lastSuccessAt) {
-      return detail.items.length === 1
-        ? 'Subscribed. 1 item in the digest.'
-        : `Subscribed. ${detail.items.length} items in the digest.`
-    }
-    if (detail.availability.consecutiveFailures > 0) {
-      return firstCheckFailure(detail.availability.category)
-    }
+/** What a new Subscription's first check came to, once it has come to anything. */
+async function firstCheckOutcome(feedId: number, signal: AbortSignal): Promise<string | undefined> {
+  let detail: FeedDetail
+  try {
+    detail = await fetchFeedDetail(feedId, signal)
+  } catch (error) {
+    // ADR 0007: the first check found a Feed already subscribed under another URL and merged this Subscription into it.
+    if (error instanceof ApiError && error.status === 404) return 'Already subscribed.'
+    return undefined
   }
-  return 'Still checking. The feed will appear in the list.'
-}
-
-function wait(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+  if (detail.availability.lastSuccessAt) {
+    return detail.items.length === 1
+      ? 'Subscribed. 1 item in the digest.'
+      : `Subscribed. ${detail.items.length} items in the digest.`
+  }
+  if (detail.availability.consecutiveFailures > 0) return firstCheckFailure(detail.availability.category)
+  return undefined
 }

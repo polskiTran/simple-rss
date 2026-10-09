@@ -35,6 +35,7 @@ function checked(availability: FeedAvailability, itemCount: number): FeedDetail 
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -86,6 +87,30 @@ describe('Feeds', () => {
     expect(await screen.findByText('Field Notes')).toBeDefined()
     expect(container.querySelectorAll('.cadence-day')).toHaveLength(30)
     expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: FEED.enteredUrl } }])
+  })
+
+  it('stops watching for the first check once the Feeds screen is left', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const api = stubApi().on('GET /api/feeds/1', { body: checked(UNCHECKED, 0) })
+    api.on('POST /api/subscriptions', () => {
+      api.on('GET /api/feeds', { body: { subscriptions: [UNCHECKED_FEED] } })
+      return { status: 201, body: { subscription: UNCHECKED_FEED } }
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    await addByAddress(user, FEED.enteredUrl)
+    await screen.findByText('Subscribed. Checking the feed…')
+    await user.click(screen.getByRole('link', { name: 'Digest' }))
+    await screen.findByRole('heading', { level: 1, name: /^Digest/ })
+    const watched = api.requestsTo('GET /api/feeds/1').length
+    const listed = api.requestsTo('GET /api/feeds').length
+
+    await act(() => vi.advanceTimersByTimeAsync(60_000))
+
+    expect(api.requestsTo('GET /api/feeds/1')).toHaveLength(watched)
+    expect(api.requestsTo('GET /api/feeds')).toHaveLength(listed)
   })
 
   it('links the domain to the Feed’s home page in a new tab, and leaves it plain text without one', async () => {
