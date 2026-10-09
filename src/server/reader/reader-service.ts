@@ -7,7 +7,7 @@ import {
   type ReaderItem,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey, longDate } from '../digest/chronology.js'
+import { dateKey, longDate } from '../digest/chronology.js'
 import type { DigestService } from '../digest/digest-service.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
@@ -119,6 +119,7 @@ export class ReaderService {
         feedContentMarkdown: feedItems.feedContentMarkdown,
         feedContentTruncated: feedItems.feedContentTruncated,
         firstSeenAt: feedItems.firstSeenAt,
+        chronologyAt: feedItems.chronologyAt,
         savedAt: libraryItems.savedAt,
         readingSource: subscriptions.readingSource,
       })
@@ -132,8 +133,6 @@ export class ReaderService {
     if (!row) return undefined
 
     const timezone = this.#settings.effectiveTimezone()
-    const now = this.#clock.now()
-    const instant = new Date(chronologyTime(row.publishedAt, row.firstSeenAt, now))
 
     return {
       feedItemId: row.feedItemId,
@@ -143,7 +142,7 @@ export class ReaderService {
       link: row.link,
       publishedAt: row.publishedAt,
       firstSeenAt: row.firstSeenAt,
-      displayDate: longDate(instant, dateKey(now, timezone), timezone),
+      displayDate: longDate(new Date(row.chronologyAt), dateKey(this.#clock.now(), timezone), timezone),
       summary: row.summary,
       feedContent: row.feedContentMarkdown
         ? {

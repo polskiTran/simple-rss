@@ -1,51 +1,65 @@
-import { and, inArray, sql } from 'drizzle-orm'
+import { inArray, sql, type SQL } from 'drizzle-orm'
 import { CADENCE_GRID_WEEKS, CADENCE_STRIP_DAYS } from '../../shared/api.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
-import { feedItems } from '../persistence/schema.js'
-import { chronologyTime, dateKey, dayStartUtc } from './chronology.js'
-import { chronologySql } from './list-page.js'
+import { feedItems, subscriptions } from '../persistence/schema.js'
+import { dayAfter, dateKey, dayStartUtc } from './chronology.js'
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
-function emptyCadence(): number[] {
-  return Array.from({ length: CADENCE_STRIP_DAYS }, () => 0)
+/** Subscribed Feed Items on each of `days`, every Feed together. */
+export function dailyCounts(db: DrizzleDatabase, timezone: string, days: readonly string[]): (day: string) => number {
+  const subscribed = db.select({ feedId: subscriptions.feedId }).from(subscriptions)
+  const counts = new Map(
+    countRows(db, timezone, days, inArray(feedItems.feedId, subscribed)).map((row) => [row.day, row.count]),
+  )
+  return (day) => counts.get(day) ?? 0
 }
 
-/**
- * The trailing thirty days of counts for each of `feedIds`, in the
- * installation timezone, as a lookup that answers a quiet Feed with zeros.
- * Days follow the chronology instant, not the raw published time.
- */
+/** Each of `feedIds`' counts across `days`, in their order; a Feed with none answers zeros. */
+export function cadenceByFeed(
+  db: DrizzleDatabase,
+  timezone: string,
+  days: readonly string[],
+  feedIds: readonly number[],
+): (feedId: number) => number[] {
+  const counts = new Map<number, Map<string, number>>()
+  const rows = feedIds.length > 0 ? countRows(db, timezone, days, inArray(feedItems.feedId, [...feedIds]), true) : []
+  for (const { feedId, day, count } of rows) {
+    const byDay = counts.get(feedId) ?? new Map<string, number>()
+    byDay.set(day, count)
+    counts.set(feedId, byDay)
+  }
+  return (feedId) => days.map((day) => counts.get(feedId)?.get(day) ?? 0)
+}
+
+/** The trailing thirty days of `cadenceByFeed`, ending today in the installation timezone. */
 export function stripCadenceByFeed(
   db: DrizzleDatabase,
   timezone: string,
   now: Date,
   feedIds: readonly number[],
 ): (feedId: number) => number[] {
-  const cadence = new Map<number, number[]>()
-  if (feedIds.length > 0) {
-    const today = dateKey(now, timezone)
-    const days = trailingDayKeys(today, CADENCE_STRIP_DAYS)
-    const indexByDate = new Map(days.map((key, index) => [key, index]))
-    const opening = dayStartUtc(days[0] ?? today, timezone).toISOString()
-    const rows = db
-      .select({ feedId: feedItems.feedId, publishedAt: feedItems.publishedAt, firstSeenAt: feedItems.firstSeenAt })
-      .from(feedItems)
-      .where(and(inArray(feedItems.feedId, [...feedIds]), sql`${chronologySql(now)} >= ${opening}`))
-      .all()
-    for (const row of rows) {
-      const time = chronologyTime(row.publishedAt, row.firstSeenAt, now)
-      const index = indexByDate.get(dateKey(new Date(time), timezone))
-      if (index === undefined) continue
-      let counts = cadence.get(row.feedId)
-      if (!counts) {
-        counts = emptyCadence()
-        cadence.set(row.feedId, counts)
-      }
-      counts[index] = (counts[index] ?? 0) + 1
-    }
-  }
-  return (feedId) => cadence.get(feedId) ?? emptyCadence()
+  return cadenceByFeed(db, timezone, trailingDayKeys(dateKey(now, timezone), CADENCE_STRIP_DAYS), feedIds)
+}
+
+/**
+ * Feed Items under `scope` per installation-timezone day, counted in SQL: each
+ * day is one range over the chronology index, so no row crosses into JavaScript.
+ * `CROSS JOIN` is SQLite's order hint: without statistics the planner may
+ * otherwise put the days inside and walk every item of every Feed against them.
+ */
+function countRows(db: DrizzleDatabase, timezone: string, days: readonly string[], scope: SQL, byFeed = false) {
+  const last = days.at(-1)
+  if (last === undefined) return []
+  const starts = [...days, dayAfter(last)].map((day) => dayStartUtc(day, timezone).toISOString())
+  const spans = days.map((day, index) => sql`(${day}, ${starts[index]}, ${starts[index + 1]})`)
+  const feed = byFeed ? feedItems.feedId : sql`NULL`
+  return db.all<{ feedId: number; day: string; count: number }>(sql`
+    WITH days (day, opening, closing) AS (VALUES ${sql.join(spans, sql`, `)})
+    SELECT ${feed} AS feedId, days.day AS day, count(*) AS count
+    FROM days CROSS JOIN ${feedItems}
+    WHERE ${feedItems.chronologyAt} >= days.opening AND ${feedItems.chronologyAt} < days.closing AND ${scope}
+    GROUP BY feedId, days.day`)
 }
 
 /** The `days` most recent date keys ending with `todayKey`, oldest first. */

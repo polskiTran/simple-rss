@@ -82,7 +82,7 @@ describe('the schema mirror', () => {
   it('mirrors every column: name, type, nullability, primary key, and default', () => {
     for (const table of mirrored) {
       const config = getTableConfig(table)
-      const actual = db.$client.prepare(`PRAGMA table_info(${config.name})`).all() as ColumnInfo[]
+      const actual = db.$client.prepare(`PRAGMA table_xinfo(${config.name})`).all() as ColumnInfo[]
       const actualByName = new Map(actual.map((column) => [column.name, column]))
 
       expect(config.columns.map((column) => column.name).sort(), config.name).toEqual([...actualByName.keys()].sort())

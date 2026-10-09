@@ -1,50 +1,26 @@
-const FUTURE_TOLERANCE_MS = 24 * 60 * 60 * 1_000
+const DAY_MS = 24 * 60 * 60 * 1_000
 
-export function chronologyTime(publishedAt: string | null, firstSeenAt: string, now: Date): number {
-  const published = publishedAt ? Date.parse(publishedAt) : Number.NaN
-  return Number.isFinite(published) && published <= now.getTime() + FUTURE_TOLERANCE_MS
-    ? published
-    : Date.parse(firstSeenAt)
+const formats = new Map<string, Intl.DateTimeFormat>()
+
+/** Building a DateTimeFormat costs far more than using one, so each shape is built once per timezone. */
+function formatIn(timezone: string, locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale} ${timezone} ${JSON.stringify(options)}`
+  let format = formats.get(key)
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { ...options, timeZone: timezone })
+    formats.set(key, format)
+  }
+  return format
 }
-
-export function plausibleHorizon(now: Date): string {
-  return new Date(now.getTime() + FUTURE_TOLERANCE_MS).toISOString()
-}
-
-export function inDigestOrder<Row extends { feedItemId: number; publishedAt: string | null; firstSeenAt: string }>(
-  rows: readonly Row[],
-  now: Date,
-): Array<{ row: Row; chronology: number }> {
-  return rows
-    .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
-    .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
-}
-
-const dateKeyFormats = new Map<string, Intl.DateTimeFormat>()
 
 export function dateKey(date: Date, timezone: string): string {
-  let format = dateKeyFormats.get(timezone)
-  if (!format) {
-    format = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
-    dateKeyFormats.set(timezone, format)
-  }
-  const parts = format.formatToParts(date)
+  const parts = formatIn(timezone, 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}-${values.month}-${values.day}`
 }
 
 export function timeLabel(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(date)
+  return formatIn(timezone, 'en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
 }
 
 /**
@@ -56,8 +32,7 @@ export function metaRowDate(instant: Date, itemDate: string, today: string, time
   if (itemDate === dayBefore(today)) return `Yesterday, ${timeLabel(instant, timezone)}`
 
   const sameYear = itemDate.slice(0, 4) === today.slice(0, 4)
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
+  return formatIn(timezone, 'en-GB', {
     day: 'numeric',
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
@@ -70,9 +45,8 @@ export function metaRowDate(instant: Date, itemDate: string, today: string, time
  */
 export function longDate(instant: Date, today: string, timezone: string): string {
   const sameYear = dateKey(instant, timezone).slice(0, 4) === today.slice(0, 4)
-  const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'long' }).format(instant)
-  const day = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
+  const weekday = formatIn(timezone, 'en-GB', { weekday: 'long' }).format(instant)
+  const day = formatIn(timezone, 'en-GB', {
     day: 'numeric',
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
@@ -81,29 +55,54 @@ export function longDate(instant: Date, today: string, timezone: string): string
 }
 
 export function dayBefore(dayKey: string): string {
-  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - 24 * 60 * 60 * 1_000).toISOString().slice(0, 10)
+  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - DAY_MS).toISOString().slice(0, 10)
 }
 
 export function dayAfter(dayKey: string): string {
-  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) + 24 * 60 * 60 * 1_000).toISOString().slice(0, 10)
+  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10)
 }
 
 /**
- * The UTC instant a timezone's calendar day begins. Two refinement rounds
- * settle the offset even when a DST transition moves it across the guess.
+ * `dateKey` for many stored instants in one timezone: Intl runs once per day
+ * touched rather than once per instant, so grouping a whole Feed stays cheap.
+ * Every offset is under a day, so the answer is the instant's UTC date or a
+ * neighbour, settled against where those days begin.
+ */
+export function dayKeysIn(timezone: string): (instant: string) => string {
+  const starts = new Map<string, string>()
+  const startOf = (day: string) => {
+    let start = starts.get(day)
+    if (start === undefined) {
+      start = dayStartUtc(day, timezone).toISOString()
+      starts.set(day, start)
+    }
+    return start
+  }
+  return (instant) => {
+    const day = instant.slice(0, 10)
+    if (instant < startOf(day)) return dayBefore(day)
+    const next = dayAfter(day)
+    return instant < startOf(next) ? day : next
+  }
+}
+
+/**
+ * The UTC instant a timezone's calendar day begins: its midnight under the offset
+ * from one side of the day or the other. A DST transition at midnight leaves
+ * only one of the two on the day's first instant — where midnight is skipped,
+ * the day begins at the transition itself.
  */
 export function dayStartUtc(dayKey: string, timezone: string): Date {
   const guess = Date.parse(`${dayKey}T00:00:00.000Z`)
-  let instant = guess
-  for (let round = 0; round < 2; round += 1) {
-    instant = guess - millisecondsAheadOfUtc(instant, timezone)
-  }
-  return new Date(instant)
+  const candidates = [guess - DAY_MS, guess + DAY_MS].map((side) => guess - millisecondsAheadOfUtc(side, timezone))
+  const start = candidates.find(
+    (instant) => dateKey(new Date(instant), timezone) === dayKey && dateKey(new Date(instant - 1), timezone) !== dayKey,
+  )
+  return new Date(start ?? Math.min(...candidates))
 }
 
 function millisecondsAheadOfUtc(instant: number, timezone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
+  const parts = formatIn(timezone, 'en-US', {
     hourCycle: 'h23',
     year: 'numeric',
     month: '2-digit',
@@ -121,7 +120,5 @@ function millisecondsAheadOfUtc(instant: number, timezone: string): number {
 
 /** Whole days from `earlier` to `later`, both day keys. */
 export function daysBetween(later: string, earlier: string): number {
-  return Math.round(
-    (Date.parse(`${later}T00:00:00.000Z`) - Date.parse(`${earlier}T00:00:00.000Z`)) / (24 * 60 * 60 * 1_000),
-  )
+  return Math.round((Date.parse(`${later}T00:00:00.000Z`) - Date.parse(`${earlier}T00:00:00.000Z`)) / DAY_MS)
 }

@@ -1,4 +1,4 @@
-import { and, eq, isNull, lte } from 'drizzle-orm'
+import { and, desc, eq, isNull, lte } from 'drizzle-orm'
 import {
   DEFAULT_POLLING_INTERVAL_MINUTES,
   DEFAULT_READING_SOURCE,
@@ -13,7 +13,7 @@ import {
   type UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { chronologyTime, dateKey } from '../digest/chronology.js'
+import { dateKey, dayKeysIn } from '../digest/chronology.js'
 import { feedItemRowOf } from '../digest/digest-service.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
@@ -404,31 +404,29 @@ export class SubscriptionService {
     if (!record) return undefined
 
     const timezone = this.#settings.effectiveTimezone()
-    const now = this.#clock.now()
-    const today = dateKey(now, timezone)
-
-    const rows = this.#db
+    const today = dateKey(this.#clock.now(), timezone)
+    const dayOf = dayKeysIn(timezone)
+    const counts = new Map<string, number>()
+    const items = this.#db
       .select({
         feedItemId: feedItems.id,
         title: feedItems.title,
         link: feedItems.link,
         publishedAt: feedItems.publishedAt,
         firstSeenAt: feedItems.firstSeenAt,
+        chronologyAt: feedItems.chronologyAt,
         savedAt: libraryItems.savedAt,
       })
       .from(feedItems)
       .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(eq(feedItems.feedId, feedId))
+      .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
       .all()
-      .map((row) => ({ row, chronology: chronologyTime(row.publishedAt, row.firstSeenAt, now) }))
-      .sort((left, right) => right.chronology - left.chronology || right.row.feedItemId - left.row.feedItemId)
-
-    const counts = new Map<string, number>()
-    const items = rows.map(({ row, chronology }) => {
-      const item = feedItemRowOf(row, new Date(chronology), timezone)
-      counts.set(item.date, (counts.get(item.date) ?? 0) + 1)
-      return item
-    })
+      .map((row) => {
+        const date = dayOf(row.chronologyAt)
+        counts.set(date, (counts.get(date) ?? 0) + 1)
+        return feedItemRowOf(row, date, timezone)
+      })
 
     return {
       feedId: record.feedId,

@@ -204,7 +204,7 @@ The additive migration leaves existing metadata, identity, first-seen time and L
 
 Timestamps are stored in UTC. One installation timezone, detected during setup and editable later, defines Digest calendar groups across devices.
 
-Items order by a valid publication time and fall back to first-seen time. Clearly implausible future dates use first-seen ordering. The Digest groups items under Today, Yesterday, and then calendar dates, with no read/unread partition.
+Items order by a valid publication time and fall back to first-seen time. A publication time more than a day past the item's first sighting is implausible and uses first-seen ordering; the rule never reads the clock, so an item's place is stored with it and does not move. The Digest groups items under Today, Yesterday, and then calendar dates, with no read/unread partition.
 
 ### Retention and unsubscribe
 
