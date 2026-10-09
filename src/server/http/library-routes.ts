@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { libraryRequestSchema, type Library, type LibraryMembership } from '../../shared/api.js'
 import type { LibraryService } from '../library/library-service.js'
-import { apiError, notFound, readId, readListCursor } from './requests.js'
+import { apiError, notFound, readId, readLibraryCursor } from './requests.js'
 
 export interface LibraryRouteDependencies {
   readonly library: LibraryService
@@ -16,7 +16,7 @@ export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
     if (!request.success) {
       return apiError(c, 400, 'invalid_request', 'The Library orders by newest or oldest save')
     }
-    const cursor = readListCursor(c)
+    const cursor = readLibraryCursor(c)
     if (!cursor.ok) return cursor.response
     return c.json<Library>(deps.library.list(request.data.order, cursor.value))
   })

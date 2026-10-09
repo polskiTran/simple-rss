@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { z } from 'zod'
 import { idParameterSchema, type ApiErrorBody, type ApiErrorCode } from '../../shared/api.js'
-import { decodeListCursor, type ListCursor } from '../digest/list-page.js'
+import { decodeLibraryCursor, type LibraryCursor } from '../library/library-cursor.js'
 
 /** What a request reader hands back: a value it accepted, or the response refusing it. */
 export type Validated<T> =
@@ -55,11 +55,11 @@ export async function readJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S
 }
 
 /** Absent means the top of the list. An undecodable cursor is answered 400 here. */
-export function readListCursor(c: Context): Validated<ListCursor | undefined> {
+export function readLibraryCursor(c: Context): Validated<LibraryCursor | undefined> {
   const raw = c.req.query('cursor')
   if (raw === undefined) return { ok: true, value: undefined }
 
-  const cursor = decodeListCursor(raw)
+  const cursor = decodeLibraryCursor(raw)
   return cursor
     ? { ok: true, value: cursor }
     : { ok: false, response: apiError(c, 400, 'invalid_cursor', 'The cursor is not one this installation issued') }

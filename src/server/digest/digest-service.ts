@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, max, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gte, lt, max, or, type SQL } from 'drizzle-orm'
 import {
   CADENCE_STRIP_DAYS,
   QUIET_SPELL_DAYS,
@@ -16,7 +16,9 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
 import { dateKey, dayAfter, dayBefore, dayKeysIn, daysBetween, dayStartUtc, longDate, timeLabel } from '../calendar.js'
-import { beyondCursorSql, LIST_PAGE_SIZE } from './list-page.js'
+
+/** Items a Digest page reaches before completing the day the last one falls on (ADR 0011). */
+const DIGEST_PAGE_SIZE = 50
 
 export class DigestService {
   readonly #db: DrizzleDatabase
@@ -31,7 +33,7 @@ export class DigestService {
 
   /**
    * One page of the Digest `from` a day, or from today: whole days, newest
-   * first, as many as it takes to reach `LIST_PAGE_SIZE` items. A busy day
+   * first, as many as it takes to reach `DIGEST_PAGE_SIZE` items. A busy day
    * comes whole however long it runs, so no Feed's day is split across pages.
    */
   read({ from }: DigestStart): Digest {
@@ -39,11 +41,11 @@ export class DigestService {
     const dayOf = dayKeysIn(timezone)
     const before = from ? lt(feedItems.chronologyAt, dayStartUtc(dayAfter(from), timezone).toISOString()) : undefined
 
-    const head = this.#newestFirst(before).limit(LIST_PAGE_SIZE).all()
+    const head = this.#newestFirst(before).limit(DIGEST_PAGE_SIZE).all()
     const last = head.at(-1)
     let fetched = head
     let nextFrom: string | null = null
-    if (last && head.length === LIST_PAGE_SIZE) {
+    if (last && head.length === DIGEST_PAGE_SIZE) {
       const opening = dayStartUtc(dayOf(last.chronologyAt), timezone).toISOString()
       fetched = this.#newestFirst(before, gte(feedItems.chronologyAt, opening)).all()
       const older = this.#newestFirst(lt(feedItems.chronologyAt, opening)).limit(1).get()
@@ -100,8 +102,12 @@ export class DigestService {
       .all()[0]
     if (!current) return undefined
 
+    const { chronologyAt } = current
     const next = this.#newestFirst(
-      beyondCursorSql(feedItems.chronologyAt, { instant: current.chronologyAt, feedItemId }),
+      or(
+        lt(feedItems.chronologyAt, chronologyAt),
+        and(eq(feedItems.chronologyAt, chronologyAt), lt(feedItems.id, feedItemId)),
+      ),
     )
       .limit(1)
       .all()[0]
