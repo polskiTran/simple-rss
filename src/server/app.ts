@@ -1,4 +1,5 @@
 import { Hono, type MiddlewareHandler } from 'hono'
+import { compress } from 'hono/compress'
 import type { Liveness, Readiness as ReadinessBody, ServiceMeta } from '../shared/api.js'
 import { VERSION } from './version.js'
 import type { Authentication } from './auth/authentication.js'
@@ -84,6 +85,8 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.use('*', securityHeaders())
   app.use('*', requestLogging(deps.logger))
+  // Text only — JSON, HTML, scripts; images and archives pass through as they are.
+  app.use('*', compress())
 
   app.get('/health/live', (c) => c.json<Liveness>({ status: 'live' }))
 
