@@ -685,6 +685,8 @@ export const readerItemSchema = z.object({
   feedId: z.number().int().positive(),
   feedTitle: z.string(),
   link: z.string().nullable(),
+  /** The Discussion the Feed declares, on a page other than the item's own. */
+  discussionUrl: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   /** The installation-timezone day it is listed under, and that timezone's today. */

@@ -176,6 +176,37 @@ describe('parseFeedDocument', () => {
     expect(parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL, [entered]).homePageUrl).toBeNull()
   })
 
+  it('reads the Discussion an RSS item declares in <comments>, as Hacker News and Lobsters do', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0"><channel><title>Aggregator</title>
+        <item><title>Story</title><link>https://blog.example/post</link>
+          <comments>https://news.example/item?id=1</comments></item>
+      </channel></rss>`
+    const [item] = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL).items
+    expect(item?.discussionUrl).toBe('https://news.example/item?id=1')
+  })
+
+  it('reads the Discussion an Atom entry declares as an HTML replies link', () => {
+    const xml = `<?xml version="1.0"?>
+      <feed xmlns="http://www.w3.org/2005/Atom"><title>Threaded</title>
+        <entry><id>one</id><title>One</title><link href="https://blog.example/one"/>
+          <link rel="replies" type="application/atom+xml" href="https://blog.example/one/comments.xml"/>
+          <link rel="replies" type="text/html" href="https://forum.example/t/one"/></entry>
+      </feed>`
+    const [item] = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL).items
+    expect(item?.discussionUrl).toBe('https://forum.example/t/one')
+  })
+
+  it('reads no Discussion when it is the item page itself, as WordPress declares it', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0"><channel><title>Blog</title>
+        <item><title>Post</title><link>https://blog.example/post/</link>
+          <comments>https://blog.example/post/#respond</comments></item>
+      </channel></rss>`
+    const [item] = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL).items
+    expect(item?.discussionUrl).toBeNull()
+  })
+
   it('gives entries without any stable ID the same content fingerprint in both formats', () => {
     const [rssItem] = parseFixture('rss-missing-optional.xml').items
     const [atomItem] = parseFixture('atom-missing-optional.xml').items

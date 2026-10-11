@@ -6,6 +6,7 @@ import { cancelledExtractions, queuedExtractions, ReaderWorkerFixtures } from '.
 
 const FEED_URL = 'https://journal.example/feed'
 const ARTICLE_URL = 'https://journal.example/first-light'
+const DISCUSSION_URL = 'https://news.example/item?id=1'
 const SECOND_ARTICLE_URL = 'https://journal.example/evening'
 const ASYNC_EXTRACTOR_TARGET = 'https://www.youtube.com/watch?v=reader-boundary'
 const FINAL_ARTICLE_URL = 'https://journal.example/archive/first-light'
@@ -78,7 +79,12 @@ async function readingSetup(
   service.upstream.stub(FEED_URL, {
     headers: { 'content-type': 'application/rss+xml' },
     body: rss(
-      item('first-light', 'First light', '2026-08-08T07:15:00.000Z', `<link>${articleUrl}</link>`),
+      item(
+        'first-light',
+        'First light',
+        '2026-08-08T07:15:00.000Z',
+        `<link>${articleUrl}</link><comments>${DISCUSSION_URL}</comments>`,
+      ),
       item('evening', 'Evening notes', '2026-08-07T09:31:00.000Z'),
     ),
   })
@@ -117,6 +123,7 @@ describe('the Reader item', () => {
     expect(reader.title).toBe('First light')
     expect(reader.feedTitle).toBe('Field Notes')
     expect(reader.link).toBe(ARTICLE_URL)
+    expect(reader.discussionUrl).toBe(DISCUSSION_URL)
     expect(reader).toMatchObject({ date: '2026-08-08', today: '2026-08-08' })
     expect(reader.summary).toBe('A clear morning over the valley.')
     expect(reader.saved).toBe(false)

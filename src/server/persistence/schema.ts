@@ -113,6 +113,7 @@ export const feedItems = sqliteTable('feed_items', {
   identityKind: text('identity_kind', { enum: ['guid', 'link', 'content'] }).notNull(),
   title: text('title'),
   link: text('link'),
+  discussionUrl: text('discussion_url'),
   publishedAt: text('published_at'),
   imageUrl: text('image_url'),
   summary: text('summary'),

@@ -55,6 +55,7 @@ export function persistFeedWindow(
         identityKind: item.identityKind,
         title: item.title,
         link: item.link,
+        discussionUrl: item.discussionUrl,
         publishedAt: item.publishedAt,
         imageUrl: item.imageUrl,
         summary: item.summary,
@@ -68,6 +69,7 @@ export function persistFeedWindow(
         set: {
           title: item.title,
           link: item.link,
+          discussionUrl: item.discussionUrl,
           publishedAt: item.publishedAt,
           imageUrl: item.imageUrl,
           summary: item.summary,

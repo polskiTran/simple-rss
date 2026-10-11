@@ -52,6 +52,10 @@ _Avoid_: Post, article
 The webpage a Feed Item links to, distinct from the Feed Content supplied inside the Feed.
 _Avoid_: Full article, source page
 
+**Discussion**:
+The page where a Feed Item is discussed, as its Feed declares it — a Hacker News or Lobsters thread beside the article it links. Absent when the Feed declares none, or only the item's own page. Simple RSS links to it and never fetches it.
+_Avoid_: Comments, thread, comment section
+
 **Feed Home Page**:
 The site a Feed declares as its own, read from the Feed document and absent when the Feed names only its own URL. It supplies the host shown beside a Feed and the link behind it, so the Feeds list names the publisher rather than whichever host serves the XML.
 _Avoid_: Site URL, website, channel link

@@ -326,6 +326,14 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE subscriptions DROP COLUMN last_failure_at;
     `,
   },
+  {
+    version: 18,
+    name: 'feed-item-discussion',
+    sql: `
+      -- The page a Feed declares the item is discussed on; filled by the next poll.
+      ALTER TABLE feed_items ADD COLUMN discussion_url TEXT;
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

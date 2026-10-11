@@ -135,6 +135,7 @@ export const readerItem = (overrides: Partial<ReaderItem> = {}): ReaderItem => (
   feedId: FEED.feedId,
   feedTitle: FEED.title,
   link: 'https://journal.example/first-light',
+  discussionUrl: null,
   publishedAt: '2026-08-08T07:15:00.000Z',
   firstSeenAt: '2026-08-08T09:00:00.000Z',
   date: TODAY,
