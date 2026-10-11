@@ -288,6 +288,37 @@ const subscriptionSummarySchema = feedSummarySchema.extend({
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
 
+/** The address the Add feed dialog previews: a Feed, or a web page declaring some. */
+export const feedPreviewRequestSchema = createSubscriptionRequestSchema
+export type FeedPreviewRequest = z.infer<typeof feedPreviewRequestSchema>
+
+export const FEED_PREVIEW_ITEMS = 5
+
+/**
+ * A Feed as one retrieval found it, before anything is recorded. `feedUrl` is
+ * the address to subscribe with; `cadence` is drawn from the Feed Window alone,
+ * and `lastItemAt` and `items` follow the Digest's chronology, newest first.
+ */
+const feedPreviewSchema = feedSummarySchema.pick({ title: true, domain: true, homePageUrl: true }).extend({
+  feedUrl: z.string(),
+  cadence: cadenceStripSchema,
+  lastItemAt: z.string().nullable(),
+  items: z.array(z.object({ title: z.string(), publishedAt: z.string().nullable() })).max(FEED_PREVIEW_ITEMS),
+  /** Whether the address is already one of a subscribed Feed's own. */
+  subscribed: z.boolean(),
+})
+export type FeedPreview = z.infer<typeof feedPreviewSchema>
+
+/**
+ * The address answered with a Feed, or with a web page and the Declared Feeds
+ * that answered, in page order; a page declaring none answers an empty list.
+ */
+export const feedPreviewResponseSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('feed'), feed: feedPreviewSchema }),
+  z.object({ kind: z.literal('page'), host: z.string(), feeds: z.array(feedPreviewSchema) }),
+])
+export type FeedPreviewResponse = z.infer<typeof feedPreviewResponseSchema>
+
 export const createSubscriptionResponseSchema = z.object({
   subscription: subscriptionSummarySchema,
 })

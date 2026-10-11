@@ -24,7 +24,7 @@ export function persistFeedWindow(
   },
 ): void {
   const { feedId, parsed, resolvedUrl, validators, now } = options
-  const domain = new URL(parsed.homePageUrl ?? resolvedUrl).hostname
+  const domain = feedDomain(parsed, resolvedUrl)
   const alias = tx
     .select({ feedId: feedUrlAliases.feedId })
     .from(feedUrlAliases)
@@ -78,4 +78,9 @@ export function persistFeedWindow(
       })
       .run()
   }
+}
+
+/** The host a Feed is shown under: its Feed Home Page's, else the one that answered. */
+export function feedDomain(parsed: ParsedFeedDocument, resolvedUrl: string): string {
+  return new URL(parsed.homePageUrl ?? resolvedUrl).hostname
 }

@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
   digestRequestSchema,
+  feedPreviewRequestSchema,
   importOpmlRequestSchema,
   readingSourcePreferenceSchema,
   updateFeedDetailsRequestSchema,
@@ -12,6 +13,7 @@ import {
   type DigestCalendar,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedPreviewResponse,
   type OpmlImportReport,
   type PollingSchedule,
   type ReadingSourcePreference,
@@ -21,6 +23,7 @@ import {
 import type { DigestService } from '../digest/digest-service.js'
 import type { FailedPoll } from '../subscriptions/feed-availability.js'
 import type { FeedPoll } from '../subscriptions/feed-poll.js'
+import type { FeedPreview } from '../subscriptions/feed-preview.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
 import type { SubscriptionService } from '../subscriptions/subscription-service.js'
@@ -30,6 +33,7 @@ import { answer, FEED_ANSWERS } from './retrieval-answers.js'
 export interface FeedRouteDependencies {
   readonly subscriptions: SubscriptionService
   readonly poll: Pick<FeedPoll, 'subscribe'>
+  readonly preview: FeedPreview
   readonly refresh: FeedRefresh
   readonly digest: DigestService
   /** Asks the scheduler to look at the due frontier now rather than next wake, for an OPML Import's first checks. */
@@ -38,6 +42,16 @@ export interface FeedRouteDependencies {
 
 export function feedRoutes(deps: FeedRouteDependencies): Hono {
   const app = new Hono()
+
+  app.post('/subscriptions/preview', async (c) => {
+    const body = await readJsonBody(c, feedPreviewRequestSchema)
+    if (!body.ok) return body.response
+
+    const outcome = await deps.preview.preview(body.value.url, c.req.raw.signal)
+    if (outcome.kind === 'previewed') return c.json<FeedPreviewResponse>(outcome.preview)
+    if (outcome.kind === 'invalid-url') return invalidUrl(c)
+    return failedPoll(c, outcome)
+  })
 
   app.post('/subscriptions', async (c) => {
     const body = await readJsonBody(c, createSubscriptionRequestSchema)
