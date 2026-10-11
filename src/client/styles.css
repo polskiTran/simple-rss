@@ -2525,6 +2525,12 @@
       &:has(.search[data-open]) > :is(.wordmark, .chrome-back, .chrome-toolbar) {
         display: none;
       }
+
+      /* Where Saved and Settings are hidden their tracks go too, or their empty
+         gaps would hold the search square short of the column's edge. */
+      .app:is([data-screen='reader'], [data-screen='search']) & {
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+      }
     }
   }
 
@@ -2576,6 +2582,11 @@
       grid-row: 1;
       justify-self: end;
       margin: 0;
+
+      /* Its squares keep the bar's own spacing. */
+      & .toolbar-group {
+        gap: 6px;
+      }
     }
   }
 
