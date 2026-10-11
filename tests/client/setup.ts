@@ -24,3 +24,7 @@ afterEach(() => {
 // and it has no `scrollIntoView` at all.
 window.scrollTo = () => {}
 Element.prototype.scrollIntoView = () => {}
+
+// jsdom has no PointerEvent; Base UI's radio passes a press on to its hidden
+// input as one, and a MouseEvent carries everything that press needs.
+if (!('PointerEvent' in window)) Object.defineProperty(window, 'PointerEvent', { value: MouseEvent })

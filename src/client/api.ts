@@ -7,6 +7,7 @@ import {
   digestSchema,
   feedDetailSchema,
   feedDetailsUpdateSchema,
+  feedPreviewResponseSchema,
   installationPreferencesSchema,
   libraryMembershipSchema,
   librarySchema,
@@ -30,6 +31,8 @@ import {
   type DigestStart,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedPreviewRequest,
+  type FeedPreviewResponse,
   type ImportOpmlRequest,
   type InstallationPreferences,
   type Library,
@@ -130,19 +133,19 @@ async function getJson<T>(
   return schema.parse(await response.json())
 }
 
-/** Sends `body` as JSON — or nothing, when it is undefined — and checks the answer against `schema`. */
+/** Sends `body` as JSON — or nothing, when it is undefined — and checks the answer against `schema`; `signal` abandons it. */
 async function sendJson<T>(
   method: 'POST' | 'PUT' | 'DELETE',
   path: string,
   body: JsonValue | undefined,
   schema: Schema<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
-  const response = await request(
-    path,
-    body === undefined
-      ? { method }
-      : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
-  )
+  const response = await request(path, {
+    method,
+    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+    ...(signal ? { signal } : {}),
+  })
   return schema.parse(await response.json())
 }
 
@@ -190,6 +193,18 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
   )
 }
 
+/** What an address answers — a Feed, or a page and the Feeds it declares — with nothing recorded. */
+export function previewFeed(url: string, signal: AbortSignal): Promise<FeedPreviewResponse> {
+  return sendJson(
+    'POST',
+    '/api/subscriptions/preview',
+    { url } satisfies FeedPreviewRequest,
+    feedPreviewResponseSchema,
+    signal,
+  )
+}
+
+/** Retrieves the Feed again and records it only when it answers; a refusal carries the reason. */
 export function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
   return sendJson(
     'POST',

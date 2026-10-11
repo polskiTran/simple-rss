@@ -33,7 +33,7 @@ The User's Subscription-held description for a Feed, shown in place of the Feed 
 _Avoid_: Note, annotation
 
 **OPML Import**:
-Recording the Subscriptions listed in an OPML file without contacting any Feed; whether each Feed answers is Feed Availability's story.
+Recording the Subscriptions listed in an OPML file without contacting any Feed, so each starts unchecked; whether each Feed answers is Feed Availability's story. A Feed added by hand is retrieved before it is recorded instead.
 _Avoid_: Feed migration, bulk subscribe
 
 **Polling Interval**:
@@ -41,7 +41,7 @@ The User-selected preset controlling how often a Subscription becomes eligible t
 _Avoid_: Polling rate, exact schedule
 
 **Feed Availability**:
-A calm summary of a Subscription's recent retrieval outcome, without implying that a failing Feed should be removed. A Subscription that has never been retrieved is unchecked.
+A calm summary of a Subscription's recent retrieval outcome, without implying that a failing Feed should be removed. An imported Subscription that has never been retrieved is unchecked; one added by hand never is, since it was retrieved before it was recorded.
 _Avoid_: Feed health, broken Feed, pending feed
 
 **Feed Item**:
@@ -63,6 +63,10 @@ _Avoid_: Subtitle, blurb, about text
 **Feed Window**:
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch
+
+**Declared Feed**:
+A Feed a web page names in its own markup, so that pasting the page finds the Feed. A page may declare several; the first in the page is its default.
+_Avoid_: Alternative feed, autodiscovered feed, link-rel
 
 **Cadence**:
 A Feed's publishing record, drawn from retained Feed Items as per-day counts in the installation timezone — a 30-day strip on the Feeds list, a 26-week grid on an opened Feed.

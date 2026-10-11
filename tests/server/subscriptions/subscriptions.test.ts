@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { claimedDevice } from '../../support/device.js'
 import { startTestService } from '../../support/service-harness.js'
 
@@ -23,7 +23,7 @@ const RSS = `<?xml version="1.0" encoding="UTF-8"?>
 </rss>`
 
 describe('Subscriptions', () => {
-  it('records the Subscription unchecked; the scheduler makes the first retrieval', async () => {
+  it('records a Subscription only once its Feed answers, with the Feed Window already ingested', async () => {
     const service = await startTestService()
     service.upstream
       .stub(ENTERED_URL, {
@@ -38,65 +38,30 @@ describe('Subscriptions', () => {
 
     const added = await user.post('/api/subscriptions', { url: ENTERED_URL })
 
-    expect(added.status).toBe(201)
-    expect(await added.json()).toEqual({
-      subscription: {
-        feedId: 1,
-        title: 'journal.example',
-        description: null,
-        domain: 'journal.example',
-        homePageUrl: null,
-        readingSource: 'original-webpage',
-        subscribedAt: '2026-08-08T09:00:00.000Z',
-        enteredUrl: ENTERED_URL,
-        resolvedUrl: ENTERED_URL,
-        cadence: Array.from({ length: 30 }, () => 0),
-        availability: {
-          state: 'unchecked',
-          lastCheckedAt: null,
-          lastSuccessDate: null,
-          consecutiveFailures: 0,
-          category: null,
-        },
+    const subscription = {
+      feedId: 1,
+      title: 'Field Notes',
+      description: 'Notes from the field',
+      domain: 'journal.example',
+      homePageUrl: 'https://journal.example/',
+      readingSource: 'original-webpage',
+      subscribedAt: '2026-08-08T09:00:00.000Z',
+      enteredUrl: ENTERED_URL,
+      resolvedUrl: RESOLVED_URL,
+      cadence: [...Array.from({ length: 29 }, () => 0), 1],
+      availability: {
+        state: 'available',
+        lastCheckedAt: '2026-08-08T09:00:00.000Z',
+        lastSuccessDate: '2026-08-08',
+        consecutiveFailures: 0,
+        category: null,
       },
-    })
-    expect(service.logs).toContainEqual(
-      expect.objectContaining({
-        message: 'subscriptions.subscription_created',
-        enteredUrl: ENTERED_URL,
-      }),
-    )
-
-    await service.wakeScheduler()
-
-    const feeds = await user.get('/api/feeds')
-    expect(feeds.status).toBe(200)
-    expect(await feeds.json()).toEqual({
-      subscriptions: [
-        {
-          feedId: 1,
-          title: 'Field Notes',
-          description: 'Notes from the field',
-          domain: 'journal.example',
-          homePageUrl: 'https://journal.example/',
-          readingSource: 'original-webpage',
-          subscribedAt: '2026-08-08T09:00:00.000Z',
-          enteredUrl: ENTERED_URL,
-          resolvedUrl: RESOLVED_URL,
-          cadence: [...Array.from({ length: 29 }, () => 0), 1],
-          availability: {
-            state: 'available',
-            lastCheckedAt: '2026-08-08T09:00:00.000Z',
-            lastSuccessDate: '2026-08-08',
-            consecutiveFailures: 0,
-            category: null,
-          },
-        },
-      ],
-    })
+    }
+    expect(added.status).toBe(201)
+    expect(await added.json()).toEqual({ subscription })
+    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [subscription] })
 
     const digest = await user.get('/api/digest')
-    expect(digest.status).toBe(200)
     expect(await digest.json()).toEqual({
       today: '2026-08-08',
       groups: [
@@ -124,23 +89,94 @@ describe('Subscriptions', () => {
     })
   })
 
-  it('nudges the scheduler, so the first retrieval lands without waiting for a wake', async () => {
-    const service = await startTestService({ scheduling: { nudges: true } })
-    service.upstream.stub(ENTERED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: RSS,
-    })
+  it('records nothing when the address does not answer with a Feed', async () => {
+    const service = await startTestService()
+    service.upstream
+      .stub('https://journal.example/', {
+        headers: { 'content-type': 'text/html' },
+        body: '<!doctype html><title>Home</title>',
+      })
+      .stub('https://journal.example/broken', {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: '<rss><channel>',
+      })
+      .stub('https://journal.example/gone', { status: 404, headers: { 'content-type': 'text/plain' } })
     const user = await claimedDevice(service)
 
+    const refusals = [
+      ['not a URL', 400, 'invalid_feed_url'],
+      ['https://nowhere.example/feed', 502, 'feed_unreachable'],
+      ['https://journal.example/gone', 502, 'feed_unreachable'],
+      ['https://journal.example/', 415, 'unsupported_feed'],
+      ['https://journal.example/broken', 422, 'malformed_feed'],
+    ] as const
+    for (const [url, status, code] of refusals) {
+      const refused = await user.post('/api/subscriptions', { url })
+      expect([url, refused.status, (await refused.json()).error.code]).toEqual([url, status, code])
+    }
+
+    for (const table of ['feeds', 'feed_url_aliases', 'subscriptions', 'feed_items']) {
+      expect(service.database.$client.prepare(`SELECT count(*) AS count FROM ${table}`).get()).toEqual({ count: 0 })
+    }
+  })
+
+  it('preserves the exact entered URL and answers its canonical form as a duplicate without retrieving it', async () => {
+    const service = await startTestService()
+    service.upstream.stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+    const exact = 'https://journal.example:443/feed#user-fragment'
+    const user = await claimedDevice(service)
+
+    const added = await user.post('/api/subscriptions', { url: exact })
+    expect(await added.json()).toMatchObject({
+      subscription: { enteredUrl: exact, resolvedUrl: ENTERED_URL },
+    })
+
+    const duplicate = await user.post('/api/subscriptions', { url: ENTERED_URL })
+    expect(duplicate.status).toBe(409)
+    expect(await duplicate.json()).toMatchObject({
+      error: { code: 'duplicate_subscription' },
+      subscription: { feedId: 1, title: 'Field Notes' },
+    })
+    expect(service.upstream.requestsTo(ENTERED_URL)).toHaveLength(1)
+  })
+
+  it('answers a duplicate, writing nothing, when the address redirects to a subscribed Feed', async () => {
+    const service = await startTestService()
+    const alias = 'https://alias.example/feed'
+    service.upstream
+      .stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+      .stub(alias, { status: 301, headers: { location: ENTERED_URL, 'content-type': 'text/plain' } })
+    const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
 
-    await vi.waitFor(async () => {
-      const feeds = await (await user.get('/api/feeds')).json()
-      expect(feeds.subscriptions[0]).toMatchObject({
-        title: 'Field Notes',
-        availability: expect.objectContaining({ state: 'available' }),
-      })
+    const duplicate = await user.post('/api/subscriptions', { url: alias })
+
+    expect(duplicate.status).toBe(409)
+    expect(await duplicate.json()).toMatchObject({ subscription: { feedId: 1, title: 'Field Notes' } })
+    expect(service.database.$client.prepare('SELECT id FROM feeds').all()).toEqual([{ id: 1 }])
+    expect(service.database.$client.prepare('SELECT url FROM feed_url_aliases').all()).toEqual([{ url: ENTERED_URL }])
+  })
+
+  it('revives a retained Feed under its own row, keeping its Feed Items and Library saves', async () => {
+    const service = await startTestService()
+    service.upstream.stub(ENTERED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
+    expect((await user.put('/api/library/1')).status).toBe(200)
+    expect((await user.delete('/api/feeds/1')).status).toBe(204)
+
+    service.clock.advance(60 * 60 * 1_000)
+    const revived = await user.post('/api/subscriptions', { url: ENTERED_URL })
+
+    expect(revived.status).toBe(201)
+    expect(await revived.json()).toMatchObject({
+      subscription: { feedId: 1, subscribedAt: '2026-08-08T10:00:00.000Z' },
     })
+    expect(service.database.$client.prepare('SELECT id, first_seen_at FROM feed_items').all()).toEqual([
+      { id: 1, first_seen_at: '2026-08-08T09:00:00.000Z' },
+    ])
+    const library = await (await user.get('/api/library')).json()
+    expect(library.items).toMatchObject([{ feedItemId: 1, feedId: 1, subscribed: true }])
   })
 
   it('names a Feed by its answering host when its declared site is the URL a redirect left behind', async () => {
@@ -154,58 +190,12 @@ describe('Subscriptions', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
 
-    await service.wakeScheduler()
-
     const feeds = await (await user.get('/api/feeds')).json()
     expect(feeds.subscriptions[0]).toMatchObject({
       title: 'Field Notes',
       domain: 'feeds.example',
       homePageUrl: null,
     })
-  })
-
-  it('preserves the exact entered URL and dedupes on its canonical form', async () => {
-    const service = await startTestService()
-    const exact = 'https://journal.example:443/feed#user-fragment'
-    const user = await claimedDevice(service)
-
-    const added = await user.post('/api/subscriptions', { url: exact })
-    expect(await added.json()).toMatchObject({
-      subscription: { enteredUrl: exact, resolvedUrl: ENTERED_URL },
-    })
-
-    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(409)
-    expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
-  })
-
-  it('quietly merges a Subscription whose first retrieval reveals an already-subscribed Feed', async () => {
-    const service = await startTestService()
-    service.upstream.stub(ENTERED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: RSS,
-    })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
-    await service.wakeScheduler()
-
-    const alias = 'https://alias.example/feed'
-    service.upstream.stub(alias, {
-      status: 301,
-      headers: { location: ENTERED_URL, 'content-type': 'text/plain' },
-    })
-    expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(201)
-    await service.wakeScheduler()
-
-    const feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions).toHaveLength(1)
-    expect(feeds.subscriptions[0]).toMatchObject({
-      title: 'Field Notes',
-      availability: expect.objectContaining({ state: 'available' }),
-    })
-    expect((await user.post('/api/subscriptions', { url: alias })).status).toBe(409)
-    expect(service.logs).toContainEqual(
-      expect.objectContaining({ message: 'subscriptions.feeds_merged', feedId: 2, intoFeedId: 1 }),
-    )
   })
 
   it('merges a long-lived Feed that moved behind another Feed without touching items or saves', async () => {
@@ -223,7 +213,6 @@ describe('Subscriptions', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(201)
-    await service.wakeScheduler()
     const digest = await (await user.get('/api/digest')).json()
     const kept = digest.groups
       .flatMap((group: { items: { feedItemId: number; title: string }[] }) => group.items)
@@ -259,7 +248,6 @@ describe('Subscriptions', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
     expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(201)
-    await service.wakeScheduler()
     const digest = await (await user.get('/api/digest')).json()
     const essay = digest.groups
       .flatMap((group: { items: { feedItemId: number; title: string }[] }) => group.items)
@@ -275,86 +263,10 @@ describe('Subscriptions', () => {
 
     const revived = await user.post('/api/subscriptions', { url: otherUrl })
     expect(revived.status).toBe(201)
-    expect(await revived.json()).toMatchObject({ subscription: { feedId: 2, title: 'Elsewhere' } })
+    expect(await revived.json()).toMatchObject({ subscription: { feedId: 2 } })
     expect((await user.post('/api/subscriptions', { url: otherUrl })).status).toBe(409)
     const library = await (await user.get('/api/library')).json()
     expect(library.items).toMatchObject([{ feedItemId: essay.feedItemId, feedId: 2, subscribed: true }])
-  })
-
-  it('refuses only what recording itself can see: a URL that is not a Feed endpoint', async () => {
-    const service = await startTestService()
-    const user = await claimedDevice(service)
-
-    const invalid = await user.post('/api/subscriptions', { url: 'not a URL' })
-    expect(invalid.status).toBe(400)
-    expect(await invalid.json()).toMatchObject({ error: { code: 'invalid_feed_url' } })
-    expect(await (await user.get('/api/feeds')).json()).toEqual({ subscriptions: [] })
-
-    service.upstream.stub(ENTERED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: RSS,
-    })
-    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
-    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(409)
-    await service.wakeScheduler()
-    expect(service.upstream.requestsTo(ENTERED_URL)).toHaveLength(1)
-    expect((await (await user.get('/api/feeds')).json()).subscriptions).toHaveLength(1)
-  })
-
-  it('answers a Feed that never answers with unchecked turning unavailable, never an error', async () => {
-    const service = await startTestService()
-    const user = await claimedDevice(service)
-
-    expect((await user.post('/api/subscriptions', { url: 'https://nowhere.example/feed' })).status).toBe(201)
-
-    await service.wakeScheduler()
-    let feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions[0].availability).toMatchObject({
-      state: 'unchecked',
-      consecutiveFailures: 1,
-      category: 'unreachable',
-    })
-
-    for (let failures = 2; failures <= 3; failures += 1) {
-      service.clock.advance(24 * 60 * 60 * 1_000)
-      await service.wakeScheduler()
-    }
-    feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions[0].availability).toMatchObject({
-      state: 'unavailable',
-      consecutiveFailures: 3,
-      lastSuccessDate: null,
-    })
-  })
-
-  it('keeps a Subscription whose first persistence failed, and the next wake retries it', async () => {
-    const service = await startTestService()
-    service.upstream.stub(ENTERED_URL, {
-      headers: { 'content-type': 'application/rss+xml' },
-      body: RSS,
-    })
-    service.database.$client.exec(`
-      CREATE TRIGGER reject_feed_item
-      BEFORE INSERT ON feed_items
-      BEGIN
-        SELECT RAISE(ABORT, 'fixture failure');
-      END;
-    `)
-    const user = await claimedDevice(service)
-
-    expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
-    await service.wakeScheduler()
-
-    expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [] })
-    service.database.$client.exec('DROP TRIGGER reject_feed_item')
-    service.clock.advance(60_000)
-    await service.wakeScheduler()
-
-    expect(await (await user.get('/api/digest')).json()).toMatchObject({
-      groups: [{ items: [{ title: expect.any(String) }] }],
-    })
-    const feeds = await (await user.get('/api/feeds')).json()
-    expect(feeds.subscriptions[0].availability).toMatchObject({ state: 'available' })
   })
 
   it('re-ingests GUID, normalized-link, and content identities without replacing first-seen or Library state', async () => {
@@ -370,7 +282,6 @@ describe('Subscriptions', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: ENTERED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     service.database.$client.exec(`
       INSERT INTO library_items (feed_item_id, saved_at)
       SELECT id, '2026-08-08T09:30:00.000Z' FROM feed_items;
@@ -441,7 +352,6 @@ describe('Subscriptions', () => {
 
     expect((await user.post('/api/subscriptions', { url: 'https://first.example/feed' })).status).toBe(201)
     expect((await user.post('/api/subscriptions', { url: 'https://second.example/feed' })).status).toBe(201)
-    await service.wakeScheduler()
 
     const digest = await (await user.get('/api/digest')).json()
     expect(

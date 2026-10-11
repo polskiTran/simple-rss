@@ -170,15 +170,15 @@
 
   /* Chrome is instant; data arrives. A screen's own title and controls are
      there the moment it opens; what the server sends — item boxes, Feed rows,
-     a group's heading, a title's companion value, a Feed's panels —
-     fades in once, as it mounts. Nothing here nests inside another, so no
+     a group's heading, a title's companion value, a Feed's panels, what an
+     address answered in Add feed — fades in once, as it mounts. Nothing here nests inside another, so no
      fade compounds. */
-  :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
+  :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels, .add-feed-found) {
     transition: opacity 150ms ease-out;
   }
 
   @starting-style {
-    :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels) {
+    :is(.item, .feed-row, .group:not(.panel) > .group-header, .page-title-companion, .feed-panels, .add-feed-found) {
       opacity: 0;
     }
   }
@@ -1270,6 +1270,163 @@
   .file-choice:focus-within {
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
+  }
+
+  /* What the address answered, under a field that never moves: one Feed under
+     a rule, or a page's Feeds as boxes to choose between. */
+  .add-feed-result {
+    display: grid;
+    min-width: 0;
+  }
+
+  .add-feed-result:empty {
+    display: none;
+  }
+
+  .feed-choices-lede {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-ink-2);
+  }
+
+  .feed-choices {
+    display: grid;
+    gap: 8px;
+  }
+
+  .feed-preview {
+    display: grid;
+    min-width: 0;
+  }
+
+  .feed-preview[data-lone] {
+    padding-top: 16px;
+    border-top: 1px solid var(--color-rule);
+  }
+
+  /* Chosen is a 1px ink ring, as a current screen's button is; no radio mark. */
+  .feed-choice {
+    border: 1px solid var(--color-edge);
+  }
+
+  .feed-choice:not([data-chosen]):hover {
+    border-color: var(--color-edge-hover);
+  }
+
+  .feed-choice[data-chosen] {
+    border-color: var(--color-ink);
+  }
+
+  .feed-choice:has(.feed-choice-head:focus-visible) {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  .feed-choice-head {
+    display: block;
+    padding: 16px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .feed-choice[data-chosen] .feed-choice-head {
+    cursor: default;
+  }
+
+  .feed-preview-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 24px;
+  }
+
+  .feed-preview-head .cadence-strip {
+    margin-top: 7px;
+  }
+
+  .feed-preview-name {
+    font: 400 19px / 1.2 var(--font-read);
+    overflow-wrap: anywhere;
+  }
+
+  .feed-preview-pulse {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--color-ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .feed-preview-pulse > * + *::before {
+    content: '·';
+    margin-inline: 6px;
+    font-weight: 400;
+    color: var(--color-ink-3);
+  }
+
+  /* What would change the decision: a silent Feed, or one already followed. */
+  .feed-preview-mark {
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+
+  .feed-preview-detail {
+    display: grid;
+    gap: 12px;
+    padding-top: 16px;
+  }
+
+  .feed-choice .feed-preview-detail {
+    padding: 0 16px 16px;
+  }
+
+  .feed-preview-warning {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .feed-preview-items {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--color-rule-soft);
+  }
+
+  .feed-preview-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 16px;
+    padding-block: 10px;
+    border-bottom: 1px solid var(--color-rule-soft);
+  }
+
+  .feed-preview-title {
+    font: 400 16px / 1.4 var(--font-read);
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .feed-preview-day {
+    font-size: 13px;
+    color: var(--color-ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .feed-preview-url {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--color-ink-2);
+    overflow-wrap: anywhere;
   }
 
   /* One Feed */

@@ -23,6 +23,11 @@ export function dayAndMonth(dateKey: string): string {
   return `${Number(dateKey.slice(8, 10))} ${shortMonth(dateKey)}`
 }
 
+/** `5 Aug`, or `5 Aug 2025` once it is not this year. */
+export function shortDate(dateKey: string, today: string): string {
+  return sameYear(dateKey, today) ? dayAndMonth(dateKey) : `${dayAndMonth(dateKey)} ${dateKey.slice(0, 4)}`
+}
+
 /** `Saturday 8 August`, beside a group labelled Today or Yesterday. */
 export function longDay(dateKey: string): string {
   return format(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })
@@ -79,6 +84,37 @@ export function dayAndTime(dateKey: string, time: string, today: string): string
 /** The calendar day before `dateKey`. */
 export function dayBefore(dateKey: string): string {
   return new Date(Date.parse(`${dateKey}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+}
+
+/**
+ * The key of the browser's own calendar day an instant falls on. Only for
+ * instants the server sends without a day — a Feed it has not recorded yet —
+ * since every recorded day already arrives as a key.
+ */
+export function localDay(instant: string | Date): string {
+  // en-CA writes a date as its key: `2026-08-08`.
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(instant),
+  )
+}
+
+/** Whole calendar days from `dateKey` to `today`. */
+export function daysBefore(dateKey: string, today: string): number {
+  return Math.round((Date.parse(today) - Date.parse(dateKey)) / 86_400_000)
+}
+
+/** How long before `today` a day was, in its largest whole unit: `40 days`, `2 months`, `1 year`. */
+export function lapse(dateKey: string, today: string): string {
+  const days = daysBefore(dateKey, today)
+  if (days < 45) return counted(days, 'day')
+  if (days < 365) return counted(Math.round(days / 30), 'month')
+  return counted(Math.floor(days / 365), 'year')
+}
+
+/** `today`, `yesterday`, then `3 days ago`, `2 months ago`, `2 years ago`; a day after `today` reads as today. */
+export function ago(dateKey: string, today: string): string {
+  if (dateKey >= today) return 'today'
+  return relativeDay(dateKey, today)?.toLowerCase() ?? `${lapse(dateKey, today)} ago`
 }
 
 /** `1 item`, `1,204 items`. */

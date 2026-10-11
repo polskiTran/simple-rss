@@ -27,7 +27,6 @@ describe('Custom Description', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const updated = await user.put('/api/feeds/1/details', { customTitle: null, customDescription: 'read weekly' })
     expect(updated.status).toBe(200)
@@ -70,7 +69,6 @@ describe('Custom Description', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss(null) })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     expect(
       (await user.put('/api/feeds/1/details', { customTitle: null, customDescription: 'woodworking' })).status,
@@ -89,6 +87,7 @@ describe('Custom Description', () => {
 
   it('refuses blank and oversized descriptions and a body missing the field', async () => {
     const service = await startTestService()
+    service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss(null) })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
@@ -111,7 +110,6 @@ describe('Custom Description', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect(
       (await user.put('/api/feeds/1/details', { customTitle: null, customDescription: 'read weekly' })).status,
     ).toBe(200)

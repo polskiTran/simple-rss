@@ -15,6 +15,8 @@ const SLOW_RIDGE_DELAY_MS = 2 * READER_DEADLINE_BUDGET_MS
 
 export interface Installation {
   readonly url: string
+  /** The publisher's site, a page that declares Field Notes and then Long Meadow. */
+  readonly siteUrl: string
   readonly feedUrl: string
   readonly brokenArticleFeedUrl: string
   readonly slowArticleFeedUrl: string
@@ -97,6 +99,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
 
   installation: async ({ readerBudgetMs }, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'simple-rss-browser-'))
+    const siteUrl = 'https://publisher.example/'
     const feedUrl = 'https://publisher.example/feed.xml'
     const brokenArticleFeedUrl = 'https://publisher.example/coast.xml'
     const slowArticleFeedUrl = 'https://publisher.example/ridge.xml'
@@ -106,6 +109,13 @@ export const test = base.extend<InstallationOptions & { installation: Installati
     publishedAt.setUTCHours(7, 15, 0, 0)
     const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
     const upstream = new UpstreamFixtures()
+      .stub(siteUrl, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        body: `<!doctype html><html><head><title>Publisher</title>
+          <link rel="alternate" type="application/rss+xml" title="Field Notes" href="/feed.xml">
+          <link rel="alternate" type="application/rss+xml" title="Long Meadow" href="/meadow.xml">
+          </head><body><p>Welcome.</p></body></html>`,
+      })
       .stub(feedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
         body: `<?xml version="1.0"?>
@@ -200,7 +210,15 @@ export const test = base.extend<InstallationOptions & { installation: Installati
         logger: createLogger({ level: 'warn' }),
         ...(readerBudgetMs === undefined ? {} : { readerBudgetMs }),
       })
-      await use({ url: service.url, feedUrl, brokenArticleFeedUrl, slowArticleFeedUrl, longFeedUrl, imageOnlyFeedUrl })
+      await use({
+        url: service.url,
+        siteUrl,
+        feedUrl,
+        brokenArticleFeedUrl,
+        slowArticleFeedUrl,
+        longFeedUrl,
+        imageOnlyFeedUrl,
+      })
     } finally {
       await service?.stop()
       await rm(dataDir, { recursive: true, force: true })
@@ -233,6 +251,18 @@ export const test = base.extend<InstallationOptions & { installation: Installati
 })
 
 export { expect } from '@playwright/test'
+
+/**
+ * Adds a Feed by hand as the User does: the address pasted, which looks it up
+ * at once, then Subscribe once the preview has a Feed chosen.
+ */
+export async function addFeed(page: Page, url: string): Promise<void> {
+  await page.getByRole('button', { name: 'Add feed' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add feed' })
+  await dialog.getByRole('textbox', { name: 'URL' }).fill(url)
+  await dialog.getByRole('button', { name: 'Subscribe', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+}
 
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.body.clientWidth)

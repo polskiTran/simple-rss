@@ -163,7 +163,6 @@ async function subscribed(user: Device, service: TestService, url: string): Prom
   service.upstream.stub(url, { headers: FEED_HEADERS, body: rss('Field Notes') })
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
-  await service.wakeScheduler()
   const body = (await response.json()) as { subscription: { feedId: number } }
   return body.subscription.feedId
 }
@@ -442,7 +441,7 @@ function scriptedRetrieval(script: RetrievalBytesResult[]): Retrieval {
   }
 }
 
-/** Subscribes without polling, so each scheduler wake spends the next scripted answer. */
+/** Subscribes, spending the script's first answer on the check; each later poll spends the next. */
 async function subscribedOnScript(service: TestService, url: string): Promise<number> {
   const user = await claimedDevice(service)
   const response = await user.post('/api/subscriptions', { url })
@@ -478,7 +477,6 @@ describe('congestion at the retrieval boundary', () => {
       ]),
     })
     const feedId = await subscribedOnScript(service, url)
-    await service.wakeScheduler()
 
     await pollWhenDue(service, feedId)
     expect(storedAvailability(service, feedId)).toMatchObject({

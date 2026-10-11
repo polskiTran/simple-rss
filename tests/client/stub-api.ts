@@ -7,6 +7,7 @@ import type {
   DigestCalendar,
   FeedDetail,
   FeedDetailsUpdate,
+  FeedPreviewResponse,
   InstallationPreferences,
   Library,
   LibraryMembership,
@@ -37,6 +38,7 @@ interface Answers {
   'GET /api/settings': InstallationPreferences
   'PUT /api/settings/timezone': InstallationPreferences
   'GET /api/feeds': SubscriptionList
+  'POST /api/subscriptions/preview': FeedPreviewResponse
   'POST /api/subscriptions': CreateSubscriptionResponse
   'POST /api/subscriptions/import': OpmlImportReport
   [route: `GET /api/feeds/${number}`]: FeedDetail

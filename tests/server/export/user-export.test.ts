@@ -60,9 +60,7 @@ describe('the JSON export', () => {
     const user = await claimedDevice(service)
     await user.put('/api/settings/timezone', { timezone: 'Europe/Berlin' })
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect((await user.post('/api/subscriptions', { url: ATOM_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const feeds = await (await user.get('/api/feeds')).json()
     const fieldNotes = feeds.subscriptions.find((entry: { title: string }) => entry.title === 'Field Notes')
@@ -125,7 +123,6 @@ describe('the JSON export', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect(
       (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: 'read weekly' }))
         .status,
@@ -146,7 +143,6 @@ describe('the JSON export', () => {
     stubFeeds(service)
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId
@@ -166,7 +162,6 @@ describe('the JSON export', () => {
     stubFeeds(service)
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const exported = await user.get('/api/export')
     const text = await exported.text()

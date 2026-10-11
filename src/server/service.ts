@@ -20,6 +20,7 @@ import { ReaderService } from './reader/reader-service.js'
 import { RetentionService, type RetentionLimits } from './retention/retention-service.js'
 import { SearchService } from './search/search-service.js'
 import { FeedPoll } from './subscriptions/feed-poll.js'
+import { FeedPreview } from './subscriptions/feed-preview.js'
 import { FeedRefresh } from './subscriptions/feed-refresh.js'
 import { PollScheduler, type PollSchedulerLimits } from './subscriptions/poll-scheduler.js'
 import { SubscriptionService } from './subscriptions/subscription-service.js'
@@ -138,6 +139,7 @@ function compose(
     const subscriptions = new SubscriptionService({ db, clock, settings, logger })
     const poll = new FeedPoll({ db, retrieval, clock, logger })
     const refresh = new FeedRefresh({ clock, poll })
+    const preview = new FeedPreview({ db, retrieval, clock, settings })
 
     const digest = new DigestService({ db, clock, settings })
     const library = new LibraryService({ db, clock, settings })
@@ -167,6 +169,8 @@ function compose(
       authentication,
       settings,
       subscriptions,
+      poll,
+      preview,
       refresh,
       digest,
       library,

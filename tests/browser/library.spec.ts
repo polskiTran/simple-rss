@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import {
+  addFeed,
   expect,
   expectNoHorizontalOverflow,
   USER_PASSWORD,
@@ -19,9 +20,7 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await page.getByLabel('Confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'Claim installation' }).click()
   await section(page, 'Feeds')
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  await page.getByRole('textbox', { name: 'URL' }).fill(installation.feedUrl)
-  await page.keyboard.press('Enter')
+  await addFeed(page, installation.feedUrl)
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
 

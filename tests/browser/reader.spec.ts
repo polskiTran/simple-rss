@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { apiErrorSchema } from '../../src/shared/api.js'
 import {
+  addFeed,
   expect,
   expectNoHorizontalOverflow,
   READER_DEADLINE_BUDGET_MS,
@@ -21,10 +22,7 @@ async function subscribe(page: Page, installation: Installation, feedUrl = insta
 
 async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
   await section(page, 'Feeds').click()
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  await page.getByRole('textbox', { name: 'URL' }).fill(feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByText(/^Subscribed\. \d+ items? in the digest\.$/)).toBeVisible()
+  await addFeed(page, feedUrl)
 }
 
 /** A section's link in the chrome; exact, since a back button names the same section. */

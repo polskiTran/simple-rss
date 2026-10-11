@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import {
+  addFeed,
   expect,
   expectNoHorizontalOverflow,
   USER_PASSWORD,
@@ -8,17 +9,41 @@ import {
   type Installation,
 } from './installation.js'
 
-async function subscribe(page: Page, installation: Installation): Promise<void> {
+async function claimToFeeds(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
   await page.getByLabel('Setup secret').fill(SETUP_SECRET)
   await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
   await page.getByLabel('Confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'Claim installation' }).click()
   await page.getByRole('link', { name: 'Feeds', exact: true }).click()
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  await page.getByRole('textbox', { name: 'URL' }).fill(installation.feedUrl)
-  await page.getByRole('button', { name: 'Subscribe' }).click()
+}
+
+async function subscribe(page: Page, installation: Installation): Promise<void> {
+  await claimToFeeds(page, installation)
+  await addFeed(page, installation.feedUrl)
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+}
+
+/** The site's address finds the Feeds it declares; the second is chosen and subscribed to. */
+async function subscribeFromSite(page: Page, installation: Installation): Promise<void> {
+  await claimToFeeds(page, installation)
+  await page.getByRole('button', { name: 'Add feed' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add feed' })
+  await dialog.getByRole('textbox', { name: 'URL' }).fill(installation.siteUrl)
+
+  await expect(dialog.getByRole('radiogroup', { name: 'publisher.example names 2 feeds. Choose one.' })).toBeVisible()
+  await expect(dialog.getByRole('radio', { name: 'Field Notes' })).toBeChecked()
+  await expect(dialog.getByText('First light')).toBeVisible()
+  await dialog.getByRole('radio', { name: 'Long Meadow' }).click()
+  await expect(dialog.getByText('Meadow note 0', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('First light')).toHaveCount(0)
+  const overflow = await dialog.evaluate((panel) => panel.scrollWidth - panel.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+
+  await dialog.getByRole('button', { name: 'Subscribe', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Field Notes' })).toHaveCount(0)
 }
 
 function narrow(page: Page): boolean {
@@ -74,7 +99,10 @@ async function expectOpenFeed(page: Page): Promise<void> {
   await expect(interval).toHaveValue('120')
   await interval.selectOption({ label: '6 hours' })
   await expect(page.getByText('Now checked every 6 hours.')).toBeVisible()
-  await page.getByRole('button', { name: 'Refresh now' }).click()
+  const refresh = page.getByRole('button', { name: 'Refresh now' })
+  await refresh.click()
+  await expect(page.getByText('Refreshed. The feed shows 1 item.')).toBeVisible()
+  await refresh.click()
   await expect(page.getByText('Checked a moment ago. Wait a little before retrying.')).toBeVisible()
 
   await page.getByRole('link', { name: 'Back to Feeds' }).click()
@@ -91,6 +119,10 @@ test.describe('desktop Feed and Digest rendering', () => {
 
   test('lists the Feed with its Cadence and shows its item in the Digest', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
+  })
+
+  test('subscribes to the Feed chosen from those a site declares', async ({ page, installation }) => {
+    await subscribeFromSite(page, installation)
   })
 
   test('opens one Feed into its Cadence grid and manages it there', async ({ page, installation }) => {
@@ -175,6 +207,10 @@ test.describe('phone Feed and Digest rendering', () => {
     await expectFeedAndDigest(page, installation)
     const settings = await page.getByRole('link', { name: 'Settings', exact: true }).boundingBox()
     expect(settings?.y).toBeLessThan(60)
+  })
+
+  test('subscribes to the Feed chosen from those a site declares, inside the sheet', async ({ page, installation }) => {
+    await subscribeFromSite(page, installation)
   })
 
   test('keeps the whole Cadence grid selectable on the phone screen', async ({ page, installation }) => {

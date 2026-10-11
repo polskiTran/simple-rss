@@ -50,7 +50,6 @@ describe('Feed Description', () => {
     for (const url of [FEED_URL, 'https://atom.example/feed.xml', 'https://rdf.example/feed']) {
       expect((await user.post('/api/subscriptions', { url })).status).toBe(201)
     }
-    await service.wakeScheduler()
 
     const feeds = await (await user.get('/api/feeds')).json()
     expect(
@@ -73,7 +72,6 @@ describe('Feed Description', () => {
     service.upstream.stub(FEED_URL, { headers: FEED_HEADERS, body: rss('word '.repeat(400)) })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const detail = await (await user.get('/api/feeds/1')).json()
     expect(detail.description).toHaveLength(1024)
@@ -89,7 +87,6 @@ describe('Feed Description', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect((await (await user.get('/api/feeds/1')).json()).description).toBe('First words')
 
     status = 304
@@ -114,7 +111,6 @@ describe('Feed Description', () => {
     service.upstream.stub(FEED_URL, { headers: FEED_HEADERS, body: rss(null) })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const detail = await (await user.get('/api/feeds/1')).json()
     expect(detail.description).toBeNull()
@@ -125,7 +121,6 @@ describe('Feed Description', () => {
     service.upstream.stub(FEED_URL, { headers: FEED_HEADERS, body: rss('Notes from the field') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const body = await (await user.get('/api/subscriptions/export')).text()
     expect(body).toContain(

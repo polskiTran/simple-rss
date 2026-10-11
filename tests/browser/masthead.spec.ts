@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, SETUP_SECRET, test, USER_PASSWORD, type Installation } from './installation.js'
+import { addFeed, expect, SETUP_SECRET, test, USER_PASSWORD, type Installation } from './installation.js'
 
 async function claim(page: Page, installation: Installation): Promise<void> {
   await page.goto(installation.url)
@@ -29,9 +29,7 @@ test.describe('the mark', () => {
   test('leads back to the digest from a Feed', async ({ page, installation }) => {
     await claim(page, installation)
     await section(page, 'Feeds')
-    await page.getByRole('button', { name: 'Add feed' }).click()
-    await page.getByRole('textbox', { name: 'URL' }).fill(installation.feedUrl)
-    await page.keyboard.press('Enter')
+    await addFeed(page, installation.feedUrl)
     await page.getByRole('link', { name: 'Field Notes', exact: true }).click()
 
     await page.getByRole('link', { name: 'simple' }).click()

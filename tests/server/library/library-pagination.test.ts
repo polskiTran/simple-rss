@@ -30,7 +30,6 @@ async function savedNotes(gapMs: number) {
   })
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-  await service.wakeScheduler()
 
   const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
   const allIds = digest.groups.flatMap((group) => group.items.map((entry) => entry.feedItemId))
@@ -88,7 +87,6 @@ describe('the Library in pages', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
     const saved = digest.groups[0]?.items[0]
     expect(saved).toBeDefined()

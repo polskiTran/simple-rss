@@ -40,7 +40,6 @@ async function subscribed(user: Device, service: TestService, xml: string, url: 
   stubFeed(service, xml, url)
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
-  await service.wakeScheduler()
 }
 
 type Answer<K extends SearchScope['kind']> = Extract<SearchResults, { scope: K }>

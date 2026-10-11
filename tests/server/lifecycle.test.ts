@@ -82,7 +82,6 @@ describe('service lifecycle', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
     const user = await claimedDevice(service)
     await user.post('/api/subscriptions', { url: FEED_URL })
-    await service.wakeScheduler()
     const digest = (await (await user.get('/api/digest')).json()) as {
       groups: { items: { feedItemId: number }[] }[]
     }

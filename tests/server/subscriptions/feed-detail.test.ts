@@ -30,7 +30,6 @@ describe('one opened Feed', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const response = await user.get('/api/feeds/1')
 
@@ -69,7 +68,6 @@ describe('one opened Feed', () => {
     })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const first = await (await user.get('/api/feeds/1')).json()
     const second = await (await user.get('/api/feeds/1')).json()
@@ -86,7 +84,6 @@ describe('one opened Feed', () => {
     const user = await claimedDevice(service)
     service.settings.setTimezone('Pacific/Auckland', service.clock.now())
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const detail = feedDetailSchema.parse(await (await user.get('/api/feeds/1')).json())
 
