@@ -1692,6 +1692,30 @@
     color: var(--color-ink);
   }
 
+  /* Its own line on a phone, where the meta line stacks; after a dot on a wide screen. */
+  .reader-discussion {
+    &::before {
+      content: '·';
+      margin-inline: 10px;
+      color: var(--color-ink-3);
+
+      @media (max-width: 640px) {
+        content: none;
+      }
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .icon {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
   .reader-truncated,
   .reader-extracting {
     margin-top: 32px;

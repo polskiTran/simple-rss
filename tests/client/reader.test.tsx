@@ -136,6 +136,16 @@ describe('Reader View', () => {
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
+  it('links the Discussion the Feed declares, named by its host, in a new tab', async () => {
+    reading().on('GET /api/items/3', { body: { ...ITEM, discussionUrl: 'https://news.ycombinator.com/item?id=1' } })
+    render(<App />)
+
+    const discussion = await screen.findByRole('link', { name: /^Discussion on news\.ycombinator\.com/ })
+    expect(discussion.getAttribute('href')).toBe('https://news.ycombinator.com/item?id=1')
+    expect(discussion.getAttribute('target')).toBe('_blank')
+    expect(discussion.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
   it('reads Feed Content without claiming a parse failure when the Original webpage has no link', async () => {
     const feedContent = {
       markdown: '## Feed methods\n\nA body from the Feed.',

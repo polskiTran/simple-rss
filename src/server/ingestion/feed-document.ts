@@ -21,6 +21,8 @@ export interface NormalizedFeedItem {
   readonly identityKind: FeedItemIdentityKind
   readonly title: string | null
   readonly link: string | null
+  /** Where the item is discussed, when the Feed declares a page other than the item's own. */
+  readonly discussionUrl: string | null
   readonly publishedAt: string | null
   readonly imageUrl: string | null
   readonly summary: string | null
@@ -196,17 +198,42 @@ function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase,
   const guid = plainValue(recordField(record, atom ? ['id', 'atom:id'] : ['guid']))
 
   const identity = itemIdentity(guid, link, title, publishedAt)
+  const discussionUrl = discussionOf(record, atom, itemBase.xmlBase, link)
 
   return {
     dedupeKey: identity.key,
     identityKind: identity.kind,
     title,
     link,
+    discussionUrl,
     publishedAt,
     imageUrl,
     summary,
     feedContent,
   }
+}
+
+/**
+ * RSS `<comments>` (Hacker News, Lobsters) or an Atom `replies` link to an HTML
+ * page (RFC 4685). A discussion that is the item's own page — WordPress points
+ * `<comments>` at `#respond` — declares nothing new, so it is dropped.
+ */
+function discussionOf(
+  record: Record<string, unknown>,
+  atom: boolean,
+  baseUrl: string,
+  link: string | null,
+): string | null {
+  const declared = atom
+    ? arrayOf(recordField(record, ['link', 'atom:link']))
+        .map(asRecord)
+        .find((candidate) => {
+          const type = plainValue(candidate['@_type'])
+          return plainValue(candidate['@_rel']) === 'replies' && (type === null || type === 'text/html')
+        })?.['@_href']
+    : recordField(record, ['comments'])
+  const url = normalizeHttpUrl(declared, baseUrl)
+  return url && !(link && samePage(url, link)) ? url : null
 }
 
 /**
