@@ -13,6 +13,7 @@ import { LoadingNote } from '../components/loading-note.js'
 import { counted } from '../day-names.js'
 import { useResource } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
+import { AddFeedPrototype } from './add-feed-prototype.js'
 import { firstCheckFailure, retryFailure, unavailableNote } from './feed-language.js'
 
 /** How often the list is read again while a Subscription waits for its first check. */
@@ -143,7 +144,12 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
                 </span>
               </a>
             )}
-            <AddFeedDialog onSubscribed={(created) => subscribed(created.subscription)} onImported={imported} />
+            {/* PROTOTYPE (#92): the subscribe-flow variants stand in for Add feed in development. */}
+            {import.meta.env.DEV ? (
+              <AddFeedPrototype />
+            ) : (
+              <AddFeedDialog onSubscribed={(created) => subscribed(created.subscription)} onImported={imported} />
+            )}
           </div>
         </div>
         {groups.length > 0 ? (
