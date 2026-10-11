@@ -35,7 +35,6 @@ async function subscribed(...items: string[]) {
   })
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-  await service.wakeScheduler()
   return { service, user }
 }
 
@@ -109,7 +108,6 @@ describe('the Digest in pages', () => {
       body: rss('Letters', item('fresh', 'A newer letter', '2026-08-08T08:00:00.000Z')),
     })
     expect((await user.post('/api/subscriptions', { url: LATER_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const rest = digestSchema.parse(await (await user.get(`/api/digest?from=${first.nextFrom}`)).json())
     expect(flatTitles(rest)).toEqual(['yesterday-1', 'yesterday-0'])

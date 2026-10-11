@@ -139,7 +139,9 @@ Railway mounts the volume only at runtime, so migrations run during application 
 
 V1 accepts an exact RSS or Atom URL; it does not discover Feeds from website URLs.
 
-Subscribing and OPML Import record the Subscription without contacting the Feed (ADR 0007). The server validates the URL shape, deduplicates against known Feed URLs, and creates the Feed and Subscription transactionally; the Subscription starts unchecked and immediately due, and the request nudges the scheduler awake. The first retrieval is an ordinary poll: it confirms RSS or Atom content, corrects the Feed's title and resolved URL, and ingests the current Feed Window. A first retrieval that reveals an already-subscribed Feed behind a different URL quietly merges the later Subscription into it.
+Subscribing by hand is checked before it is recorded (ADR 0012). `POST /api/subscriptions` retrieves the Feed within the request, and only an RSS or Atom answer records the Feed and Subscription, ingests the Feed Window and settles Feed Availability, all in one transaction; anything else is refused with its reason and writes nothing. An address whose redirects end at a subscribed Feed answers as a duplicate.
+
+OPML Import records each listed Subscription without contacting the Feed (ADR 0007). The server validates the URL shape, deduplicates against known Feed URLs, and creates the Feed and Subscription transactionally; the Subscription starts unchecked and immediately due, and the request nudges the scheduler awake. The first retrieval is an ordinary poll: it confirms RSS or Atom content, corrects the Feed's title and resolved URL, and ingests the current Feed Window. A first retrieval that reveals an already-subscribed Feed behind a different URL quietly merges the later Subscription into it.
 
 The entered URL is preserved while a validated resolved URL may be recorded for subsequent retrievals. One OPML import records at most 500 Feeds; a wake that finds a full due batch drains the next batch at once, so an import's first checks finish at the pace of the retrieval budgets rather than one batch per minute.
 

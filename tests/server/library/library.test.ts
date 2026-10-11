@@ -36,7 +36,6 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
 
     const first = await user.put(`/api/library/${feedItemId}`)
@@ -60,7 +59,6 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
 
     const unsaved = await user.delete(`/api/library/${feedItemId}`)
@@ -99,7 +97,6 @@ describe('saving Feed Items to the Library', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     for (const title of ['First light', 'A June letter', 'Evening notes']) {
       const { feedItemId } = await digestItem(user, title)
@@ -128,7 +125,6 @@ describe('saving Feed Items to the Library', () => {
     )
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const { feedItemId, feedId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
@@ -150,7 +146,6 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
@@ -168,7 +163,6 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const { feedItemId } = await digestItem(user, 'First light')
     expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
 
@@ -185,7 +179,6 @@ describe('saving Feed Items to the Library', () => {
     stubFeed(service, rss(item('one', 'First light', '2026-08-08T07:15:00.000Z')))
     const phone = await claimedDevice(service)
     expect((await phone.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     const laptop = new Device(service)
     expect((await laptop.signIn()).status).toBe(200)
 

@@ -167,6 +167,7 @@ function compose(
       authentication,
       settings,
       subscriptions,
+      poll,
       refresh,
       digest,
       library,

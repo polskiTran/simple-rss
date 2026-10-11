@@ -44,7 +44,6 @@ async function readingSetup(
 
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-  await service.wakeScheduler()
 
   const digest = (await (await user.get('/api/digest')).json()) as {
     groups: { items: { title: string; feedItemId: number }[] }[]

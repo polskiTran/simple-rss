@@ -35,7 +35,6 @@ async function ingest(document: string) {
   service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/xml' }, body: document })
   const user = await claimedDevice(service)
   expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-  await service.wakeScheduler()
   const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
   const id = digest.groups[0]?.items[0]?.feedItemId
   if (!id) throw new Error('Feed Item was not ingested')

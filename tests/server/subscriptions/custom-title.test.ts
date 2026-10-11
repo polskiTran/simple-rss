@@ -24,7 +24,6 @@ describe('Custom Title', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
 
     const updated = await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })
     expect(updated.status).toBe(200)
@@ -51,7 +50,6 @@ describe('Custom Title', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect(
       (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,
     ).toBe(200)
@@ -104,6 +102,7 @@ describe('Custom Title', () => {
 
   it('refuses blank and oversized titles, and answers an unknown Feed with not found', async () => {
     const service = await startTestService()
+    service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
@@ -118,7 +117,7 @@ describe('Custom Title', () => {
     )
 
     const detail = await (await user.get('/api/feeds/1')).json()
-    expect(detail).toMatchObject({ title: 'journal.example', customTitle: null })
+    expect(detail).toMatchObject({ title: 'Field Notes', customTitle: null })
   })
 })
 
@@ -128,7 +127,6 @@ describe('Custom Title across read surfaces', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect(
       (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,
     ).toBe(200)
@@ -161,7 +159,6 @@ describe('Custom Title across read surfaces', () => {
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: 'https://alpha.example/feed' })).status).toBe(201)
     expect((await user.post('/api/subscriptions', { url: 'https://zebra.example/feed' })).status).toBe(201)
-    await service.wakeScheduler()
 
     expect(
       (await user.put('/api/feeds/2/details', { customTitle: 'Aardvark Signal', customDescription: null })).status,
@@ -183,7 +180,6 @@ describe('Custom Title across read surfaces', () => {
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-    await service.wakeScheduler()
     expect((await user.put('/api/library/1')).status).toBe(200)
     expect(
       (await user.put('/api/feeds/1/details', { customTitle: 'Tech tabloid', customDescription: null })).status,

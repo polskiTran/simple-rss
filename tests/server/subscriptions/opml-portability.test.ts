@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { digestSchema } from '../../../src/shared/api.js'
 import { MAX_OPML_FEEDS } from '../../../src/server/subscriptions/opml.js'
 import { Device, claimedDevice } from '../../support/device.js'
@@ -32,6 +32,7 @@ function stubHealthyFeeds(service: TestService): void {
 describe('OPML import', () => {
   it('records every usable Feed without waiting on any of them answering', async () => {
     const service = await startTestService()
+    service.upstream.stub(RSS_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
     const user = await claimedDevice(service)
     expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
 
@@ -113,6 +114,101 @@ describe('OPML import', () => {
         (subscription: { availability: { state: string } }) => subscription.availability.state === 'available',
       ),
     ).toBe(true)
+  })
+
+  it('nudges the scheduler, so the first retrievals land without waiting for a wake', async () => {
+    const service = await startTestService({ scheduling: { nudges: true } })
+    stubHealthyFeeds(service)
+    const user = await claimedDevice(service)
+
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL]) })).status).toBe(200)
+
+    await vi.waitFor(async () => {
+      const feeds = await (await user.get('/api/feeds')).json()
+      expect(feeds.subscriptions[0]).toMatchObject({
+        title: 'Field Notes',
+        availability: expect.objectContaining({ state: 'available' }),
+      })
+    })
+  })
+
+  it('quietly merges an imported Feed whose first retrieval reveals an already-subscribed Feed', async () => {
+    const service = await startTestService()
+    const alias = 'https://alias.example/feed'
+    stubHealthyFeeds(service)
+    service.upstream.stub(alias, { status: 301, headers: { location: RSS_URL, 'content-type': 'text/plain' } })
+    const user = await claimedDevice(service)
+    expect((await user.post('/api/subscriptions', { url: RSS_URL })).status).toBe(201)
+
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([alias]) })).status).toBe(200)
+    await service.wakeScheduler()
+
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions).toHaveLength(1)
+    expect(feeds.subscriptions[0]).toMatchObject({
+      title: 'Field Notes',
+      availability: expect.objectContaining({ state: 'available' }),
+    })
+    expect(await (await user.post('/api/subscriptions/import', { opml: opmlListing([alias]) })).json()).toMatchObject({
+      alreadySubscribed: 1,
+    })
+    expect(service.logs).toContainEqual(
+      expect.objectContaining({ message: 'subscriptions.feeds_merged', feedId: 2, intoFeedId: 1 }),
+    )
+  })
+
+  it('keeps an imported Feed that never answers, unchecked turning unavailable, never an error', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    const nowhere = 'https://nowhere.example/feed'
+
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([nowhere]) })).status).toBe(200)
+
+    await service.wakeScheduler()
+    let feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0].availability).toMatchObject({
+      state: 'unchecked',
+      consecutiveFailures: 1,
+      category: 'unreachable',
+    })
+
+    for (let failures = 2; failures <= 3; failures += 1) {
+      service.clock.advance(24 * 60 * 60 * 1_000)
+      await service.wakeScheduler()
+    }
+    feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0].availability).toMatchObject({
+      state: 'unavailable',
+      consecutiveFailures: 3,
+      lastSuccessDate: null,
+    })
+  })
+
+  it('keeps an imported Subscription whose first persistence failed, and the next wake retries it', async () => {
+    const service = await startTestService()
+    stubHealthyFeeds(service)
+    service.database.$client.exec(`
+      CREATE TRIGGER reject_feed_item
+      BEFORE INSERT ON feed_items
+      BEGIN
+        SELECT RAISE(ABORT, 'fixture failure');
+      END;
+    `)
+    const user = await claimedDevice(service)
+
+    expect((await user.post('/api/subscriptions/import', { opml: opmlListing([RSS_URL]) })).status).toBe(200)
+    await service.wakeScheduler()
+
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [] })
+    service.database.$client.exec('DROP TRIGGER reject_feed_item')
+    service.clock.advance(60_000)
+    await service.wakeScheduler()
+
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({
+      groups: [{ items: [{ title: 'First light' }] }],
+    })
+    const feeds = await (await user.get('/api/feeds')).json()
+    expect(feeds.subscriptions[0].availability).toMatchObject({ state: 'available' })
   })
 
   it('gives imported Subscriptions the default 2-hour Polling Interval', async () => {

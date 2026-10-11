@@ -19,7 +19,6 @@ describe('Subscription reading source', () => {
 
     const created = await user.post('/api/subscriptions', { url: FEED_URL })
     expect(await created.json()).toMatchObject({ subscription: { readingSource: 'original-webpage' } })
-    await service.wakeScheduler()
 
     const changed = await user.put('/api/feeds/1/reading-source', { readingSource: 'feed-content' })
     expect(changed.status).toBe(200)
@@ -42,7 +41,6 @@ describe('Subscription reading source', () => {
       .stub(ITEM_URL, { headers: { 'content-type': 'text/html' }, body: '<main><p>Original body.</p></main>' })
     const user = await claimedDevice(service)
     await user.post('/api/subscriptions', { url: FEED_URL })
-    await service.wakeScheduler()
 
     expect((await user.put('/api/feeds/1/reading-source', { readingSource: 'automatic' })).status).toBe(400)
     expect((await user.put('/api/feeds/99/reading-source', { readingSource: 'feed-content' })).status).toBe(404)
@@ -68,7 +66,6 @@ describe('Subscription reading source', () => {
       .stub(ITEM_URL, { status: 500, headers: { 'content-type': 'text/html' }, body: 'unavailable' })
     const user = await claimedDevice(service)
     await user.post('/api/subscriptions', { url: FEED_URL })
-    await service.wakeScheduler()
     await user.put('/api/feeds/1/reading-source', { readingSource: 'feed-content' })
     const { items } = await (await user.get('/api/feeds/1')).json()
     const idOf = (title: string) => items.find((item: { title: string }) => item.title === title).feedItemId

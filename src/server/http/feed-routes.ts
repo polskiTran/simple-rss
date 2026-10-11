@@ -19,18 +19,20 @@ import {
   type SubscriptionList,
 } from '../../shared/api.js'
 import type { DigestService } from '../digest/digest-service.js'
-import type { FeedDocumentFailureCode } from '../ingestion/feed-document.js'
+import type { FailedPoll } from '../subscriptions/feed-availability.js'
+import type { FeedPoll } from '../subscriptions/feed-poll.js'
 import type { FeedRefresh, RefreshFeedOutcome } from '../subscriptions/feed-refresh.js'
 import { MAX_OPML_FEEDS, type OpmlFailureCode } from '../subscriptions/opml.js'
-import type { CreateSubscriptionOutcome, SubscriptionService } from '../subscriptions/subscription-service.js'
+import type { SubscriptionService } from '../subscriptions/subscription-service.js'
 import { apiError, notFound, readId, readJsonBody } from './requests.js'
 import { answer, FEED_ANSWERS } from './retrieval-answers.js'
 
 export interface FeedRouteDependencies {
   readonly subscriptions: SubscriptionService
+  readonly poll: Pick<FeedPoll, 'subscribe'>
   readonly refresh: FeedRefresh
   readonly digest: DigestService
-  /** Asks the scheduler to look at the due frontier now rather than next wake. */
+  /** Asks the scheduler to look at the due frontier now rather than next wake, for an OPML Import's first checks. */
   readonly nudgeScheduler: () => void
 }
 
@@ -41,12 +43,20 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const body = await readJsonBody(c, createSubscriptionRequestSchema)
     if (!body.ok) return body.response
 
-    const outcome = deps.subscriptions.create(body.value.url)
-    if (outcome.kind === 'created') {
-      deps.nudgeScheduler()
-      return c.json<CreateSubscriptionResponse>({ subscription: outcome.subscription }, 201)
-    }
-    return createFailure(c, outcome)
+    const outcome = await deps.poll.subscribe(body.value.url, c.req.raw.signal)
+    if (outcome.kind === 'invalid-url') return invalidUrl(c)
+    if (outcome.kind !== 'created' && outcome.kind !== 'duplicate') return failedPoll(c, outcome)
+
+    const subscription = deps.subscriptions.summary(outcome.feedId)
+    if (!subscription) return notFound(c)
+    if (outcome.kind === 'created') return c.json<CreateSubscriptionResponse>({ subscription }, 201)
+    return c.json<ApiErrorBody & CreateSubscriptionResponse>(
+      {
+        error: { code: 'duplicate_subscription', message: `Already subscribed to ${subscription.title}` },
+        subscription,
+      },
+      409,
+    )
   })
 
   app.post('/subscriptions/import', async (c) => {
@@ -150,19 +160,8 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   return app
 }
 
-function createFailure(c: Context, outcome: Exclude<CreateSubscriptionOutcome, { kind: 'created' }>) {
-  switch (outcome.kind) {
-    case 'invalid-url':
-      return apiError(c, 400, 'invalid_feed_url', 'Enter an exact HTTP or HTTPS Feed URL')
-    case 'duplicate':
-      return c.json<ApiErrorBody & CreateSubscriptionResponse>(
-        {
-          error: { code: 'duplicate_subscription', message: `Already subscribed to ${outcome.subscription.title}` },
-          subscription: outcome.subscription,
-        },
-        409,
-      )
-  }
+function invalidUrl(c: Context) {
+  return apiError(c, 400, 'invalid_feed_url', 'Enter an HTTP or HTTPS URL')
 }
 
 function refreshFailure(
@@ -176,19 +175,19 @@ function refreshFailure(
       return apiError(c, 429, 'refresh_rate_limited', 'Wait before refreshing this Feed again', {
         'Retry-After': String(outcome.retryAfterSeconds),
       })
-    case 'invalid-feed':
-      return invalidFeed(c, outcome.code)
-    case 'retrieval-failed':
-      return answer(c, FEED_ANSWERS[outcome.failure.code])
+    default:
+      return failedPoll(c, outcome)
   }
 }
 
-function invalidFeed(c: Context, code: FeedDocumentFailureCode) {
+/** A Feed that would not answer, or answered with something other than RSS or Atom. */
+function failedPoll(c: Context, outcome: FailedPoll) {
+  if (outcome.kind === 'retrieval-failed') return answer(c, FEED_ANSWERS[outcome.failure.code])
   const message =
-    code === 'malformed_feed'
+    outcome.code === 'malformed_feed'
       ? 'The Feed returned malformed XML'
       : 'The URL did not return a supported RSS or Atom Feed'
-  return apiError(c, 422, code, message)
+  return apiError(c, 422, outcome.code, message)
 }
 
 function opmlFailure(c: Context, code: OpmlFailureCode) {

@@ -40,7 +40,6 @@ async function subscribed(
   service.upstream.stub(url, { headers: { ...FEED_HEADERS, ...headers }, body: xml })
   const response = await user.post('/api/subscriptions', { url })
   expect(response.status).toBe(201)
-  await service.wakeScheduler()
   const body = (await response.json()) as { subscription: { feedId: number } }
   return body.subscription.feedId
 }
@@ -135,7 +134,6 @@ describe('background polling', () => {
     })
     const added = await user.post('/api/subscriptions', { url })
     expect(added.status).toBe(201)
-    await service.wakeScheduler()
 
     service.clock.advance(3 * HOUR_MS)
     await service.wakeScheduler()
