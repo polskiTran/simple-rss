@@ -56,6 +56,7 @@
   --color-saved: var(--color-ramp-5);
   --color-saved-edge: var(--color-ramp-3);
   --color-away: var(--color-ramp-5);
+  --color-feed-name: var(--color-ramp-4);
   --color-match: light-dark(oklch(91.4% 0.032 277.9), oklch(37.5% 0.063 97.7));
 
   /* The Markdown renderer's tokens, under the names its classes ask for. */
@@ -852,6 +853,10 @@
     z-index: 1;
     justify-self: start;
     font-weight: 500;
+  }
+
+  a.item-feed {
+    color: var(--color-feed-name);
   }
 
   a.item-feed:hover {
