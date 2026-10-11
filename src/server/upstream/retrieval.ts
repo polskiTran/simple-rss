@@ -17,7 +17,7 @@ const MAX_REDIRECTS = 5
 
 const DEFAULT_CAPACITY: RetrievalCapacity = { maxConcurrent: 6, maxQueued: 32 }
 
-export type RetrievalOperation = 'feed' | 'reader' | 'image'
+export type RetrievalOperation = 'feed' | 'discovery' | 'reader' | 'image'
 
 export interface RetrievalCapacity {
   readonly maxConcurrent: number
@@ -34,13 +34,23 @@ export interface RetrievalProfile {
   readonly capacity: RetrievalCapacity
 }
 
+const FEED_MEDIA_TYPES = ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml']
+
 export const RETRIEVAL_PROFILES = {
   feed: {
-    accept: ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml'],
+    accept: FEED_MEDIA_TYPES,
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
     timeoutMs: 10_000,
     bodyTimeoutMs: 60_000,
     capacity: { maxConcurrent: 4, maxQueued: 24 },
+  },
+  /** An address the User entered to preview: a Feed, or a web page that may declare some. */
+  discovery: {
+    accept: [...FEED_MEDIA_TYPES, 'text/html', 'application/xhtml+xml'],
+    maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
+    timeoutMs: 10_000,
+    bodyTimeoutMs: 60_000,
+    capacity: { maxConcurrent: 2, maxQueued: 8 },
   },
   reader: {
     accept: ['text/html', 'application/xhtml+xml'],
@@ -164,6 +174,7 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
   const shared = new ConcurrencyGate(sharedCapacity)
   const operationGates = {
     feed: new ConcurrencyGate(options.operationCapacity?.feed ?? RETRIEVAL_PROFILES.feed.capacity),
+    discovery: new ConcurrencyGate(options.operationCapacity?.discovery ?? RETRIEVAL_PROFILES.discovery.capacity),
     reader: new ConcurrencyGate(options.operationCapacity?.reader ?? RETRIEVAL_PROFILES.reader.capacity),
     image: new ConcurrencyGate(options.operationCapacity?.image ?? RETRIEVAL_PROFILES.image.capacity),
   } satisfies Record<RetrievalOperation, ConcurrencyGate>
