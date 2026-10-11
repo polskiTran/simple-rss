@@ -234,6 +234,24 @@ rises in over 240ms and sinks out over 180ms, opaque, under the fading scrim.
 While one is open the page's scrollbar gutter takes the scrim's colour too,
 fading with it both ways, so no strip runs down the edge.
 
+**Add feed.** A dialog with a switch of Site or feed URL and Import OPML. The
+address field stays put and what the address answers arrives under it: a paste
+or Enter looks it up at once, typing once it pauses, and "Reading
+publisher.example" is the wait. A lone Feed stands under a rule, not in a box:
+its name and Cadence strip, a meta line — Last item 3 days ago · Weekly — its
+five newest titles in Literata 16, two lines at most, each with its day in
+meta, then the Feed's address. A page naming several says so — "publisher.example
+names 3 feeds. Choose one." — and gives each a box with its name, strip and
+meta line. The first is chosen, ringed in ink with no radio mark, and only the
+chosen box opens to its titles; arrow keys move the choice. A Feed with no item
+in 90 days says Last item 2 years ago in ink at 500 and, open, "Nothing new in
+2 years. It may have stopped publishing." One already followed says You follow
+this, and the primary action reads Already subscribed, disabled. A page that
+names no Feed, or an address that doesn't answer, is a field error with its
+reason; the second ends "Nothing was added." and turns the primary action to
+Retry. Subscribe is the one primary action, and its new row simply arrives in
+the list.
+
 **Undo line.** Removing something from a list leaves a `row-hover` line in
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
@@ -274,7 +292,7 @@ rows to a group, then Show N more with the rest named beside it; opened,
 Show fewer folds it back. With no Subscriptions there is nothing to export,
 so Export OPML gives way to Add feed alone. Jump buttons
 with each Rhythm's count reach the groups; By name lists everything
-alphabetically instead, and Recently added newest Subscription first. A row says when a Feed awaits its first check, or why
+alphabetically instead, and Recently added newest Subscription first. A row says when an imported Feed awaits its first check, or why
 checking fails, what it last reached and that its items stay, with Retry.
 
 **One Feed.** The way back, then the Feed's name, description and host (as in
@@ -315,7 +333,7 @@ Subscriptions lead as Feed rows; items follow with the query's words marked in
 `match`. Beside them, the Feeds the results came from, with counts, narrow the
 list when ticked — a checkbox list on desktop, a row of chips on a phone.
 
-**Notices.** A result the User waits on — a first check, an import, a
+**Notices.** A result the User waits on outside a dialog — an import, a
 refresh — is one line of meta text in an `aria-live` region under the control
 that started it. Errors give a reason, in danger text, never an apology.
 
@@ -349,10 +367,11 @@ Chrome is instant; data arrives. What the User presses or opens — a control, a
 switch, a screen with its title and toolbar, a hover — changes in the same
 frame, and nothing moves: a pressed control steps its fill, never its size.
 What the server sends — item boxes, Feed rows and cards, a group's heading, a
-title's companion value, a Feed's panels — fades in over 150ms as it mounts,
-opacity only; an article over 200ms, and the Original webpage arriving over
-Feed Content is a new article that fades in, never text rewritten in place. A
-wait shorter than 400ms shows nothing; after that the waiting line fades in.
+title's companion value, a Feed's panels, what an address answers in Add feed
+— fades in over 150ms as it mounts, opacity only; an article over 200ms, and
+the Original webpage arriving over Feed Content is a new article that fades
+in, never text rewritten in place. A wait shorter than 400ms shows nothing;
+after that the waiting line fades in.
 Stepping to another day keeps the one on show until the next answers, so the
 screen changes once rather than emptying first.
 
