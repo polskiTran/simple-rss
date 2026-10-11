@@ -5,6 +5,7 @@ import type {
   FeedAvailability,
   FeedDetail,
   FeedItemRow,
+  FeedItems,
   FeedPreview,
   Library,
   LibraryItem,
@@ -83,7 +84,7 @@ export const feedItemRow = (overrides: Partial<FeedItemRow> = {}): FeedItemRow =
   ...overrides,
 })
 
-/** An opened Feed: by default no Cadence and First light as its one item. */
+/** An opened Feed: by default no Cadence. Its items arrive apart, as `feedItems`. */
 export const feedDetail = (overrides: Partial<FeedDetail> = {}): FeedDetail => ({
   ...FEED,
   reportedTitle: FEED.title,
@@ -94,7 +95,13 @@ export const feedDetail = (overrides: Partial<FeedDetail> = {}): FeedDetail => (
   schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
   subscribedDate: '2026-08-01',
   cadence: [],
+  ...overrides,
+})
+
+/** A page of an opened Feed's items: by default First light alone, and nothing older. */
+export const feedItems = (overrides: Partial<FeedItems> = {}): FeedItems => ({
   items: [feedItemRow()],
+  nextFrom: null,
   ...overrides,
 })
 

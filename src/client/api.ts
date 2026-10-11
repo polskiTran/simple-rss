@@ -6,6 +6,7 @@ import {
   digestParamsOf,
   digestSchema,
   feedDetailSchema,
+  feedItemsSchema,
   feedDetailsUpdateSchema,
   feedPreviewResponseSchema,
   installationPreferencesSchema,
@@ -31,6 +32,7 @@ import {
   type DigestStart,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedItems,
   type FeedPreviewRequest,
   type FeedPreviewResponse,
   type ImportOpmlRequest,
@@ -228,6 +230,11 @@ export function fetchSubscriptions(signal?: AbortSignal): Promise<SubscriptionLi
 
 export function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<FeedDetail> {
   return getJson(`/api/feeds/${feedId}`, feedDetailSchema, { signal })
+}
+
+/** `query` is a `feedItemsParamsOf` encoding, which is also the cursor a Feed's Show more pages by. */
+export function fetchFeedItems(feedId: number, query: string, signal?: AbortSignal): Promise<FeedItems> {
+  return getJson(withQuery(`/api/feeds/${feedId}/items`, new URLSearchParams(query)), feedItemsSchema, { signal })
 }
 
 export function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {

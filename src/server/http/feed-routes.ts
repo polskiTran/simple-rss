@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
   digestRequestSchema,
+  feedItemsRequestSchema,
   feedPreviewRequestSchema,
   importOpmlRequestSchema,
   readingSourcePreferenceSchema,
@@ -13,6 +14,7 @@ import {
   type DigestCalendar,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedItems,
   type FeedPreviewResponse,
   type OpmlImportReport,
   type PollingSchedule,
@@ -103,6 +105,18 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
     const detail = deps.subscriptions.detail(feedId.value)
     if (!detail) return notFound(c)
     return c.json<FeedDetail>(detail)
+  })
+
+  app.get('/feeds/:feedId/items', (c) => {
+    const feedId = readId(c, 'feedId')
+    if (!feedId.ok) return feedId.response
+    const start = feedItemsRequestSchema.safeParse({ from: c.req.query('from'), through: c.req.query('through') })
+    if (!start.success)
+      return apiError(c, 400, 'invalid_request', "A Feed's items start from and run through days as YYYY-MM-DD")
+
+    const page = deps.subscriptions.items(feedId.value, start.data)
+    if (!page) return notFound(c)
+    return c.json<FeedItems>(page)
   })
 
   app.post('/feeds/:feedId/refresh', async (c) => {

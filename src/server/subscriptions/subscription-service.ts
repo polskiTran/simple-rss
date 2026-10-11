@@ -1,7 +1,9 @@
-import { desc, eq, lte } from 'drizzle-orm'
+import { and, desc, eq, lte } from 'drizzle-orm'
 import type {
   FeedDetail,
   FeedDetailsUpdate,
+  FeedItems,
+  FeedItemsStart,
   PollingIntervalMinutes,
   PollingSchedule,
   ReadingSource,
@@ -23,6 +25,7 @@ import {
   subscriptions,
 } from '../persistence/schema.js'
 import { cadenceByFeed, gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
+import { wholeDayPage } from '../digest/whole-day-page.js'
 import { availabilityOf, type RecordedAvailability } from './feed-availability.js'
 import { canonicalFeedUrl, recordSubscription, subscribedFeedId } from './new-subscription.js'
 import { OpmlError, parseOpml, serializeOpml, type OpmlFailureCode, type OpmlFeedOutline } from './opml.js'
@@ -241,7 +244,7 @@ export class SubscriptionService {
     return records.map((record) => summaryOf(record, cadenceOf, timezone))
   }
 
-  /** Days and labels use the installation timezone, so the cadence grid reads in the User's own calendar. */
+  /** Days use the installation timezone, so the cadence grid reads in the User's own calendar. */
   detail(feedId: number): FeedDetail | undefined {
     const record = this.#db
       .select({
@@ -262,22 +265,8 @@ export class SubscriptionService {
 
     const timezone = this.#settings.effectiveTimezone()
     const today = dateKey(this.#clock.now(), timezone)
-    const dayOf = dayKeysIn(timezone)
     const days = gridDayKeys(today)
     const counts = cadenceByFeed(this.#db, timezone, days, [feedId])(feedId)
-    const items = this.#db
-      .select({ ...LISTED_ITEM_COLUMNS, link: feedItems.link })
-      .from(feedItems)
-      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
-      .where(eq(feedItems.feedId, feedId))
-      .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
-      .all()
-      .map((row) => ({
-        ...listedItemOf(row),
-        link: row.link,
-        date: dayOf(row.chronologyAt),
-        displayTime: timeLabel(new Date(row.chronologyAt), timezone),
-      }))
 
     return {
       feedId: record.feedId,
@@ -296,7 +285,41 @@ export class SubscriptionService {
       readingSource: record.readingSource,
       subscribedDate: dateKey(new Date(record.subscribedAt), timezone),
       cadence: days.map((date, index) => ({ date, count: counts[index] ?? 0 })),
-      items,
+    }
+  }
+
+  /** A page of a subscribed Feed's retained items, cut into whole installation-timezone days as the Digest is. */
+  items(feedId: number, start: FeedItemsStart): FeedItems | undefined {
+    const subscribed = this.#db
+      .select({ feedId: subscriptions.feedId })
+      .from(subscriptions)
+      .where(eq(subscriptions.feedId, feedId))
+      .get()
+    if (!subscribed) return undefined
+
+    const timezone = this.#settings.effectiveTimezone()
+    const dayOf = dayKeysIn(timezone)
+    const { rows, nextFrom } = wholeDayPage(
+      (conditions, limit) => {
+        const query = this.#db
+          .select({ ...LISTED_ITEM_COLUMNS, link: feedItems.link })
+          .from(feedItems)
+          .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
+          .where(and(eq(feedItems.feedId, feedId), ...conditions))
+          .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
+        return limit === undefined ? query.all() : query.limit(limit).all()
+      },
+      start,
+      timezone,
+    )
+    return {
+      items: rows.map((row) => ({
+        ...listedItemOf(row),
+        link: row.link,
+        date: dayOf(row.chronologyAt),
+        displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+      })),
+      nextFrom,
     }
   }
 

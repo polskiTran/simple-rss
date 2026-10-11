@@ -1,17 +1,20 @@
 import { Button } from '@base-ui/react/button'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import {
   MAX_FEED_DESCRIPTION_LENGTH,
   MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
+  feedItemsParamsOf,
   type FeedDetail,
   type FeedDetailsUpdate,
+  type FeedItems,
   type PollingIntervalMinutes,
   type ReadingSource,
 } from '../../shared/api.js'
 import {
   ApiError,
   fetchFeedDetail,
+  fetchFeedItems,
   refreshFeed,
   unsubscribeFromFeed,
   updateFeedDetails,
@@ -32,12 +35,13 @@ import { ItemBox } from '../components/item-box.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { NativeSelect } from '../components/native-select.js'
+import { OlderItems } from '../components/older-items.js'
 import { Row } from '../components/row.js'
 import { withSaved } from '../components/save-toggle.js'
-import { counted, dayOfYear, dayTitle, longDay } from '../day-names.js'
+import { counted, dayOfYear, dayTitle } from '../day-names.js'
 import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS } from '../reading-source.js'
 import type { Origin } from '../routing.js'
-import { useResource, valueInView } from '../use-resource.js'
+import { type OlderState, usePagedResource, useResource, valueInView, type Resource } from '../use-resource.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
 
 interface FeedViewProps {
@@ -56,6 +60,16 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   // While another Feed loads, the one it replaces is not this Feed's to show.
   const detail = inView?.feedId === feedId ? inView : undefined
   useScreenTitle(detail?.title)
+  // Each page carries its Feed, so a page of the Feed just left never shows under this one.
+  const [itemsState, pages] = usePagedResource(
+    String(feedId),
+    async (cursor, signal) => ({ feedId, ...(await fetchFeedItems(feedId, cursor ?? '', signal)) }),
+    (shown, page) => ({ ...shown, items: [...shown.items, ...page.items], nextFrom: page.nextFrom }),
+  )
+  const itemsInView = valueInView(itemsState)
+  const items = itemsInView?.feedId === feedId ? itemsInView : undefined
+  // A day picked on the cadence grid, waiting for the page that brings it.
+  const [shownDay, setShownDay] = useState<string>()
   const [notice, setNotice] = useState('')
   const [refreshing, startRefresh] = useTransition()
   const [changing, startChange] = useTransition()
@@ -72,8 +86,9 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       } catch (error) {
         setNotice(retryFailure(error))
       }
-      // Read again in place: the detail stays in view, and a Feed opened meanwhile cancels it.
+      // Read again in place: the detail and items stay in view, and a Feed opened meanwhile cancels them.
       retry()
+      pages.retry()
     })
   }
 
@@ -104,6 +119,24 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       }
     })
   }
+
+  // A day already in view is entered at once; an older one is fetched with every day down to it first.
+  function showDay(date: string) {
+    const anchor = dayAnchor(feedId, date)
+    if (document.getElementById(anchor) || !items?.nextFrom) {
+      enterSection(anchor)
+      return
+    }
+    setShownDay(date)
+    pages.loadMore(feedItemsParamsOf({ from: items.nextFrom, through: date }).toString())
+  }
+
+  // Enters the picked day once its page is on screen; a failed page leaves the view where it was.
+  useEffect(() => {
+    if (shownDay === undefined || pages.older === 'loading') return
+    enterSection(dayAnchor(feedId, shownDay))
+    setShownDay(undefined)
+  }, [feedId, shownDay, pages.older, items])
 
   const back = <BackButton className="view-back" origin={origin} onBack={onBack} />
 
@@ -165,7 +198,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
 
       <div className="feed-panels">
         <Group id="feed-cadence" title="Cadence" className="panel">
-          <CadenceGrid grid={grid} title={detail.title} onShowDay={(date) => enterSection(dayAnchor(feedId, date))} />
+          <CadenceGrid grid={grid} title={detail.title} onShowDay={showDay} />
         </Group>
         <Group id="feed-info" title="Info" className="panel">
           <dl className="rows">
@@ -214,9 +247,16 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       </div>
 
       <Items
-        detail={detail}
+        feedId={feedId}
+        feedTitle={detail.title}
+        today={today}
+        state={itemsState}
+        page={items}
+        older={pages.older}
+        onLoadOlder={pages.loadMore}
+        onRetry={pages.retry}
         onSaved={(feedItemId, saved) =>
-          set((current) => ({ ...current, items: withSaved(current.items, feedItemId, saved) }))
+          pages.set((current) => ({ ...current, items: withSaved(current.items, feedItemId, saved) }))
         }
         onOpenItem={onOpenItem}
       />
@@ -224,32 +264,50 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   )
 }
 
+/**
+ * The Feed's retained items, a day to a group, a page of whole days at a time;
+ * Show more goes on from the day the page names.
+ */
 function Items({
-  detail,
+  feedId,
+  feedTitle,
+  today,
+  state,
+  page,
+  older,
+  onLoadOlder,
+  onRetry,
   onSaved,
   onOpenItem,
 }: {
-  detail: FeedDetail
+  feedId: number
+  feedTitle: string
+  /** The Cadence's last day, which day titles count back from. */
+  today: string
+  state: Resource<FeedItems>
+  page: FeedItems | undefined
+  older: OlderState
+  onLoadOlder: (cursor: string) => void
+  onRetry: () => void
   onSaved: (feedItemId: number, saved: boolean) => void
   onOpenItem: (feedItemId: number, feedTitle: string) => void
 }) {
-  if (detail.items.length === 0) {
+  if (!page) {
+    if (state.kind === 'unavailable' || state.kind === 'unreachable') {
+      return <LoadFailure subject="The feed’s items" kind={state.kind} onRetry={onRetry} />
+    }
+    return <LoadingNote>Loading the items</LoadingNote>
+  }
+  if (page.items.length === 0) {
     return <p className="note feed-items-state">Nothing retained from this feed yet.</p>
   }
 
-  // The Cadence runs through today; every retained item arrives at once, so
-  // each day's count is whole.
-  const today = detail.cadence.at(-1)?.date
-  const days = Map.groupBy(detail.items, (item) => item.date)
+  // Pages are whole days, so each day's count is whole.
+  const days = Map.groupBy(page.items, (item) => item.date)
   return (
     <div className="feed-items">
       {[...days].map(([date, items]) => (
-        <Group
-          key={date}
-          id={dayAnchor(detail.feedId, date)}
-          title={today ? dayTitle(date, today) : longDay(date)}
-          count={items.length}
-        >
+        <Group key={date} id={dayAnchor(feedId, date)} title={dayTitle(date, today)} count={items.length}>
           <div className="item-list">
             {items.map((item) => (
               <ItemBox
@@ -258,13 +316,19 @@ function Items({
                 title={item.title}
                 saved={item.saved}
                 when={{ label: item.displayTime, dateTime: item.publishedAt ?? item.firstSeenAt }}
-                onOpen={(feedItemId) => onOpenItem(feedItemId, detail.title)}
+                onOpen={(feedItemId) => onOpenItem(feedItemId, feedTitle)}
                 onSaved={(saved) => onSaved(item.feedItemId, saved)}
               />
             ))}
           </div>
         </Group>
       ))}
+      <OlderItems
+        nextCursor={page.nextFrom}
+        older={older}
+        noun="items"
+        onLoadOlder={(from) => onLoadOlder(feedItemsParamsOf({ from }).toString())}
+      />
     </div>
   )
 }

@@ -66,8 +66,8 @@ describe('the JSON export', () => {
     const fieldNotes = feeds.subscriptions.find((entry: { title: string }) => entry.title === 'Field Notes')
     await user.put(`/api/feeds/${fieldNotes.feedId}/interval`, { pollingIntervalMinutes: 360 })
     await user.put(`/api/feeds/${fieldNotes.feedId}/reading-source`, { readingSource: 'feed-content' })
-    const detail = await (await user.get(`/api/feeds/${fieldNotes.feedId}`)).json()
-    expect((await user.put(`/api/library/${detail.items[0].feedItemId}`)).status).toBe(200)
+    const { items } = await (await user.get(`/api/feeds/${fieldNotes.feedId}/items`)).json()
+    expect((await user.put(`/api/library/${items[0].feedItemId}`)).status).toBe(200)
 
     const document = userExportSchema.parse(await (await user.get('/api/export')).json())
 
@@ -146,8 +146,8 @@ describe('the JSON export', () => {
 
     const feeds = await (await user.get('/api/feeds')).json()
     const feedId = feeds.subscriptions[0].feedId
-    const detail = await (await user.get(`/api/feeds/${feedId}`)).json()
-    await user.put(`/api/library/${detail.items[0].feedItemId}`)
+    const { items } = await (await user.get(`/api/feeds/${feedId}/items`)).json()
+    await user.put(`/api/library/${items[0].feedItemId}`)
     expect((await user.delete(`/api/feeds/${feedId}`)).status).toBe(204)
 
     const document = await (await user.get('/api/export')).json()

@@ -7,6 +7,7 @@ import type {
   DigestCalendar,
   FeedDetail,
   FeedDetailsUpdate,
+  FeedItems,
   FeedPreviewResponse,
   InstallationPreferences,
   Library,
@@ -42,6 +43,8 @@ interface Answers {
   'POST /api/subscriptions': CreateSubscriptionResponse
   'POST /api/subscriptions/import': OpmlImportReport
   [route: `GET /api/feeds/${number}`]: FeedDetail
+  [route: `GET /api/feeds/${number}/items`]: FeedItems
+  [route: `GET /api/feeds/${number}/items?${string}`]: FeedItems
   [route: `DELETE /api/feeds/${number}`]: undefined
   [route: `POST /api/feeds/${number}/refresh`]: RefreshFeedResponse
   [route: `PUT /api/feeds/${number}/details`]: FeedDetailsUpdate

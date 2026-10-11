@@ -3,26 +3,34 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow as cadence } from './cadence-window.js'
-import { availability, feedDetail, feedItemRow, subscription } from './fixtures.js'
+import { availability, feedDetail, feedItemRow, feedItems, subscription } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const DETAIL = feedDetail({
   subscribedDate: '2026-05-20',
   cadence: cadence({ '2026-06-03': 2, '2026-08-08': 1 }),
-  items: [
-    feedItemRow({ feedItemId: 12 }),
-    feedItemRow({
-      feedItemId: 11,
-      title: 'A June letter',
-      link: null,
-      publishedAt: '2026-06-03T12:00:00.000Z',
-      firstSeenAt: '2026-06-03T13:00:00.000Z',
-      date: '2026-06-03',
-      displayTime: '12:00',
-      saved: true,
-    }),
-  ],
 })
+
+const JUNE_LETTER = feedItemRow({
+  feedItemId: 11,
+  title: 'A June letter',
+  link: null,
+  publishedAt: '2026-06-03T12:00:00.000Z',
+  firstSeenAt: '2026-06-03T13:00:00.000Z',
+  date: '2026-06-03',
+  displayTime: '12:00',
+  saved: true,
+})
+
+const ITEMS = feedItems({ items: [feedItemRow({ feedItemId: 12 }), JUNE_LETTER] })
+
+/** Today's page alone, with June waiting behind Show more. */
+const TODAY_ONLY = feedItems({ items: [feedItemRow({ feedItemId: 12 })], nextFrom: '2026-06-03' })
+
+/** Field Notes opened, its detail and first page of items answered. */
+function feedApi(items = ITEMS) {
+  return stubApi().on('GET /api/feeds/1', { body: DETAIL }).on('GET /api/feeds/1/items', { body: items })
+}
 
 const LIST_FEED = subscription({ subscribedAt: '2026-05-20T09:00:00.000Z' })
 
@@ -37,9 +45,7 @@ function infoValue(label: string): string | null | undefined {
 
 describe('opening one Feed', () => {
   it('opens from its list row into the accepted header, grid, statistics, and retained items', async () => {
-    stubApi()
-      .on('GET /api/feeds', { body: { subscriptions: [LIST_FEED] } })
-      .on('GET /api/feeds/1', { body: DETAIL })
+    feedApi().on('GET /api/feeds', { body: { subscriptions: [LIST_FEED] } })
     window.history.replaceState(null, '', '/feeds')
     const { container } = render(<App />)
     const user = userEvent.setup()
@@ -75,7 +81,7 @@ describe('opening one Feed', () => {
   })
 
   it('shows the Feed Description under the header when the Feed reports one', async () => {
-    stubApi().on('GET /api/feeds/1', { body: { ...DETAIL, description: 'Notes from the field' } })
+    feedApi().on('GET /api/feeds/1', { body: { ...DETAIL, description: 'Notes from the field' } })
     window.history.replaceState(null, '', '/feeds/1')
     const { container } = render(<App />)
 
@@ -86,8 +92,7 @@ describe('opening one Feed', () => {
   })
 
   it('saves and unsaves a retained item in place, from this Feed', async () => {
-    const api = stubApi()
-      .on('GET /api/feeds/1', { body: DETAIL })
+    const api = feedApi()
       .on('PUT /api/library/12', { body: { feedItemId: 12, saved: true, savedAt: '2026-08-08T09:05:00.000Z' } })
       .on('DELETE /api/library/12', { body: { feedItemId: 12, saved: false, savedAt: null } })
     window.history.replaceState(null, '', '/feeds/1')
@@ -108,7 +113,7 @@ describe('opening one Feed', () => {
   })
 
   it('opens directly from its own address', async () => {
-    stubApi().on('GET /api/feeds/1', { body: DETAIL })
+    feedApi()
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
 
@@ -116,9 +121,7 @@ describe('opening one Feed', () => {
   })
 
   it('goes back to the list without losing the tab', async () => {
-    stubApi()
-      .on('GET /api/feeds', { body: { subscriptions: [LIST_FEED] } })
-      .on('GET /api/feeds/1', { body: DETAIL })
+    feedApi().on('GET /api/feeds', { body: { subscriptions: [LIST_FEED] } })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -130,7 +133,7 @@ describe('opening one Feed', () => {
   })
 
   it('moves focus and view to a selected day’s Feed Items, by keyboard alone', async () => {
-    stubApi().on('GET /api/feeds/1', { body: DETAIL })
+    feedApi()
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -144,8 +147,45 @@ describe('opening one Feed', () => {
     expect(document.activeElement).toBe(anchored)
   })
 
+  it('shows the next older days on Show more, and stops where the Feed ends', async () => {
+    const api = feedApi(TODAY_ONLY).on('GET /api/feeds/1/items?from=2026-06-03', {
+      body: feedItems({ items: [JUNE_LETTER] }),
+    })
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await screen.findByRole('heading', { name: 'First light' })
+    expect(screen.queryByRole('heading', { name: 'A June letter' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
+
+    expect(await screen.findByRole('heading', { name: 'A June letter' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull()
+    expect(api.requestsTo('GET /api/feeds/1/items?from=2026-06-03')).toHaveLength(1)
+  })
+
+  it('fetches a day picked on the grid that is not shown yet, then moves to it', async () => {
+    const api = feedApi(TODAY_ONLY).on('GET /api/feeds/1/items?from=2026-06-03&through=2026-06-03', {
+      body: feedItems({ items: [JUNE_LETTER] }),
+    })
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await screen.findByRole('heading', { name: 'First light' })
+    await user.click(screen.getByRole('button', { name: /2 items on 3 June 2026, show that day/i }))
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(document.getElementById('feed-1-day-2026-06-03')?.closest('section')),
+    )
+    expect(document.activeElement?.textContent).toContain('A June letter')
+    expect(api.requestsTo('GET /api/feeds/1/items?from=2026-06-03&through=2026-06-03')).toHaveLength(1)
+  })
+
   it('leaves silent days out of the keyboard order — only represented days are selectable', async () => {
-    stubApi().on('GET /api/feeds/1', { body: DETAIL })
+    feedApi()
     window.history.replaceState(null, '', '/feeds/1')
     const { container } = render(<App />)
 
@@ -156,11 +196,9 @@ describe('opening one Feed', () => {
 
 describe('managing one Feed', () => {
   it('changes the Polling Interval to another preset and says so', async () => {
-    const api = stubApi()
-      .on('GET /api/feeds/1', { body: DETAIL })
-      .on('PUT /api/feeds/1/interval', {
-        body: { pollingIntervalMinutes: 360, nextPollAt: '2026-08-08T15:00:00.000Z' },
-      })
+    const api = feedApi().on('PUT /api/feeds/1/interval', {
+      body: { pollingIntervalMinutes: 360, nextPollAt: '2026-08-08T15:00:00.000Z' },
+    })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -175,7 +213,7 @@ describe('managing one Feed', () => {
   })
 
   it('refreshes by hand and shows what the attempt observed', async () => {
-    const api = stubApi().on('GET /api/feeds/1', { body: DETAIL })
+    const api = feedApi()
     api.on('POST /api/feeds/1/refresh', () => {
       api.on('GET /api/feeds/1', {
         body: { ...DETAIL, cadence: cadence({ '2026-06-03': 2, '2026-08-08': 2 }) },
@@ -194,13 +232,11 @@ describe('managing one Feed', () => {
   })
 
   it('explains a refresh the server asked to wait on', async () => {
-    stubApi()
-      .on('GET /api/feeds/1', { body: DETAIL })
-      .on('POST /api/feeds/1/refresh', {
-        status: 429,
-        headers: { 'retry-after': '42' },
-        body: { error: { code: 'refresh_rate_limited', message: 'Wait before refreshing this Feed again' } },
-      })
+    feedApi().on('POST /api/feeds/1/refresh', {
+      status: 429,
+      headers: { 'retry-after': '42' },
+      body: { error: { code: 'refresh_rate_limited', message: 'Wait before refreshing this Feed again' } },
+    })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -211,7 +247,7 @@ describe('managing one Feed', () => {
   })
 
   it('shows calm Feed Availability while keeping the retained items readable', async () => {
-    stubApi().on('GET /api/feeds/1', {
+    feedApi().on('GET /api/feeds/1', {
       body: {
         ...DETAIL,
         availability: availability({
@@ -232,7 +268,7 @@ describe('managing one Feed', () => {
   })
 
   it('says what unsubscribing means before doing it, and lets the User keep the Feed', async () => {
-    const api = stubApi().on('GET /api/feeds/1', { body: DETAIL })
+    const api = feedApi()
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -249,7 +285,7 @@ describe('managing one Feed', () => {
   })
 
   it('unsubscribes on the confirming word and returns to the Feeds list', async () => {
-    const api = stubApi().on('GET /api/feeds/1', { body: DETAIL }).on('DELETE /api/feeds/1', { status: 204 })
+    const api = feedApi().on('DELETE /api/feeds/1', { status: 204 })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -263,12 +299,10 @@ describe('managing one Feed', () => {
   })
 
   it('stays on the Feed and says so when unsubscribing does not go through', async () => {
-    stubApi()
-      .on('GET /api/feeds/1', { body: DETAIL })
-      .on('DELETE /api/feeds/1', {
-        status: 503,
-        body: { error: { code: 'unavailable', message: 'Starting' } },
-      })
+    feedApi().on('DELETE /api/feeds/1', {
+      status: 503,
+      body: { error: { code: 'unavailable', message: 'Starting' } },
+    })
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
     const user = userEvent.setup()
@@ -284,7 +318,7 @@ describe('managing one Feed', () => {
 
 describe('the quiet states of one Feed', () => {
   it('stays calm when nothing is retained yet', async () => {
-    stubApi().on('GET /api/feeds/1', { body: { ...DETAIL, cadence: cadence(), items: [] } })
+    feedApi(feedItems({ items: [] })).on('GET /api/feeds/1', { body: { ...DETAIL, cadence: cadence() } })
     window.history.replaceState(null, '', '/feeds/1')
     const { container } = render(<App />)
 

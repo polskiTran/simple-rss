@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, max, or, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, lt, max, or, type SQL } from 'drizzle-orm'
 import {
   CADENCE_STRIP_DAYS,
   QUIET_SPELL_DAYS,
@@ -15,10 +15,8 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { dateKey, dayAfter, dayKeysIn, daysBetween, dayStartUtc, timeLabel } from '../calendar.js'
-
-/** Items a Digest page reaches before completing the day the last one falls on (ADR 0011). */
-const DIGEST_PAGE_SIZE = 50
+import { dateKey, dayKeysIn, daysBetween, dayStartUtc, timeLabel } from '../calendar.js'
+import { wholeDayPage } from './whole-day-page.js'
 
 export class DigestService {
   readonly #db: DrizzleDatabase
@@ -33,24 +31,19 @@ export class DigestService {
 
   /**
    * One page of the Digest `from` a day, or from today: whole days, newest
-   * first, as many as it takes to reach `DIGEST_PAGE_SIZE` items. A busy day
-   * comes whole however long it runs, so no Feed's day is split across pages.
+   * first, as `wholeDayPage` cuts them, so no Feed's day is split across pages.
    */
-  read({ from }: DigestStart): Digest {
+  read(start: DigestStart): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const dayOf = dayKeysIn(timezone)
-    const before = from ? lt(feedItems.chronologyAt, dayStartUtc(dayAfter(from), timezone).toISOString()) : undefined
-
-    const head = this.#newestFirst(before).limit(DIGEST_PAGE_SIZE).all()
-    const last = head.at(-1)
-    let fetched = head
-    let nextFrom: string | null = null
-    if (last && head.length === DIGEST_PAGE_SIZE) {
-      const opening = dayStartUtc(dayOf(last.chronologyAt), timezone).toISOString()
-      fetched = this.#newestFirst(before, gte(feedItems.chronologyAt, opening)).all()
-      const older = this.#newestFirst(lt(feedItems.chronologyAt, opening)).limit(1).get()
-      nextFrom = older ? dayOf(older.chronologyAt) : null
-    }
+    const { rows: fetched, nextFrom } = wholeDayPage(
+      (conditions, limit) => {
+        const query = this.#newestFirst(...conditions)
+        return limit === undefined ? query.all() : query.limit(limit).all()
+      },
+      start,
+      timezone,
+    )
 
     const today = dateKey(this.#clock.now(), timezone)
     const groups = new Map<string, Omit<DigestGroup, 'returns'>>()

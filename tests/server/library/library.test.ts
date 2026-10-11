@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { digestSchema, feedDetailSchema, libraryMembershipSchema, librarySchema } from '../../../src/shared/api.js'
+import { digestSchema, feedItemsSchema, libraryMembershipSchema, librarySchema } from '../../../src/shared/api.js'
 import { claimedDevice, Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 
@@ -134,8 +134,8 @@ describe('saving Feed Items to the Library', () => {
       ['Second thoughts', false],
     ])
 
-    const detail = feedDetailSchema.parse(await (await user.get(`/api/feeds/${feedId}`)).json())
-    expect(detail.items.map((entry) => [entry.title, entry.saved])).toEqual([
+    const { items } = feedItemsSchema.parse(await (await user.get(`/api/feeds/${feedId}/items`)).json())
+    expect(items.map((entry) => [entry.title, entry.saved])).toEqual([
       ['First light', true],
       ['Second thoughts', false],
     ])

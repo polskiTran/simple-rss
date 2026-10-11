@@ -27,7 +27,8 @@ describe('Subscription reading source', () => {
 
     const detail = await (await user.get('/api/feeds/1')).json()
     expect(detail.readingSource).toBe('feed-content')
-    const item = await (await user.get(`/api/items/${detail.items[0].feedItemId}`)).json()
+    const { items } = await (await user.get('/api/feeds/1/items')).json()
+    const item = await (await user.get(`/api/items/${items[0].feedItemId}`)).json()
     expect(item.readingSource).toBe('feed-content')
 
     await service.restart()
@@ -46,8 +47,8 @@ describe('Subscription reading source', () => {
     expect((await user.put('/api/feeds/99/reading-source', { readingSource: 'feed-content' })).status).toBe(404)
     expect((await user.put('/api/feeds/1/reading-source', { readingSource: 'feed-content' })).status).toBe(200)
 
-    const detail = await (await user.get('/api/feeds/1')).json()
-    const feedItemId = detail.items[0].feedItemId
+    const { items } = await (await user.get('/api/feeds/1/items')).json()
+    const feedItemId = items[0].feedItemId
     expect((await user.get(`/api/items/${feedItemId}`)).status).toBe(200)
     expect((await user.get(`/api/items/${feedItemId}/reader`)).status).toBe(200)
     expect(service.upstream.requestsTo(ITEM_URL)).toHaveLength(1)
@@ -67,7 +68,7 @@ describe('Subscription reading source', () => {
     const user = await claimedDevice(service)
     await user.post('/api/subscriptions', { url: FEED_URL })
     await user.put('/api/feeds/1/reading-source', { readingSource: 'feed-content' })
-    const { items } = await (await user.get('/api/feeds/1')).json()
+    const { items } = await (await user.get('/api/feeds/1/items')).json()
     const idOf = (title: string) => items.find((item: { title: string }) => item.title === title).feedItemId
 
     const bare = idOf('Bare')

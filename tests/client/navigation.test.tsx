@@ -4,7 +4,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow } from './cadence-window.js'
 import type { SearchResults } from '../../src/shared/api.js'
-import { digest, feedDetail, library, libraryItem, readerArticle, readerItem, searchResult } from './fixtures.js'
+import {
+  digest,
+  feedDetail,
+  feedItems,
+  library,
+  libraryItem,
+  readerArticle,
+  readerItem,
+  searchResult,
+} from './fixtures.js'
 import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
 
 const DETAIL = feedDetail({ subscribedDate: '2026-08-08', cadence: cadenceWindow({ '2026-08-08': 1 }) })
@@ -31,6 +40,7 @@ function reading(path: string): StubbedApi {
   const api = stubApi()
     .on('GET /api/digest', { body: digest() })
     .on('GET /api/feeds/1', { body: DETAIL })
+    .on('GET /api/feeds/1/items', { body: feedItems() })
     .on('GET /api/items/3', { body: readerItem() })
     .on('GET /api/items/3/reader', { body: readerArticle() })
     .on('GET /api/library', { body: LIBRARY })

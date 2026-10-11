@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { feedDetailSchema } from '../../../src/shared/api.js'
+import { feedDetailSchema, feedItemsSchema } from '../../../src/shared/api.js'
 import { claimedDevice } from '../../support/device.js'
 import { startTestService } from '../../support/service-harness.js'
 
@@ -17,7 +17,7 @@ const rss = (...items: string[]) => `<?xml version="1.0"?>
   <rss version="2.0"><channel><title>Field Notes</title><link>https://journal.example/</link>${items.join('')}</channel></rss>`
 
 describe('one opened Feed', () => {
-  it('answers with identity, retained Feed Items, cadence observations, schedule, and availability', async () => {
+  it('answers with identity, cadence observations, schedule, and availability, and its retained Feed Items apart', async () => {
     const service = await startTestService()
     service.upstream.stub(FEED_URL, {
       headers: { 'content-type': 'application/rss+xml' },
@@ -45,7 +45,8 @@ describe('one opened Feed', () => {
       subscribedDate: '2026-08-08',
     })
 
-    expect(detail.items.map(({ title, date, displayTime }) => [title, date, displayTime])).toEqual([
+    const { items } = feedItemsSchema.parse(await (await user.get('/api/feeds/1/items')).json())
+    expect(items.map(({ title, date, displayTime }) => [title, date, displayTime])).toEqual([
       ['First light', '2026-08-08', '07:15'],
       ['Evening notes', '2026-08-07', '09:31'],
       ['A June letter', '2026-06-03', '12:00'],
@@ -86,8 +87,9 @@ describe('one opened Feed', () => {
     expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
 
     const detail = feedDetailSchema.parse(await (await user.get('/api/feeds/1')).json())
+    const { items } = feedItemsSchema.parse(await (await user.get('/api/feeds/1/items')).json())
 
-    expect(detail.items[0]).toMatchObject({ date: '2026-08-08', displayTime: '08:00' })
+    expect(items[0]).toMatchObject({ date: '2026-08-08', displayTime: '08:00' })
     expect(detail.cadence.at(-1)).toEqual({ date: '2026-08-08', count: 1 })
   })
 
@@ -97,5 +99,6 @@ describe('one opened Feed', () => {
 
     expect((await user.get('/api/feeds/999')).status).toBe(404)
     expect((await user.get('/api/feeds/1e1')).status).toBe(404)
+    expect((await user.get('/api/feeds/999/items')).status).toBe(404)
   })
 })
