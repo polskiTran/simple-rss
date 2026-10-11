@@ -1,36 +1,27 @@
 import { Button } from '@base-ui/react/button'
 import { useEffect, useEffectEvent, useState, useTransition } from 'react'
 import { useScreenTitle } from '../arrival.js'
-import type { FeedDetail, OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
+import type { OpmlImportReport, SubscriptionSummary } from '../../shared/api.js'
 import { RHYTHM_LABELS, RHYTHMS, rhythmOf, type Rhythm } from '../../shared/rhythm.js'
-import { ApiError, fetchFeedDetail, fetchSubscriptions, refreshFeed } from '../api.js'
+import { fetchSubscriptions, refreshFeed } from '../api.js'
 import { Choice } from '../components/choice.js'
 import { FeedRow } from '../components/feed-row.js'
 import { enterSection, Group } from '../components/group.js'
 import { Icon } from '../components/icon.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { counted } from '../day-names.js'
 import { useResource } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
-import { firstCheckFailure, retryFailure, unavailableNote } from './feed-language.js'
+import { retryFailure, unavailableNote } from './feed-language.js'
 
-/** How often the list is read again while a Subscription waits for its first check. */
+/** How often, and how many times, the list is read again while an imported Subscription waits for its first check. */
 const POLL_INTERVAL_MS = 2_000
 const POLL_ROUNDS = 30
-/** Rounds a new Subscription's own first check is watched before the notice gives up on it. */
-const FIRST_CHECK_ROUNDS = 8
 
 /** Rows a Rhythm group shows before Show N more. */
 const GROUP_PREVIEW = 6
 
 type Order = 'rhythm' | 'name' | 'recent'
-
-/** Where polling is: its round, and the new Subscription whose first check the notice waits on. */
-interface Poll {
-  readonly round: number
-  readonly watching: number | undefined
-}
 
 interface FeedsViewProps {
   onOpenFeed(feedId: number): void
@@ -44,7 +35,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   )
   const [notice, setNotice] = useState('')
   const [report, setReport] = useState<OpmlImportReport | undefined>(undefined)
-  const [poll, setPoll] = useState<Poll>({ round: 0, watching: undefined })
+  const [pollRound, setPollRound] = useState(0)
   const [order, setOrder] = useState<Order>('rhythm')
 
   async function refreshList(): Promise<void> {
@@ -58,56 +49,42 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     } catch {}
   }
 
-  // One round of polling: how the watched first check went, then the list.
-  const pollRound = useEffectEvent(async (signal: AbortSignal) => {
-    let { watching } = poll
-    if (watching !== undefined) {
-      const outcome = await firstCheckOutcome(watching, signal)
-      if (signal.aborted) return
-      if (outcome !== undefined || poll.round + 1 >= FIRST_CHECK_ROUNDS) {
-        setNotice(outcome ?? 'Still checking. The feed will appear in the list.')
-        watching = undefined
-      }
-    }
+  // One round of polling: the list read again.
+  const poll = useEffectEvent(async (signal: AbortSignal) => {
     try {
       const { subscriptions } = await fetchSubscriptions(signal)
       if (!signal.aborted) set(() => subscriptions)
     } catch {}
-    if (!signal.aborted) setPoll({ round: poll.round + 1, watching })
+    if (!signal.aborted) setPollRound(pollRound + 1)
   })
 
-  // Polls while a first check is awaited, and stops on leaving the screen.
+  // Polls while an imported Subscription awaits its first check, and stops on leaving the screen.
   useEffect(() => {
-    if (state.kind !== 'loaded') return
-    const unchecked = state.value.some((subscription) => subscription.availability.state === 'unchecked')
-    if (poll.watching === undefined && (!unchecked || poll.round >= POLL_ROUNDS)) return
+    if (state.kind !== 'loaded' || pollRound >= POLL_ROUNDS) return
+    if (!state.value.some((subscription) => subscription.availability.state === 'unchecked')) return
     const round = new AbortController()
-    // A new Subscription's first round goes at once.
-    const timer = window.setTimeout(
-      () => void pollRound(round.signal),
-      poll.round === 0 && poll.watching !== undefined ? 0 : POLL_INTERVAL_MS,
-    )
+    const timer = window.setTimeout(() => void poll(round.signal), POLL_INTERVAL_MS)
     return () => {
       window.clearTimeout(timer)
       round.abort()
     }
-  }, [state, poll])
+  }, [state, pollRound])
 
+  // A Subscription added by hand was checked before it was recorded: its row simply arrives.
   function subscribed(created: SubscriptionSummary) {
+    setNotice('')
     setReport(undefined)
-    setNotice('Subscribed. Checking the feed…')
     if (state.kind === 'loaded') {
       set((current) => [...current.filter((listed) => listed.feedId !== created.feedId), created])
     } else {
       reload()
     }
-    setPoll({ round: 0, watching: created.feedId })
   }
 
   function imported(next: OpmlImportReport) {
     setNotice('')
     setReport(next)
-    setPoll({ round: 0, watching: undefined })
+    setPollRound(0)
     void refreshList()
   }
 
@@ -340,21 +317,4 @@ function ImportReport({ report }: { report: OpmlImportReport | undefined }) {
       ) : null}
     </div>
   )
-}
-
-/** What a new Subscription's first check came to, once it has come to anything. */
-async function firstCheckOutcome(feedId: number, signal: AbortSignal): Promise<string | undefined> {
-  let detail: FeedDetail
-  try {
-    detail = await fetchFeedDetail(feedId, signal)
-  } catch (error) {
-    // ADR 0007: the first check found a Feed already subscribed under another URL and merged this Subscription into it.
-    if (error instanceof ApiError && error.status === 404) return 'Already subscribed.'
-    return undefined
-  }
-  if (detail.availability.lastSuccessDate) {
-    return `Subscribed. ${counted(detail.items.length, 'item')} in the digest.`
-  }
-  if (detail.availability.consecutiveFailures > 0) return firstCheckFailure(detail.availability.category)
-  return undefined
 }

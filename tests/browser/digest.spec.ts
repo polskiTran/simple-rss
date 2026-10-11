@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import {
+  addFeed,
   expect,
   expectNoHorizontalOverflow,
   USER_PASSWORD,
@@ -17,9 +18,7 @@ async function claimAndSubscribe(page: Page, installation: Installation, feedUrl
   await page.getByLabel('Confirm password').fill(USER_PASSWORD)
   await page.getByRole('button', { name: 'Claim installation' }).click()
   await page.getByRole('link', { name: 'Feeds', exact: true }).click()
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  await page.getByRole('textbox', { name: 'URL' }).fill(feedUrl)
-  await page.keyboard.press('Enter')
+  await addFeed(page, feedUrl)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
 }
 
@@ -183,9 +182,7 @@ test.describe('the Digest at phone width', () => {
 
   test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('button', { name: 'Add feed' }).click()
-    await page.getByRole('textbox', { name: 'URL' }).fill(installation.longFeedUrl)
-    await page.getByRole('button', { name: 'Subscribe' }).click()
+    await addFeed(page, installation.longFeedUrl)
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 

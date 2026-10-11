@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import {
+  addFeed,
   expect,
   expectNoHorizontalOverflow,
   USER_PASSWORD,
@@ -21,13 +22,6 @@ async function openDigest(page: Page, installation: Installation): Promise<void>
   await expect(page.getByRole('heading', { name: 'The Quiet Coast' })).toBeVisible()
   await section(page, 'Digest').click()
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
-}
-
-async function addFeed(page: Page, feedUrl: string): Promise<void> {
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  await page.getByRole('textbox', { name: 'URL' }).fill(feedUrl)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('dialog')).toHaveCount(0)
 }
 
 /** A section's link in the chrome; exact, since a back button names the same section. */

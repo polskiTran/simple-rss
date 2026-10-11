@@ -5,6 +5,7 @@ import type {
   FeedAvailability,
   FeedDetail,
   FeedItemRow,
+  FeedPreview,
   Library,
   LibraryItem,
   ReaderArticle,
@@ -53,6 +54,19 @@ export const subscription = (overrides: Partial<SubscriptionSummary> = {}): Subs
   subscribedAt: '2026-08-01T09:00:00.000Z',
   cadence: Array.from({ length: 30 }, () => 0),
   availability: availability(),
+  ...overrides,
+})
+
+/** Field Notes as the Add feed dialog previews it, before it is recorded: one item, at noon on the fixtures' day. */
+export const feedPreview = (overrides: Partial<FeedPreview> = {}): FeedPreview => ({
+  feedUrl: FEED.enteredUrl,
+  title: FEED.title,
+  domain: FEED.domain,
+  homePageUrl: FEED.homePageUrl,
+  cadence: Array.from({ length: 30 }, (_, day) => (day === 29 ? 1 : 0)),
+  lastItemAt: `${TODAY}T12:00:00.000Z`,
+  items: [{ title: 'First light', publishedAt: `${TODAY}T12:00:00.000Z` }],
+  subscribed: false,
   ...overrides,
 })
 

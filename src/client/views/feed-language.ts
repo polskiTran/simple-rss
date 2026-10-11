@@ -17,9 +17,12 @@ const AVAILABILITY_COPY = {
   invalid_feed: 'The feed is returning unusable XML',
 } satisfies Readonly<Record<FeedAvailabilityCategory, string>>
 
+/** The Add feed field's answer to a line that is no address at all. */
+export const NOT_AN_ADDRESS = 'Enter a site or feed address, like lowtechmagazine.com.'
+
 const SUBSCRIPTION_FAILURE_COPY = {
   duplicate_subscription: 'Already subscribed.',
-  invalid_feed_url: 'Enter a site or feed address, like lowtechmagazine.com.',
+  invalid_feed_url: NOT_AN_ADDRESS,
   feed_too_large: `That feed is larger than ${MAX_FEED_SIZE_MIB} MiB.`,
   unsupported_feed: 'That address doesn’t return RSS or Atom.',
   malformed_feed: 'That feed contains malformed XML.',
@@ -28,23 +31,29 @@ const SUBSCRIPTION_FAILURE_COPY = {
   feed_unreachable: 'That feed couldn’t be reached.',
 } as const satisfies Partial<Record<ApiErrorCode, string>>
 
-export function subscriptionFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'That feed couldn’t be reached.'
-  const code = cause.code
-  return hasOwn(SUBSCRIPTION_FAILURE_COPY, code) ? SUBSCRIPTION_FAILURE_COPY[code] : 'That feed couldn’t be added.'
-}
+/** What the address's host failed to do, when it never gave an answer to read. */
+const UNANSWERED_COPY = {
+  feed_unreachable: 'couldn’t be reached.',
+  feed_timeout: 'took too long to respond.',
+  feed_body_timeout: 'took too long to download.',
+} as const satisfies Partial<Record<ApiErrorCode, string>>
 
-const FIRST_CHECK_FAILURE_CODE = {
-  unreachable: 'feed_unreachable',
-  timeout: 'feed_timeout',
-  too_large: 'feed_too_large',
-  unsupported_content: 'unsupported_feed',
-  http_error: 'feed_unreachable',
-  invalid_feed: 'malformed_feed',
-} satisfies Readonly<Record<FeedAvailabilityCategory, keyof typeof SUBSCRIPTION_FAILURE_COPY>>
-
-export function firstCheckFailure(category: FeedAvailabilityCategory | null): string {
-  return category ? SUBSCRIPTION_FAILURE_COPY[FIRST_CHECK_FAILURE_CODE[category]] : 'That feed couldn’t be added.'
+/**
+ * Why the Add feed dialog has nothing to subscribe to at `host` — a lookup or
+ * a Subscribe refused — and whether trying again could help: a retrieval that
+ * failed may answer next time, an address that is no address never will.
+ */
+export function addFailure(cause: unknown, host: string) {
+  const code = cause instanceof ApiError ? cause.code : 'feed_unreachable'
+  if (code === 'invalid_feed_url' || code === 'duplicate_subscription') {
+    return { reason: SUBSCRIPTION_FAILURE_COPY[code], retry: false }
+  }
+  const reason = hasOwn(UNANSWERED_COPY, code)
+    ? `${host} ${UNANSWERED_COPY[code]}`
+    : hasOwn(SUBSCRIPTION_FAILURE_COPY, code)
+      ? SUBSCRIPTION_FAILURE_COPY[code]
+      : 'That feed couldn’t be added.'
+  return { reason: `${reason} Nothing was added.`, retry: true }
 }
 
 export function retryFailure(cause: unknown): string {
