@@ -9,14 +9,14 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
 ## 1. Principles
 
 1. **Colour comes from the content.** The interface is greyscale. Colour
-   appears only in data — Cadence, saved state and search matches — and on a
-   Feed's host, the one link that leaves for the publisher. It is blue in light
-   mode and yellow in dark.
+   appears only in data — Cadence, saved state and search matches — on a
+   Feed's host, the one link that leaves for the publisher, and on the Feed
+   name an item box links to. It is blue in light mode and yellow in dark.
 2. **One shape means you can press it.** Every control is a hard-edged block of
    the same height. Grey fill is an ordinary action, ink fill is the single
    primary action on a screen. Counts and status are plain grey text with no
    box. The only text that acts on its own is a link, and links are underlined —
-   except a Feed's host, which is coloured instead.
+   except a Feed's host and an item's Feed name, which are coloured instead.
 3. **Hierarchy from size and weight.** No cards, shadows, tinted bars or
    coloured headers. Hairlines separate groups; thin-edged boxes hold items and
    Feeds.
@@ -61,6 +61,7 @@ one item never reads as empty.
 | `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.5% 0.11 277.5)` · `oklch(59.4% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
 | `away` | `ramp-5` | a Feed's host, wherever it is shown |
+| `feed-name` | `ramp-4` | the Feed name an item box links to |
 | `match` | `oklch(91.4% 0.032 277.9)` | search highlight, under `ink` text |
 | `scrim` | ink at `.24` | behind a dialog |
 
@@ -82,6 +83,7 @@ one item never reads as empty.
 | `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(49% 0.08 97)` · `oklch(61.3% 0.106 96.1)` · `oklch(73.5% 0.132 95.2)` · `oklch(85.8% 0.158 94.4)` |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` |
 | `away` | `ramp-5` |
+| `feed-name` | `ramp-4` |
 | `match` | `oklch(37.5% 0.063 97.7)` |
 
 Appearance follows the system unless the User picks Light or Dark in Settings;
