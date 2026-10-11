@@ -304,8 +304,10 @@ day with whole counts.
 
 **Reader.** A toolbar — the way back on the left, Open original ↗ and Save on
 the right — over a 680px column: the title, a meta line of the Feed (a link),
-the day and the minutes to read, the Reading Source switch (spanning the column
-on a phone), then the article.
+the day, the minutes to read and the Discussion, the Reading Source switch
+(spanning the column on a phone), then the article.
+The Discussion appears only when the Feed declares one: "Discussion on
+lobste.rs", an underlined link marked ↗ because it leaves for another site.
 The meta line names the reading only when it is not the one chosen: "Feed
 content for now" while the Original webpage loads or fails, or the one reading
 an item has when the chosen one is missing. Article links are ink and
