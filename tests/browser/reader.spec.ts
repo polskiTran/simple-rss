@@ -426,12 +426,13 @@ test.describe('Reader View at phone width', () => {
     await expect(back).toHaveCount(1)
     await expect(back).toHaveClass(/chrome-back/)
 
-    // One top bar: the back square, then Open original, Save and search, in that order.
+    // One top bar: the back square, then search, Open original and Save, drawn
+    // and focused in that order.
     const topBar = [
       back,
+      page.getByRole('button', { name: 'Search' }),
       page.getByRole('link', { name: 'Open original' }),
       page.getByRole('button', { name: 'Save First light' }),
-      page.getByRole('button', { name: 'Search' }),
     ]
     const boxes = await Promise.all(topBar.map((control) => control.boundingBox()))
     for (const box of boxes) {
@@ -440,6 +441,11 @@ test.describe('Reader View at phone width', () => {
     }
     const lefts = boxes.map((box) => box?.x ?? Number.NaN)
     expect(lefts).toEqual([...lefts].sort((a, b) => a - b))
+    await back.focus()
+    for (const control of topBar.slice(1)) {
+      await page.keyboard.press('Tab')
+      await expect(control).toBeFocused()
+    }
     await expect(page.getByText('Next in the digest')).toHaveCount(0)
 
     await expect(page.getByText(/the-long-unbroken-address/)).toBeVisible()

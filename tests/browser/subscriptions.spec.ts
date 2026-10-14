@@ -47,7 +47,7 @@ async function subscribeFromSite(page: Page, installation: Installation): Promis
 }
 
 function narrow(page: Page): boolean {
-  return (page.viewportSize()?.width ?? 0) <= 640
+  return (page.viewportSize()?.width ?? 0) <= 1024
 }
 
 async function expectFeedAndDigest(page: Page, installation: Installation): Promise<void> {
@@ -216,5 +216,18 @@ test.describe('phone Feed and Digest rendering', () => {
   test('keeps the whole Cadence grid selectable on the phone screen', async ({ page, installation }) => {
     await subscribe(page, installation)
     await expectOpenFeed(page)
+  })
+})
+
+test.describe('an opened Feed on the narrowest phone', () => {
+  test.use({ viewport: { width: 320, height: 640 } })
+
+  test('fits its actions and its Cadence grid inside the screen', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    await expect(page.getByRole('group', { name: '26 weeks of Cadence for Field Notes' })).toBeVisible()
+
+    await expect(page.getByRole('button', { name: 'Unsubscribe' })).toBeInViewport({ ratio: 1 })
+    await expectNoHorizontalOverflow(page)
   })
 })

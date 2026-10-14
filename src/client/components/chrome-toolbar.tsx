@@ -7,7 +7,8 @@ export const ChromeToolbarSlot = createContext<HTMLElement | null>(null)
 /**
  * A screen's toolbar, drawn inside the chrome so the stylesheet alone places
  * it: a row under the header on desktop, and on a phone within the top bar,
- * between the back square and the search square, so one row holds both.
+ * after the search square. Either way it is drawn after the header, as it
+ * stands in the DOM, so focus follows what is seen.
  */
 export function ChromeToolbar({ children }: { readonly children: ReactNode }) {
   const slot = use(ChromeToolbarSlot)

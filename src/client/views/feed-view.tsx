@@ -200,7 +200,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         <Group id="feed-cadence" title="Cadence" className="panel">
           <CadenceGrid grid={grid} title={detail.title} onShowDay={showDay} />
         </Group>
-        <Group id="feed-info" title="Info" className="panel">
+        <Group id="feed-info" title="Info" className="panel feed-info">
           <dl className="rows">
             <Row label="Subscribed" value={dayOfYear(detail.subscribedDate, today)} />
             <Row label="Items, last 26 weeks" value={grid.stats.total.toLocaleString('en-GB')} />

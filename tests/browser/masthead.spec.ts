@@ -23,6 +23,34 @@ async function section(page: Page, name: string): Promise<void> {
   await page.getByRole('link', { name, exact: true }).click()
 }
 
+test.describe('the header', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('takes focus in the order it shows its controls', async ({ page, installation }) => {
+    await claim(page, installation)
+    await page.getByRole('link', { name: 'simple' }).focus()
+
+    const stops: { name: string; x: number }[] = []
+    for (let stop = 0; stop < 5; stop++) {
+      await page.keyboard.press('Tab')
+      stops.push(
+        await page.evaluate(() => {
+          const focused = document.activeElement
+          if (!(focused instanceof HTMLElement)) return { name: '', x: Number.NaN }
+          return {
+            name: focused.getAttribute('aria-label') ?? focused.textContent ?? '',
+            x: focused.getBoundingClientRect().x,
+          }
+        }),
+      )
+    }
+
+    expect(stops.map((stop) => stop.name)).toEqual(['Digest', 'Feeds', 'Search your reading', 'Saved', 'Settings'])
+    const xs = stops.map((stop) => stop.x)
+    expect(xs).toEqual([...xs].sort((left, right) => left - right))
+  })
+})
+
 test.describe('the mark', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 

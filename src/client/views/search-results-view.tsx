@@ -155,7 +155,13 @@ export function SearchResultsView({
             ) : null}
           </div>
           {feeds.length > 1 ? (
-            <FeedFilter id="search-feeds" title="Feeds" feeds={feeds} shown={shownFeeds} onChange={setShownFeeds} />
+            <FeedFilter
+              id="search-feeds"
+              title="Narrow by feed"
+              feeds={feeds}
+              shown={shownFeeds}
+              onChange={setShownFeeds}
+            />
           ) : null}
         </section>
       )}

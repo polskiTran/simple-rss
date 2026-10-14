@@ -240,7 +240,7 @@ test.describe('searching at phone width', () => {
     await expect(
       page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'Slow water' }),
     ).toBeVisible()
-    await expect(page.getByRole('navigation', { name: 'Sections' })).not.toBeVisible()
+    for (const name of ['Digest', 'Feeds', 'Saved', 'Settings'] as const) await expect(section(page, name)).toBeHidden()
     await expectNoHorizontalOverflow(page)
 
     await page.getByRole('button', { name: 'Close search' }).click()

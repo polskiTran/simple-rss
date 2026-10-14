@@ -33,12 +33,18 @@ CAPS, decoration without a source in the data.
 Tokens are OKLCH. Ink rules are the ink at an alpha, so they sit correctly on
 any ground.
 
-`ink-2` is the quietest grey for small text — meta, counts, placeholders. On
-`ground`, `ink-3` clears only 3:1, so it is text only where that is enough:
+`ink-2` is the quietest grey for small text — meta, counts, placeholders — and
+clears 4.5:1 on `control` as well as `ground`, so a placeholder in a field stays
+readable. A grey control darkens under the pointer and when pressed, past where
+`ink-2` holds, so text that stays grey inside a control — a chip's or a jump
+button's count, an unselected segment — is `ink-off`, which clears 4.5:1 on
+every control fill: `control`, `control-hover`, `toggle-off` and a selected
+segment. On `ground`, `ink-3` clears only 3:1, so it is text only where that is enough:
 the page title's companion value, disabled controls and separator dots. On a
 selected filter's `ink` fill it clears 4.5:1 and carries that filter's count.
 The lowest step with items, `ramp-2`, is 3:1 against `ground`, so a day with
-one item never reads as empty.
+one item never reads as empty. A day's number on the Digest month clears 4.5:1 on its
+fill: `ink` up to `ramp-2`, `ground` from `ramp-3`, in both modes.
 
 ### Light
 
@@ -46,9 +52,9 @@ one item never reads as empty.
 | --- | --- | --- |
 | `ground` | `oklch(100% 0 0)` | page, dialog panel, selected segment |
 | `ink` | `oklch(17.8% 0 0)` | text, primary button fill |
-| `ink-2` | `oklch(53.8% 0 0)` | meta, secondary text, counts, placeholders |
+| `ink-2` | `oklch(52.5% 0 0)` | meta, secondary text, counts, placeholders |
 | `ink-3` | `oklch(62% 0 0)` | title companion values, disabled text, separators |
-| `ink-off` | `oklch(47.5% 0 0)` | unselected segment text |
+| `ink-off` | `oklch(47.5% 0 0)` | grey text inside a control: unselected segments, chip and button counts |
 | `control` | `oklch(95.2% 0 0)` | grey buttons, fields, switch tracks |
 | `control-hover` | `oklch(91.9% 0 0)` | |
 | `primary-hover` | `oklch(32% 0 0)` | primary button under the pointer |
@@ -58,7 +64,7 @@ one item never reads as empty.
 | `rule-soft` | ink at `.07` | between rows |
 | `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
-| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.5% 0.11 277.5)` · `oklch(59.4% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
+| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.5% 0.11 277.5)` · `oklch(57% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
 | `away` | `ramp-5` | a Feed's host, wherever it is shown |
 | `feed-name` | `ramp-4` | the Feed name an item box links to |
@@ -72,6 +78,7 @@ one item never reads as empty.
 | `ground` | `oklch(18.2% 0 0)` |
 | `ink` | `oklch(94.6% 0 0)`; a primary button's text is `ground` |
 | `ink-2` / `ink-3` | `oklch(68.6% 0 0)` / `oklch(53% 0 0)` |
+| `ink-off` | `oklch(72% 0 0)` |
 | `control` / `control-hover` | `oklch(26.9% 0 0)` / `oklch(30.9% 0 0)` |
 | selected segment | `oklch(34.8% 0 0)` |
 | `row-hover` | `oklch(22.6% 0 0)` |
@@ -117,27 +124,30 @@ Numbers in counts and meta use tabular figures.
 - Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
 - The reading column is 680px, centred.
 - On desktop a 300px column beside a list — the Digest's month, a Feed filter —
-  holds 24px from the top as the list scrolls, and scrolls itself when taller
-  than the window.
-- One breakpoint: `max-width: 640px` is the phone layout.
-- A phone row that scrolls sideways — a day's Feed chips, jump buttons, a
-  Feed filter's chips — fades over its trailing 32px, so what is past the edge
-  reads as there.
+  stands 64px from it, holds 24px from the top as the list scrolls, and scrolls
+  itself when taller than the window. Without one, a list runs the page's full
+  width.
+- One breakpoint: `max-width: 1024px` is the phone layout.
+- A row that scrolls sideways fades over its trailing 32px, so what is past
+  the edge reads as there: a day's Feed chips at every width, and on a phone
+  the jump buttons and a Feed filter's chips.
 
 ## 5. Components
 
 **Header (desktop, 68px).** Mark and wordmark; Digest / Feeds as a switch of
 links; on the right, the search field (340px), then Saved and Settings as grey
 buttons with their icons. Saved or Settings shows it is the current screen
-with a 1px ink ring instead of a fill. The header scrolls with the page.
+with a 1px ink ring instead of a fill. Focus moves through it in the order it
+shows: mark, switch, search, Saved, Settings. The header scrolls with the page.
 
 **Phone chrome.** One 60px top bar that scrolls with the page, and nothing
 fixed to the bottom edge: the mark without its wordmark, the Digest / Feeds
 switch, then 44px squares for search, Saved and Settings, the current one
 ringed in ink. An opened Feed swaps the mark and the switch for a back square.
-The Reader keeps only the back square and its toolbar — Open original and Save
-beside the search square — so one row holds it whole; a search hides the
-sections too. Pressing the search square turns the bar into the search field
+The Reader keeps only the back square, the search square and its toolbar —
+Open original and Save where Saved and Settings stand — so one row holds it
+whole and is focused in the order it is drawn; a search hides the sections
+too. Pressing the search square turns the bar into the search field
 with a back square.
 
 **Section.** Exactly one section is current, including in the Reader: it
@@ -178,7 +188,8 @@ from ink toward `ground`; nothing moves.
 **Switch.** A grey track with 3px padding and 2px gaps; the selected segment
 is `ground` with a hairline ring, the rest are `ink-off` and darken on hover.
 Used for sections, views and settings with two or three values. Arrow keys
-move within it.
+move within it. On a phone a screen's switch spans the column, its segments
+sharing the width, padded 4px at least so three fit the narrowest screen.
 
 **Toggle.** 40×22 track with a 16px square knob; ink when on, `toggle-off`
 when off.
@@ -195,7 +206,9 @@ a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
 the title, then a 36px save square; in a Feed's own list, which names no Feed,
 the meta column narrows to 56px for the time. The meta column sits on the
 title's first baseline, and the save square centres on its first line, however
-many lines the title runs to. The save square shows on hover
+many lines the title runs to. A title or snippet holds a measure of 32em —
+about 66 characters a line — so a box as wide as the page keeps its edges with
+the page's and its lines short enough to read. The save square shows on hover
 and focus; a saved item shows it always, filled in `saved`, and keeps a
 `saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
 every item is saved and the edge would say nothing. On a phone the Feed name
@@ -219,8 +232,10 @@ and the Settings screen.
 phone. A day with no items is `ramp-1`; items step up the ramp.
 
 **Cadence grid.** 26 weeks as columns of seven 13px cells with 4px gaps (11px
-and 2px on a phone), month labels under it and a Fewer → More legend. A day
-with items is a button that scrolls to that day's items.
+and 2px on a phone, the cells narrowing to fill the panel edge to edge where it
+is too narrow for 11), month labels under it and a Fewer → More legend in 10px
+squares — on a phone, squares the size of the cells. A day with items is a
+button that scrolls to that day's items.
 
 **Group.** A group heading with its count in `ink-2`, a `rule` under it on
 panels, then its content. A count is always the whole group's: the Digest's
@@ -229,8 +244,8 @@ come from the server; elsewhere a count appears only once the group is loaded.
 **Dialog.** A 560px ground panel with a hairline ring and a soft shadow over
 the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
 is right-aligned Cancel and the primary action, which stays disabled until
-there is something to submit. On a phone it is a hard-edged sheet rising from
-the bottom edge with Cancel and the primary action side by side at 48px. The
+there is something to submit. On a phone it is a hard-edged sheet, still at most
+560px wide and centred, rising from the bottom edge with Cancel and the primary action side by side at 48px. The
 scrim and the desktop panel fade in over 150ms and out over 120ms; the sheet
 rises in over 240ms and sinks out over 180ms, opaque, under the fading scrim.
 While one is open the page's scrollbar gutter takes the scrim's colour too,
@@ -261,7 +276,7 @@ not jump.
 **Digest.** Today's short date as the title's companion, then one list, newest
 day first, each day a group headed with its count and, for Today and Yesterday,
 its date. Under the heading the day's Feeds stand as chips with their counts
-after a note of how many; a pressed chip, ringed in ink, shows that Feed's box
+after a note of how many, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
 alone, and pressing it again shows them all. Each Feed that published that day
 gets one box, the most recent first: a lone item is the ordinary item box; more
 share a box, the Feed's name, its count and its span of times in the meta
@@ -278,7 +293,7 @@ days, the day on show ringed, then the legend and that day's count. Any day
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the title's row opens the platform's own date picker, in
-place of the month, and a day's chips scroll as one row. The phone Digest has no
+place of the month, and a day's chips run past the screen's edge. The phone Digest has no
 save squares, so its titles take the whole width of the box: in a shared box
 each title's time trails its last line in meta, three lines at most, and a
 saved title is marked after its time with the bookmark in `saved` — a lone box
@@ -298,10 +313,12 @@ alphabetically instead, and Recently added newest Subscription first. A row says
 checking fails, what it last reached and that its items stay, with Retry.
 
 **One Feed.** The way back, then the Feed's name, description and host (as in
-a Feed row) with
-Edit, Refresh now and Unsubscribe beside them, then three panels: Cadence (the
+a Feed row) with Edit, Refresh now and Unsubscribe beside them on the title's
+first line — under them on a phone, wrapping to fill each line — then three panels: Cadence (the
 grid), Info (subscribed, items in 26 weeks, busiest day, longest quiet
-stretch, last checked) and Settings (Check every, Open items with). Items follow, grouped by
+stretch, last checked) and Settings (Check every, Open items with). Cadence and Settings
+keep their own widths and Info takes the rest; where the three do not fit on one line,
+Settings wraps under Cadence. Items follow, grouped by
 day with whole counts.
 
 **Reader.** A toolbar — the way back on the left, Open original ↗ and Save on
@@ -333,9 +350,10 @@ and, for a save that outlived its Subscription, No longer subscribed.
 the Feed's name when scoped to one. A search begun in a scope (a Feed, Saved,
 Feeds) shows a switch of that scope and Everywhere, moving both ways; Best
 match and Newest sit at the other end wherever items answer. Matching
-Subscriptions lead as Feed rows; items follow with the query's words marked in
-`match`. Beside them, the Feeds the results came from, with counts, narrow the
-list when ticked — a checkbox list on desktop, a row of chips on a phone.
+Subscriptions lead as Feed rows, a lone one spanning the list; items follow
+with the query's words marked in `match`. Beside them, Narrow by feed lists the
+Feeds the results came from, with counts, and narrows the list to those ticked —
+a checkbox list on desktop, a row of chips on a phone.
 
 **Notices.** A result the User waits on outside a dialog — an import, a
 refresh — is one line of meta text in an `aria-live` region under the control

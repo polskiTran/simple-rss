@@ -37,12 +37,13 @@ export function App() {
         <Wordmark onNavigate={open ? () => navigation.navigate('digest') : undefined} />
         {open ? (
           <>
-            <GlobalSearch
-              query={location.screen === 'search' ? location.query : ''}
-              scope={scopeOf(location)}
-              onQueryChange={navigation.updateSearch}
-            />
-            <SectionNav active={sectionOf(location)} onNavigate={navigation.navigate} />
+            <SectionNav active={sectionOf(location)} onNavigate={navigation.navigate}>
+              <GlobalSearch
+                query={location.screen === 'search' ? location.query : ''}
+                scope={scopeOf(location)}
+                onQueryChange={navigation.updateSearch}
+              />
+            </SectionNav>
             <div className="chrome-toolbar" ref={setToolbarSlot} />
           </>
         ) : null}
