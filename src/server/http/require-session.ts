@@ -9,7 +9,6 @@ import { readSessionCookie } from './session-cookie.js'
  */
 const PUBLIC_API_PATHS: ReadonlySet<string> = new Set(['/api/auth/status', '/api/auth/setup', '/api/auth/session'])
 
-/** Closes every `/api` route it is mounted over unless its path is on the allowlist. */
 export function requireSession(authentication: Authentication): MiddlewareHandler {
   return async (c, next) => {
     if (PUBLIC_API_PATHS.has(c.req.path) || authentication.authenticate(readSessionCookie(c))) return next()

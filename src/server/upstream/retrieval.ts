@@ -12,7 +12,6 @@ import { elapsedMs } from '../monotonic.js'
 import { HttpClientError, type HttpClient, type HttpTimings } from './http-client.js'
 import { createNetworkHttpClient } from './network-client.js'
 
-/** Every operation follows at most this many redirects. */
 const MAX_REDIRECTS = 5
 
 const DEFAULT_CAPACITY: RetrievalCapacity = { maxConcurrent: 6, maxQueued: 32 }
@@ -83,9 +82,7 @@ export type RetrievalFailureCode =
   | 'unsupported_content_encoding'
   | 'too_large'
   | 'http_error'
-  /** The publisher never answered. */
   | 'timeout'
-  /** Answered, but the body did not finish arriving. */
   | 'body_timeout'
   | 'cancelled'
   | 'busy'

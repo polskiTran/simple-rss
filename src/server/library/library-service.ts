@@ -52,7 +52,6 @@ export class LibraryService {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()
     const direction = order === 'oldest' ? asc : desc
-    // Strictly beyond the cursor in the page's own direction, ties broken by id the same way.
     const beyond = order === 'oldest' ? gt : lt
 
     const fetched = this.#db

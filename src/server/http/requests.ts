@@ -4,7 +4,6 @@ import type { z } from 'zod'
 import { idParameterSchema, type ApiErrorBody, type ApiErrorCode } from '../../shared/api.js'
 import { decodeLibraryCursor, type LibraryCursor } from '../library/library-cursor.js'
 
-/** What a request reader hands back: a value it accepted, or the response refusing it. */
 export type Validated<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly response: Response }

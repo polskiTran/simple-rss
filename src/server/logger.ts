@@ -18,7 +18,6 @@ export interface Logger {
   info(message: string, fields?: LogFields): void
   warn(message: string, fields?: LogFields): void
   error(message: string, fields?: LogFields): void
-  /** A logger that stamps `fields` onto everything it writes. */
   child(fields: LogFields): Logger
 }
 

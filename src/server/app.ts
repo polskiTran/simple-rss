@@ -61,7 +61,6 @@ export interface Services {
   readonly scheduler: PollScheduler
 }
 
-/** What startup produced: the whole bundle, or the reason there is none. */
 export type Startup =
   | { readonly kind: 'ready'; readonly services: Services }
   | { readonly kind: 'failed'; readonly reason: string }

@@ -82,7 +82,6 @@ export function persistFeedWindow(
   }
 }
 
-/** The host a Feed is shown under: its Feed Home Page's, else the one that answered. */
 export function feedDomain(parsed: ParsedFeedDocument, resolvedUrl: string): string {
   return new URL(parsed.homePageUrl ?? resolvedUrl).hostname
 }

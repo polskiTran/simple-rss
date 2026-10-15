@@ -51,7 +51,6 @@ export function writeSnapshot(source: string, destination: string): SnapshotWrit
 /** What a completed restore left on the volume, for the operator to verify. */
 export interface RestoreReport {
   readonly restored: true
-  /** How many schema migrations the snapshot needed to reach the current schema. */
   readonly migrationsApplied: number
   readonly indexedItems: number
   readonly feeds: number

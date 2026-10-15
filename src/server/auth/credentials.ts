@@ -3,10 +3,8 @@ import { and, eq, lte, or, sql } from 'drizzle-orm'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { sessions, userAuth } from '../persistence/schema.js'
 
-/** A session dies this long after the device last used it. */
 export const IDLE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000
 
-/** A session dies this long after it was created, however active it stays. */
 export const ABSOLUTE_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000
 
 const TOUCH_INTERVAL_MS = 60_000
@@ -58,7 +56,6 @@ export class CredentialStore {
     return row?.passwordHash
   }
 
-  /** Stores the first verifier and issues the claiming device's Session; `undefined` when already claimed. */
   claim(passwordHash: string, now: Date): IssuedSession | undefined {
     const at = now.toISOString()
 
@@ -119,7 +116,6 @@ export class CredentialStore {
       .run()
   }
 
-  /** Removes Sessions past either deadline. Returns how many were swept. */
   prune(now: Date): number {
     return this.#db
       .delete(sessions)

@@ -33,12 +33,10 @@ export class InstallationSettingsStore {
     return row
   }
 
-  /** An installation that never chose a zone reads as UTC. */
   effectiveTimezone(): string {
     return this.read()?.timezone ?? 'UTC'
   }
 
-  /** False, writing nothing, for a zone the platform cannot resolve. */
   setTimezone(timezone: string, now: Date): boolean {
     if (!isResolvableTimezone(timezone)) return false
     const at = now.toISOString()

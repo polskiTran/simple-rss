@@ -31,7 +31,6 @@ export interface NormalizedFeedItem {
 
 export interface ParsedFeedDocument {
   readonly title: string
-  /** The Feed Description, absent when the document declares none. */
   readonly description: string | null
   /** The site the Feed points at, absent when it declares nothing but its own URL. */
   readonly homePageUrl: string | null

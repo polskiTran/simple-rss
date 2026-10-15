@@ -60,7 +60,6 @@ export class Authentication {
     return { claimed: this.#isClaimed(), authenticated: this.authenticate(token) }
   }
 
-  /** Why claiming is blocked, or `undefined`. */
   setupBlocker(): string | undefined {
     if (this.#isClaimed()) return undefined
 
@@ -137,7 +136,6 @@ export class Authentication {
     }
   }
 
-  /** Whether this token is a live session, sliding its idle deadline. */
   authenticate(token: string | undefined): boolean {
     return token ? this.#deps.credentials.touch(token, this.#deps.clock.now()) : false
   }
