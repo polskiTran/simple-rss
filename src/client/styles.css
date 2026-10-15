@@ -1655,8 +1655,9 @@
     color: var(--color-saved);
   }
 
-  /* On a phone Open original and Save are squares in the top bar. */
+  /* On a phone Open original, Discussion and Save are squares in the top bar. */
   .reader-original,
+  .reader-discussion,
   .save-toggle.save-toggle-labelled {
     @media (max-width: 1024px) {
       width: var(--control);
@@ -1720,30 +1721,6 @@
 
   .reader-feed {
     color: var(--color-ink);
-  }
-
-  /* Its own line on a phone, where the meta line stacks; after a dot on a wide screen. */
-  .reader-discussion {
-    &::before {
-      content: '·';
-      margin-inline: 10px;
-      color: var(--color-ink-3);
-
-      @media (max-width: 1024px) {
-        content: none;
-      }
-    }
-
-    a {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-    }
-
-    .icon {
-      width: 14px;
-      height: 14px;
-    }
   }
 
   .reader-truncated,

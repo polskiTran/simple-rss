@@ -162,6 +162,7 @@ function OpenReader({
         <BackButton className="view-back" origin={origin} onBack={onBack} />
         <div className="toolbar-group">
           {item.link ? <OpenOriginal link={item.link} /> : null}
+          {item.discussionUrl ? <DiscussionLink url={item.discussionUrl} /> : null}
           <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} labelled onSaved={onSaved} />
         </div>
       </ChromeToolbar>
@@ -182,7 +183,6 @@ function OpenReader({
               {displayed ? <span>{displayed.content.readingTimeMinutes} min read</span> : null}
               {displayed ? <ReadingNote shown={displayed.source} resolved={source} chosen={viewSource} /> : null}
             </span>
-            {item.discussionUrl ? <DiscussionLink url={item.discussionUrl} /> : null}
           </p>
           {canSwitchSource ? (
             <Choice
@@ -284,16 +284,19 @@ function OpenOriginal({ link }: { link: string }) {
   )
 }
 
-/** The Discussion the Feed declares, named by its host; it leaves, so it opens a new tab marked ↗. */
 function DiscussionLink({ url }: { url: string }) {
   return (
-    <span className="reader-discussion">
-      <a className="link" href={url} target="_blank" rel="noopener noreferrer">
-        Discussion on {new URL(url).hostname}
-        <Icon name="external" />
-        <span className="visually-hidden"> (opens in a new tab)</span>
-      </a>
-    </span>
+    <a
+      className="button reader-discussion"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Discussion"
+      title="Discussion"
+    >
+      <Icon name="chat" />
+      <span className="wide-only">Discussion</span>
+    </a>
   )
 }
 

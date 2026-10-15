@@ -145,7 +145,8 @@ fixed to the bottom edge: the mark without its wordmark, the Digest / Feeds
 switch, then 44px squares for search, Saved and Settings, the current one
 ringed in ink. An opened Feed swaps the mark and the switch for a back square.
 The Reader keeps only the back square, the search square and its toolbar —
-Open original and Save where Saved and Settings stand — so one row holds it
+Open original and Save, and Discussion when the Feed declares one, where Saved
+and Settings stand — so one row holds it
 whole and is focused in the order it is drawn; a search hides the sections
 too. Pressing the search square turns the bar into the search field
 with a back square.
@@ -321,12 +322,14 @@ keep their own widths and Info takes the rest; where the three do not fit on one
 Settings wraps under Cadence. Items follow, grouped by
 day with whole counts.
 
-**Reader.** A toolbar — the way back on the left, Open original ↗ and Save on
-the right — over a 680px column: the title, a meta line of the Feed (a link),
-the day, the minutes to read and the Discussion, the Reading Source switch
+**Reader.** A toolbar — the way back on the left, Open original ↗, Discussion and
+Save on the right — over a 680px column: the title, a meta line of the Feed (a
+link), the day and the minutes to read, the Reading Source switch
 (spanning the column on a phone), then the article.
-The Discussion appears only when the Feed declares one: "Discussion on
-lobste.rs", an underlined link marked ↗ because it leaves for another site.
+The Discussion appears only when the Feed declares one. It is a grey button in
+that toolbar, labelled Discussion beside a chat bubble, and on a phone the same
+square as Open original and Save, the bubble alone, named Discussion. It opens
+in a new tab because it leaves for another site.
 The meta line names the reading only when it is not the one chosen: "Feed
 content for now" while the Original webpage loads or fails, or the one reading
 an item has when the chosen one is missing. Article links are ink and
