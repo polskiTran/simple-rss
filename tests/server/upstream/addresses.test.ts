@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyAddress, isBenchmarkAddress } from '../../../src/server/upstream/addresses.js'
+import { classifyAddress, isBenchmarkIpv4Literal } from '../../../src/server/upstream/addresses.js'
 
 describe('classifyAddress', () => {
   it('accepts ordinary public addresses', () => {
@@ -78,13 +78,13 @@ describe('classifyAddress', () => {
   })
 
   it('recognises only the 198.18.0.0/15 benchmarking range', () => {
-    expect(isBenchmarkAddress('198.18.0.0')).toBe(true)
-    expect(isBenchmarkAddress('198.18.0.1')).toBe(true)
-    expect(isBenchmarkAddress('198.19.255.255')).toBe(true)
-    expect(isBenchmarkAddress('198.17.255.255')).toBe(false)
-    expect(isBenchmarkAddress('198.20.0.0')).toBe(false)
-    expect(isBenchmarkAddress('10.0.0.1')).toBe(false)
-    expect(isBenchmarkAddress('::ffff:198.18.0.1')).toBe(false)
+    expect(isBenchmarkIpv4Literal('198.18.0.0')).toBe(true)
+    expect(isBenchmarkIpv4Literal('198.18.0.1')).toBe(true)
+    expect(isBenchmarkIpv4Literal('198.19.255.255')).toBe(true)
+    expect(isBenchmarkIpv4Literal('198.17.255.255')).toBe(false)
+    expect(isBenchmarkIpv4Literal('198.20.0.0')).toBe(false)
+    expect(isBenchmarkIpv4Literal('10.0.0.1')).toBe(false)
+    expect(isBenchmarkIpv4Literal('::ffff:198.18.0.1')).toBe(false)
   })
 
   it('rejects anything that is not an address at all', () => {

@@ -29,13 +29,7 @@ export function classifyAddress(address: string): AddressClass {
   return 'invalid'
 }
 
-/**
- * 198.18.0.0/15, the RFC 2544 benchmarking range. Some sandboxed dev
- * environments answer every DNS lookup with 198.18.0.1, a proxy rather than
- * a host the operator chose. Only an IPv4 address in this range matches.
- * Mapped and translated forms stay out, so the exemption cannot widen.
- */
-export function isBenchmarkAddress(address: string): boolean {
+export function isBenchmarkIpv4Literal(address: string): boolean {
   if (isIP(address) !== 4) return false
   const bytes = parseIpv4(address)
   if (!bytes) return false

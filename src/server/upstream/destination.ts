@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises'
-import { classifyAddress, isBenchmarkAddress, unbracket, type AddressClass } from './addresses.js'
+import { classifyAddress, isBenchmarkIpv4Literal, unbracket, type AddressClass } from './addresses.js'
 
 /** The signal lets bounded adapters stop waiting at the retrieval deadline. */
 export type ResolveAddresses = (hostname: string, signal: AbortSignal) => Promise<readonly string[]>
@@ -8,10 +8,6 @@ export interface DestinationPolicy {
   readonly resolve: ResolveAddresses
   /** This installation's canonical public origin. */
   readonly self: URL
-  /**
-   * Dev opt-in. When true, 198.18.0.0/15 may be connected to. Absent means
-   * refused. Production never sets this.
-   */
   readonly allowBenchmarkAddresses?: boolean
 }
 
@@ -125,7 +121,7 @@ export async function validateDestination(
 
 function allowsAddress(address: string, classification: AddressClass, policy: DestinationPolicy): boolean {
   if (classification === 'public') return true
-  return policy.allowBenchmarkAddresses === true && isBenchmarkAddress(address)
+  return policy.allowBenchmarkAddresses === true && isBenchmarkIpv4Literal(address)
 }
 
 /** `URL` leaves a trailing dot alone; `example.com.` must not slip past a rule for `example.com`. */
