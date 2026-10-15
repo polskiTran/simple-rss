@@ -152,12 +152,10 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   )
 }
 
-/** `Saved today`, `Saved yesterday`, then `Saved 27 August`. */
 function savedLabel(savedDate: string, today: string): string {
   return `Saved ${relativeDay(savedDate, today)?.toLowerCase() ?? dayOfYear(savedDate, today)}`
 }
 
-/** What an unsave leaves in the list: what happened, and the way back. */
 function UndoLine({ item, onResaved }: { item: LibraryItem; onResaved: () => void }) {
   const [pending, startUndo] = useTransition()
   const [failed, setFailed] = useState(false)

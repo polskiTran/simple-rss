@@ -180,7 +180,6 @@ function FeedDayBox({
   )
 }
 
-/** A Feed back after a Quiet Spell: its Cadence strip, then how long it was away. */
 function QuietSpell({ spell, title }: { spell: DigestReturn; title: string }) {
   const span = spell.quietDays < 60 ? `${spell.quietDays} days` : `${Math.round(spell.quietDays / 30)} months`
   return (

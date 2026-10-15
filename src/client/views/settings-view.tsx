@@ -72,7 +72,6 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   )
 }
 
-/** One preference: what it is and does on the left, its control on the right. */
 function Setting({ label, note, children }: { label: string; note?: string; children: ReactNode }) {
   return (
     <div className="setting">
