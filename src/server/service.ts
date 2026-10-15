@@ -63,12 +63,16 @@ const IDLE_SWEEP_MS = 20
 export async function startService(options: ServiceOptions): Promise<RunningService> {
   const { config } = options
   const logger = options.logger ?? createLogger({ level: config.logLevel })
+  if (config.reservedFetchMode === 'ignored') {
+    logger.warn('ALLOW_RESERVED_FETCH_DESTINATIONS is ignored when NODE_ENV is production')
+  }
   const clock = options.clock ?? systemClock
   const retrieval =
     options.retrieval ??
     createNetworkRetrieval({
       logger,
       self: new URL(config.publicOrigin),
+      allowBenchmarkAddresses: config.reservedFetchMode === 'benchmark',
     })
 
   const startup = compose(options, { logger, clock, retrieval })

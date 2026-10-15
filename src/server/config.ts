@@ -61,6 +61,8 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((value) => value === 'true'),
+  ALLOW_RESERVED_FETCH_DESTINATIONS: z.string().optional(),
+  NODE_ENV: z.string().optional(),
 })
 
 /** The environment, read into the shape the service runs on, with every path absolute. */
@@ -76,8 +78,19 @@ const configSchema = envSchema.transform((env) => {
     setupSecret: env.SETUP_SECRET,
     publicOrigin: env.PUBLIC_ORIGIN,
     trustProxyHeaders: env.TRUST_PROXY_HEADERS,
+    reservedFetchMode: readReservedFetchMode(env),
   }
 })
+
+export type ReservedFetchMode = 'blocked' | 'benchmark' | 'ignored'
+
+export function readReservedFetchMode(env: {
+  readonly ALLOW_RESERVED_FETCH_DESTINATIONS?: string | undefined
+  readonly NODE_ENV?: string | undefined
+}): ReservedFetchMode {
+  if (env.ALLOW_RESERVED_FETCH_DESTINATIONS !== 'true') return 'blocked'
+  return env.NODE_ENV === 'production' ? 'ignored' : 'benchmark'
+}
 
 export type Config = Readonly<z.output<typeof configSchema>>
 

@@ -29,6 +29,17 @@ export function classifyAddress(address: string): AddressClass {
   return 'invalid'
 }
 
+export function isBenchmarkIpv4Literal(address: string): boolean {
+  if (isIP(address) !== 4) return false
+  const bytes = parseIpv4(address)
+  if (!bytes) return false
+  return isBenchmarkIpv4(bytes[0] ?? 0, bytes[1] ?? 0)
+}
+
+function isBenchmarkIpv4(first: number, second: number): boolean {
+  return first === 198 && (second === 18 || second === 19)
+}
+
 /** `[::1]` is the same destination as `::1`; every rule here uses the unbracketed form. */
 export function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
@@ -51,7 +62,7 @@ function classifyIpv4(bytes: Uint8Array): AddressClass {
   if (a === 192 && b === 88 && c === 99) return 'reserved'
   if (a === 198 && b === 51 && c === 100) return 'reserved'
   if (a === 203 && b === 0 && c === 113) return 'reserved'
-  if (a === 198 && (b === 18 || b === 19)) return 'reserved'
+  if (isBenchmarkIpv4(a, b)) return 'reserved'
   if (a >= 224 && a <= 239) return 'multicast'
   // 240/4, including the broadcast address at its top.
   if (a >= 240) return 'reserved'

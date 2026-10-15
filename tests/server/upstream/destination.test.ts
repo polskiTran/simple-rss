@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readReservedFetchMode } from '../../../src/server/config.js'
 import {
   validateDestination as decideDestination,
   type DestinationPolicy,
@@ -18,6 +19,10 @@ function validateDestination(
   policy: Omit<DestinationPolicy, 'self'> & { readonly self?: URL },
 ) {
   return decideDestination(candidate, { ...policy, self: policy.self ?? TEST_SELF }, new AbortController().signal)
+}
+
+function devOptIn(env: { readonly ALLOW_RESERVED_FETCH_DESTINATIONS?: string; readonly NODE_ENV?: string }): boolean {
+  return readReservedFetchMode(env) === 'benchmark'
 }
 
 describe('validateDestination', () => {
@@ -92,6 +97,70 @@ describe('validateDestination', () => {
       code: 'blocked_destination',
     })
     expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('refuses a name that resolves to 198.18.0.1 by default', async () => {
+    await expect(
+      validateDestination('https://feeds.example/rss.xml', {
+        resolve: resolver({ 'feeds.example': ['198.18.0.1'] }),
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'blocked_destination',
+      reason: 'host resolves to a reserved address',
+    })
+  })
+
+  it('allows a name that resolves to 198.18.0.1 when the dev opt-in is set', async () => {
+    await expect(
+      validateDestination('https://feeds.example/rss.xml', {
+        resolve: resolver({ 'feeds.example': ['198.18.0.1'] }),
+        allowBenchmarkAddresses: devOptIn({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'true' }),
+      }),
+    ).resolves.toMatchObject({ ok: true, addresses: ['198.18.0.1'] })
+  })
+
+  it('still refuses 198.18.0.1 when the opt-in is set and NODE_ENV is production', async () => {
+    await expect(
+      validateDestination('https://feeds.example/rss.xml', {
+        resolve: resolver({ 'feeds.example': ['198.18.0.1'] }),
+        allowBenchmarkAddresses: devOptIn({
+          ALLOW_RESERVED_FETCH_DESTINATIONS: 'true',
+          NODE_ENV: 'production',
+        }),
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'blocked_destination',
+      reason: 'host resolves to a reserved address',
+    })
+  })
+
+  it.each([
+    ['10.0.0.1', 'host resolves to a private address'],
+    ['127.0.0.1', 'host resolves to a loopback address'],
+    ['169.254.169.254', 'host resolves to a link-local address'],
+    ['198.51.100.5', 'host resolves to a reserved address'],
+  ])('still refuses %s when the dev opt-in is set', async (address, reason) => {
+    await expect(
+      validateDestination('https://feeds.example/rss.xml', {
+        resolve: resolver({ 'feeds.example': [address] }),
+        allowBenchmarkAddresses: devOptIn({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'true', NODE_ENV: 'development' }),
+      }),
+    ).resolves.toMatchObject({ ok: false, code: 'blocked_destination', reason })
+  })
+
+  it('still refuses a benchmark address mixed with a private one when the opt-in is set', async () => {
+    await expect(
+      validateDestination('https://feeds.example/rss.xml', {
+        resolve: resolver({ 'feeds.example': ['198.18.0.1', '10.0.0.1'] }),
+        allowBenchmarkAddresses: devOptIn({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'true' }),
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'blocked_destination',
+      reason: 'host resolves to a private address',
+    })
   })
 
   it('refuses a name that resolves to a private address', async () => {

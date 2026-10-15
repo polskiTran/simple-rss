@@ -151,7 +151,7 @@ The entered URL is preserved while a validated resolved URL may be recorded for 
 - Five redirects at most
 - Twenty MiB decoded Feed body
 - Redirect destinations revalidated independently
-- No credentials, localhost, private/reserved destinations, or self-reference
+- No credentials, localhost, private/reserved destinations, or self-reference. Outside production, `ALLOW_RESERVED_FETCH_DESTINATIONS=true` may allow the 198.18.0.0/15 benchmarking range and nothing else. Production ignores that variable.
 - No forwarding of browser credentials or cookies
 
 ### Polling
