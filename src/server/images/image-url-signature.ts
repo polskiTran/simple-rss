@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { READER_IMAGE_PATH } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
+import type { VouchedImageUrl } from './image-service.js'
 
 export const READER_IMAGE_URL_LIFETIME_SECONDS = 2 * 86_400
 
@@ -11,7 +12,7 @@ export const IMAGE_URL_KEY_BYTES = 32
 export type SignImageUrl = (url: string) => string
 
 export type VerifiedImageUrl =
-  | { readonly ok: true; readonly url: string }
+  | { readonly ok: true; readonly url: VouchedImageUrl }
   | { readonly ok: false; readonly reason: 'unsigned' | 'expired' | 'tampered' }
 
 export interface ImageUrlSignature {
@@ -61,7 +62,8 @@ export function createImageUrlSignature(options: {
         return { ok: false, reason: 'expired' }
       }
 
-      return { ok: true, url }
+      // SAFETY: url matched the HMAC over this expiry and target.
+      return { ok: true, url: url as VouchedImageUrl }
     },
   }
 }

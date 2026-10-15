@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { IMAGE_CACHE_SECONDS, READER_IMAGE_PATH } from '../../../src/shared/api.js'
+import type { ImageService, VouchedImageUrl } from '../../../src/server/images/image-service.js'
 import { claimedDevice, Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 import { chunkedBody } from '../../support/upstream-fixtures.js'
@@ -140,6 +141,45 @@ async function signedImagePath(user: Device, feedItemId: number): Promise<string
   if (!match?.[1]) throw new Error(`no image reference in the markdown:\n${markdown}`)
   return match[1].replaceAll('\\&', '&').replaceAll('%28', '(').replaceAll('%29', ')')
 }
+
+describe('vouched image URLs', () => {
+  it('accepts only a vouched URL at the image fetch', () => {
+    expectTypeOf<Parameters<ImageService['image']>[0]>().toEqualTypeOf<VouchedImageUrl>()
+    expectTypeOf<string>().not.toMatchTypeOf<VouchedImageUrl>()
+  })
+
+  it('fetches a stored Feed Item image and a correctly signed Reader image, and refuses an arbitrary, unsigned, or tampered target before retrieval', async () => {
+    const arbitrary = 'https://attacker.example/secret.png'
+    const service = await startTestService()
+    service.upstream.stub(ARTICLE_URL, { headers: { 'content-type': 'text/html' }, body: ARTICLE_HTML })
+    service.upstream.stub(IMAGE_URL, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
+    service.upstream.stub(arbitrary, { headers: { 'content-type': 'image/png' }, body: pngBytes() })
+    const { user, withImage } = await imageSetup(service)
+
+    const stored = await user.get(`/api/items/${withImage}/image`)
+    expect(stored.status).toBe(200)
+    expect(new Uint8Array(await stored.arrayBuffer())).toEqual(pngBytes())
+    expect(service.upstream.requestsTo(IMAGE_URL)).toHaveLength(1)
+
+    const unsigned = await user.get(`${READER_IMAGE_PATH}?url=${encodeURIComponent(arbitrary)}`)
+    expect(unsigned.status).toBe(404)
+    expect(service.upstream.requestsTo(arbitrary)).toHaveLength(0)
+    expect(service.upstream.requestsTo(IMAGE_URL)).toHaveLength(1)
+
+    const path = await signedImagePath(user, withImage)
+    const signed = await user.get(path)
+    expect(signed.status).toBe(200)
+    expect(new Uint8Array(await signed.arrayBuffer())).toEqual(pngBytes())
+    expect(service.upstream.requestsTo(IMAGE_URL)).toHaveLength(2)
+
+    const tampered = new URL(path, 'https://reader.test')
+    const sig = tampered.searchParams.get('sig') ?? ''
+    tampered.searchParams.set('sig', (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1))
+    expect((await user.get(`${tampered.pathname}?${tampered.searchParams.toString()}`)).status).toBe(404)
+    expect(service.upstream.requestsTo(IMAGE_URL)).toHaveLength(2)
+    expect(service.upstream.requestsTo(arbitrary)).toHaveLength(0)
+  })
+})
 
 describe('the signed Reader image route', () => {
   it('rewrites extracted images to signed same-origin paths that serve the image', async () => {
