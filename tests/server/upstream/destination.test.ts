@@ -16,9 +16,13 @@ const TEST_SELF = new URL('https://reader.test')
 
 function validateDestination(
   candidate: string | URL,
-  policy: Omit<DestinationPolicy, 'self'> & { readonly self?: URL },
+  policy: Omit<DestinationPolicy, 'canonicalOrigin'> & { readonly canonicalOrigin?: URL },
 ) {
-  return decideDestination(candidate, { ...policy, self: policy.self ?? TEST_SELF }, new AbortController().signal)
+  return decideDestination(
+    candidate,
+    { ...policy, canonicalOrigin: policy.canonicalOrigin ?? TEST_SELF },
+    new AbortController().signal,
+  )
 }
 
 function devOptIn(env: { readonly ALLOW_RESERVED_FETCH_DESTINATIONS?: string; readonly NODE_ENV?: string }): boolean {
@@ -206,7 +210,7 @@ describe('validateDestination', () => {
   it('refuses the installation asking itself for a page', async () => {
     const policy = {
       resolve: resolver({ 'reader.example.com': ['93.184.216.34'] }),
-      self: new URL('https://reader.example.com'),
+      canonicalOrigin: new URL('https://reader.example.com'),
     }
 
     await expect(validateDestination('https://reader.example.com/api/meta', policy)).resolves.toMatchObject({
@@ -223,7 +227,7 @@ describe('validateDestination', () => {
     await expect(
       validateDestination('https://reader.example.com./api/meta', {
         resolve: resolver({ 'reader.example.com': ['93.184.216.34'] }),
-        self: new URL('https://reader.example.com'),
+        canonicalOrigin: new URL('https://reader.example.com'),
       }),
     ).resolves.toMatchObject({ ok: false, code: 'blocked_destination' })
   })
@@ -232,7 +236,7 @@ describe('validateDestination', () => {
     await expect(
       validateDestination('https://reader.example.com:8443/feed.xml', {
         resolve: resolver({ 'reader.example.com': ['93.184.216.34'] }),
-        self: new URL('https://reader.example.com'),
+        canonicalOrigin: new URL('https://reader.example.com'),
       }),
     ).resolves.toMatchObject({ ok: true })
   })

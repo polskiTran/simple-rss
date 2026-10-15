@@ -20,7 +20,7 @@ interface Harness {
 interface HarnessOptions {
   readonly addresses?: Record<string, readonly string[]>
   readonly resolve?: ResolveAddresses
-  readonly self?: URL
+  readonly canonicalOrigin?: URL
   readonly maxConcurrent?: number
   readonly maxQueued?: number
   readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
@@ -35,7 +35,7 @@ function harness(options: HarnessOptions = {}): Harness {
     httpClient: upstream.client,
     logger: createLogger({ level: 'debug', sink: (record) => logs.push(record) }),
     resolve: options.resolve ?? (async (hostname) => addresses[hostname] ?? []),
-    self: options.self ?? new URL('https://reader.test'),
+    canonicalOrigin: options.canonicalOrigin ?? new URL('https://reader.test'),
     ...(options.maxConcurrent === undefined
       ? {}
       : { capacity: { maxConcurrent: options.maxConcurrent, maxQueued: options.maxQueued ?? 0 } }),
@@ -229,7 +229,7 @@ describe('retrieveBytes', () => {
       },
       logger: createLogger({ level: 'error', sink: () => {} }),
       resolve: async () => ['93.184.216.34'],
-      self: new URL('https://reader.test'),
+      canonicalOrigin: new URL('https://reader.test'),
     })
 
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))).resolves.toMatchObject({
@@ -773,7 +773,7 @@ describe('phase log', () => {
       },
       logger: createLogger({ level: 'debug', sink: (record) => logs.push(record) }),
       resolve: async () => ['93.184.216.34'],
-      self: new URL('https://reader.test'),
+      canonicalOrigin: new URL('https://reader.test'),
     })
 
     await retrieval.retrieveBytes(feedRequest('https://example.com/feed.xml'))
