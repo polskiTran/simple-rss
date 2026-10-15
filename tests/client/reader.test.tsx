@@ -136,14 +136,37 @@ describe('Reader View', () => {
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
   })
 
-  it('links the Discussion the Feed declares, named by its host, in a new tab', async () => {
+  it('puts Discussion in the action row when the Feed declares one', async () => {
     reading().on('GET /api/items/3', { body: { ...ITEM, discussionUrl: 'https://news.ycombinator.com/item?id=1' } })
     render(<App />)
 
-    const discussion = await screen.findByRole('link', { name: /^Discussion on news\.ycombinator\.com/ })
+    const discussion = await screen.findByRole('link', { name: 'Discussion' })
+    const row = discussion.closest('.toolbar-group')
+    if (!row) throw new Error('Discussion is not in the action row')
+
     expect(discussion.getAttribute('href')).toBe('https://news.ycombinator.com/item?id=1')
     expect(discussion.getAttribute('target')).toBe('_blank')
     expect(discussion.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(discussion.getAttribute('aria-label')).toBe('Discussion')
+    expect(discussion.getAttribute('title')).toBe('Discussion')
+    expect(discussion.querySelector('.wide-only')?.textContent).toBe('Discussion')
+    expect(discussion.querySelectorAll('svg.icon')).toHaveLength(1)
+    expect([...row.querySelectorAll('a, button')].map((control) => control.getAttribute('aria-label'))).toEqual([
+      'Open original',
+      'Discussion',
+      'Save First light',
+    ])
+    expect(screen.queryByRole('link', { name: /Discussion on/ })).toBeNull()
+    expect(screen.getByText('Saturday 8 August').closest('p')?.textContent).not.toContain('Discussion')
+  })
+
+  it('omits Discussion when the Feed declares none', async () => {
+    reading()
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'First light' })).toBeDefined()
+    expect(screen.queryByRole('link', { name: 'Discussion' })).toBeNull()
+    expect(screen.queryByText(/Discussion on/)).toBeNull()
   })
 
   it('reads Feed Content without claiming a parse failure when the Original webpage has no link', async () => {
