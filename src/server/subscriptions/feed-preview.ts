@@ -10,6 +10,7 @@ import { trailingDayKeys } from '../digest/cadence-window.js'
 import { declaredFeeds } from '../ingestion/declared-feeds.js'
 import { feedDomain } from '../ingestion/feed-window.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
+import { feedItemChronologyAt } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { RETRIEVAL_PROFILES, type Retrieval, type RetrievalBytes } from '../upstream/retrieval.js'
 import type { FailedPoll } from './feed-availability.js'
@@ -17,8 +18,6 @@ import { readFeed, type FeedAnswer } from './feed-poll.js'
 import { canonicalFeedUrl, subscribedFeedId } from './new-subscription.js'
 
 const MAX_DECLARED_FEEDS = 5
-
-const DAY_MS = 24 * 60 * 60 * 1_000
 
 const FEED_ROOT_NAMES = ['rdf:RDF', 'feed', 'rss'] as const
 
@@ -91,15 +90,12 @@ export class FeedPreview {
   }
 
   /**
-   * Names the Feed as ingestion would and orders its Feed Items by the stored
-   * chronology: publication time, unless missing or more than a day past now —
-   * when the items would be first seen — and then now. Cadence counts them by
+   * Names the Feed as ingestion would. Cadence counts Feed Items by
    * installation-timezone day over the strip's thirty days.
    */
   #summarise(feedUrl: string, answer: Extract<FeedAnswer, { kind: 'parsed' }>, now: Date): PreviewedFeed {
     const { retrieved, parsed } = answer
     const seenAt = now.toISOString()
-    const latest = new Date(now.getTime() + DAY_MS).toISOString()
     // One Feed Item per identity, as storing the window would keep: the last
     // occurrence wins. Ties fall as stored ones do, the later in the document first.
     const items = [...new Map(parsed.items.map((item) => [item.dedupeKey, item])).values()]
@@ -107,7 +103,7 @@ export class FeedPreview {
       .map((item) => ({
         title: item.title ?? 'Untitled',
         publishedAt: item.publishedAt,
-        chronologyAt: item.publishedAt !== null && item.publishedAt <= latest ? item.publishedAt : seenAt,
+        chronologyAt: feedItemChronologyAt(item.publishedAt, seenAt),
       }))
       .sort((left, right) => right.chronologyAt.localeCompare(left.chronologyAt))
 
