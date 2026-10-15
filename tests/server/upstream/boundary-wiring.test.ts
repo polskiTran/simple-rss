@@ -30,6 +30,61 @@ describe('the service boundary', () => {
     expect(service.upstream.requests).toHaveLength(0)
   })
 
+  it('refuses 198.18.0.1 unless the dev opt-in is on outside production', async () => {
+    const blocked = await startTestService()
+    await expect(
+      blocked.retrieval.retrieveBytes({ url: 'http://198.18.0.1/feed.xml', operation: 'feed' }),
+    ).resolves.toMatchObject({ ok: false, code: 'blocked_destination', reason: 'reserved address' })
+
+    const allowed = await startTestService({
+      env: { ALLOW_RESERVED_FETCH_DESTINATIONS: 'true', NODE_ENV: 'development' },
+    })
+    allowed.upstream.stub('http://198.18.0.1/feed.xml', {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: '<rss></rss>',
+    })
+    await expect(
+      allowed.retrieval.retrieveBytes({ url: 'http://198.18.0.1/feed.xml', operation: 'feed' }),
+    ).resolves.toMatchObject({ ok: true })
+    expect(allowed.logs.map((record) => record.message)).not.toContain(
+      'ALLOW_RESERVED_FETCH_DESTINATIONS is ignored when NODE_ENV is production',
+    )
+
+    const production = await startTestService({
+      env: { ALLOW_RESERVED_FETCH_DESTINATIONS: 'true', NODE_ENV: 'production' },
+    })
+    await expect(
+      production.retrieval.retrieveBytes({ url: 'http://198.18.0.1/feed.xml', operation: 'feed' }),
+    ).resolves.toMatchObject({ ok: false, code: 'blocked_destination', reason: 'reserved address' })
+    const warnings = production.logs.filter(
+      (record) => record.message === 'ALLOW_RESERVED_FETCH_DESTINATIONS is ignored when NODE_ENV is production',
+    )
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        message: 'ALLOW_RESERVED_FETCH_DESTINATIONS is ignored when NODE_ENV is production',
+      }),
+    ])
+  })
+
+  it('still refuses other reserved destinations when the dev opt-in is on', async () => {
+    const service = await startTestService({
+      env: { ALLOW_RESERVED_FETCH_DESTINATIONS: 'true', NODE_ENV: 'development' },
+    })
+
+    for (const url of [
+      'http://10.0.0.1/feed.xml',
+      'http://127.0.0.1/feed.xml',
+      'http://169.254.169.254/latest/meta-data/',
+    ]) {
+      await expect(service.retrieval.retrieveBytes({ url, operation: 'feed' })).resolves.toMatchObject({
+        ok: false,
+        code: 'blocked_destination',
+      })
+    }
+    expect(service.upstream.requests).toHaveLength(0)
+  })
+
   it('refuses a private destination even though nothing configured said so', async () => {
     const service = await startTestService()
 

@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises'
-import { classifyAddress, unbracket } from './addresses.js'
+import { classifyAddress, isBenchmarkAddress, unbracket, type AddressClass } from './addresses.js'
 
 /** The signal lets bounded adapters stop waiting at the retrieval deadline. */
 export type ResolveAddresses = (hostname: string, signal: AbortSignal) => Promise<readonly string[]>
@@ -8,6 +8,11 @@ export interface DestinationPolicy {
   readonly resolve: ResolveAddresses
   /** This installation's canonical public origin. */
   readonly self: URL
+  /**
+   * Dev opt-in. When true, 198.18.0.0/15 may be connected to. Absent means
+   * refused. Production never sets this.
+   */
+  readonly allowBenchmarkAddresses?: boolean
 }
 
 /** Asks for every address, not just the first: one private answer must refuse the name. */
@@ -24,8 +29,9 @@ export interface AllowedDestination {
   /** The name asked of the resolver, without a trailing dot or brackets. */
   readonly hostname: string
   /**
-   * Every address the name answered with, each judged public — the only
-   * addresses the adapter's socket may connect to for this hop.
+   * Every address the name answered with. Each one is public, or in
+   * 198.18.0.0/15 when the dev opt-in is on. The socket may connect only to
+   * these addresses for this hop.
    */
   readonly addresses: readonly string[]
 }
@@ -48,8 +54,10 @@ const BLOCKED_SUFFIXES = ['localhost', 'local', 'internal', 'arpa']
 /**
  * Validates one URL before any connection: scheme, credentials, name, then
  * every resolved address must be public — a mixed answer is the shape of a
- * rebinding attempt. This is the hop's only resolution: the socket is pinned
- * to the approved addresses. Each redirect hop is validated by a separate call.
+ * rebinding attempt. The dev opt-in may also accept 198.18.0.0/15, and no
+ * other non-public range. This is the hop's only resolution: the socket is
+ * pinned to the approved addresses. Each redirect hop is validated by a
+ * separate call.
  */
 export async function validateDestination(
   candidate: string | URL,
@@ -86,7 +94,7 @@ export async function validateDestination(
 
   const literal = classifyAddress(hostname)
   if (literal !== 'invalid') {
-    return literal === 'public'
+    return allowsAddress(hostname, literal, policy)
       ? { ok: true, url, hostname, addresses: [hostname] }
       : { ok: false, code: 'blocked_destination', reason: `${literal} address` }
   }
@@ -107,12 +115,17 @@ export async function validateDestination(
 
   for (const address of addresses) {
     const classification = classifyAddress(address)
-    if (classification !== 'public') {
+    if (!allowsAddress(address, classification, policy)) {
       return { ok: false, code: 'blocked_destination', reason: `host resolves to a ${classification} address` }
     }
   }
 
   return { ok: true, url, hostname, addresses }
+}
+
+function allowsAddress(address: string, classification: AddressClass, policy: DestinationPolicy): boolean {
+  if (classification === 'public') return true
+  return policy.allowBenchmarkAddresses === true && isBenchmarkAddress(address)
 }
 
 /** `URL` leaves a trailing dot alone; `example.com.` must not slip past a rule for `example.com`. */

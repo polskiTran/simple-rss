@@ -48,6 +48,7 @@ export async function bootService({
       resolve: upstream.resolve,
       logger: options.logger,
       self: new URL(config.publicOrigin),
+      allowBenchmarkAddresses: config.reservedFetchMode === 'benchmark',
     })
   const service = await startService({ ...options, config, port: 0, retrieval: boundary })
   return { ...service, config, retrieval: boundary }

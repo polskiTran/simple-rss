@@ -52,6 +52,8 @@ pnpm test:browser # real Chromium against the built client
 pnpm test:smoke   # builds the image and exercises the container (needs Docker)
 ```
 
+Some sandboxes resolve every hostname to `198.18.0.1`. Set `ALLOW_RESERVED_FETCH_DESTINATIONS=true` so feed fetches may use the `198.18.0.0/15` benchmarking range. No other private or reserved range is allowed. When `NODE_ENV` is `production`, the server ignores the variable and logs a warning at startup.
+
 [Deployment, configuration, and operational commands](docs/DEPLOYMENT.md).
 
 ## Domain and decisions

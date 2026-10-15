@@ -114,4 +114,21 @@ describe('loadConfig', () => {
   it('rejects an unrecognised forwarding setting rather than guessing which way it meant', () => {
     expect(() => loadConfig({ TRUST_PROXY_HEADERS: 'yes' })).toThrow(/TRUST_PROXY_HEADERS/)
   })
+
+  it('keeps reserved fetch destinations blocked unless the variable is exactly true', () => {
+    expect(loadConfig({}).reservedFetchMode).toBe('blocked')
+    expect(loadConfig({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'TRUE' }).reservedFetchMode).toBe('blocked')
+    expect(loadConfig({ ALLOW_RESERVED_FETCH_DESTINATIONS: '1' }).reservedFetchMode).toBe('blocked')
+    expect(loadConfig({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'false' }).reservedFetchMode).toBe('blocked')
+  })
+
+  it('allows the benchmarking range only outside production', () => {
+    expect(loadConfig({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'true' }).reservedFetchMode).toBe('benchmark')
+    expect(loadConfig({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'true', NODE_ENV: 'development' }).reservedFetchMode).toBe(
+      'benchmark',
+    )
+    expect(loadConfig({ ALLOW_RESERVED_FETCH_DESTINATIONS: 'true', NODE_ENV: 'production' }).reservedFetchMode).toBe(
+      'ignored',
+    )
+  })
 })

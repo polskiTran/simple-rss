@@ -61,6 +61,13 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((value) => value === 'true'),
+  /**
+   * Exact opt-in. Any other value, including empty, stays off. Read here so
+   * the destination check never sees the raw variable.
+   */
+  ALLOW_RESERVED_FETCH_DESTINATIONS: z.string().optional(),
+  /** Only `production` disables the opt-in. Other values, including unset, do not. */
+  NODE_ENV: z.string().optional(),
 })
 
 /** The environment, read into the shape the service runs on, with every path absolute. */
@@ -76,8 +83,25 @@ const configSchema = envSchema.transform((env) => {
     setupSecret: env.SETUP_SECRET,
     publicOrigin: env.PUBLIC_ORIGIN,
     trustProxyHeaders: env.TRUST_PROXY_HEADERS,
+    reservedFetchMode: readReservedFetchMode(env),
   }
 })
+
+/**
+ * What `ALLOW_RESERVED_FETCH_DESTINATIONS=true` means for this process.
+ * `benchmark` may connect to 198.18.0.0/15. `ignored` means the variable was
+ * set under production and must be warned about, not applied. Everything else
+ * is `blocked`.
+ */
+export type ReservedFetchMode = 'blocked' | 'benchmark' | 'ignored'
+
+export function readReservedFetchMode(env: {
+  readonly ALLOW_RESERVED_FETCH_DESTINATIONS?: string | undefined
+  readonly NODE_ENV?: string | undefined
+}): ReservedFetchMode {
+  if (env.ALLOW_RESERVED_FETCH_DESTINATIONS !== 'true') return 'blocked'
+  return env.NODE_ENV === 'production' ? 'ignored' : 'benchmark'
+}
 
 export type Config = Readonly<z.output<typeof configSchema>>
 
