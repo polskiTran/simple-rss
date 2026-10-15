@@ -55,7 +55,6 @@ function wayBack() {
   return way
 }
 
-/** The scope the results' switch holds. */
 function pressedScope() {
   const scopes = screen.getByRole('group', { name: 'Search in' })
   return within(scopes)

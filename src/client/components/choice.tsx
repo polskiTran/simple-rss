@@ -7,7 +7,6 @@ interface ChoiceOption<Value extends string> {
 }
 
 interface ChoiceProps<Value extends string> {
-  /** Names the group for assistive technology; the segments name the values. */
   readonly label: string
   readonly options: readonly ChoiceOption<Value>[]
   readonly value: NoInfer<Value>

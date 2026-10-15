@@ -24,7 +24,6 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
 
-/** The site's address finds the Feeds it declares; the second is chosen and subscribed to. */
 async function subscribeFromSite(page: Page, installation: Installation): Promise<void> {
   await claimToFeeds(page, installation)
   await page.getByRole('button', { name: 'Add feed' }).click()

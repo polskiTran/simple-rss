@@ -13,7 +13,6 @@ interface CadenceColumn {
   readonly monthLabel: string | undefined
 }
 
-/** What a Feed's Info panel says about its 26 weeks. */
 interface CadenceStats {
   readonly total: number
   /** Undefined when nothing was published. */
@@ -55,7 +54,6 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
     })
   }
 
-  // A label where a column opens a month, never within six columns of the last.
   let lastLabelled: number | undefined
   for (const [index, column] of columns.entries()) {
     const opening = column.cells[0]?.date
@@ -70,7 +68,6 @@ export function cadenceGrid(days: readonly CadenceObservation[]): CadenceGrid {
   return { columns, stats: statsOf(days) }
 }
 
-/** Screen-reader label: `3 items on 3 June 2026`. */
 export function cadenceDayLabel(cell: CadenceCell): string {
   return `${counted(cell.count, 'item')} on ${fullDate(cell.date)}`
 }
@@ -85,7 +82,6 @@ function statsOf(days: readonly CadenceObservation[]): CadenceStats {
     byWeekday[day] = (byWeekday[day] ?? 0) + count
   }
   const busiest = byWeekday.indexOf(Math.max(...byWeekday))
-  // Any day of the busiest weekday names it.
   const busiestDay = days.find(({ date }) => mondayFirst(date) === busiest)
 
   let quiet = 0

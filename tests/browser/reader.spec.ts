@@ -426,8 +426,6 @@ test.describe('Reader View at phone width', () => {
     await expect(back).toHaveCount(1)
     await expect(back).toHaveClass(/chrome-back/)
 
-    // One top bar: the back square, then search, Open original and Save, drawn
-    // and focused in that order.
     const topBar = [
       back,
       page.getByRole('button', { name: 'Search' }),

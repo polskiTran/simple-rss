@@ -27,7 +27,6 @@ const ITEMS = feedItems({ items: [feedItemRow({ feedItemId: 12 }), JUNE_LETTER] 
 /** Today's page alone, with June waiting behind Show more. */
 const TODAY_ONLY = feedItems({ items: [feedItemRow({ feedItemId: 12 })], nextFrom: '2026-06-03' })
 
-/** Field Notes opened, its detail and first page of items answered. */
 function feedApi(items = ITEMS) {
   return stubApi().on('GET /api/feeds/1', { body: DETAIL }).on('GET /api/feeds/1/items', { body: items })
 }
@@ -38,7 +37,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-/** The value beside a label in the Feed's Info panel. */
 function infoValue(label: string): string | null | undefined {
   return screen.getByText(label).nextElementSibling?.textContent
 }

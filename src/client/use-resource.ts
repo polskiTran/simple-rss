@@ -13,19 +13,14 @@ export type Resource<T> =
   | { readonly kind: 'unreachable'; readonly error: unknown }
 
 interface ResourceControls<T> {
-  /** Loads again, keeping the value in view until the answer; the way back from a failed load. */
   retry(): void
-  /** Patches the value in view — loaded, or still showing while the next load answers. */
   set(update: (current: T) => T): void
 }
 
-/** How asking for the next page went: not yet, under way, or refused. */
 export type OlderState = 'idle' | 'loading' | 'failed'
 
 interface PagedControls<T> extends ResourceControls<T> {
-  /** Asks for the page at `cursor` and appends it to the value it was asked from. */
   loadMore(cursor: string): void
-  /** How the latest `loadMore` on the value in view went. */
   readonly older: OlderState
 }
 
@@ -94,7 +89,6 @@ function failureKind(cause: unknown): 'unreachable' | 'unavailable' {
   return cause instanceof TypeError ? 'unreachable' : 'unavailable'
 }
 
-/** The value a view can show right now: the loaded one, or the one a reload is replacing. */
 export function valueInView<T>(resource: Resource<T>): T | undefined {
   if (resource.kind === 'loaded') return resource.value
   if (resource.kind === 'loading') return resource.previous
@@ -103,7 +97,6 @@ export function valueInView<T>(resource: Resource<T>): T | undefined {
 
 interface Held<T> {
   readonly resource: Resource<T>
-  /** Which load the value in view came from; it changes only when a load answers. */
   readonly load: number
 }
 
@@ -128,7 +121,6 @@ function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>) {
     return () => request.abort()
   }, [key, attempt])
 
-  /** Patches the value in view, or — given a load — only if the value in view still came from it. */
   const patch = (from: number | undefined, update: (current: T) => T) =>
     setHeld((current) => {
       if (from !== undefined && current.load !== from) return current

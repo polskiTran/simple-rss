@@ -7,7 +7,6 @@ interface ActionDialogProps {
   readonly open: boolean
   readonly title: string
   readonly description?: string | undefined
-  /** The control that opens the dialog; focus returns to it on close. */
   readonly trigger: ReactElement
   readonly children: ReactNode
   onOpenChange(open: boolean): void

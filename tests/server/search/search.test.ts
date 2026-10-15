@@ -44,7 +44,6 @@ async function subscribed(user: Device, service: TestService, xml: string, url: 
 
 type Answer<K extends SearchScope['kind']> = Extract<SearchResults, { scope: K }>
 
-/** An answer takes the shape of its scope; the default is everywhere. */
 function search(user: Device, query: string): Promise<Answer<'everywhere'>>
 function search<K extends SearchScope['kind']>(
   user: Device,

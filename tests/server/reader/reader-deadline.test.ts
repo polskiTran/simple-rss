@@ -111,7 +111,6 @@ describe('the Reader budget', () => {
   })
 
   it('expires an operation still queued for a retrieval slot with the same contract', async () => {
-    // One Reader slot, so the second Original webpage waits in the queue.
     const upstream = new UpstreamFixtures()
     const retrieval = createRetrieval({
       httpClient: upstream.client,

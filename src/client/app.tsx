@@ -22,14 +22,11 @@ export function App() {
   const { location } = navigation
   const gate = useAccess()
   const open = gate.access.kind === 'open'
-  // The way back from a nested screen — the one its view and the phone bar both offer.
   const back = open && (location.screen === 'feed' || location.screen === 'reader') ? location.origin : undefined
   const page = useRef<HTMLElement>(null)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null)
   useArrival(navigation.arrival, page)
 
-  // The screen decides the chrome: a phone hides the sections in the Reader and
-  // a search, and leads with a back square on nested screens.
   return (
     <div className="app" data-screen={open ? location.screen : 'gate'}>
       <header className="chrome">

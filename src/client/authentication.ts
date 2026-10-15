@@ -15,7 +15,6 @@ type Access =
 
 export interface Gate {
   readonly access: Access
-  /** Adopts the status a claim, sign-in, or password change just returned. */
   adopt(status: AuthStatus): void
   recheck(): void
 }

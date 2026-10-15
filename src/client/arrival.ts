@@ -1,7 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import type { Arrival } from './routing.js'
 
-/** Names the screen in the tab and the window list: `Digest — simple`, or `simple` until its name loads. */
 export function useScreenTitle(name: string | undefined) {
   useEffect(() => {
     document.title = name ? `${name} — simple` : 'simple'

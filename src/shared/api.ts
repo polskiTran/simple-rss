@@ -26,7 +26,6 @@ export type ReaderDeadlineStage = z.infer<typeof readerDeadlineStageSchema>
  * is not listed here, and the client can match on nothing else.
  */
 export const apiErrorCodeSchema = z.enum([
-  // Anywhere under /api
   'not_found',
   'internal_error',
   'unavailable',
@@ -34,13 +33,11 @@ export const apiErrorCodeSchema = z.enum([
   'forbidden_origin',
   'invalid_request',
   'invalid_cursor',
-  // Authentication and installation preferences
   'already_claimed',
   'setup_unavailable',
   'invalid_credentials',
   'too_many_attempts',
   'unknown_timezone',
-  // Subscriptions and Feed retrieval
   'invalid_feed_url',
   'duplicate_subscription',
   'refresh_rate_limited',
@@ -53,7 +50,6 @@ export const apiErrorCodeSchema = z.enum([
   'malformed_opml',
   'unsupported_opml',
   'too_many_feeds',
-  // Reader View over the Original webpage
   'no_original_link',
   'article_unreadable',
   'article_deadline_exceeded',
@@ -64,7 +60,6 @@ export const apiErrorCodeSchema = z.enum([
   'article_too_large',
   'article_timeout',
   'article_body_timeout',
-  // Image proxy
   'image_unavailable',
   'image_busy',
   'image_rate_limited',
@@ -79,7 +74,6 @@ export const apiErrorSchema = z.object({
     stage: readerDeadlineStageSchema.optional(),
   }),
 })
-/** The body of every API refusal. */
 export type ApiErrorBody = z.infer<typeof apiErrorSchema>
 
 export const MIN_PASSWORD_LENGTH = 12
@@ -90,7 +84,6 @@ const MAX_PASSWORD_LENGTH = 512
 
 const utf8 = new TextEncoder()
 
-/** Whether a password is short enough, in UTF-8 bytes, to hash. */
 export function fitsPasswordBytes(password: string): boolean {
   return utf8.encode(password).length <= MAX_PASSWORD_BYTES
 }
@@ -181,7 +174,6 @@ export const pollingScheduleSchema = z.object({
 })
 export type PollingSchedule = z.infer<typeof pollingScheduleSchema>
 
-/** A Feed or Feed Item identifier as it arrives in a path or query string. */
 export const idParameterSchema = z
   .string()
   .regex(/^[1-9]\d*$/)
@@ -288,7 +280,6 @@ const subscriptionSummarySchema = feedSummarySchema.extend({
 })
 export type SubscriptionSummary = z.infer<typeof subscriptionSummarySchema>
 
-/** The address the Add feed dialog previews: a Feed, or a web page declaring some. */
 export const feedPreviewRequestSchema = createSubscriptionRequestSchema
 export type FeedPreviewRequest = z.infer<typeof feedPreviewRequestSchema>
 
@@ -657,13 +648,6 @@ export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSche
 const searchItemsSchema = z.array(searchResultSchema)
 const searchJumpToSchema = z.array(searchSubscriptionMatchSchema)
 
-/**
- * The answer carries only what its scope can hold: the jump-to group
- * everywhere and on the Feeds screen, ranked Feed Items everywhere else, and
- * the effective title of the Feed a Feed-scoped search answered from, so the
- * surface can name it. Every answer carries the installation-timezone `today`
- * its items' days are named against.
- */
 export const searchResultsSchema = z.discriminatedUnion('scope', [
   z.object({
     scope: z.literal('everywhere'),

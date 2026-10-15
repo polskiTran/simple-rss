@@ -147,7 +147,6 @@ async function stop(service: BootedService): Promise<void> {
   if (index >= 0) running.splice(index, 1)
 }
 
-/** Path to the database file a harness created, for direct SQLite assertions. */
 export function databasePathOf(harness: TestService): string {
   return join(harness.dataDir, DATABASE_FILE)
 }

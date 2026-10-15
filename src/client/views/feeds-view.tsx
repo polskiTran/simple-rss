@@ -49,7 +49,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     } catch {}
   }
 
-  // One round of polling: the list read again.
   const poll = useEffectEvent(async (signal: AbortSignal) => {
     try {
       const { subscriptions } = await fetchSubscriptions(signal)

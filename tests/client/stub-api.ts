@@ -70,7 +70,6 @@ export interface StubbedRequest {
   readonly body: unknown
 }
 
-/** A success carries the route's answer; a refusal carries the API's error body. */
 export type Reply<T> =
   | { readonly status?: 200 | 201; readonly body: T; readonly headers?: Record<string, string> }
   | { readonly status: number; readonly body?: ApiErrorBody; readonly headers?: Record<string, string> }

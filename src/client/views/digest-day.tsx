@@ -25,7 +25,6 @@ interface DigestDayProps {
   onSaved(feedItemId: number, saved: boolean): void
 }
 
-/** One Feed's items on one day, newest first. */
 interface FeedDay {
   readonly feedId: number
   readonly title: string
@@ -33,10 +32,6 @@ interface FeedDay {
   readonly quiet: DigestReturn | undefined
 }
 
-/**
- * One day of the Digest: a box for each Feed that published, the most recent
- * first, under the day's Feeds as chips — pressing one shows that Feed alone.
- */
 export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DigestDayProps) {
   const [only, setOnly] = useState<number>()
   const feeds = feedDaysOf(group)

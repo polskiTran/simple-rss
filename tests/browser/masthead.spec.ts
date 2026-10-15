@@ -10,7 +10,6 @@ async function claim(page: Page, installation: Installation): Promise<void> {
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 }
 
-/** The glint lifts each cell's ink through `filter`; at rest every cell has none. */
 async function glintFrame(page: Page, scope = '.chrome'): Promise<string[]> {
   return page.$$eval(`${scope} .wordmark-cell`, (cells) => cells.map((cell) => getComputedStyle(cell).filter))
 }

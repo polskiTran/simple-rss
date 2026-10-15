@@ -49,7 +49,6 @@ const FEED = {
   readingSource: 'original-webpage',
 } as const satisfies Partial<FeedDetail>
 
-/** A row of the Feeds list. */
 export const subscription = (overrides: Partial<SubscriptionSummary> = {}): SubscriptionSummary => ({
   ...FEED,
   subscribedAt: '2026-08-01T09:00:00.000Z',
@@ -58,7 +57,6 @@ export const subscription = (overrides: Partial<SubscriptionSummary> = {}): Subs
   ...overrides,
 })
 
-/** Field Notes as the Add feed dialog previews it, before it is recorded: one item, at noon on the fixtures' day. */
 export const feedPreview = (overrides: Partial<FeedPreview> = {}): FeedPreview => ({
   feedUrl: FEED.enteredUrl,
   title: FEED.title,
@@ -71,7 +69,6 @@ export const feedPreview = (overrides: Partial<FeedPreview> = {}): FeedPreview =
   ...overrides,
 })
 
-/** One item on an opened Feed's page. */
 export const feedItemRow = (overrides: Partial<FeedItemRow> = {}): FeedItemRow => ({
   feedItemId: 3,
   title: 'First light',
@@ -98,7 +95,6 @@ export const feedDetail = (overrides: Partial<FeedDetail> = {}): FeedDetail => (
   ...overrides,
 })
 
-/** A page of an opened Feed's items: by default First light alone, and nothing older. */
 export const feedItems = (overrides: Partial<FeedItems> = {}): FeedItems => ({
   items: [feedItemRow()],
   nextFrom: null,
@@ -120,7 +116,6 @@ export const digestItem = (overrides: Partial<DigestItem> = {}): DigestItem => (
   ...overrides,
 })
 
-/** A day of the Digest; Today unless told otherwise. */
 export const digestGroup = (overrides: Partial<DigestGroup> = {}): DigestGroup => ({
   date: TODAY,
   items: [digestItem()],
@@ -128,7 +123,6 @@ export const digestGroup = (overrides: Partial<DigestGroup> = {}): DigestGroup =
   ...overrides,
 })
 
-/** One Digest page: by default today alone, holding First light, and nothing older. */
 export const digest = (overrides: Partial<Digest> = {}): Digest => ({
   today: TODAY,
   groups: [digestGroup()],
@@ -176,10 +170,6 @@ export const libraryItem = (overrides: Partial<LibraryItem> = {}): LibraryItem =
   ...overrides,
 })
 
-/**
- * A Library page: by default two saves — First light today, and A June letter
- * from The Slow Press saved on 28 July — and nothing further.
- */
 export const library = (overrides: Partial<Library> = {}): Library => {
   const items = overrides.items ?? [
     libraryItem(),

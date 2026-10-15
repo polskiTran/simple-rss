@@ -252,10 +252,6 @@ export const test = base.extend<InstallationOptions & { installation: Installati
 
 export { expect } from '@playwright/test'
 
-/**
- * Adds a Feed by hand as the User does: the address pasted, which looks it up
- * at once, then Subscribe once the preview has a Feed chosen.
- */
 export async function addFeed(page: Page, url: string): Promise<void> {
   await page.getByRole('button', { name: 'Add feed' }).click()
   const dialog = page.getByRole('dialog', { name: 'Add feed' })
