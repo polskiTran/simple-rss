@@ -297,13 +297,17 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
 
   const queueStartedAt = performance.now()
   for (const gate of context.gates) {
-    if (!(await gate.enter(controller.signal))) {
-      phases.queueMs = elapsedMs(queueStartedAt)
-      return abandoned
-        ? fail(abandoned, `gave up waiting for a retrieval slot`)
-        : fail('busy', 'no retrieval slot available')
+    switch (await gate.enter(controller.signal)) {
+      case 'entered':
+        entered += 1
+        break
+      case 'full':
+      case 'aborted':
+        phases.queueMs = elapsedMs(queueStartedAt)
+        return abandoned
+          ? fail(abandoned, `gave up waiting for a retrieval slot`)
+          : fail('busy', 'no retrieval slot available')
     }
-    entered += 1
   }
   phases.queueMs = elapsedMs(queueStartedAt)
 
@@ -583,10 +587,12 @@ function describe(cause: unknown): string {
   return 'upstream request failed'
 }
 
+type GateAdmission = 'entered' | 'full' | 'aborted'
+
 class ConcurrencyGate {
   readonly #limit: number
   readonly #queueLimit: number
-  readonly #waiting: Array<(granted: boolean) => void> = []
+  readonly #waiting: Array<(admission: GateAdmission) => void> = []
   #active = 0
 
   constructor({ maxConcurrent, maxQueued }: RetrievalCapacity) {
@@ -602,22 +608,22 @@ class ConcurrencyGate {
     this.#queueLimit = maxQueued
   }
 
-  /** Resolves true holding a slot; false when full or the caller aborted. */
-  async enter(signal: AbortSignal): Promise<boolean> {
+  async enter(signal: AbortSignal): Promise<GateAdmission> {
     if (this.#active < this.#limit) {
       this.#active += 1
-      return true
+      return 'entered'
     }
-    if (this.#waiting.length >= this.#queueLimit || signal.aborted) return false
+    if (signal.aborted) return 'aborted'
+    if (this.#waiting.length >= this.#queueLimit) return 'full'
 
-    return new Promise<boolean>((resolve) => {
-      const settle = (granted: boolean): void => {
+    return new Promise<GateAdmission>((resolve) => {
+      const settle = (admission: GateAdmission): void => {
         signal.removeEventListener('abort', onAbort)
         const index = this.#waiting.indexOf(settle)
         if (index !== -1) this.#waiting.splice(index, 1)
-        resolve(granted)
+        resolve(admission)
       }
-      const onAbort = (): void => settle(false)
+      const onAbort = (): void => settle('aborted')
 
       signal.addEventListener('abort', onAbort, { once: true })
       this.#waiting.push(settle)
@@ -626,7 +632,7 @@ class ConcurrencyGate {
 
   leave(): void {
     const next = this.#waiting.shift()
-    if (next) next(true)
+    if (next) next('entered')
     else this.#active = Math.max(0, this.#active - 1)
   }
 }
@@ -645,9 +651,13 @@ class BoundedResolver {
   }
 
   readonly resolve: ResolveAddresses = async (hostname, signal) => {
-    if (!(await this.#gate.enter(signal))) {
-      if (signal.aborted) throw signal.reason
-      throw new ResolutionCapacityError()
+    switch (await this.#gate.enter(signal)) {
+      case 'aborted':
+        throw signal.reason
+      case 'full':
+        throw new ResolutionCapacityError()
+      case 'entered':
+        break
     }
 
     const resolution = Promise.resolve().then(() => this.#resolve(hostname, signal))
