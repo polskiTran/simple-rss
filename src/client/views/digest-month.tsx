@@ -60,10 +60,9 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
       }
     >
       <div className="calendar" role="group" aria-label={`Days of ${monthTitle}`}>
-        {WEEKDAY_INITIALS.map((initial, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the seven weekdays never reorder, and two share an initial.
-          <span key={index} className="calendar-weekday" aria-hidden="true">
-            {initial}
+        {WEEKDAYS.map((weekday) => (
+          <span key={weekday.id} className="calendar-weekday" aria-hidden="true">
+            {weekday.initial}
           </span>
         ))}
         {weeksOf(month).map((date) => {
@@ -107,7 +106,15 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
   )
 }
 
-const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
+const WEEKDAYS = [
+  { id: 'monday', initial: 'M' },
+  { id: 'tuesday', initial: 'T' },
+  { id: 'wednesday', initial: 'W' },
+  { id: 'thursday', initial: 'T' },
+  { id: 'friday', initial: 'F' },
+  { id: 'saturday', initial: 'S' },
+  { id: 'sunday', initial: 'S' },
+] as const
 
 const DAY_MS = 86_400_000
 

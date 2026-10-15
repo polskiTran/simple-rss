@@ -26,7 +26,7 @@ export const ROUTE_LABELS = {
  */
 export interface Origin {
   readonly path: string
-  readonly label: string
+  readonly label?: string
   readonly from: Origin | undefined
 }
 
@@ -308,7 +308,6 @@ export function useNavigation(): Navigation {
   const updateSearch = useCallback(
     (query: string) => {
       if (location.screen !== 'search') {
-        // The results surface shows no way-back link, so the origin's label is never read.
         if (query.trim() !== '') go(searchPath(query, scopeOf(location)), originOf(location))
         return
       }

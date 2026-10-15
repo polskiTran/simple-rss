@@ -126,7 +126,7 @@ describe('createNetworkHttpClient', () => {
       httpClient: (request, connection) => network(request, { ...connection, ...TEST_SERVER }),
       logger: createLogger({ level: 'error', sink: () => {} }),
       resolve: async () => ['93.184.216.34'],
-      self: new URL('https://reader.test'),
+      canonicalOrigin: new URL('https://reader.test'),
     })
 
     await expect(

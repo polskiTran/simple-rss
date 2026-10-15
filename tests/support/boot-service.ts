@@ -45,7 +45,7 @@ export async function bootService({
       httpClient: upstream.client,
       resolve: upstream.resolve,
       logger: options.logger,
-      self: new URL(config.publicOrigin),
+      canonicalOrigin: new URL(config.publicOrigin),
       allowBenchmarkAddresses: config.reservedFetchMode === 'benchmark',
     })
   const service = await startService({ ...options, config, port: 0, retrieval: boundary })
