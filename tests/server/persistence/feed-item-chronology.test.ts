@@ -56,15 +56,15 @@ function flat(sql: string): string {
   return sql.replace(/\s+/g, ' ').trim()
 }
 
+function chunkText(chunk: unknown): string {
+  if (!chunk || typeof chunk !== 'object' || !('value' in chunk) || !Array.isArray(chunk.value)) return ''
+  return chunk.value.join('')
+}
+
 function declaredChronologySql(): string {
   const column = getTableConfig(feedItems).columns.find((entry) => entry.name === 'chronology_at')
   if (!column?.generated) throw new Error('chronology_at is not a generated column')
-  return column.generated.as.queryChunks
-    .map((chunk) => {
-      if (!chunk || typeof chunk !== 'object' || !('value' in chunk) || !Array.isArray(chunk.value)) return ''
-      return chunk.value.join('')
-    })
-    .join('')
+  return column.generated.as.queryChunks.map(chunkText).join('')
 }
 
 describe('Feed Item chronology', () => {
