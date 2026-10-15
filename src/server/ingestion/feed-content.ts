@@ -11,6 +11,28 @@ const MAX_NODES = 20_000
 const MAX_DEPTH = 64
 const MAX_TABLE_COLUMNS = 64
 const MAX_TABLE_ROWS = 512
+const HEADING_DEPTHS = {
+  h1: 1,
+  h2: 2,
+  h3: 3,
+  h4: 4,
+  h5: 5,
+  h6: 6,
+} as const
+
+function headingDepthOf(tag: string): (typeof HEADING_DEPTHS)[keyof typeof HEADING_DEPTHS] | undefined {
+  switch (tag) {
+    case 'h1':
+    case 'h2':
+    case 'h3':
+    case 'h4':
+    case 'h5':
+    case 'h6':
+      return HEADING_DEPTHS[tag]
+    default:
+      return undefined
+  }
+}
 
 // Unknown elements are transparent so their prose survives; these carry no prose
 // a reader should see and drop with everything inside them.
@@ -146,10 +168,9 @@ function htmlBlocks(
       blocks.push(...htmlBlocks(element.childNodes, base, budget, depth + 1))
       continue
     }
-    if (/^h[1-6]$/.test(tag)) {
+    const headingDepth = headingDepthOf(tag)
+    if (headingDepth !== undefined) {
       flush()
-      // SAFETY: the heading tag check restricts this digit to 1 through 6.
-      const headingDepth = Number(tag[1]) as 1 | 2 | 3 | 4 | 5 | 6
       blocks.push({
         type: 'heading',
         depth: headingDepth,

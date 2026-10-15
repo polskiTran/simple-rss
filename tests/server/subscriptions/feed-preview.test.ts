@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { feedPreviewResponseSchema, type FeedPreviewResponse } from '../../../src/shared/api.js'
+import { FeedPreview, type FeedPreviewOutcome } from '../../../src/server/subscriptions/feed-preview.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 
@@ -221,4 +222,85 @@ describe('Feed preview', () => {
 
     expect(storedRows(service)).toEqual(before)
   })
+
+  it('detects RSS, Atom, and RDF served as a page, including a preamble, and leaves other HTML as a page', async () => {
+    const service = await startTestService()
+    const rssUrl = 'https://journal.example/rss.xml'
+    const atomUrl = 'https://journal.example/atom.xml'
+    const rdfUrl = 'https://journal.example/rdf.xml'
+    const spacedUrl = 'https://journal.example/spaced.xml'
+    const preambleUrl = 'https://journal.example/preamble.xml'
+    const declaredUrl = 'https://journal.example/declared.xml'
+    service.upstream
+      .stub(rssUrl, { headers: HTML_HEADERS, body: feedDocument('rss', 'RSS Notes') })
+      .stub(atomUrl, { headers: HTML_HEADERS, body: feedDocument('atom', 'Atom Letters') })
+      .stub(rdfUrl, { headers: HTML_HEADERS, body: feedDocument('rdf', 'RDF Notes') })
+      .stub(spacedUrl, {
+        headers: HTML_HEADERS,
+        body: '\n  <rss version="2.0"><channel><title>Spaced Notes</title><link>https://journal.example/</link></channel></rss>',
+      })
+      .stub(preambleUrl, {
+        headers: HTML_HEADERS,
+        body: '\uFEFF<?xml version="1.0"?>\n<!-- kept -->\n<rss version="2.0"><channel><title>Preamble Notes</title><link>https://journal.example/</link></channel></rss>',
+      })
+      .stub(declaredUrl, {
+        headers: HTML_HEADERS,
+        body: '  <?xml version="1.0"?><rss version="2.0"><channel><title>Declared Notes</title><link>https://journal.example/</link></channel></rss>',
+      })
+      .stub(PAGE_URL, {
+        headers: HTML_HEADERS,
+        body: '<!doctype html><html><body><p>Read the <rss version="2.0">notes</rss> later.</p></body></html>',
+      })
+
+    expect(await detect(service, rssUrl)).toEqual(detectedFeed(rssUrl, 'RSS Notes'))
+    expect(await detect(service, atomUrl)).toEqual(detectedFeed(atomUrl, 'Atom Letters'))
+    expect(await detect(service, rdfUrl)).toEqual(detectedFeed(rdfUrl, 'RDF Notes'))
+    expect(await detect(service, spacedUrl)).toEqual(detectedFeed(spacedUrl, 'Spaced Notes'))
+    expect(await detect(service, preambleUrl)).toEqual(detectedFeed(preambleUrl, 'Preamble Notes'))
+    expect(await detect(service, declaredUrl)).toEqual({ kind: 'invalid-feed', code: 'malformed_feed' })
+    expect(await detect(service, PAGE_URL)).toEqual({
+      kind: 'previewed',
+      preview: { kind: 'page', host: 'journal.example', feeds: [] },
+    })
+  })
 })
+
+const QUIET_CADENCE = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+function feedDocument(kind: 'rss' | 'atom' | 'rdf', title: string): string {
+  if (kind === 'atom') {
+    return `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>${title}</title><link href="https://journal.example/"/></feed>`
+  }
+  if (kind === 'rdf') {
+    return `<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/"><channel><title>${title}</title><link>https://journal.example/</link></channel></rdf:RDF>`
+  }
+  return `<?xml version="1.0"?><rss version="2.0"><channel><title>${title}</title><link>https://journal.example/</link></channel></rss>`
+}
+
+function detectedFeed(feedUrl: string, title: string): FeedPreviewOutcome {
+  return {
+    kind: 'previewed',
+    preview: {
+      kind: 'feed',
+      feed: {
+        feedUrl,
+        title,
+        domain: 'journal.example',
+        homePageUrl: 'https://journal.example/',
+        cadence: QUIET_CADENCE,
+        lastItemAt: null,
+        items: [],
+        subscribed: false,
+      },
+    },
+  }
+}
+
+async function detect(service: TestService, url: string): Promise<FeedPreviewOutcome> {
+  return new FeedPreview({
+    db: service.database,
+    retrieval: service.retrieval,
+    clock: service.clock,
+    settings: service.settings,
+  }).preview(url)
+}

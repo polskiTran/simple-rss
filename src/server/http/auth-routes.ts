@@ -38,11 +38,20 @@ export function authRoutes(deps: AuthRouteDependencies): Hono {
     })
 
     switch (outcome.kind) {
-      case 'claimed':
-        // The browser's zone seeds the Digest calendar; one the server cannot resolve leaves it on UTC.
-        if (body.value.timezone) deps.settings.setTimezone(body.value.timezone, deps.clock.now())
+      case 'claimed': {
+        const offeredTimezone = body.value.timezone
+        const digestCalendar: 'seeded' | 'utc' =
+          offeredTimezone !== undefined && deps.settings.setTimezone(offeredTimezone, deps.clock.now())
+            ? 'seeded'
+            : 'utc'
+        switch (digestCalendar) {
+          case 'seeded':
+          case 'utc':
+            break
+        }
         writeSessionCookie(c, outcome.session, deps.clock.now())
         return status(c, { claimed: true, authenticated: true }, 201)
+      }
       case 'already-claimed':
         return apiError(c, 409, 'already_claimed', 'This installation already has a User')
       case 'unavailable':

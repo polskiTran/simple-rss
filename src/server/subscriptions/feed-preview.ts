@@ -20,8 +20,7 @@ const MAX_DECLARED_FEEDS = 5
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
-/** A Feed document's root element, past any XML declaration, processing instructions and comments. */
-const FEED_ROOT = /^\s*(?:(?:<\?[\s\S]*?\?>|<!--[\s\S]*?-->)\s*)*<(?:rss|feed|rdf:RDF)[\s/>]/
+const FEED_ROOT_NAMES = ['rdf:RDF', 'feed', 'rss'] as const
 
 export type FeedPreviewOutcome =
   | { readonly kind: 'previewed'; readonly preview: FeedPreviewResponse }
@@ -135,5 +134,36 @@ export class FeedPreview {
 
 function servesFeed(retrieved: RetrievalBytes): boolean {
   if (RETRIEVAL_PROFILES.feed.accept.includes(retrieved.contentType)) return true
-  return FEED_ROOT.test(new TextDecoder().decode(retrieved.bytes.subarray(0, 1_024)))
+  const head = new TextDecoder().decode(retrieved.bytes.subarray(0, 1_024))
+  return hasFeedRoot(skipFeedPreamble(head))
+}
+
+function skipFeedPreamble(markup: string): string {
+  let index = 0
+  for (;;) {
+    const whitespace = /^\s*/.exec(markup.slice(index))
+    index += whitespace?.[0].length ?? 0
+    if (markup.startsWith('<?', index)) {
+      const close = markup.indexOf('?>', index + 2)
+      if (close === -1) return markup.slice(index)
+      index = close + 2
+      continue
+    }
+    if (markup.startsWith('<!--', index)) {
+      const close = markup.indexOf('-->', index + 4)
+      if (close === -1) return markup.slice(index)
+      index = close + 3
+      continue
+    }
+    return markup.slice(index)
+  }
+}
+
+function hasFeedRoot(markup: string): boolean {
+  if (!markup.startsWith('<')) return false
+  const rest = markup.slice(1)
+  const name = FEED_ROOT_NAMES.find((candidate) => rest.startsWith(candidate))
+  if (name === undefined) return false
+  const boundary = rest[name.length]
+  return boundary !== undefined && /[\s/>]/.test(boundary)
 }
