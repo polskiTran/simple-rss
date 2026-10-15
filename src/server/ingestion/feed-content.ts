@@ -7,6 +7,7 @@ import { readerMarkdownTree, serializeReaderMarkdown } from '../markdown/markdow
 const MAX_INPUT_CHARACTERS = 512 * 1024
 /** Durable Markdown budget; response-time image signatures add delivery overhead. */
 export const FEED_CONTENT_MAX_BYTES = 256 * 1024
+const MAX_CODE_LANGUAGE_CHARACTERS = 64
 const MAX_NODES = 20_000
 const MAX_DEPTH = 64
 const MAX_TABLE_COLUMNS = 64
@@ -201,8 +202,7 @@ function htmlBlocks(
     } else if (tag === 'pre') {
       flush()
       const language = /(?:^|\s)language-([\w+#.-]+)/.exec(element.firstElementChild?.getAttribute('class') ?? '')?.[1]
-      // Language metadata must not consume the body budget before any code fits.
-      const acceptedLanguage = language && language.length <= 64 ? language : undefined
+      const acceptedLanguage = language && language.length <= MAX_CODE_LANGUAGE_CHARACTERS ? language : undefined
       if (language && !acceptedLanguage) budget.truncated = true
       blocks.push({
         type: 'code',
@@ -388,6 +388,7 @@ function prefixTree<Node extends Root | RootContent>(node: Node, budget: { remai
     return { ...node, alt, title }
   }
   if ('value' in node) {
+    if (node.type === 'code') budget.remaining -= node.lang?.length ?? 0
     const value = unicodePrefix(node.value, Math.max(0, budget.remaining))
     budget.remaining -= value.length
     return { ...node, value }

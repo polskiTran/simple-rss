@@ -4,6 +4,10 @@ import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
 import { RetrievalError, type Retrieval, type RetrievalFailure } from '../upstream/retrieval.js'
 
+declare const vouchedImageUrl: unique symbol
+
+export type VouchedImageUrl = string & { readonly [vouchedImageUrl]: true }
+
 export type ImageOutcome =
   | { readonly kind: 'missing' }
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
@@ -28,15 +32,11 @@ export class ImageService {
       .all()[0]
     if (!row?.imageUrl) return { kind: 'missing' }
 
-    return this.image(row.imageUrl, signal)
+    // SAFETY: row.imageUrl is feed_items.image_url for the requested Feed Item.
+    return this.image(row.imageUrl as VouchedImageUrl, signal)
   }
 
-  /**
-   * An image by URL. Callers pass only URLs the installation vouches for (a Feed
-   * Item's stored image, or a Reader image whose signature they checked), so
-   * this is never an open proxy.
-   */
-  async image(url: string, signal?: AbortSignal): Promise<ImageOutcome> {
+  async image(url: VouchedImageUrl, signal?: AbortSignal): Promise<ImageOutcome> {
     const result = await this.#retrieval.retrieve({ url, operation: 'image', ...(signal ? { signal } : {}) })
     if (!result.ok) return { kind: 'retrieval-failed', failure: result }
 
