@@ -75,7 +75,6 @@ export const subscriptions = sqliteTable('subscriptions', {
   customTitle: text('custom_title'),
   /** The Custom Description; null means the Feed Description stands. */
   customDescription: text('custom_description'),
-  // The migration's CHECK is what makes the narrowed type true on read.
   pollingIntervalMinutes: integer('polling_interval_minutes')
     .$type<PollingIntervalMinutes>()
     .notNull()
