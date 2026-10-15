@@ -3,7 +3,7 @@ import type { Root, RootContent } from 'mdast'
 import { fromMarkdown } from 'mdast-util-from-markdown'
 import { describe, expect, it } from 'vitest'
 import { DATABASE_FILE } from '../../../src/server/config.js'
-import { FEED_CONTENT_MAX_BYTES } from '../../../src/server/ingestion/feed-content.js'
+import { FEED_CONTENT_MAX_BYTES, normalizeFeedContent } from '../../../src/server/ingestion/feed-content.js'
 import { openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations, migrations } from '../../../src/server/persistence/migrations.js'
 import { ManualClock } from '../../support/manual-clock.js'
@@ -422,6 +422,41 @@ describe('Feed Content conversion limits', () => {
   it('records a list cut at the node limit even when no later block follows', { timeout: 20_000 }, async () => {
     const { read } = await ingest(rss(`<description><![CDATA[<ul>${'<li>x</li>'.repeat(20_001)}</ul>]]></description>`))
     expect((await read()).feedContent).toMatchObject({ truncated: true })
+  })
+
+  it('keeps a 64-character code language and drops the next character', () => {
+    const context = { xmlBase: 'https://journal.example/feed', linkBase: 'https://journal.example/item' }
+    const kept = normalizeFeedContent(
+      `<pre><code class="language-${'x'.repeat(64)}">Readable code.</code></pre>`,
+      'html',
+      context,
+    )
+    const dropped = normalizeFeedContent(
+      `<pre><code class="language-${'x'.repeat(65)}">Readable code.</code></pre>`,
+      'html',
+      context,
+    )
+
+    expect(kept).toEqual({
+      markdown: `\`\`\`${'x'.repeat(64)}\nReadable code.\n\`\`\``,
+      truncated: false,
+      plainText: 'Readable code.',
+    })
+    expect(dropped).toEqual({ markdown: '```\nReadable code.\n```', truncated: true, plainText: 'Readable code.' })
+  })
+
+  it('counts a code fence language toward the stored body budget', () => {
+    const context = { xmlBase: 'https://journal.example/feed', linkBase: 'https://journal.example/item' }
+    const code = 'a'.repeat(FEED_CONTENT_MAX_BYTES)
+    const language = 'x'.repeat(64)
+    const bare = normalizeFeedContent(`<pre><code>${code}</code></pre>`, 'html', context)
+    const fenced = normalizeFeedContent(`<pre><code class="language-${language}">${code}</code></pre>`, 'html', context)
+
+    expect(Buffer.byteLength(bare?.markdown ?? '')).toBe(FEED_CONTENT_MAX_BYTES)
+    expect(Buffer.byteLength(fenced?.markdown ?? '')).toBe(FEED_CONTENT_MAX_BYTES)
+    expect(bare?.markdown.slice(4, -4)).toHaveLength(262_136)
+    expect(fenced?.markdown.startsWith(`\`\`\`${language}\n`)).toBe(true)
+    expect(fenced?.markdown.slice(language.length + 4, -4)).toHaveLength(262_072)
   })
 
   it('does not let oversized code-language metadata crowd out a readable body', async () => {
