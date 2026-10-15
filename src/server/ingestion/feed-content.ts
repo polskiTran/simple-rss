@@ -194,7 +194,7 @@ function htmlBlocks(
     } else if (tag === 'table') {
       flush()
       const rows: TableRow[] = []
-      for (const { row, base: rowBase } of tableRows(element, base, budget, depth + 1)) {
+      for (const { row, base: rowBase } of tableSectionRows(element, base, budget, depth + 1)) {
         if (rows.length >= MAX_TABLE_ROWS) {
           exhaust(budget)
           break
@@ -226,8 +226,7 @@ function htmlBlocks(
   return blocks
 }
 
-/** Walk table sections without losing their XML bases or entering nested tables. */
-function* tableRows(
+function* tableSectionRows(
   element: HtmlNode,
   context: FeedContentContext,
   budget: Budget,
@@ -238,7 +237,7 @@ function* tableRows(
     const tag = localTag(child)
     const base = withXmlBase(context, child.getAttribute('xml:base'))
     if (tag === 'tr') yield { row: child, base }
-    else if (['thead', 'tbody', 'tfoot'].includes(tag)) yield* tableRows(child, base, budget, depth + 1)
+    else if (['thead', 'tbody', 'tfoot'].includes(tag)) yield* tableSectionRows(child, base, budget, depth + 1)
   }
 }
 
