@@ -129,9 +129,8 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     pages.loadMore(feedItemsParamsOf({ from: items.nextFrom, through: date }).toString())
   }
 
-  // Enters the picked day once its page is on screen; a failed page leaves the view where it was.
   useEffect(() => {
-    if (shownDay === undefined || pages.older === 'loading') return
+    if (shownDay === undefined || pages.older === 'loading' || pages.older === 'failed') return
     enterSection(dayAnchor(feedId, shownDay))
     setShownDay(undefined)
   }, [feedId, shownDay, pages.older, items])
