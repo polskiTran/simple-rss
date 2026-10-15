@@ -265,7 +265,7 @@ describe('returning to a claimed installation', () => {
     const service = await startTestService()
     await claimedDevice(service)
 
-    const impostor = new Device(service).present('a-token-nobody-issued')
+    const impostor = new Device(service).plantUnissuedToken('a-token-nobody-issued')
 
     expect((await impostor.get('/api/meta')).status).toBe(401)
   })
@@ -598,7 +598,7 @@ describe('cross-site request forgery', () => {
   it('protects an authenticated mutation the same way', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
-    const forged = new Device(service, { origin: 'https://evil.example' }).present(user.sessionToken)
+    const forged = new Device(service, { origin: 'https://evil.example' }).plantUnissuedToken(user.sessionToken)
 
     const response = await forged.changePassword(USER_PASSWORD, 'a-replacement-password')
 

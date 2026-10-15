@@ -99,6 +99,11 @@ type SourceResult =
   | { readonly source: 'feed-content'; readonly content: FeedContent }
   | { readonly source: 'original-webpage'; readonly content: ReaderArticle }
 
+function resolvedReadingSource(chosen: ReadingSource, item: Pick<ReaderItem, 'feedContent' | 'link'>): ReadingSource {
+  if (chosen === 'feed-content') return item.feedContent ? 'feed-content' : 'original-webpage'
+  return item.link || !item.feedContent ? 'original-webpage' : 'feed-content'
+}
+
 function OpenReader({
   item,
   origin,
@@ -115,15 +120,7 @@ function OpenReader({
   onSaved(saved: boolean): void
 }) {
   const [viewSource, setViewSource] = useState<ReadingSource>(item.readingSource)
-  // The chosen source, unless this Feed Item lacks it and the other one is available.
-  const source: ReadingSource =
-    viewSource === 'feed-content'
-      ? item.feedContent
-        ? 'feed-content'
-        : 'original-webpage'
-      : item.link || !item.feedContent
-        ? 'original-webpage'
-        : 'feed-content'
+  const source = resolvedReadingSource(viewSource, item)
   const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
   const [sourceState, { retry: retrySource }] = useResource(
     `${item.feedItemId} ${source}`,

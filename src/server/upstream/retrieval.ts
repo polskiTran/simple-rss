@@ -142,8 +142,7 @@ interface RetrievalOptions {
   readonly httpClient: HttpClient
   readonly logger: Logger
   readonly resolve?: ResolveAddresses
-  /** The installation's canonical public origin. */
-  readonly self: URL
+  readonly canonicalOrigin: URL
   readonly allowBenchmarkAddresses?: boolean
   readonly capacity?: RetrievalCapacity
   readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
@@ -170,7 +169,7 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
   const resolver = new BoundedResolver(options.resolve ?? systemResolver, sharedCapacity)
   const policy: DestinationPolicy = {
     resolve: resolver.resolve,
-    self: options.self,
+    canonicalOrigin: options.canonicalOrigin,
     allowBenchmarkAddresses: options.allowBenchmarkAddresses === true,
   }
   const shared = new ConcurrencyGate(sharedCapacity)
@@ -197,13 +196,13 @@ export function createRetrieval(options: RetrievalOptions): Retrieval {
 
 export function createNetworkRetrieval(options: {
   readonly logger: Logger
-  readonly self: URL
+  readonly canonicalOrigin: URL
   readonly allowBenchmarkAddresses?: boolean
 }): Retrieval {
   return createRetrieval({
     httpClient: createNetworkHttpClient(),
     logger: options.logger,
-    self: options.self,
+    canonicalOrigin: options.canonicalOrigin,
     allowBenchmarkAddresses: options.allowBenchmarkAddresses === true,
   })
 }

@@ -116,7 +116,7 @@ describe('the Reader budget', () => {
       httpClient: upstream.client,
       resolve: upstream.resolve,
       logger: createLogger({ level: 'error', sink: () => {} }),
-      self: new URL('https://reader.test'),
+      canonicalOrigin: new URL('https://reader.test'),
       operationCapacity: { reader: { maxConcurrent: 1, maxQueued: 4 } },
     })
     const guids = ['item-held', 'item-queued']

@@ -70,7 +70,7 @@ export async function startService(options: ServiceOptions): Promise<RunningServ
     options.retrieval ??
     createNetworkRetrieval({
       logger,
-      self: new URL(config.publicOrigin),
+      canonicalOrigin: new URL(config.publicOrigin),
       allowBenchmarkAddresses: config.reservedFetchMode === 'benchmark',
     })
 

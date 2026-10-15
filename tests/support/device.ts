@@ -26,8 +26,7 @@ export class Device {
     return this.#cookie
   }
 
-  /** Puts a token this device was never given into its jar. */
-  present(token: string | undefined): this {
+  plantUnissuedToken(token: string | undefined): this {
     this.#cookie = token
     return this
   }

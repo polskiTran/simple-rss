@@ -6,8 +6,7 @@ export type ResolveAddresses = (hostname: string, signal: AbortSignal) => Promis
 
 export interface DestinationPolicy {
   readonly resolve: ResolveAddresses
-  /** This installation's canonical public origin. */
-  readonly self: URL
+  readonly canonicalOrigin: URL
   readonly allowBenchmarkAddresses?: boolean
 }
 
@@ -80,7 +79,7 @@ export async function validateDestination(
     return { ok: false, code: 'invalid_url', reason: 'URL has no host' }
   }
 
-  if (isSelf(url, policy.self)) {
+  if (isSelf(url, policy.canonicalOrigin)) {
     return { ok: false, code: 'blocked_destination', reason: 'destination is this installation' }
   }
 
@@ -135,9 +134,10 @@ function isBlockedName(hostname: string): boolean {
 }
 
 /** Scheme is deliberately ignored: the public proxy may answer HTTPS outside and HTTP inside. */
-function isSelf(url: URL, self: URL): boolean {
+function isSelf(url: URL, canonicalOrigin: URL): boolean {
   return (
-    normaliseHostname(url.hostname) === normaliseHostname(self.hostname) && effectivePort(url) === effectivePort(self)
+    normaliseHostname(url.hostname) === normaliseHostname(canonicalOrigin.hostname) &&
+    effectivePort(url) === effectivePort(canonicalOrigin)
   )
 }
 
