@@ -132,7 +132,6 @@
 }
 
 @layer components {
-
   .app {
     max-width: 1360px;
     min-height: 100dvh;
@@ -284,7 +283,6 @@
     gap: 16px;
   }
 
-
   .link {
     text-decoration: underline;
     text-decoration-thickness: 1px;
@@ -295,7 +293,6 @@
   .link:hover {
     text-decoration-color: currentColor;
   }
-
 
   .button {
     display: inline-flex;
@@ -438,7 +435,6 @@
     }
   }
 
-
   .field {
     display: grid;
     gap: 8px;
@@ -527,7 +523,6 @@
     color: var(--color-danger);
   }
 
-
   .select {
     position: relative;
     display: inline-flex;
@@ -568,7 +563,6 @@
     right: 12px;
     pointer-events: none;
   }
-
 
   /* Above the chrome, which a dialog covers like everything else. */
   .dialog-backdrop,
@@ -700,7 +694,6 @@
     }
   }
 
-
   .group + .group {
     margin-top: 56px;
   }
@@ -783,7 +776,6 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-
 
   .item-list {
     display: grid;
@@ -1009,7 +1001,6 @@
     }
   }
 
-
   .cadence-strip {
     display: inline-grid;
     grid-auto-flow: column;
@@ -1048,7 +1039,6 @@
   :is(.cadence-day, .cadence-cell, .calendar-day, .wordmark-cell)[data-level='4'] {
     background: var(--color-ramp-5);
   }
-
 
   .wordmark {
     display: inline-flex;
@@ -1120,7 +1110,6 @@
   .loading-note .wordmark-cell {
     animation: mark-glint-loop 1200ms linear infinite calc(var(--glint-step) * 60ms);
   }
-
 
   .feeds-notices > * {
     margin-bottom: 24px;
@@ -1447,7 +1436,6 @@
     overflow-wrap: anywhere;
   }
 
-
   .view-topline {
     display: flex;
     align-items: center;
@@ -1638,7 +1626,6 @@
   .cadence-legend .cadence-cell:last-of-type {
     margin-right: 6px;
   }
-
 
   .reader-source {
     margin-top: 24px;
@@ -1974,7 +1961,6 @@
     gap: 16px;
     margin-top: 72px;
   }
-
 
   .first-run {
     display: grid;
@@ -2327,7 +2313,6 @@
     display: none;
   }
 
-
   .with-aside {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;
@@ -2364,7 +2349,6 @@
   .with-aside:not(:has(> :nth-child(2))) {
     grid-template-columns: minmax(0, 1fr);
   }
-
 
   .search-feeds {
     margin-bottom: 48px;
@@ -2467,7 +2451,6 @@
     }
   }
 
-
   .settings-view > * {
     max-width: 920px;
   }
@@ -2517,7 +2500,6 @@
     color: var(--color-ink-2);
   }
 
-
   .gate {
     display: grid;
     gap: 24px;
@@ -2544,7 +2526,6 @@
     width: 100%;
     height: var(--field);
   }
-
 
   .chrome {
     display: grid;
