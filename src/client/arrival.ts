@@ -9,13 +9,19 @@ export function useScreenTitle(name: string | undefined) {
 
 const READER_TAKES_OVER = ['keydown', 'pointerdown', 'touchstart', 'wheel'] as const
 
-/**
- * Settles the page on each Arrival: its h1 takes focus without scrolling, so
- * the screen is announced, and the page scrolls to where the Arrival stands.
- * A screen draws its heading and its list as they load, so both wait on the
- * page's changes until they can happen; the User's first key, press or
- * scroll ends the wait. Focus stays in a field the User is typing in.
- */
+function focusHeadingWithoutScroll(root: HTMLElement): boolean {
+  const heading = root.querySelector('h1')
+  if (heading === null) return false
+  heading.tabIndex = -1
+  heading.focus({ preventScroll: true })
+  return true
+}
+
+function scrollToRecordedPlace(target: number): boolean {
+  window.scrollTo({ top: target, behavior: 'instant' })
+  return Math.abs(window.scrollY - target) < 1
+}
+
 export function useArrival(arrival: Arrival | undefined, page: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const root = page.current
@@ -31,16 +37,8 @@ export function useArrival(arrival: Arrival | undefined, page: RefObject<HTMLEle
       takeover.abort()
     }
     const settle = () => {
-      const heading = focused ? null : root.querySelector('h1')
-      if (heading) {
-        heading.tabIndex = -1
-        heading.focus({ preventScroll: true })
-        focused = true
-      }
-      if (target !== undefined && !placed) {
-        window.scrollTo({ top: target, behavior: 'instant' })
-        placed = Math.abs(window.scrollY - target) < 1
-      }
+      if (!focused) focused = focusHeadingWithoutScroll(root)
+      if (target !== undefined && !placed) placed = scrollToRecordedPlace(target)
       if (focused && placed) stop()
     }
 
