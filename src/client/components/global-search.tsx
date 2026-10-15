@@ -41,6 +41,11 @@ export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps)
   }, [draft, query])
 
   useEffect(() => {
+    if (!opened) return
+    input.current?.focus()
+  }, [opened])
+
+  useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if (event.isComposing || event.key !== '/' || event.altKey || event.ctrlKey || event.metaKey) return
       if (editable(event.target)) return
@@ -78,11 +83,7 @@ export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps)
         type="button"
         className="button button-icon search-open"
         aria-label="Search"
-        onClick={() => {
-          setOpened(true)
-          // The field is display:none until the state lands; focus once it shows.
-          requestAnimationFrame(() => input.current?.focus())
-        }}
+        onClick={() => setOpened(true)}
       >
         <Icon name="search" />
       </button>
