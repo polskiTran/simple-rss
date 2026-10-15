@@ -24,7 +24,6 @@ export interface ListedItemRow {
   readonly savedAt: string | null
 }
 
-/** The fields every listed Feed Item answers alike: an untitled item reads `Untitled`, a saved one says so. */
 export function listedItemOf(row: ListedItemRow) {
   return {
     feedItemId: row.feedItemId,

@@ -25,7 +25,6 @@ export type SubscribeOutcome =
   | { readonly kind: 'invalid-url' }
   | FailedPoll
 
-/** A subscribed Feed and what one attempt at it needs: its validators, its cadence, its failure run. */
 interface PollableFeed extends PolledFeed {
   readonly enteredUrl: string
   readonly readingSource: ReadingSource
@@ -170,7 +169,6 @@ export class FeedPoll {
     return this.#ingestWindow(tx, feed, answer, now)
   }
 
-  /** Writes a parsed Feed Window for a subscribed Feed, merging it first if the retrieval revealed another. */
   #ingestWindow(
     tx: DatabaseTransaction,
     feed: PollableFeed,

@@ -64,7 +64,6 @@ export class DigestService {
     }
   }
 
-  /** Every day of the cadence grid window, counted across the whole Digest, and the Subscriptions feeding it. */
   calendar(): DigestCalendar {
     const timezone = this.#settings.effectiveTimezone()
     const today = dateKey(this.#clock.now(), timezone)
@@ -100,7 +99,6 @@ export class DigestService {
     return next && digestItemOf(next, this.#settings.effectiveTimezone())
   }
 
-  /** Digest rows under `conditions`, newest first along the chronology index. */
   #newestFirst(...conditions: (SQL | undefined)[]) {
     return this.#db
       .select(DIGEST_ROW_COLUMNS)

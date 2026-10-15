@@ -6,7 +6,6 @@ import { dayAfter, dateKey, dayStartUtc } from '../calendar.js'
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
-/** Subscribed Feed Items on each of `days`, every Feed together. */
 export function dailyCounts(db: DrizzleDatabase, timezone: string, days: readonly string[]): (day: string) => number {
   const subscribed = db.select({ feedId: subscriptions.feedId }).from(subscriptions)
   const counts = new Map(
@@ -15,7 +14,6 @@ export function dailyCounts(db: DrizzleDatabase, timezone: string, days: readonl
   return (day) => counts.get(day) ?? 0
 }
 
-/** Each of `feedIds`' counts across `days`, in their order; a Feed with none answers zeros. */
 export function cadenceByFeed(
   db: DrizzleDatabase,
   timezone: string,
@@ -32,7 +30,6 @@ export function cadenceByFeed(
   return (feedId) => days.map((day) => counts.get(feedId)?.get(day) ?? 0)
 }
 
-/** The trailing thirty days of `cadenceByFeed`, ending today in the installation timezone. */
 export function stripCadenceByFeed(
   db: DrizzleDatabase,
   timezone: string,
@@ -62,7 +59,6 @@ function countRows(db: DrizzleDatabase, timezone: string, days: readonly string[
     GROUP BY feedId, days.day`)
 }
 
-/** The `days` most recent date keys ending with `todayKey`, oldest first. */
 export function trailingDayKeys(todayKey: string, days: number): string[] {
   const today = Date.parse(`${todayKey}T00:00:00.000Z`)
   return Array.from({ length: days }, (_, index) => keyOf(today - (days - 1 - index) * DAY_MS))

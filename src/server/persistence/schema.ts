@@ -84,7 +84,6 @@ export const subscriptions = sqliteTable('subscriptions', {
   /** The persisted due-time frontier the scheduler wakes to query. */
   nextPollAt: text('next_poll_at').notNull().default('1970-01-01T00:00:00.000Z'),
   lastPolledAt: text('last_polled_at'),
-  /** Feed Availability: how the recent attempts went, in safe categories. */
   lastSuccessAt: text('last_success_at'),
   consecutiveFailures: integer('consecutive_failures').notNull().default(0),
   lastFailureCategory: text('last_failure_category', { enum: FEED_AVAILABILITY_CATEGORIES }),

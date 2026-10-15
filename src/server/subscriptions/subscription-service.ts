@@ -165,7 +165,6 @@ export class SubscriptionService {
     return { pollingIntervalMinutes, nextPollAt }
   }
 
-  /** False when there is no Subscription to change. */
   setReadingSource(feedId: number, readingSource: ReadingSource): boolean {
     const updated = this.#db.update(subscriptions).set({ readingSource }).where(eq(subscriptions.feedId, feedId)).run()
     if (updated.changes === 0) return false
@@ -225,7 +224,6 @@ export class SubscriptionService {
       .map((row) => row.feedId)
   }
 
-  /** One Subscription as the Feeds list shows it; undefined when there is none. */
   summary(feedId: number): SubscriptionSummary | undefined {
     const record = this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)

@@ -144,7 +144,6 @@ export class SearchService {
     }))
   }
 
-  /** Every word of the line somewhere in the effective title or the domain, in Feeds list order. */
   #matchingSubscriptions(words: readonly string[]): Omit<SearchSubscriptionMatch, 'cadence'>[] {
     if (words.length === 0) return []
     const needles = words.map(folded)
@@ -188,7 +187,6 @@ function folded(value: string): string {
     .toLowerCase()
 }
 
-/** The line as words: whitespace-split, quotes dropped, only tokenizable words kept. */
 function wordsOf(query: string): string[] {
   return (
     query
@@ -208,7 +206,6 @@ function matchExpressionOf(words: readonly string[]): string {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }
 
-/** Rebuilds the derived FTS5 index from its canonical tables. */
 export function rebuildSearchIndex(db: DrizzleDatabase): number {
   return db.transaction((tx) => {
     tx.delete(feedItemSearch).run()

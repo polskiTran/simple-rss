@@ -48,7 +48,6 @@ export interface RunningService {
   readonly port: number
   /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
   readonly url: string
-  /** Stops accepting connections, drains in-flight work, closes the database. */
   stop(): Promise<void>
 }
 

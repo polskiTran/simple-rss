@@ -16,7 +16,6 @@ import type { FailedPoll } from './feed-availability.js'
 import { readFeed, type FeedAnswer } from './feed-poll.js'
 import { canonicalFeedUrl, subscribedFeedId } from './new-subscription.js'
 
-/** How many of a page's Declared Feeds one preview retrieves. */
 const MAX_DECLARED_FEEDS = 5
 
 const DAY_MS = 24 * 60 * 60 * 1_000
@@ -134,7 +133,6 @@ export class FeedPreview {
   }
 }
 
-/** Served as a Feed media type, or as a page but rooted like a Feed document. */
 function servesFeed(retrieved: RetrievalBytes): boolean {
   if (RETRIEVAL_PROFILES.feed.accept.includes(retrieved.contentType)) return true
   return FEED_ROOT.test(new TextDecoder().decode(retrieved.bytes.subarray(0, 1_024)))

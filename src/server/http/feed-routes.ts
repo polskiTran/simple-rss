@@ -208,7 +208,6 @@ function refreshFailure(
   }
 }
 
-/** A Feed that would not answer, or answered with something other than RSS or Atom. */
 function failedPoll(c: Context, outcome: FailedPoll) {
   if (outcome.kind === 'retrieval-failed') return answer(c, FEED_ANSWERS[outcome.failure.code])
   const message =

@@ -16,7 +16,6 @@ export function canonicalFeedUrl(value: string): string | undefined {
   }
 }
 
-/** The subscribed Feed that `url` is one of the addresses of, if any. */
 export function subscribedFeedId(db: DrizzleDatabase | DatabaseTransaction, url: string): number | undefined {
   return db
     .select({ feedId: subscriptions.feedId })

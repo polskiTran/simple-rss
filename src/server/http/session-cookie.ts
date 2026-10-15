@@ -16,7 +16,6 @@ export function readSessionCookie(c: Context): string | undefined {
   return getCookie(c, SESSION_COOKIE)
 }
 
-/** The cookie lifetime is the session's absolute deadline. */
 export function writeSessionCookie(c: Context, session: IssuedSession, now: Date): void {
   const maxAge = Math.max(0, Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000))
   setCookie(c, SESSION_COOKIE, session.token, { ...COOKIE_ATTRIBUTES, maxAge })

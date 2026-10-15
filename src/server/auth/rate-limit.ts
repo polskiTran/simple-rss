@@ -1,9 +1,7 @@
 import type { Clock } from '../clock.js'
 
-/** How far back a failed attempt still counts against a client. */
 export const WINDOW_MS = 15 * 60 * 1000
 
-/** Failed attempts one client address may make inside the window. */
 export const PER_CLIENT_FAILURES = 5
 
 export const GLOBAL_FAILURES = 20
@@ -45,7 +43,6 @@ export class LoginRateLimiter {
     this.#clock = clock
   }
 
-  /** Reserves one attempt before its secret is checked. */
   begin(client: string): AttemptVerdict {
     const now = this.#clock.now().getTime()
     const recent = this.#recent(client, now)
