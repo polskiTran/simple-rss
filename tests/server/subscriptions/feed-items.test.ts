@@ -34,7 +34,6 @@ async function subscribed(feeds: Readonly<Record<string, readonly string[]>>) {
   return user
 }
 
-/** Each day of a page with how many of its items it carries, newest first. */
 const daysOf = ({ items }: { items: readonly { date: string }[] }) =>
   [...Map.groupBy(items, (entry) => entry.date)].map(([date, entries]) => [date, entries.length])
 

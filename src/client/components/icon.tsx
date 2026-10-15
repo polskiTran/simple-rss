@@ -20,12 +20,6 @@ import {
   X,
 } from 'lucide-react'
 
-/**
- * Every glyph the interface draws, from Lucide's 24px grid at a 2 stroke with
- * square caps, so icons read as one set at the 16px they are shown at, as heavy
- * as the 14/500 labels beside them. Decorative: the control that holds an icon
- * carries the name.
- */
 const GLYPHS = {
   'arrow-left': ArrowLeft,
   bookmark: Bookmark,

@@ -7,7 +7,6 @@ import type { UpstreamFixtures } from './upstream-fixtures.js'
 /** The Setup Secret every test installation is deployed with. */
 export const SETUP_SECRET = 'a-deployment-setup-secret'
 
-/** The password tests claim an installation with. */
 export const USER_PASSWORD = 'a-calm-reading-password'
 
 export interface BootOptions extends Omit<ServiceOptions, 'config' | 'port' | 'retrieval' | 'logger'> {
@@ -23,7 +22,6 @@ export interface BootOptions extends Omit<ServiceOptions, 'config' | 'port' | 'r
 
 export interface BootedService extends RunningService {
   readonly config: Config
-  /** The outbound boundary the service was wired with. */
   readonly retrieval: Retrieval
 }
 

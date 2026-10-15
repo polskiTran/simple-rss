@@ -86,7 +86,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       } catch (error) {
         setNotice(retryFailure(error))
       }
-      // Read again in place: the detail and items stay in view, and a Feed opened meanwhile cancels them.
       retry()
       pages.retry()
     })
@@ -120,7 +119,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     })
   }
 
-  // A day already in view is entered at once; an older one is fetched with every day down to it first.
   function showDay(date: string) {
     const anchor = dayAnchor(feedId, date)
     if (document.getElementById(anchor) || !items?.nextFrom) {
@@ -163,7 +161,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   }
 
   const grid = cadenceGrid(detail.cadence)
-  // The Cadence runs through today.
   const today = detail.cadence.at(-1)?.date ?? detail.subscribedDate
   return (
     <div className="view">

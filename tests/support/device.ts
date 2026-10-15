@@ -101,7 +101,6 @@ export class Device {
   }
 }
 
-/** A device that has already claimed the installation and is signed in. */
 export async function claimedDevice(service: TestService, options: DeviceOptions = {}): Promise<Device> {
   const device = new Device(service, options)
   const response = await device.claim()

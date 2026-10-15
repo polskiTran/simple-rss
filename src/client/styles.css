@@ -132,7 +132,6 @@
 }
 
 @layer components {
-  /* Page frame */
 
   .app {
     max-width: 1360px;
@@ -211,7 +210,6 @@
     }
   }
 
-  /* The companion wraps whole, never mid-date, and flush under the title. */
   .page-title:has(.page-title-companion) {
     display: flex;
     flex-wrap: wrap;
@@ -286,7 +284,6 @@
     gap: 16px;
   }
 
-  /* Links — the only text that acts on its own */
 
   .link {
     text-decoration: underline;
@@ -299,7 +296,6 @@
     text-decoration-color: currentColor;
   }
 
-  /* Buttons */
 
   .button {
     display: inline-flex;
@@ -442,7 +438,6 @@
     }
   }
 
-  /* Field */
 
   .field {
     display: grid;
@@ -532,7 +527,6 @@
     color: var(--color-danger);
   }
 
-  /* Native select, drawn as a grey button */
 
   .select {
     position: relative;
@@ -575,7 +569,6 @@
     pointer-events: none;
   }
 
-  /* Dialog */
 
   /* Above the chrome, which a dialog covers like everything else. */
   .dialog-backdrop,
@@ -707,7 +700,6 @@
     }
   }
 
-  /* Groups and label-value rows */
 
   .group + .group {
     margin-top: 56px;
@@ -792,7 +784,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Items */
 
   .item-list {
     display: grid;
@@ -1018,7 +1009,6 @@
     }
   }
 
-  /* Cadence */
 
   .cadence-strip {
     display: inline-grid;
@@ -1059,7 +1049,6 @@
     background: var(--color-ramp-5);
   }
 
-  /* Mark */
 
   .wordmark {
     display: inline-flex;
@@ -1132,7 +1121,6 @@
     animation: mark-glint-loop 1200ms linear infinite calc(var(--glint-step) * 60ms);
   }
 
-  /* Feeds */
 
   .feeds-notices > * {
     margin-bottom: 24px;
@@ -1459,7 +1447,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* One Feed */
 
   .view-topline {
     display: flex;
@@ -1652,7 +1639,6 @@
     margin-right: 6px;
   }
 
-  /* Reader */
 
   .reader-source {
     margin-top: 24px;
@@ -1989,9 +1975,7 @@
     margin-top: 72px;
   }
 
-  /* Digest */
 
-  /* Before any Subscription: the note, then Add feed under it. */
   .first-run {
     display: grid;
     justify-items: start;
@@ -2007,8 +1991,6 @@
     }
   }
 
-  /* Started from a day, the list offers today back at its head, as Show more
-     offers what is past its end. */
   .newer {
     margin-bottom: 32px;
 
@@ -2019,7 +2001,6 @@
     }
   }
 
-  /* The phone's date picker: the input, invisible, takes the press. */
   .day-picker {
     position: relative;
     display: none;
@@ -2346,7 +2327,6 @@
     display: none;
   }
 
-  /* A list and the column beside it: a Feed filter, or the Digest's month. */
 
   .with-aside {
     display: grid;
@@ -2371,7 +2351,6 @@
     padding: 4px 12px;
     overflow-y: auto;
 
-    /* On a phone a Feed filter becomes a row of chips above its list. */
     @media (max-width: 1024px) {
       order: -1;
       position: static;
@@ -2386,7 +2365,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Search */
 
   .search-feeds {
     margin-bottom: 48px;
@@ -2489,7 +2467,6 @@
     }
   }
 
-  /* Settings */
 
   .settings-view > * {
     max-width: 920px;
@@ -2540,7 +2517,6 @@
     color: var(--color-ink-2);
   }
 
-  /* Sign in and setup */
 
   .gate {
     display: grid;
@@ -2569,7 +2545,6 @@
     height: var(--field);
   }
 
-  /* Chrome */
 
   .chrome {
     display: grid;
@@ -2578,9 +2553,6 @@
     grid-template-rows: 68px;
     column-gap: 12px;
 
-    /* On a phone, one top bar that scrolls with the page — the mark or a back
-       square, the Digest and Feeds switch, then the search, Saved and Settings
-       squares. Nothing is fixed to the bottom edge. */
     @media (max-width: 1024px) {
       grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
       grid-template-rows: 60px;

@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 
 interface GroupProps {
-  /** Ties the heading to its section; unique on the page. */
   readonly id: string
   readonly title: ReactNode
   /** The whole group's, or none — a partial count is a wrong one. */

@@ -41,7 +41,6 @@ async function savedNotes(gapMs: number) {
   return user
 }
 
-/** Every page of the Library in one order, following cursors to the end. */
 async function pages(user: Awaited<ReturnType<typeof savedNotes>>, order: 'newest' | 'oldest') {
   const titles: string[][] = []
   let cursor: string | null | undefined

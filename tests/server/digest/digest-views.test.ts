@@ -13,7 +13,6 @@ const item = (guid: string, pubDate: string) => `
     <pubDate>${new Date(pubDate).toUTCString()}</pubDate>
   </item>`
 
-/** One item at noon UTC on each day, `count` days running back from `latest`. */
 const daily = (prefix: string, latest: string, count: number) =>
   Array.from({ length: count }, (_, index) => {
     const date = new Date(Date.parse(`${latest}T12:00:00.000Z`) - index * 86_400_000).toISOString()

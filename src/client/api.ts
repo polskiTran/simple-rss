@@ -102,7 +102,6 @@ interface ApiRequestOptions extends RequestInit {
   readonly timeoutMs?: number
 }
 
-/** What the client checks an answer against: any schema in `shared/api.ts`. */
 type Schema<T> = z.ZodType<T, z.ZodTypeDef, unknown>
 
 async function request(path: string, options: ApiRequestOptions = {}): Promise<Response> {
@@ -124,7 +123,6 @@ async function request(path: string, options: ApiRequestOptions = {}): Promise<R
   throw new ApiError(response.status, failure.code, retryAfterOf(response), failure.stage)
 }
 
-/** Reads `path` and checks the answer against `schema`. */
 async function getJson<T>(
   path: string,
   schema: Schema<T>,
@@ -135,7 +133,6 @@ async function getJson<T>(
   return schema.parse(await response.json())
 }
 
-/** Sends `body` as JSON — or nothing, when it is undefined — and checks the answer against `schema`; `signal` abandons it. */
 async function sendJson<T>(
   method: 'POST' | 'PUT' | 'DELETE',
   path: string,
@@ -151,7 +148,6 @@ async function sendJson<T>(
   return schema.parse(await response.json())
 }
 
-/** `path`, with `?params` only when there are any. */
 function withQuery(path: string, params: URLSearchParams): string {
   return params.size > 0 ? `${path}?${params}` : path
 }
@@ -275,7 +271,6 @@ export function fetchDigestCalendar(signal?: AbortSignal): Promise<DigestCalenda
   return getJson('/api/digest/days', digestCalendarSchema, { signal })
 }
 
-/** Searches retained reading metadata only, within the scope; results ranked by match quality blended with recency. */
 export function fetchSearchResults(
   query: string,
   scope: SearchScope,
@@ -285,7 +280,6 @@ export function fetchSearchResults(
   return getJson(withQuery('/api/search', searchParamsOf(query, scope, sort)), searchResultsSchema, { signal })
 }
 
-/** Newest save first needs no parameter; a cursor continues the order it came from. */
 export function fetchLibrary(order: LibraryOrder, cursor?: string, signal?: AbortSignal): Promise<Library> {
   const params = new URLSearchParams()
   if (order !== 'newest') params.set('order', order)

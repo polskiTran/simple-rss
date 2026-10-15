@@ -38,7 +38,6 @@ export class UpstreamFixtures {
     return this
   }
 
-  /** Stubs a URL whose response changes between calls, e.g. a growing Feed. */
   stubDynamic(url: string, respond: () => FixtureResponse): this {
     this.#responses.set(url, respond)
     return this
@@ -121,7 +120,6 @@ export class UpstreamFixtures {
   }
 }
 
-/** A stream that yields the given chunks, so a test can watch bytes arrive. */
 export function chunkedBody(chunks: readonly Uint8Array[]): ReadableStream<Uint8Array> {
   let index = 0
   return new ReadableStream<Uint8Array>({

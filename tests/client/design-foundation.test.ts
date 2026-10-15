@@ -11,7 +11,6 @@ beforeAll(async () => {
   css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
 })
 
-/** Every `property: value` declaration of a property, value trimmed, comments ignored. */
 function declarations(property: string): string[] {
   const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
   return [...code.matchAll(new RegExp(`(?:^|[;{\\s])${property}\\s*:\\s*([^;{}]+)`, 'g'))].map(([, value]) =>

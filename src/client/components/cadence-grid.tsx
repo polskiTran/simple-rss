@@ -4,13 +4,10 @@ import { cadenceDayLabel, type CadenceGrid as Grid } from '../cadence.js'
 interface CadenceGridProps {
   readonly grid: Grid
   readonly title: string
-  /** The day on show, ringed. */
   readonly selected?: string | undefined
-  /** A day with items is a button that brings its items into view. */
   onShowDay(date: string): void
 }
 
-/** 26 weeks as columns of seven days, oldest on the left, with months under them. */
 export function CadenceGrid({ grid, title, selected, onShowDay }: CadenceGridProps) {
   return (
     <div className="cadence-figure">
@@ -59,7 +56,6 @@ export function CadenceGrid({ grid, title, selected, onShowDay }: CadenceGridPro
   )
 }
 
-/** The five shades a count is drawn in, least to most. */
 export function CadenceLegend() {
   return (
     <p className="cadence-legend" aria-hidden="true">

@@ -39,7 +39,6 @@ afterEach(() => {
 
 type User = ReturnType<typeof userEvent.setup>
 
-/** Opens Add feed and pastes the address, which looks it up at once. */
 async function lookUp(user: User, address: string) {
   await user.click(await screen.findByRole('button', { name: 'Add feed' }))
   await user.click(await screen.findByRole('textbox', { name: 'URL' }))
@@ -59,7 +58,6 @@ async function importFile(user: User, file: File) {
   await user.click(screen.getByRole('button', { name: 'Import' }))
 }
 
-/** Thirty days of Cadence with items on the first `active` of them. */
 function activeOn(active: number): number[] {
   return Array.from({ length: 30 }, (_, index) => (index < active ? 1 : 0))
 }

@@ -9,13 +9,10 @@ interface FieldProps {
   readonly type?: 'text' | 'password' | 'url'
   readonly autoComplete?: string
   readonly autoFocus?: boolean
-  /** What stands when the value is left blank, e.g. a Feed's reported title. */
   readonly placeholder?: string | undefined
   readonly maxLength?: number
   readonly multiline?: boolean
-  /** One line under the control saying what the value does. */
   readonly note?: string | undefined
-  /** The reason the value was refused; replaces the note and rings the control. */
   readonly error?: string | undefined
   onChange(value: string): void
 }
