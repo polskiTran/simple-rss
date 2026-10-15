@@ -74,6 +74,11 @@ interface ExtractionTask {
   workerQueueMs?: number
 }
 
+type ReaderWorkerSlot =
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'idle'; readonly worker: Worker }
+  | { readonly kind: 'running'; readonly worker: Worker; readonly task: ExtractionTask }
+
 export class ReaderExtractor {
   readonly #clock: Clock
   readonly #imageSigningKey: Uint8Array
@@ -81,9 +86,8 @@ export class ReaderExtractor {
   readonly #workerUrl: URL
   readonly #queue: ExtractionTask[] = []
   #nextId = 1
-  #worker: Worker | undefined
   #retirement: Promise<void> | undefined
-  #active: ExtractionTask | undefined
+  #slot: ReaderWorkerSlot = { kind: 'absent' }
   #closed = false
 
   constructor(options: {
@@ -96,7 +100,8 @@ export class ReaderExtractor {
     this.#imageSigningKey = options.imageSigningKey
     this.#logger = options.logger
     this.#workerUrl = options.workerUrl ?? readerWorkerUrl()
-    this.#worker = this.#spawnWorker()
+    const worker = this.#spawnWorker()
+    this.#slot = worker ? { kind: 'idle', worker } : { kind: 'absent' }
   }
 
   extract(input: ReaderExtractionInput, signal: AbortSignal): Promise<ReaderExtractionResult> {
@@ -127,34 +132,40 @@ export class ReaderExtractor {
     const queued = this.#queue.splice(0, this.#queue.length)
     for (const task of queued) this.#settleCancelled(task)
 
-    const active = this.#active
-    this.#active = undefined
-    if (active) this.#settleCancelled(active)
+    const slot = this.#slot
+    this.#slot = { kind: 'absent' }
+    if (slot.kind === 'running') this.#settleCancelled(slot.task)
 
     const retirement = this.#retirement
-    const worker = this.#worker
-    this.#worker = undefined
-    if (worker) {
-      worker.removeAllListeners()
-      await this.#terminateWorker(worker)
+    if (slot.kind !== 'absent') {
+      slot.worker.removeAllListeners()
+      await this.#terminateWorker(slot.worker)
     }
     if (retirement) await retirement
   }
 
   #pump(): void {
-    if (this.#closed || this.#retirement || this.#active || this.#queue.length === 0) return
+    if (this.#closed || this.#retirement || this.#slot.kind === 'running' || this.#queue.length === 0) return
 
-    const worker = this.#worker ?? this.#spawnWorker()
-    this.#worker = worker
-    const task = this.#queue.shift()
-    if (!task) return
+    let worker = this.#slot.kind === 'idle' ? this.#slot.worker : undefined
     if (!worker) {
-      this.#settle(task, { kind: 'failed' })
-      this.#pump()
+      worker = this.#spawnWorker()
+      if (!worker) {
+        const failed = this.#queue.shift()
+        if (!failed) return
+        this.#settle(failed, { kind: 'failed' })
+        this.#pump()
+        return
+      }
+    }
+
+    const task = this.#queue.shift()
+    if (!task) {
+      this.#slot = { kind: 'idle', worker }
       return
     }
 
-    this.#active = task
+    this.#slot = { kind: 'running', worker, task }
     task.workerQueueMs = elapsedMs(task.enqueuedAt)
     const request: ReaderWorkerRequest = {
       id: task.id,
@@ -179,38 +190,35 @@ export class ReaderExtractor {
       return
     }
 
-    const active = this.#active
-    if (!active || active.id !== id) return
-    this.#active = undefined
-    this.#settleCancelled(active)
-
-    // An active task always has a worker: `#pump` activates only on one, and
-    // every path that drops the worker clears `#active` with it.
-    const worker = this.#worker
-    this.#worker = undefined
-    if (worker) this.#retireWorker(worker, true)
+    if (this.#slot.kind !== 'running' || this.#slot.task.id !== id) return
+    const { worker, task } = this.#slot
+    this.#slot = { kind: 'absent' }
+    this.#settleCancelled(task)
+    this.#retireWorker(worker, true)
   }
 
   #onMessage(worker: Worker, value: ReaderWorkerReply | undefined): void {
-    if (worker !== this.#worker) return
+    const slot = this.#slot
+    if (slot.kind === 'absent' || slot.worker !== worker) return
     if (!value) {
       this.#logger.error('reader.worker_protocol_failed', {})
       this.#replaceFailedWorker(worker)
       return
     }
 
-    const active = this.#active
-    if (!active || value.id !== active.id) {
+    if (slot.kind !== 'running' || value.id !== slot.task.id) {
       this.#logger.error('reader.worker_protocol_failed', { taskId: value.id })
       this.#replaceFailedWorker(worker)
       return
     }
 
-    this.#active = undefined
+    this.#slot = { kind: 'idle', worker }
     const timings: ReaderExtractionTimings =
-      active.workerQueueMs === undefined ? value.timings : { ...value.timings, workerQueueMs: active.workerQueueMs }
+      slot.task.workerQueueMs === undefined
+        ? value.timings
+        : { ...value.timings, workerQueueMs: slot.task.workerQueueMs }
     this.#settle(
-      active,
+      slot.task,
       value.kind === 'extracted'
         ? { kind: 'extracted', article: value.article, timings }
         : { kind: 'unreadable', timings },
@@ -219,16 +227,16 @@ export class ReaderExtractor {
   }
 
   #replaceFailedWorker(worker: Worker, error?: Error): void {
-    if (worker !== this.#worker) return
-    this.#worker = undefined
-    const replace = this.#active !== undefined || this.#queue.length > 0
+    const slot = this.#slot
+    if (slot.kind === 'absent' || slot.worker !== worker) return
+    const task = slot.kind === 'running' ? slot.task : undefined
+    const replace = task !== undefined || this.#queue.length > 0
+    this.#slot = { kind: 'absent' }
 
     if (error !== undefined) {
       this.#logger.error('reader.worker_failed', { error })
     }
-    const active = this.#active
-    this.#active = undefined
-    if (active) this.#settle(active, { kind: 'failed' })
+    if (task) this.#settle(task, { kind: 'failed' })
 
     this.#retireWorker(worker, replace)
   }
@@ -243,7 +251,8 @@ export class ReaderExtractor {
       })
       worker.on('error', (error) => this.#replaceFailedWorker(worker, error))
       worker.on('exit', (code) => {
-        if (worker === this.#worker) {
+        const slot = this.#slot
+        if (slot.kind !== 'absent' && slot.worker === worker) {
           this.#replaceFailedWorker(worker, new Error(`Reader worker exited with code ${code}`))
         }
       })
@@ -261,7 +270,10 @@ export class ReaderExtractor {
     void retirement.then(() => {
       if (this.#retirement !== retirement) return
       this.#retirement = undefined
-      if (!this.#closed && replace) this.#worker = this.#spawnWorker()
+      if (!this.#closed && replace) {
+        const spawned = this.#spawnWorker()
+        this.#slot = spawned ? { kind: 'idle', worker: spawned } : { kind: 'absent' }
+      }
       this.#pump()
     })
   }
