@@ -350,3 +350,51 @@ describe('the quiet states of one Feed', () => {
     expect(await screen.findByText('The feed didn’t load. Try again in a moment.')).toBeDefined()
   })
 })
+
+describe('moving from one Feed to the next', () => {
+  it('shows nothing of the feed just left while the next one loads', async () => {
+    const next = Promise.withResolvers<{ body: ReturnType<typeof feedDetail> }>()
+    stubApi()
+      .on('GET /api/feeds/2', {
+        body: feedDetail({
+          feedId: 2,
+          title: 'Other Wire',
+          domain: 'wire.example',
+          homePageUrl: 'https://wire.example/',
+        }),
+      })
+      .on('GET /api/feeds/2/items', {
+        body: feedItems({ items: [feedItemRow({ feedItemId: 8, title: 'Second light' })] }),
+      })
+      .on('GET /api/feeds/1', () => next.promise)
+      .on('GET /api/feeds/1/items', () => new Promise(() => {}))
+    window.history.replaceState(null, '', '/feeds/1')
+    window.history.pushState(null, '', '/feeds/2')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Other Wire' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Second light' })).toBeDefined()
+
+    window.history.back()
+
+    expect(await screen.findByText('Loading the feed')).toBeDefined()
+    expect(screen.queryByText('Other Wire')).toBeNull()
+    expect(screen.queryByText('Second light')).toBeNull()
+    expect(screen.queryByText('wire.example')).toBeNull()
+
+    next.resolve({
+      body: feedDetail({
+        feedId: 1,
+        title: 'Morning Wire',
+        domain: 'morning.example',
+        homePageUrl: 'https://morning.example/',
+      }),
+    })
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Morning Wire' })).toBeDefined()
+    expect(screen.getByText('Loading the items')).toBeDefined()
+    expect(screen.queryByText('Other Wire')).toBeNull()
+    expect(screen.queryByText('Second light')).toBeNull()
+    expect(screen.queryByText('wire.example')).toBeNull()
+  })
+})

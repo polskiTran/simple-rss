@@ -48,10 +48,9 @@ function reading(path: string): StubbedApi {
   return api
 }
 
-/** The view's own way back, after the phone bar's square that repeats it. */
 function wayBack() {
-  const way = screen.getAllByRole('link', { name: /^Back to / }).at(-1)
-  if (!way) throw new Error('the screen offers no way back')
+  const way = document.querySelector('.chrome-back')
+  if (!(way instanceof HTMLElement)) throw new Error('the screen offers no way back')
   return way
 }
 

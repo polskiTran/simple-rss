@@ -55,19 +55,18 @@ interface FeedViewProps {
 }
 
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
-  const [state, { retry, set }] = useResource(String(feedId), (signal) => fetchFeedDetail(feedId, signal))
-  const inView = valueInView(state)
-  // While another Feed loads, the one it replaces is not this Feed's to show.
-  const detail = inView?.feedId === feedId ? inView : undefined
+  const [state, { retry, set }] = useResource(String(feedId), (signal) => fetchFeedDetail(feedId, signal), {
+    retainOnNewKey: false,
+  })
+  const detail = valueInView(state)
   useScreenTitle(detail?.title)
-  // Each page carries its Feed, so a page of the Feed just left never shows under this one.
   const [itemsState, pages] = usePagedResource(
     String(feedId),
-    async (cursor, signal) => ({ feedId, ...(await fetchFeedItems(feedId, cursor ?? '', signal)) }),
+    (cursor, signal) => fetchFeedItems(feedId, cursor ?? '', signal),
     (shown, page) => ({ ...shown, items: [...shown.items, ...page.items], nextFrom: page.nextFrom }),
+    { retainOnNewKey: false },
   )
-  const itemsInView = valueInView(itemsState)
-  const items = itemsInView?.feedId === feedId ? itemsInView : undefined
+  const items = valueInView(itemsState)
   // A day picked on the cadence grid, waiting for the page that brings it.
   const [shownDay, setShownDay] = useState<string>()
   const [notice, setNotice] = useState('')
