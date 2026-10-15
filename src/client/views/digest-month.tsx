@@ -10,7 +10,6 @@ import { counted, longDay, monthOfYear } from '../day-names.js'
 
 interface DigestMonthProps {
   readonly calendar: DigestCalendar
-  /** The day the Digest starts from, ringed. */
   readonly selected: string
   onPick(date: string): void
 }

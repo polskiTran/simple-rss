@@ -24,7 +24,6 @@ interface ItemBoxProps {
   /** Search results mark their matches; everything else shows the plain title. */
   readonly titleContent?: ReactNode
   readonly snippet?: ReactNode
-  /** Said under the time, in the meta column. */
   readonly note?: ReactNode
   onOpen(feedItemId: number): void
   onSaved(saved: boolean): void

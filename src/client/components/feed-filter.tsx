@@ -1,7 +1,6 @@
 import { Group } from './group.js'
 
 interface FeedFilterProps {
-  /** Ties the heading to its section; unique on the page. */
   readonly id: string
   readonly title: string
   readonly feeds: readonly { feedId: number; title: string; count: number }[]

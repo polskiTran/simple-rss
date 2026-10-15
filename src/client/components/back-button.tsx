@@ -9,7 +9,6 @@ interface BackButtonProps {
   onBack(origin: Origin): void
 }
 
-/** The way out of a nested screen, named after the screen it returns to. */
 export function BackButton({ origin, className, onBack }: BackButtonProps) {
   return (
     <RoutedLink

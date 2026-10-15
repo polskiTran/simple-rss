@@ -105,7 +105,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     }
   }
 
-  // Typing looks up once it pauses on something that could be an address.
   const lookUpPaused = useEffectEvent((line: string) => void lookUp(line))
   useEffect(() => {
     if (!open || way !== 'address' || lookup.kind !== 'idle' || !feedAddressOf(address)) return
@@ -145,7 +144,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     })
   }
 
-  /** Subscribes to the chosen Feed once there is one, and looks the address up otherwise. */
   function proceed() {
     if (working) return
     if (lookup.kind === 'found') {
@@ -289,7 +287,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
   )
 }
 
-/** A preview as the dialog holds it: a Feed alone, a page's Feeds with the first chosen, or the page's silence. */
 function found(preview: FeedPreviewResponse, host: string): Lookup {
   if (preview.kind === 'feed') return { kind: 'found', host, feeds: [preview.feed], chosen: preview.feed }
   const [first] = preview.feeds
@@ -299,10 +296,6 @@ function found(preview: FeedPreviewResponse, host: string): Lookup {
   return { kind: 'found', host: preview.host, feeds: preview.feeds, chosen: first }
 }
 
-/**
- * What the address answered. One Feed stands on its own; several are a choice,
- * one box each, and only the chosen one opens to its newest titles.
- */
 function FoundFeeds({
   host,
   feeds,
@@ -393,7 +386,6 @@ function FeedHead({ feed, today, id }: { feed: FeedPreview; today: string; id: s
   )
 }
 
-/** An open Feed: a word on its silence, its newest titles with their days, and the address Subscribe sends. */
 function FeedDetail({ feed, today }: { feed: FeedPreview; today: string }) {
   const lastItem = lastDay(feed)
   return (

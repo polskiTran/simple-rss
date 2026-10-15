@@ -43,7 +43,6 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
   )
 }
 
-/** The list after a SaveToggle answered: the one Feed Item's `saved` replaced, every other item as it was. */
 export function withSaved<Item extends { readonly feedItemId: number; readonly saved: boolean }>(
   items: readonly Item[],
   feedItemId: number,

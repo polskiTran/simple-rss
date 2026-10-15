@@ -169,7 +169,6 @@ export function SearchResultsView({
   )
 }
 
-/** The Feeds the results came from, most results first. */
 function feedsOf(results: readonly SearchResult[]) {
   return [...Map.groupBy(results, (result) => result.feedId)]
     .map(([feedId, matches]) => ({ feedId, title: matches[0]?.feedTitle ?? '', count: matches.length }))

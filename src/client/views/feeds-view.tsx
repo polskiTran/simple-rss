@@ -268,7 +268,6 @@ function FeedRows({
   )
 }
 
-/** A row also says when a Feed has never been checked, or why checking fails, and offers the retry. */
 function Availability({
   subscription,
   onRetry,

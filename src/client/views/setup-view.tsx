@@ -8,7 +8,6 @@ import { describeFailure, reasonToHold } from './password-failure.js'
 
 interface SetupViewProps {
   onClaimed(status: AuthStatus): void
-  /** Called when the server says someone else got here first. */
   onAlreadyClaimed(): void
 }
 
