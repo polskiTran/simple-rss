@@ -553,7 +553,8 @@
     background: var(--color-toggle-off);
   }
 
-  .select-control:disabled {
+  .select-control[aria-disabled='true'] {
+    background: var(--color-control);
     color: var(--color-ink-3);
     cursor: not-allowed;
   }

@@ -10,7 +10,9 @@ interface NativeSelectProps<Value extends string> {
 
 /**
  * A grey button that opens the platform's own picker — on a phone, the native
- * wheel beats any listbox (ADR 0008). Disabling it drops focus, as ever.
+ * wheel beats any listbox (ADR 0008). Disabled, it keeps keyboard focus, as
+ * Button's `focusableWhenDisabled` does: it reads as disabled and ignores changes
+ * rather than taking the native `disabled`, which drops focus to the body.
  */
 export function NativeSelect<const Value extends string>({
   label,
@@ -25,8 +27,9 @@ export function NativeSelect<const Value extends string>({
         className="select-control"
         aria-label={label}
         value={value}
-        disabled={disabled}
+        aria-disabled={disabled}
         onChange={(event) => {
+          if (disabled) return
           const chosen = options.find((option) => option.value === event.target.value)
           if (chosen) onChange(chosen.value)
         }}

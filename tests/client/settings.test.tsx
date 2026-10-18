@@ -37,6 +37,28 @@ describe('the Settings timezone', () => {
     expect(api.requestsTo('PUT /api/settings/timezone')[0]?.body).toEqual({ timezone: 'Pacific/Auckland' })
   })
 
+  it('keeps the select focusable while a choice saves, ignoring another until it lands', async () => {
+    const reply = Promise.withResolvers<void>()
+    const api = stubApi().on('PUT /api/settings/timezone', async (request) => {
+      await reply.promise
+      return { body: { timezone: (request.body as { timezone: string }).timezone } }
+    })
+    openSettings()
+    const user = userEvent.setup()
+
+    const select = await screen.findByLabelText('Installation timezone')
+    await user.selectOptions(select, 'Pacific/Auckland')
+
+    await waitFor(() => expect(select.getAttribute('aria-disabled')).toBe('true'))
+    expect(select).toHaveProperty('disabled', false)
+    await user.selectOptions(select, 'Europe/Paris')
+    expect(select).toHaveProperty('value', 'Pacific/Auckland')
+
+    reply.resolve()
+    await waitFor(() => expect(select.getAttribute('aria-disabled')).toBe('false'))
+    expect(api.requestsTo('PUT /api/settings/timezone')).toHaveLength(1)
+  })
+
   it('keeps the held timezone and says so when the server refuses the choice', async () => {
     stubApi().on('PUT /api/settings/timezone', {
       status: 400,
