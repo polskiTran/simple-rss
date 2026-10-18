@@ -89,8 +89,9 @@ export async function startService(options: ServiceOptions): Promise<RunningServ
   const shutdown = async (): Promise<void> => {
     const graceMs = config.shutdownGraceMs
     logger.info('server.stopping', { graceMs })
-    services?.scheduler.stop()
+    const polling = services?.scheduler.stop()
     await drain(server, graceMs, logger)
+    await polling
     await services?.reader.close()
     services?.db.$client.close()
     logger.info('server.stopped')

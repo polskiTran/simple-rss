@@ -450,21 +450,21 @@ async function subscribedOnScript(service: TestService, url: string): Promise<nu
   return body.subscription.feedId
 }
 
-describe('congestion at the retrieval boundary', () => {
-  function feedBytes(url: string): RetrievalBytesResult {
-    return {
-      ok: true,
-      status: 200,
-      url,
-      contentType: 'application/rss+xml',
-      charset: undefined,
-      etag: null,
-      lastModified: null,
-      notModified: false,
-      bytes: new TextEncoder().encode(rss('Field Notes')),
-    }
+function feedBytes(url: string): RetrievalBytesResult {
+  return {
+    ok: true,
+    status: 200,
+    url,
+    contentType: 'application/rss+xml',
+    charset: undefined,
+    etag: null,
+    lastModified: null,
+    notModified: false,
+    bytes: new TextEncoder().encode(rss('Field Notes')),
   }
+}
 
+describe('congestion at the retrieval boundary', () => {
   it('defers the attempt without blaming the Feed when no retrieval slot was available', async () => {
     const url = 'https://one.example/feed'
     const service = await startTestService({
@@ -496,5 +496,36 @@ describe('congestion at the retrieval boundary', () => {
       consecutiveFailures: 0,
       lastFailureCategory: null,
     })
+  })
+})
+
+describe('a poll that throws instead of reaching a verdict', () => {
+  it('moves the Feed down the due frontier, so it cannot starve the Feeds behind it', async () => {
+    const throwing = ['https://one.example/feed', 'https://two.example/feed']
+    const healthy = 'https://three.example/feed'
+    const checked = new Set<string>()
+    const service = await startTestService({
+      clock: new ManualClock(START),
+      scheduling: { batchLimit: throwing.length },
+      retrieval: {
+        retrieve: () => Promise.reject(new Error('these polls buffer, they never stream')),
+        retrieveBytes: async (request) => {
+          const url = String(request.url)
+          if (throwing.includes(url) && checked.has(url)) throw new Error('ingest broke')
+          checked.add(url)
+          return feedBytes(url)
+        },
+      },
+    })
+    const user = await claimedDevice(service)
+    for (const url of throwing) expect((await user.post('/api/subscriptions', { url })).status).toBe(201)
+    service.clock.advance(60 * 60_000)
+    const response = await user.post('/api/subscriptions', { url: healthy })
+    const healthyFeedId = ((await response.json()) as { subscription: { feedId: number } }).subscription.feedId
+    service.clock.advance(4 * 60 * 60_000)
+
+    await service.wakeScheduler()
+
+    expect(storedAvailability(service, healthyFeedId).lastPolledAt).toBe(service.clock.now().toISOString())
   })
 })

@@ -16,7 +16,7 @@ process immediately rather than at the first request that trips over it.
 | `SHUTDOWN_GRACE_MS` | `10000` | How long in-flight requests may finish after `SIGTERM`. |
 | `SETUP_SECRET` | — | The one-time secret that lets the first visitor become the User. **Required until the installation is claimed**; ignored afterwards. At least 16 characters. |
 | `PUBLIC_ORIGIN` | — | **Required.** The canonical HTTP or HTTPS origin the User uses, e.g. `https://reader.up.railway.app`. Outbound retrieval refuses this origin so a Feed or Feed Item link cannot point the installation back at its own API. |
-| `TRUST_PROXY_HEADERS` | `true` | Whether `X-Forwarded-For` may be believed when identifying a client for rate limiting. Leave it on behind a platform proxy; set `false` if the service is exposed directly. |
+| `TRUST_PROXY_HEADERS` | `true` | Whether `X-Forwarded-For` may be believed when identifying a client for rate limiting. Leave it on behind a platform proxy; set `false` if the service is exposed directly, otherwise a caller can rotate the header to escape the per-address limit (the installation-wide limit still applies). |
 | `ALLOW_RESERVED_FETCH_DESTINATIONS` | unset | Dev only. Set to exactly `true` when DNS resolves every host to `198.18.0.1`, so retrieval may use the `198.18.0.0/15` benchmarking range. Every other private or reserved range stays blocked. `NODE_ENV=production` ignores the variable and logs a warning once at startup. |
 
 Generate the setup secret with something that is not a word:
@@ -379,8 +379,9 @@ automatically. Upgrading is deliberate:
    and holds traffic until they finish.
 
 Migrations only move forward — a newer build never downgrades a database, and
-an older build must not be pointed at a volume a newer one migrated. Rolling
-back therefore means the backup, not the old image alone: deploy the previous
+an older build pointed at a volume a newer one migrated refuses it: it stays
+unready and logs the database's schema version beside its own. Rolling back
+therefore means the backup, not the old image alone: deploy the previous
 image version against a fresh data directory restored from the pre-upgrade
 snapshot, accepting that anything that happened after that snapshot is lost.
 

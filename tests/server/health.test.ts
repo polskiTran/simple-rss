@@ -5,6 +5,7 @@ import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { livenessSchema, readinessSchema } from '../../src/shared/api.js'
 import { DATABASE_FILE } from '../../src/server/config.js'
+import { migrations } from '../../src/server/persistence/migrations.js'
 import { startTestService } from '../support/service-harness.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
@@ -60,6 +61,24 @@ describe('health endpoints', () => {
     expect(readinessSchema.parse(await ready.json())).toEqual({ status: 'unready', reason: 'migrations failed' })
     // SQLite removes the WAL when its last connection closes.
     expect(existsSync(`${databasePath}-wal`)).toBe(false)
+  })
+
+  it('refuses to start on a database a newer release has migrated, as after rolling the image back', async () => {
+    const service = await startTestService()
+    await service.stop()
+    const newer = new Database(join(service.dataDir, DATABASE_FILE))
+    newer
+      .prepare("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, 'from-the-future', ?)")
+      .run(migrations.length + 1, new Date().toISOString())
+    newer.close()
+
+    await service.restart()
+    const ready = await service.fetch('/health/ready')
+
+    expect(readinessSchema.parse(await ready.json())).toEqual({ status: 'unready', reason: 'migrations failed' })
+    expect(service.logs.findLast((record) => record.message === 'startup.failed')).toMatchObject({
+      error: { message: expect.stringContaining(`schema version ${migrations.length + 1}`) },
+    })
   })
 
   it('refuses API requests when startup failed', async () => {
