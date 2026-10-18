@@ -24,6 +24,7 @@ export function OlderItems({
         className="button"
         focusableWhenDisabled
         disabled={older === 'loading'}
+        aria-busy={older === 'loading'}
         onClick={() => onLoadOlder(nextCursor)}
       >
         {older === 'loading' ? `Loading more ${noun}…` : older === 'failed' ? 'Retry' : 'Show more'}

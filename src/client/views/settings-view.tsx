@@ -69,7 +69,7 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
         </Setting>
         <Setting label="Session">
           <div className="setting-stack">
-            <Button className="button" focusableWhenDisabled disabled={leaving} onClick={leave}>
+            <Button className="button" focusableWhenDisabled disabled={leaving} aria-busy={leaving} onClick={leave}>
               Sign out
             </Button>
             <p className="note note-error" role="status">

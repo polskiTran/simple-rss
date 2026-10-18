@@ -31,6 +31,69 @@ describe('colour', () => {
   })
 })
 
+/** Each colour token's light and dark values, `var()` aliases followed. */
+function tokens(): Map<string, readonly [string, string]> {
+  const raw = new Map(
+    [...css.matchAll(/--color-([\w-]+)\s*:\s*([^;]+);/g)].map(([, name = '', value = '']) => [name, value] as const),
+  )
+  const resolve = (name: string): readonly [string, string] => {
+    const value = raw.get(name) ?? ''
+    const alias = value.match(/^var\(--color-([\w-]+)\)$/)
+    if (alias?.[1]) return resolve(alias[1])
+    const pair = value.match(/^light-dark\((oklch\([^)]*\)),\s*(oklch\([^)]*\))\)$/)
+    if (!pair?.[1] || !pair[2]) throw new Error(`--color-${name} is not a light-dark() pair`)
+    return [pair[1], pair[2]]
+  }
+  return new Map([...raw.keys()].map((name) => [name, resolve(name)]))
+}
+
+/** WCAG relative luminance of an opaque `oklch(L% C h)`, through linear sRGB. */
+function luminance(colour: string): number {
+  const [lightness = 0, chroma = 0, hue = 0] = (colour.match(/[\d.]+/g) ?? []).map(Number)
+  const L = lightness / 100
+  const a = chroma * Math.cos((hue * Math.PI) / 180)
+  const b = chroma * Math.sin((hue * Math.PI) / 180)
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3
+  const clamp = (channel: number) => Math.min(1, Math.max(0, channel))
+  const red = clamp(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s)
+  const green = clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s)
+  const blue = clamp(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+}
+
+function contrast(one: string, other: string): number {
+  const [light, dark] = [luminance(one), luminance(other)].sort((x, y) => y - x)
+  return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05)
+}
+
+// The pairs docs/DESIGN.md §2 promises, as [text, ground, least ratio].
+const PROMISED: readonly (readonly [string, string, number])[] = [
+  ['ink-2', 'ground', 4.5],
+  ['ink-2', 'control', 4.5],
+  ...['control', 'control-hover', 'toggle-off', 'segment'].map((fill) => ['ink-off', fill, 4.5] as const),
+  ['ink-3', 'ink', 4.5],
+  ['ramp-2', 'ground', 3],
+  ...['ramp-1', 'ramp-2'].map((fill) => ['ink', fill, 4.5] as const),
+  ...['ramp-3', 'ramp-4', 'ramp-5'].map((fill) => ['ground', fill, 4.5] as const),
+  ...['ground', 'control', 'danger-fill'].map((fill) => ['danger', fill, 4.5] as const),
+  ['feed-name', 'ground', 4.5],
+  ['away', 'ground', 4.5],
+  ['ink', 'match', 4.5],
+]
+
+describe('contrast', () => {
+  it.each(['light', 'dark'] as const)('keeps every promised pair in %s', (mode) => {
+    const colours = tokens()
+    const side = mode === 'light' ? 0 : 1
+    for (const [text, ground, least] of PROMISED) {
+      const ratio = contrast(colours.get(text)?.[side] ?? '', colours.get(ground)?.[side] ?? '')
+      expect(ratio, `${text} on ${ground}`).toBeGreaterThanOrEqual(least)
+    }
+  })
+})
+
 describe('shape', () => {
   it('has no rounded corners', () => {
     for (const value of declarations('border-radius')) expect(value).toBe('0')

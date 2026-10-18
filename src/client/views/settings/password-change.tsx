@@ -82,7 +82,13 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
         </p>
         <div className="dialog-footer">
           <DialogCancel disabled={saving} />
-          <Button className="button button-primary" type="submit" focusableWhenDisabled disabled={!ready || saving}>
+          <Button
+            className="button button-primary"
+            type="submit"
+            focusableWhenDisabled
+            disabled={!ready || saving}
+            aria-busy={saving}
+          >
             {saving ? 'Changing…' : 'Change password'}
           </Button>
         </div>

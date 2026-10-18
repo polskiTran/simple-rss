@@ -171,7 +171,13 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
         </div>
         <div className="toolbar-group feed-actions">
           <EditFeed detail={detail} onSaved={(details) => set((current) => ({ ...current, ...details }))} />
-          <Button className="button" focusableWhenDisabled disabled={refreshing} onClick={refresh}>
+          <Button
+            className="button"
+            focusableWhenDisabled
+            disabled={refreshing}
+            aria-busy={refreshing}
+            onClick={refresh}
+          >
             <Icon name="refresh" />
             {refreshing ? 'Refreshing…' : 'Refresh now'}
           </Button>
@@ -221,7 +227,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
                   value: String(minutes),
                   label: INTERVALS[minutes].label,
                 }))}
-                disabled={changing}
+                busy={changing}
                 onChange={(chosen) => {
                   const minutes = POLLING_INTERVAL_MINUTES.find((offered) => String(offered) === chosen)
                   if (minutes !== undefined) changeInterval(minutes)
@@ -405,7 +411,13 @@ function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: 
         </p>
         <div className="dialog-footer">
           <DialogCancel disabled={saving} />
-          <Button className="button button-primary" type="submit" focusableWhenDisabled disabled={!changed || saving}>
+          <Button
+            className="button button-primary"
+            type="submit"
+            focusableWhenDisabled
+            disabled={!changed || saving}
+            aria-busy={saving}
+          >
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </div>
@@ -453,7 +465,13 @@ function Unsubscribe({
     >
       <div className="dialog-footer">
         <DialogCancel disabled={working} />
-        <Button className="button button-danger" focusableWhenDisabled disabled={working} onClick={unsubscribe}>
+        <Button
+          className="button button-danger"
+          focusableWhenDisabled
+          disabled={working}
+          aria-busy={working}
+          onClick={unsubscribe}
+        >
           {working ? 'Unsubscribing…' : 'Unsubscribe'}
         </Button>
       </div>

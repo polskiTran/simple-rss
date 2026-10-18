@@ -241,7 +241,7 @@ describe('the chronological Digest', () => {
 
 const CALENDAR = {
   today: '2026-08-08',
-  days: cadenceWindow({ '2026-08-08': 2, '2026-08-07': 1, '2026-08-03': 4, '2026-06-03': 1 }),
+  days: cadenceWindow({ '2026-08-08': 2, '2026-08-07': 1, '2026-08-03': 4, '2026-07-31': 2, '2026-06-03': 1 }),
   subscriptions: 1,
 }
 
@@ -280,6 +280,21 @@ describe('the Digest from a day', () => {
     expect(window.location.search).toBe('')
     expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
+  })
+
+  it('draws the days of the months either side as plain numbers, picked in their own month', async () => {
+    digestWithCalendar()
+    window.history.replaceState(null, '', '/digest')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const august = await screen.findByRole('region', { name: 'August 2026' })
+    expect(within(august).queryByRole('button', { name: '2 items on 31 July 2026' })).toBeNull()
+
+    await user.click(within(august).getByRole('button', { name: 'Previous month' }))
+
+    const july = await screen.findByRole('region', { name: 'July 2026' })
+    expect(within(july).getByRole('button', { name: '2 items on 31 July 2026' })).toBeDefined()
   })
 
   it('starts from a day chosen in the date picker, and from today when today is chosen', async () => {

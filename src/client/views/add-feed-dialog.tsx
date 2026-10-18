@@ -264,7 +264,13 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
         <div className="dialog-footer">
           <DialogCancel disabled={working} />
           {way === 'opml' ? (
-            <Button className="button button-primary" type="submit" focusableWhenDisabled disabled={!file || working}>
+            <Button
+              className="button button-primary"
+              type="submit"
+              focusableWhenDisabled
+              disabled={!file || working}
+              aria-busy={working}
+            >
               {working ? 'Importing…' : 'Import'}
             </Button>
           ) : failure?.retry ? (
@@ -277,6 +283,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
               type="submit"
               focusableWhenDisabled
               disabled={!chosen || chosen.subscribed || working}
+              aria-busy={working}
             >
               {chosen?.subscribed ? 'Already subscribed' : working ? 'Subscribing…' : 'Subscribe'}
             </Button>
