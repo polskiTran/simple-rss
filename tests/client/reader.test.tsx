@@ -237,6 +237,21 @@ describe('Reader View', () => {
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
   })
 
+  it('says so when saving fails, leaving the item unsaved', async () => {
+    reading().on('PUT /api/library/3', {
+      status: 503,
+      body: { error: { code: 'unavailable', message: 'Unavailable' } },
+    })
+    render(<App />)
+    const user = userEvent.setup()
+
+    const toggle = await screen.findByRole('button', { name: 'Save First light' })
+    await user.click(toggle)
+
+    expect(await screen.findByText('“First light” couldn’t be saved. Try once more.')).toBeDefined()
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  })
+
   it('falls back to the stored summary with open original and retry parsing', async () => {
     let healed = false
     reading().on('GET /api/items/3/reader', () =>
