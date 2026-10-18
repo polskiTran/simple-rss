@@ -4,7 +4,11 @@ export const WINDOW_MS = 15 * 60 * 1000
 
 export const PER_CLIENT_FAILURES = 5
 
+/** Installation-wide failures past which every attempt pays the maximum delay. */
 export const GLOBAL_FAILURES = 20
+
+/** Installation-wide failures past which every attempt is refused, whoever sends it. */
+export const GLOBAL_LIMIT = 100
 
 const BASE_DELAY_MS = 250
 
@@ -26,17 +30,26 @@ export type AttemptVerdict =
 
 export type AllowedAttempt = Extract<AttemptVerdict, { kind: 'allowed' }>
 
+interface Reservation {
+  readonly client: string
+  readonly at: number
+}
+
 /**
- * Counts failed secret checks per client address inside a sliding window.
+ * Counts failed secret checks inside a sliding window, per client address and
+ * across the installation.
  *
  * `begin` records the attempt's start time before the secret is checked, so
- * concurrent checks cannot exceed the limit; that record *is* the failure, and
- * a failure is measured from when its attempt began. The first outcome wins:
- * failure keeps the record, cancel removes it, success forgets the client.
+ * concurrent checks cannot exceed either limit; that record *is* the failure,
+ * and a failure is measured from when its attempt began. The first outcome
+ * wins: failure keeps the record, cancel removes it, success forgets the client.
+ *
+ * Every record lives in one list, oldest first. `GLOBAL_LIMIT` refuses before
+ * the list can grow past it, so however many addresses a caller rotates
+ * through, memory and each `begin` stay bounded.
  */
 export class LoginRateLimiter {
-  /** Start times per client, oldest first. */
-  readonly #attempts = new Map<string, number[]>()
+  #reservations: Reservation[] = []
   readonly #clock: Clock
 
   constructor(clock: Clock) {
@@ -45,10 +58,14 @@ export class LoginRateLimiter {
 
   begin(client: string): AttemptVerdict {
     const now = this.#clock.now().getTime()
-    const recent = this.#recent(client, now)
-    const decisive = recent.at(-PER_CLIENT_FAILURES)
+    this.#reservations = this.#reservations.filter((reservation) => reservation.at > now - WINDOW_MS)
+    const own = this.#reservations.filter((reservation) => reservation.client === client)
+    const decisive = Math.max(
+      own.at(-PER_CLIENT_FAILURES)?.at ?? Number.NEGATIVE_INFINITY,
+      this.#reservations.at(-GLOBAL_LIMIT)?.at ?? Number.NEGATIVE_INFINITY,
+    )
 
-    if (decisive !== undefined && decisive + WINDOW_MS > now) {
+    if (decisive !== Number.NEGATIVE_INFINITY) {
       return {
         kind: 'refused',
         delayMs: MAX_DELAY_MS,
@@ -56,10 +73,10 @@ export class LoginRateLimiter {
       }
     }
 
-    const successDelayMs = this.#cost(recent.length, now)
-    recent.push(now)
-    this.#attempts.set(client, recent)
-    const failureDelayMs = this.#cost(recent.length, now)
+    const successDelayMs = this.#cost(own.length)
+    const reservation: Reservation = { client, at: now }
+    this.#reservations.push(reservation)
+    const failureDelayMs = this.#cost(own.length + 1)
     let open = true
     const settle = (): boolean => {
       const first = open
@@ -75,37 +92,17 @@ export class LoginRateLimiter {
         return failureDelayMs
       },
       recordSuccess: () => {
-        if (settle()) this.#attempts.delete(client)
+        if (settle()) this.#reservations = this.#reservations.filter((kept) => kept.client !== client)
       },
       cancel: () => {
-        if (settle()) this.#release(client, now)
+        if (settle()) this.#reservations = this.#reservations.filter((kept) => kept !== reservation)
       },
     }
   }
 
-  /** Drops one reservation. Records are bare start times, so any one equal to `at` is the same record. */
-  #release(client: string, at: number): void {
-    const kept = this.#attempts.get(client)
-    const index = kept?.indexOf(at) ?? -1
-    if (index !== -1) kept?.splice(index, 1)
-  }
-
-  #cost(clientAttempts: number, now: number): number {
-    const pressure = this.#allRecentCount(now) >= GLOBAL_FAILURES ? MAX_DELAY_MS : 0
+  #cost(clientAttempts: number): number {
+    const pressure = this.#reservations.length >= GLOBAL_FAILURES ? MAX_DELAY_MS : 0
     return Math.max(delayFor(clientAttempts), pressure)
-  }
-
-  #recent(client: string, now: number): number[] {
-    const kept = (this.#attempts.get(client) ?? []).filter((at) => at > now - WINDOW_MS)
-    if (kept.length === 0) this.#attempts.delete(client)
-    else this.#attempts.set(client, kept)
-    return kept
-  }
-
-  #allRecentCount(now: number): number {
-    let count = 0
-    for (const client of this.#attempts.keys()) count += this.#recent(client, now).length
-    return count
   }
 }
 
