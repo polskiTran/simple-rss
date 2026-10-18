@@ -3,6 +3,7 @@ import {
   addFeed,
   expect,
   expectNoHorizontalOverflow,
+  LEDGER_LONG_TITLE,
   USER_PASSWORD,
   SETUP_SECRET,
   test,
@@ -178,6 +179,34 @@ test.describe('the Digest at phone width', () => {
 
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save First light' })).toBeHidden()
+  })
+
+  test('keeps a cut-off title’s bookmark in view, after its ellipsis', async ({ page, installation }) => {
+    await claimAndSubscribe(page, installation, installation.ledgerFeedUrl, 'Valley Ledger')
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await page.getByRole('link', { name: LEDGER_LONG_TITLE }).click()
+    await page.getByRole('button', { name: `Save ${LEDGER_LONG_TITLE}` }).click()
+    await expect(page.getByRole('button', { name: `Saved ${LEDGER_LONG_TITLE}` })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await page.goBack()
+
+    const row = page.locator('.feed-day-item', { hasText: LEDGER_LONG_TITLE })
+    await expect(row.getByRole('img', { name: 'Saved' })).toBeVisible()
+    const shown = await row.evaluate((item) => {
+      const line = item.querySelector('.feed-day-line')
+      const mark = item.querySelector('[aria-label="Saved"]')
+      const time = item.querySelector('time')
+      if (!line || !mark || !time) return null
+      const box = line.getBoundingClientRect()
+      const within = (part: Element) => {
+        const { top, bottom } = part.getBoundingClientRect()
+        return top >= box.top && bottom <= box.bottom + 0.5
+      }
+      return { cut: line.scrollHeight > line.clientHeight, time: within(time), mark: within(mark) }
+    })
+    expect(shown).toEqual({ cut: true, time: true, mark: true })
   })
 
   test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {

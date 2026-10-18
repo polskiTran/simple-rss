@@ -42,6 +42,38 @@ describe('shape', () => {
   })
 })
 
+/** Every rule's prelude, with the preludes of the blocks it is nested in. */
+function rules(): { prelude: string; within: string[] }[] {
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const found: { prelude: string; within: string[] }[] = []
+  const open: string[] = []
+  let start = 0
+  for (let at = 0; at < code.length; at++) {
+    const char = code[at]
+    if (char === '{') {
+      const prelude = code.slice(start, at).trim()
+      found.push({ prelude, within: [...open] })
+      open.push(prelude)
+    } else if (char === '}') open.pop()
+    if (char === '{' || char === '}' || char === ';') start = at + 1
+  }
+  return found
+}
+
+describe('pointer', () => {
+  // A tap reports a hover that never ends, so an ungated hover style sticks after it.
+  it('styles hover only where a pointer can hover', () => {
+    const hovers = rules().filter(({ prelude }) => prelude.includes(':hover'))
+    expect(hovers.length).toBeGreaterThan(0)
+    for (const { prelude, within } of hovers) {
+      expect(
+        within.some((outer) => /^@media[^{]*\(hover:\s*hover\)/.test(outer)),
+        prelude,
+      ).toBe(true)
+    }
+  })
+})
+
 describe('type', () => {
   it('keeps monospace out of the interface', () => {
     expect(css).not.toMatch(/monospace|ui-monospace|Menlo/)

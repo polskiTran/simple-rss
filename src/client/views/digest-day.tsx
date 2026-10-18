@@ -94,7 +94,7 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
 /**
  * A lone item is the ordinary item box. More share one box under the Feed's
  * name, each title opening its own item — on a phone, where the Digest has no
- * save squares, a saved title is marked after its time; past `FOLD_OVER` the box opens folded,
+ * save squares, the time leads a title and a saved title ends with a bookmark; past `FOLD_OVER` the box opens folded,
  * and folds again on Show less — scrolled back to its head if that has left the
  * screen, so the reader stays at the box they closed.
  */
@@ -148,19 +148,21 @@ function FeedDayBox({
         <ul className="feed-day-items">
           {(folded ? feed.items.slice(0, FOLDED_ITEMS) : feed.items).map((item) => (
             <li key={item.feedItemId} className="feed-day-item">
-              <h3 className="feed-day-title">
-                <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpenItem(item.feedItemId)}>
-                  {item.title}
-                </RoutedLink>
-              </h3>
-              <time className="item-when" dateTime={item.publishedAt ?? item.firstSeenAt}>
-                {item.displayTime}
-              </time>
-              {item.saved ? (
-                <span className="feed-day-saved" role="img" aria-label="Saved">
-                  <Icon name="bookmark" filled />
-                </span>
-              ) : null}
+              <div className="feed-day-line">
+                {item.saved ? (
+                  <span className="feed-day-saved" role="img" aria-label="Saved">
+                    <Icon name="bookmark" filled />
+                  </span>
+                ) : null}
+                <time className="item-when" dateTime={item.publishedAt ?? item.firstSeenAt}>
+                  {item.displayTime}
+                </time>
+                <h3 className="feed-day-title">
+                  <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpenItem(item.feedItemId)}>
+                    {item.title}
+                  </RoutedLink>
+                </h3>
+              </div>
               <SaveToggle
                 feedItemId={item.feedItemId}
                 title={item.title}

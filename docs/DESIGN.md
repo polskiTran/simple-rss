@@ -127,7 +127,8 @@ Numbers in counts and meta use tabular figures.
   stands 64px from it, holds 24px from the top as the list scrolls, and scrolls
   itself when taller than the window. Without one, a list runs the page's full
   width.
-- One breakpoint: `max-width: 1024px` is the phone layout.
+- One breakpoint: `max-width: 1024px` is the phone layout. Below 375px the
+  phone's top bar drops its mark to keep every square whole.
 - A row that scrolls sideways fades over its trailing 32px, so what is past
   the edge reads as there: a day's Feed chips at every width, and on a phone
   the jump buttons and a Feed filter's chips.
@@ -143,7 +144,8 @@ shows: mark, switch, search, Saved, Settings. The header scrolls with the page.
 **Phone chrome.** One 60px top bar that scrolls with the page, and nothing
 fixed to the bottom edge: the mark without its wordmark, the Digest / Feeds
 switch, then 44px squares for search, Saved and Settings, the current one
-ringed in ink. An opened Feed swaps the mark and the switch for a back square.
+ringed in ink. Narrower than 375px the mark gives way — the Digest segment
+goes home as well — and no square shrinks or slides under another. An opened Feed swaps the mark and the switch for a back square.
 The Reader keeps only the back square, the search square and its toolbar —
 Open original and Save, and Discussion when the Feed declares one, where Saved
 and Settings stand — so one row holds it
@@ -246,7 +248,8 @@ come from the server; elsewhere a count appears only once the group is loaded.
 the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
 is right-aligned Cancel and the primary action, which stays disabled until
 there is something to submit. On a phone it is a hard-edged sheet, still at most
-560px wide and centred, rising from the bottom edge with Cancel and the primary action side by side at 48px. The
+560px wide and centred, rising from the bottom edge with Cancel and the primary action side by side at 48px;
+a sheet taller than the screen scrolls, and scrolls back to its title. The
 scrim and the desktop panel fade in over 150ms and out over 120ms; the sheet
 rises in over 240ms and sinks out over 180ms, opaque, under the fading scrim.
 While one is open the page's scrollbar gutter takes the scrim's colour too,
@@ -296,8 +299,9 @@ Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the title's row opens the platform's own date picker, in
 place of the month, and a day's chips run past the screen's edge. The phone Digest has no
 save squares, so its titles take the whole width of the box: in a shared box
-each title's time trails its last line in meta, three lines at most, and a
-saved title is marked after its time with the bookmark in `saved` — a lone box
+each title leads with its time in meta and runs three lines at most, and a
+saved title ends with the bookmark in `saved` on the last line shown — after
+the ellipsis when the title is cut — so the clamp never hides it. A lone box
 keeps its `saved-edge`. Pages are whole days,
 as many as reach fifty items, so Show more continues from the next day and
 names no number; Saved ends the same way. Before the first Subscription, the
@@ -391,6 +395,8 @@ isn't right. Passwords are case-sensitive."
 Chrome is instant; data arrives. What the User presses or opens — a control, a
 switch, a screen with its title and toolbar, a hover — changes in the same
 frame, and nothing moves: a pressed control steps its fill, never its size.
+An item box steps to `row-hover` while pressed. Hover styles apply only where a
+pointer can hover, so a tap never leaves one behind.
 What the server sends — item boxes, Feed rows and cards, a group's heading, a
 title's companion value, a Feed's panels, what an address answers in Add feed
 — fades in over 150ms as it mounts, opacity only; an article over 200ms, and
