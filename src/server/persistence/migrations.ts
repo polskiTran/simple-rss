@@ -353,14 +353,25 @@ export function appliedVersions(db: DrizzleDatabase): number[] {
 
 /**
  * Each migration runs in its own transaction, so a failure leaves the database at the
- * last complete version.
+ * last complete version. A database a newer release has migrated is refused before
+ * anything runs: this release cannot know what that schema means, as after an image
+ * rollback.
  */
 export function applyMigrations(
   db: DrizzleDatabase,
   clock: Clock = systemClock,
   pending: readonly Migration[] = migrations,
 ): number[] {
-  const already = new Set(appliedVersions(db))
+  const recorded = appliedVersions(db)
+  const newest = recorded.at(-1) ?? 0
+  const known = pending.at(-1)?.version ?? 0
+  if (newest > known) {
+    throw new Error(
+      `database is at schema version ${newest}, newer than this release's ${known}; run the release that migrated it or restore a backup`,
+    )
+  }
+
+  const already = new Set(recorded)
   const applied: number[] = []
 
   for (const migration of pending) {
