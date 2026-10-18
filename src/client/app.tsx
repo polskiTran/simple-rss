@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react'
+import { Button } from '@base-ui/react/button'
+import { useRef, useState, useTransition } from 'react'
 import { useArrival } from './arrival.js'
 import { useAccess, type Gate } from './authentication.js'
 import { BackButton } from './components/back-button.js'
 import { ChromeToolbarSlot } from './components/chrome-toolbar.js'
 import { GlobalSearch } from './components/global-search.js'
+import { LoadingNote } from './components/loading-note.js'
 import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
 import { locationAt, originOf, scopeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
@@ -57,13 +59,14 @@ export function App() {
 function viewFor(gate: Gate, navigation: Navigation) {
   switch (gate.access.kind) {
     case 'checking':
-      return null
-    case 'unavailable':
       return (
         <div className="view">
-          <p className="note">The reader is unavailable. Try again in a moment.</p>
+          <LoadingNote>Opening simple</LoadingNote>
         </div>
       )
+    case 'unreachable':
+    case 'unavailable':
+      return <Unanswered kind={gate.access.kind} onRetry={gate.recheck} />
     case 'unclaimed':
       return <SetupView onClaimed={gate.adopt} onAlreadyClaimed={gate.recheck} />
     case 'locked':
@@ -130,4 +133,32 @@ function signedInView(navigation: Navigation, gate: Gate) {
         />
       )
   }
+}
+
+/** Nothing has said whether this device may read: say why, and offer to ask again. */
+function Unanswered({ kind, onRetry }: { kind: 'unreachable' | 'unavailable'; onRetry(): Promise<void> }) {
+  const [retrying, startRetry] = useTransition()
+  return (
+    <div className="view">
+      <header className="page-head">
+        <h1 className="page-title">{kind === 'unreachable' ? 'Can’t reach simple' : 'simple isn’t available'}</h1>
+      </header>
+      <div className="load-failure">
+        <p className="note note-error">
+          {kind === 'unreachable'
+            ? 'Check the connection, then try again. simple also tries again once the connection is back.'
+            : 'Its server answered with an error. Try again in a moment; simple also keeps trying.'}
+        </p>
+        <Button
+          className="button"
+          focusableWhenDisabled
+          disabled={retrying}
+          aria-busy={retrying}
+          onClick={() => startRetry(onRetry)}
+        >
+          {retrying ? 'Retrying…' : 'Retry'}
+        </Button>
+      </div>
+    </div>
+  )
 }

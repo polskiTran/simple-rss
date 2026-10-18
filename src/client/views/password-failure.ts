@@ -22,10 +22,14 @@ export function describeFailure(cause: unknown, copy: Partial<Record<ApiErrorCod
   return hasOwn(PASSWORD_FAILURE_COPY, cause.code) ? PASSWORD_FAILURE_COPY[cause.code] : 'That didn’t work. Try again.'
 }
 
-export function reasonToHold(password: string, confirmation: string): string | undefined {
-  if (password !== confirmation) return 'Those two passwords aren’t the same.'
-  if (password.length < MIN_PASSWORD_LENGTH) return TOO_SHORT
-  if (!newPasswordSchema.safeParse(password).success) return 'That password is too long.'
+/** Why a new password can't be sent yet, on the field that has to change: the password before its confirmation. */
+export function reasonToHold(
+  password: string,
+  confirmation: string,
+): { readonly field: 'password' | 'confirmation'; readonly reason: string } | undefined {
+  if (password.length < MIN_PASSWORD_LENGTH) return { field: 'password', reason: TOO_SHORT }
+  if (!newPasswordSchema.safeParse(password).success) return { field: 'password', reason: 'That password is too long.' }
+  if (password !== confirmation) return { field: 'confirmation', reason: 'Those two passwords aren’t the same.' }
   return undefined
 }
 

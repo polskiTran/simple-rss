@@ -78,6 +78,9 @@ export type ApiErrorBody = z.infer<typeof apiErrorSchema>
 
 export const MIN_PASSWORD_LENGTH = 12
 
+/** Shorter, a deployment's setup secret protects nothing, so setup refuses to start. */
+export const MIN_SETUP_SECRET_LENGTH = 16
+
 /** Argon2id hashes bytes, so the password bound that matters is in UTF-8 bytes. */
 export const MAX_PASSWORD_BYTES = 1024
 const MAX_PASSWORD_LENGTH = 512

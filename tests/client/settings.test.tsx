@@ -23,6 +23,22 @@ describe('the Settings timezone', () => {
     expect(await screen.findByLabelText('Installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
   })
 
+  it('offers Retry when it does not load, and shows it once it does', async () => {
+    let reads = 0
+    stubApi().on('GET /api/settings', () => {
+      reads += 1
+      return reads === 1
+        ? { status: 503, body: { error: { code: 'unavailable', message: 'Unavailable' } } }
+        : { body: { timezone: 'Pacific/Auckland' } }
+    })
+    openSettings()
+
+    expect(await screen.findByText('The timezone didn’t load. Try again in a moment.')).toBeDefined()
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByLabelText('Installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
+  })
+
   it('lets the User change it, sending the choice to the installation', async () => {
     const api = stubApi().on('PUT /api/settings/timezone', (request) => ({
       body: { timezone: (request.body as { timezone: string }).timezone },
