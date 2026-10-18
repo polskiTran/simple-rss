@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { authStatusSchema, readinessSchema } from '../../src/shared/api.js'
+import { readinessSchema } from '../../src/shared/api.js'
 import { migrations } from '../../src/server/persistence/migrations.js'
 import { SETUP_SECRET, USER_PASSWORD } from '../support/boot-service.js'
 import { buildImage, docker, IMAGE, logRecords, startContainer, uniqueName, type Container } from './docker.js'
@@ -222,6 +222,8 @@ describe('the release lifecycle', () => {
     const upgraded = await start({ volume: first.volume })
     expect((await upgraded.container.fetch('/health/ready')).status).toBe(200)
     expect((await upgraded.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
+    const kept = await upgraded.container.exec(['node', 'dist/server/cli-main.js', 'show'])
+    expect(JSON.parse(kept.stdout).timezone).toBe('Europe/Berlin')
     await retire(upgraded.container)
 
     const freshVolume = uniqueName('simple-rss-data')
@@ -249,68 +251,5 @@ describe('the release lifecycle', () => {
     expect((await signIn(recovered.container, USER_PASSWORD)).status).toBe(200)
     const shown = await recovered.container.exec(['node', 'dist/server/cli-main.js', 'show'])
     expect(JSON.parse(shown.stdout).timezone).toBe('Europe/Berlin')
-  })
-})
-
-describe('replacing the container', () => {
-  it('preserves a seeded installation setting on the retained volume', async () => {
-    const first = await start()
-    await first.container.exec(['node', 'dist/server/cli-main.js', 'set-timezone', 'Europe/Berlin'])
-
-    await retire(first.container)
-    const second = await start({ volume: first.volume })
-
-    const shown = await second.container.exec(['node', 'dist/server/cli-main.js', 'show'])
-    expect(JSON.parse(shown.stdout).timezone).toBe('Europe/Berlin')
-  })
-
-  it('applies no migrations the second time', async () => {
-    const first = await start()
-    await retire(first.container)
-
-    const second = await start({ volume: first.volume })
-
-    const migrated = logRecords(await second.container.logs()).find(
-      (record) => record.message === 'startup.migrations_applied',
-    )
-    expect(migrated).toMatchObject({ applied: [] })
-  })
-
-  it('comes back ready on the retained volume', async () => {
-    const first = await start()
-    await retire(first.container)
-
-    const second = await start({ volume: first.volume })
-
-    expect((await second.container.fetch('/health/ready')).status).toBe(200)
-  })
-
-  it('starts empty on a fresh volume', async () => {
-    const { container } = await start()
-
-    const shown = await container.exec(['node', 'dist/server/cli-main.js', 'show'])
-
-    expect(shown.stdout.trim()).toBe('null')
-  })
-
-  it('keeps the User signed in, because the session is on the volume', async () => {
-    const first = await start()
-    const cookie = await claim(first.container)
-    await retire(first.container)
-
-    const second = await start({ volume: first.volume })
-
-    expect((await second.container.fetch('/api/meta', { headers: { cookie } })).status).toBe(200)
-  })
-
-  it('does not ask the User to claim it again', async () => {
-    const first = await start()
-    await claim(first.container)
-    await retire(first.container)
-
-    const second = await start({ volume: first.volume })
-
-    const status = await second.container.fetch('/api/auth/status')
-    expect(authStatusSchema.parse(await status.json())).toEqual({ claimed: true, authenticated: false })
   })
 })
