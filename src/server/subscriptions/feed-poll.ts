@@ -9,6 +9,7 @@ import { feedUrlAliases, feeds, subscriptions } from '../persistence/schema.js'
 import type { Retrieval, RetrievalBytes, RetrievalBytesResult } from '../upstream/retrieval.js'
 import { settle, type FailedPoll, type PolledFeed, type SettledPoll } from './feed-availability.js'
 import { loggableUrl } from './loggable-url.js'
+import { nextPollTime } from './polling-schedule.js'
 import { canonicalFeedUrl, recordSubscription, subscribedFeedId } from './new-subscription.js'
 
 export type IngestFeedOutcome =
@@ -80,9 +81,21 @@ export class FeedPoll {
     const feed = pollableFeed(this.#db, feedId)
     if (!feed) return { kind: 'missing' }
 
-    const answer = await this.#ask(feed)
-    const now = this.#clock.now()
-    return this.#db.transaction((tx) => this.#record(tx, feed, answer, now))
+    try {
+      const answer = await this.#ask(feed)
+      const now = this.#clock.now()
+      return this.#db.transaction((tx) => this.#record(tx, feed, answer, now))
+    } catch (error) {
+      // A throw reaches no verdict, so Feed Availability stays as it was; the
+      // due time still moves one Polling Interval on, or a Feed that always
+      // throws would stay first on the due frontier and starve the rest.
+      this.#db
+        .update(subscriptions)
+        .set({ nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, this.#clock.now()) })
+        .where(eq(subscriptions.feedId, feed.feedId))
+        .run()
+      throw error
+    }
   }
 
   /**

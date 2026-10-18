@@ -184,7 +184,7 @@ describe('OPML import', () => {
     })
   })
 
-  it('keeps an imported Subscription whose first persistence failed, and the next wake retries it', async () => {
+  it('keeps an imported Subscription whose first persistence failed, and retries it a Polling Interval later', async () => {
     const service = await startTestService()
     stubHealthyFeeds(service)
     service.database.$client.exec(`
@@ -202,6 +202,9 @@ describe('OPML import', () => {
     expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [] })
     service.database.$client.exec('DROP TRIGGER reject_feed_item')
     service.clock.advance(60_000)
+    await service.wakeScheduler()
+    expect(await (await user.get('/api/digest')).json()).toMatchObject({ groups: [] })
+    service.clock.advance(3 * 60 * 60_000)
     await service.wakeScheduler()
 
     expect(await (await user.get('/api/digest')).json()).toMatchObject({
