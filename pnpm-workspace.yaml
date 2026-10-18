@@ -6,3 +6,6 @@ allowBuilds:
 patchedDependencies:
   # Inline math as `$$…$$` so a currency `$` never opens math (667a7eb); tests/server/reader/reader.test.ts "returns the supported Reader dialect…" guards it.
   defuddle@0.19.3: patches/defuddle@0.19.3.patch
+overrides:
+  # defuddle -> mathml-to-latex parses untrusted article HTML for Reader; 0.9.12 fixes its quadratic-time and ReDoS advisories, and mathml-to-latex's ^0.9.10 range would allow older.
+  '@xmldom/xmldom': ^0.9.12

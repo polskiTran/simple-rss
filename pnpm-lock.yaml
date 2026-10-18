@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@xmldom/xmldom': ^0.9.12
+
 patchedDependencies:
   defuddle@0.19.3: bf73e383e8e1cbe7a59e615ea372da12ce09c89dc411af0947b2574c4f0f7e37
 
@@ -16,7 +19,7 @@ importers:
         version: 1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@hono/node-server':
         specifier: ^1.13.8
-        version: 1.19.17(hono@4.13.0)
+        version: 1.19.17(hono@4.13.13)
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -30,17 +33,17 @@ importers:
         specifier: 0.19.3
         version: 0.19.3(patch_hash=bf73e383e8e1cbe7a59e615ea372da12ce09c89dc411af0947b2574c4f0f7e37)
       drizzle-orm:
-        specifier: ^0.39.3
-        version: 0.39.3(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
+        specifier: ^0.45.4
+        version: 0.45.4(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
       fast-xml-parser:
         specifier: ^5.10.1
         version: 5.10.1
       hono:
-        specifier: ^4.7.2
-        version: 4.13.0
+        specifier: ^4.13.13
+        version: 4.13.13
       html-to-text:
-        specifier: ^10.0.0
-        version: 10.0.0
+        specifier: ^10.0.1
+        version: 10.0.1
       katex:
         specifier: ^0.16.47
         version: 0.16.47
@@ -1496,10 +1499,9 @@ packages:
   '@vitest/utils@3.2.7':
     resolution: {integrity: sha512-x6BDOd7dyo3PFLY3I9/HJ25X/6OurhGXk2/B9gOZNPF7XDVjeBK4k01lQE5uvDpbuheErh91qYuE1E2OEjK3Rw==}
 
-  '@xmldom/xmldom@0.9.10':
-    resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
-    deprecated: this version has critical issues, please update to the latest version
 
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
@@ -1858,9 +1860,9 @@ packages:
     resolution: {integrity: sha512-LOHxIOaPYdHlJRtCQfDIVZtfw/ufM8+rVj649RIHzcm/vGwQRXFt6OPqIFWsm2XEMrNIEtWR64sY1LEKD2vAOA==}
     engines: {node: '>=4.0.0'}
 
-  deepmerge-ts@7.1.5:
-    resolution: {integrity: sha512-HOJkrhaYsweh+W+e74Yn7YStZOilkoPb6fycpwNLKzSPtruFs48nYis0zy5yJz1+ktUhHxoRDJ27RQAWLIJVJw==}
-    engines: {node: '>=16.0.0'}
+  deepmerge-ts@8.0.2:
+    resolution: {integrity: sha512-uqbvqLUMrc6p0MO+WBRtTxY55hmyh94WRwI5a++PZe54X+bfVh59FSN7uWCBCW1CCVjzjnrwzfI8zidE2obMMw==}
+    engines: {node: '>=16.9.0'}
 
   defuddle@0.19.3:
     resolution: {integrity: sha512-5ZbOQ/B+iiRRqSQWwmCx/zEuqZOA/5q7gxyE2/4O2Bxq7nUC0PgKw9EdyxqWbFF1nrrrYemSeR25jg4TmA2fsA==}
@@ -1905,8 +1907,8 @@ packages:
     resolution: {integrity: sha512-gYzvtM72ZtxQO0T048kd6HWSbbGCNOUwcnfQ01cqIJ4X2IYKFFHZ5mKvrQETcFXxsRObZulDaKmy//R7TPtsBg==}
     engines: {node: '>=20.19.0'}
 
-  dompurify@3.4.13:
-    resolution: {integrity: sha512-2vmYIoqjze2d+kakP8S/nS5shfsl587kzwEjcGlTdiksUVgFHnFCsLYDVj/JNqJVOQZGSYBTmuycv0PodwmnMQ==}
+  dompurify@3.4.17:
+    resolution: {integrity: sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==}
 
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
@@ -1915,8 +1917,8 @@ packages:
     resolution: {integrity: sha512-qI4JLRKnSzqFqr7hAlS5xQDusBCjKSEG4t4+7aNrIQMHBcsC2TGEhuyABJdYkgSewL57PNLYEiibY2iPKhKpaA==}
     engines: {node: '>=20.19.0'}
 
-  drizzle-orm@0.39.3:
-    resolution: {integrity: sha512-EZ8ZpYvDIvKU9C56JYLOmUskazhad+uXZCTCRN4OnRMsL+xAJ05dv1eCpAG5xzhsm1hqiuC5kAZUCS924u2DTw==}
+  drizzle-orm@0.45.4:
+    resolution: {integrity: sha512-NiM1YZpJ2UxyeE67DpDDZ+Tsw4YLX3trSlkNT7Tm9eKoUNb1LvaAaQzXgYQsWs+AQ9TUmmwMmBOCXuqqxUWKKQ==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -1924,19 +1926,22 @@ packages:
       '@libsql/client': '>=0.10.0'
       '@libsql/client-wasm': '>=0.10.0'
       '@neondatabase/serverless': '>=0.10.0'
+      '@netlify/db': '>=0.4.0'
       '@op-engineering/op-sqlite': '>=2'
       '@opentelemetry/api': ^1.4.1
-      '@planetscale/database': '>=1'
+      '@planetscale/database': '>=1.13'
       '@prisma/client': '*'
       '@tidbcloud/serverless': '*'
       '@types/better-sqlite3': '*'
       '@types/pg': '*'
       '@types/sql.js': '*'
+      '@upstash/redis': '>=1.34.7'
       '@vercel/postgres': '>=0.8.0'
       '@xata.io/client': '*'
       better-sqlite3: '>=7'
       bun-types: '*'
       expo-sqlite: '>=14.0.0'
+      gel: '>=2'
       knex: '*'
       kysely: '*'
       mysql2: '>=2'
@@ -1958,6 +1963,8 @@ packages:
         optional: true
       '@neondatabase/serverless':
         optional: true
+      '@netlify/db':
+        optional: true
       '@op-engineering/op-sqlite':
         optional: true
       '@opentelemetry/api':
@@ -1974,6 +1981,8 @@ packages:
         optional: true
       '@types/sql.js':
         optional: true
+      '@upstash/redis':
+        optional: true
       '@vercel/postgres':
         optional: true
       '@xata.io/client':
@@ -1983,6 +1992,8 @@ packages:
       bun-types:
         optional: true
       expo-sqlite:
+        optional: true
+      gel:
         optional: true
       knex:
         optional: true
@@ -2175,8 +2186,8 @@ packages:
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
 
-  hono@4.13.0:
-    resolution: {integrity: sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ==}
+  hono@4.13.13:
+    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@4.0.0:
@@ -2186,8 +2197,8 @@ packages:
   html-escaper@3.0.3:
     resolution: {integrity: sha512-RuMffC89BOWQoY0WKGpIhn5gX3iI54O6nRA0yC124NYVtzjmFWBIiFd8M0x+ZdX0P9R4lADg1mgP8C7PxGOWuQ==}
 
-  html-to-text@10.0.0:
-    resolution: {integrity: sha512-2OH59Gtprdczel+7Rxgpz9hGVJREaf8Lt1H4kZwWHpEn70VQKRuMNGsb2eDbwaTzrYzb0hheiOG1P7Dim0B4dQ==}
+  html-to-text@10.0.1:
+    resolution: {integrity: sha512-GiVhRI1BatGARSCmlXWNCjDT0cWrwBWoeduLoV0WSKAgaV/wa+hUWy5LiQLUs4UwiUrE52ZCMfBGiKD87TDPrg==}
     engines: {node: '>=20.19.0'}
 
   html-url-attributes@3.0.1:
@@ -3636,9 +3647,9 @@ snapshots:
 
   '@fontsource-variable/literata@5.3.0': {}
 
-  '@hono/node-server@1.19.17(hono@4.13.0)':
+  '@hono/node-server@1.19.17(hono@4.13.13)':
     dependencies:
-      hono: 4.13.0
+      hono: 4.13.13
 
   '@iconify/types@2.0.0': {}
 
@@ -4297,7 +4308,7 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
-  '@xmldom/xmldom@0.9.10':
+  '@xmldom/xmldom@0.9.12':
     optional: true
 
   agent-base@7.1.4: {}
@@ -4662,7 +4673,7 @@ snapshots:
 
   deep-extend@0.6.0: {}
 
-  deepmerge-ts@7.1.5: {}
+  deepmerge-ts@8.0.2: {}
 
   defuddle@0.19.3(patch_hash=bf73e383e8e1cbe7a59e615ea372da12ce09c89dc411af0947b2574c4f0f7e37):
     dependencies:
@@ -4713,7 +4724,7 @@ snapshots:
     dependencies:
       domelementtype: 3.0.0
 
-  dompurify@3.4.13:
+  dompurify@3.4.17:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -4729,7 +4740,7 @@ snapshots:
       domelementtype: 3.0.0
       domhandler: 6.0.1
 
-  drizzle-orm@0.39.3(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0):
+  drizzle-orm@0.45.4(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0):
     optionalDependencies:
       '@types/better-sqlite3': 7.6.13
       better-sqlite3: 11.10.0
@@ -5005,7 +5016,7 @@ snapshots:
 
   help-me@5.0.0: {}
 
-  hono@4.13.0: {}
+  hono@4.13.13: {}
 
   html-encoding-sniffer@4.0.0:
     dependencies:
@@ -5013,10 +5024,10 @@ snapshots:
 
   html-escaper@3.0.3: {}
 
-  html-to-text@10.0.0:
+  html-to-text@10.0.1:
     dependencies:
       '@selderee/plugin-htmlparser2': 0.12.0(selderee@0.12.0)
-      deepmerge-ts: 7.1.5
+      deepmerge-ts: 8.0.2
       dom-serializer: 2.0.0
       htmlparser2: 10.1.0
       selderee: 0.12.0
@@ -5221,7 +5232,7 @@ snapshots:
 
   mathml-to-latex@1.8.0:
     dependencies:
-      '@xmldom/xmldom': 0.9.10
+      '@xmldom/xmldom': 0.9.12
     optional: true
 
   mdast-util-find-and-replace@3.0.2:
@@ -5403,7 +5414,7 @@ snapshots:
       d3-sankey: 0.12.3
       dagre-d3-es: 7.0.14
       dayjs: 1.11.21
-      dompurify: 3.4.13
+      dompurify: 3.4.17
       es-toolkit: 1.50.0
       katex: 0.16.47
       khroma: 2.1.0
