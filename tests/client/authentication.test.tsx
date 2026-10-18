@@ -258,6 +258,21 @@ describe('leaving the reader', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeDefined()
   })
 
+  it('stays signed in and says so when the server keeps the session', async () => {
+    stubApi().on('DELETE /api/auth/session', {
+      status: 503,
+      body: { error: { code: 'unavailable', message: 'Unavailable' } },
+    })
+    renderApp('/settings')
+    await screen.findByRole('navigation', { name: 'Sections' })
+
+    await press('Sign out')
+
+    expect(await screen.findByText('Couldn’t sign out. Try again in a moment.')).toBeDefined()
+    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull()
+  })
+
   it('changes the password and says every device must sign in again', async () => {
     const api = stubApi().on('POST /api/auth/password', { body: { claimed: true, authenticated: false } })
     renderApp('/settings')

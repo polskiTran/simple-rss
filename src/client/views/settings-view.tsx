@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState, useTransition } from 'react'
 import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { signOut } from '../api.js'
@@ -16,12 +16,21 @@ interface SettingsViewProps {
 
 export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   useScreenTitle('Settings')
-  async function leave() {
-    try {
-      await signOut()
-    } finally {
-      onAccessChanged({ claimed: true, authenticated: false })
-    }
+  const [leaving, startLeaving] = useTransition()
+  const [notice, setNotice] = useState('')
+
+  // Signed out only once the server ends the session; until then it is still valid.
+  function leave() {
+    if (leaving) return
+    setNotice('')
+    startLeaving(async () => {
+      try {
+        await signOut()
+        onAccessChanged({ claimed: true, authenticated: false })
+      } catch {
+        setNotice('Couldn’t sign out. Try again in a moment.')
+      }
+    })
   }
 
   return (
@@ -59,9 +68,14 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
           <PasswordChange onChanged={onAccessChanged} />
         </Setting>
         <Setting label="Session">
-          <Button className="button" onClick={leave}>
-            Sign out
-          </Button>
+          <div className="setting-stack">
+            <Button className="button" focusableWhenDisabled disabled={leaving} onClick={leave}>
+              Sign out
+            </Button>
+            <p className="note note-error" role="status">
+              {notice}
+            </p>
+          </div>
         </Setting>
       </Group>
 
