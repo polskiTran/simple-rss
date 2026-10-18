@@ -44,6 +44,7 @@ export class PollScheduler {
   #timer: NodeJS.Timeout | undefined
   #current: Promise<void> | undefined
   #nudged = false
+  #stopped = false
 
   constructor(options: PollSchedulerOptions) {
     this.#subscriptions = options.subscriptions
@@ -55,15 +56,22 @@ export class PollScheduler {
   }
 
   start(): void {
-    if (this.#timer) return
+    if (this.#timer || this.#stopped) return
     this.#timer = setInterval(() => void this.tick(), WAKE_INTERVAL_MS)
     // The timer must never hold the process open past a shutdown signal.
     this.#timer.unref()
   }
 
-  stop(): void {
+  /**
+   * Refuses every later wake and resolves once the drain in flight has finished
+   * its polls, so the caller may close the database. A drain takes no new Feed
+   * after stop; the polls already started run to completion.
+   */
+  stop(): Promise<void> {
+    this.#stopped = true
     if (this.#timer) clearInterval(this.#timer)
     this.#timer = undefined
+    return this.#current ?? Promise.resolve()
   }
 
   /** Checks the due frontier now, so a fresh Subscription's first retrieval doesn't wait out a wake. */
@@ -74,6 +82,7 @@ export class PollScheduler {
 
   /** A wake arriving while another drains joins it and earns one more drain, not a compounded batch bound. */
   tick(): Promise<void> {
+    if (this.#stopped) return Promise.resolve()
     if (this.#current) {
       this.#nudged = true
       return this.#current
@@ -87,12 +96,12 @@ export class PollScheduler {
   async #run(): Promise<void> {
     do {
       await this.#drain()
-    } while (this.#nudged)
+    } while (this.#nudged && !this.#stopped)
   }
 
   async #drain(): Promise<void> {
     try {
-      for (let batches = 0; batches < MAX_BATCHES_PER_WAKE; batches += 1) {
+      for (let batches = 0; batches < MAX_BATCHES_PER_WAKE && !this.#stopped; batches += 1) {
         this.#nudged = false
         const due = this.#subscriptions.dueFeedIds(this.#batchLimit)
         if (due.length > 0) {
@@ -101,7 +110,7 @@ export class PollScheduler {
             for (;;) {
               const feedId = due[cursor]
               cursor += 1
-              if (feedId === undefined) return
+              if (feedId === undefined || this.#stopped) return
               await this.#poll(feedId)
             }
           }

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readinessSchema } from '../../src/shared/api.js'
 import { claimedDevice } from '../support/device.js'
 import { databasePathOf, startTestService } from '../support/service-harness.js'
@@ -94,6 +94,28 @@ describe('service lifecycle', () => {
 
     expect((await inFlight).status).toBe(200)
     await stopped
+  })
+
+  it('finishes a background poll already in flight before closing the database', async () => {
+    const service = await startTestService({ env: { SHUTDOWN_GRACE_MS: '30000' } })
+    service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: RSS })
+    const user = await claimedDevice(service)
+    await user.post('/api/subscriptions', { url: FEED_URL })
+    const secondItem = RSS.replace('<item>', '<item><guid>second-light</guid><title>Second light</title></item><item>')
+    service.upstream.stub(FEED_URL, {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: secondItem,
+      delayMs: 200,
+    })
+    service.clock.advance(24 * 60 * 60 * 1000)
+
+    const wake = service.wakeScheduler()
+    await vi.waitFor(() => expect(service.upstream.requestsTo(FEED_URL)).toHaveLength(2))
+    await service.stop()
+    await wake
+    await service.restart()
+
+    expect(service.database.$client.prepare('SELECT count(*) AS n FROM feed_items').get()).toEqual({ n: 2 })
   })
 
   it('closes readiness when the volume stops accepting writes', async () => {
