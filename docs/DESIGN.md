@@ -370,6 +370,14 @@ with the query's words marked in `match`. Beside them, Narrow by feed lists the
 Feeds the results came from, with counts, and narrows the list to those ticked —
 a checkbox list on desktop, a row of chips on a phone.
 
+**Gate.** Setup and Sign in are the screens before the reader. Their submit
+is never disabled before it is pressed: a reason that belongs to one field —
+empty, wrong, too short, not the same — is that field's error and takes focus.
+Before either, while nothing has said whether this device may read, the page
+says why — Can't reach simple, or simple isn't available — with Retry, and asks
+again on its own when the connection or the tab comes back and on a wait that
+doubles up to a minute.
+
 **Notices.** A result the User waits on outside a dialog — an import, a
 refresh — is one line of meta text in an `aria-live` region under the control
 that started it. Errors give a reason, in danger text, never an apology.

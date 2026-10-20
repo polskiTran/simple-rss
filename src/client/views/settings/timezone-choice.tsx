@@ -1,15 +1,17 @@
 import { useState, useTransition } from 'react'
 import { ApiError, fetchInstallationPreferences, updateInstallationTimezone } from '../../api.js'
+import { LoadFailure } from '../../components/load-failure.js'
 import { NativeSelect } from '../../components/native-select.js'
 import { useResource } from '../../use-resource.js'
 
 export function TimezoneChoice() {
-  const [preferences, { set }] = useResource('preferences', fetchInstallationPreferences)
+  const [preferences, { set, retry }] = useResource('preferences', fetchInstallationPreferences)
   const [saving, startSaving] = useTransition()
   const [notice, setNotice] = useState('')
 
   if (preferences.kind === 'loading') return <span className="note">Loading…</span>
-  if (preferences.kind !== 'loaded') return <span className="note">Unavailable</span>
+  if (preferences.kind !== 'loaded')
+    return <LoadFailure subject="The timezone" kind={preferences.kind} onRetry={retry} />
 
   const held = preferences.value.timezone
 

@@ -1,5 +1,5 @@
 import { Field as BaseField } from '@base-ui/react/field'
-import { useState } from 'react'
+import { useState, type Ref } from 'react'
 import { Icon } from './icon.js'
 
 interface FieldProps {
@@ -14,6 +14,8 @@ interface FieldProps {
   readonly multiline?: boolean
   readonly note?: string | undefined
   readonly error?: string | undefined
+  /** The input, for a form that moves focus to the field in error. */
+  readonly ref?: Ref<HTMLInputElement>
   onChange(value: string): void
 }
 
@@ -32,6 +34,7 @@ export function Field({
   multiline,
   note,
   error,
+  ref,
   onChange,
 }: FieldProps) {
   const [revealed, setRevealed] = useState(false)
@@ -42,6 +45,7 @@ export function Field({
       <BaseField.Label className="field-label">{label}</BaseField.Label>
       <span className="field-control">
         <BaseField.Control
+          ref={ref}
           className="field-input"
           type={multiline ? undefined : password && !revealed ? 'password' : 'text'}
           inputMode={type === 'url' ? 'url' : undefined}

@@ -72,6 +72,9 @@ describe('an installation nobody has claimed', () => {
 
     expect(await screen.findByText(/aren’t the same/)).toBeDefined()
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
+    const confirm = screen.getByLabelText('Confirm password')
+    expect(confirm.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(confirm)
   })
 
   it('says a password is too short before spending a request on it', async () => {
@@ -117,6 +120,23 @@ describe('an installation nobody has claimed', () => {
     await press('Claim installation')
 
     expect(await screen.findByText(/setup secret isn’t right/i)).toBeDefined()
+    expect(document.activeElement).toBe(screen.getByLabelText('Setup secret'))
+  })
+
+  it('names what the deployment must set when its setup secret is missing or too short', async () => {
+    stubApi({ claimed: false, authenticated: false }).on('POST /api/auth/setup', {
+      status: 503,
+      body: { error: { code: 'setup_unavailable', message: 'setup secret is too short' } },
+    })
+    renderApp()
+    await screen.findByLabelText('Setup secret')
+
+    await fill('Setup secret', 'short-secret')
+    await fill('Password', 'a-calm-reading-password')
+    await fill('Confirm password', 'a-calm-reading-password')
+    await press('Claim installation')
+
+    expect(await screen.findByText(/SETUP_SECRET set to at least 16 characters/)).toBeDefined()
   })
 
   it('moves to the sign-in screen when someone else claimed it first', async () => {
@@ -160,18 +180,17 @@ describe('coming back to a claimed installation', () => {
     expect(screen.queryByRole('link', { name: 'simple' })).toBeNull()
   })
 
-  it('offers Sign in only once there is a password to send', async () => {
+  it('says on the field, without a request, when Sign in is pressed with no password', async () => {
     const api = stubApi({ claimed: true, authenticated: false })
     renderApp()
-    await screen.findByLabelText('Password')
+    const field = await screen.findByLabelText('Password')
 
-    const signIn = screen.getByRole('button', { name: 'Sign in' })
-    expect(signIn.getAttribute('aria-disabled')).toBe('true')
-    await userEvent.click(signIn)
+    await press('Sign in')
+
     expect(api.requestsTo('POST /api/auth/session')).toHaveLength(0)
-
-    await fill('Password', 'a')
-    expect(signIn.getAttribute('aria-disabled')).toBe('false')
+    expect(field.getAttribute('aria-invalid')).toBe('true')
+    expect(await screen.findByText('Enter your password.')).toBeDefined()
+    expect(document.activeElement).toBe(field)
   })
 
   it('opens the reader once the password is accepted', async () => {
@@ -214,7 +233,9 @@ describe('coming back to a claimed installation', () => {
     await press('Sign in')
 
     await screen.findByText(/isn’t right/)
-    expect(screen.getByLabelText('Password')).toHaveProperty('value', '')
+    const field = screen.getByLabelText('Password')
+    expect(field).toHaveProperty('value', '')
+    expect(document.activeElement).toBe(field)
   })
 
   it('passes on how long to wait when the installation is refusing attempts', async () => {
@@ -232,17 +253,36 @@ describe('coming back to a claimed installation', () => {
     expect(await screen.findByText(/Too many attempts\. Try again in 10 minutes\./)).toBeDefined()
   })
 
-  it('says the reader is unavailable when the server cannot be reached at all', async () => {
+  it('says it cannot reach simple, and gets through on Retry once the server answers', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
         throw new TypeError('network error')
       }),
     )
-
     renderApp()
 
-    expect(await screen.findByText(/the reader is unavailable/i)).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Can’t reach simple' })).toBeDefined()
+    stubApi({ claimed: true, authenticated: false })
+    await press('Retry')
+
+    expect(await screen.findByLabelText('Password')).toBeDefined()
+  })
+
+  it('asks again on its own when the connection comes back', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('network error')
+      }),
+    )
+    renderApp()
+    await screen.findByRole('heading', { name: 'Can’t reach simple' })
+
+    stubApi({ claimed: true, authenticated: false })
+    window.dispatchEvent(new Event('online'))
+
+    expect(await screen.findByLabelText('Password')).toBeDefined()
   })
 })
 

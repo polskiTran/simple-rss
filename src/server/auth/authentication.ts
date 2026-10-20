@@ -1,13 +1,11 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import type { AuthStatus } from '../../shared/api.js'
+import { MIN_SETUP_SECRET_LENGTH, type AuthStatus } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { CredentialStore, type IssuedSession } from './credentials.js'
 import { argon2idHasher, type PasswordHasher } from './password.js'
 import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
-
-export const MIN_SETUP_SECRET_LENGTH = 16
 
 /** How Authentication waits out a delay; the harness records instead of waiting. */
 export type Sleeper = (milliseconds: number) => Promise<void>
