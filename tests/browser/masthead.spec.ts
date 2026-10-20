@@ -50,6 +50,30 @@ test.describe('the header', () => {
   })
 })
 
+test.describe('the top bar on the narrowest phone', () => {
+  test.use({ viewport: { width: 320, height: 640 } })
+
+  test('keeps every square whole and apart from its neighbours', async ({ page, installation }) => {
+    await claim(page, installation)
+
+    const squares = await Promise.all(
+      [
+        page.getByRole('link', { name: 'Feeds', exact: true }),
+        page.getByRole('button', { name: 'Search', exact: true }),
+        page.getByRole('link', { name: 'Saved', exact: true }),
+        page.getByRole('link', { name: 'Settings', exact: true }),
+      ].map(async (square) => {
+        await expect(square).toBeInViewport({ ratio: 1 })
+        return square.boundingBox()
+      }),
+    )
+    for (const [index, square] of squares.entries()) {
+      const next = squares[index + 1]
+      if (square && next) expect(square.x + square.width).toBeLessThanOrEqual(next.x)
+    }
+  })
+})
+
 test.describe('the mark', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 

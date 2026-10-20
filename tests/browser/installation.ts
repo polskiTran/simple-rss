@@ -22,7 +22,13 @@ export interface Installation {
   readonly slowArticleFeedUrl: string
   readonly longFeedUrl: string
   readonly imageOnlyFeedUrl: string
+  /** Two items today, one titled `LEDGER_LONG_TITLE`, so the Digest shares a box between them. */
+  readonly ledgerFeedUrl: string
 }
+
+/** Long enough to run past three lines in a phone's Digest box. */
+export const LEDGER_LONG_TITLE =
+  'The morning the valley flooded, the road washed out and every one of us walked the ridge path home in the rain before the light came back'
 
 const FIGURE_IMAGE_URL = 'https://cdn.publisher.example/image/fetch/$s_!9LbW!,w_424,c_limit,f_webp/valley.png'
 const FIGURE_FULL_SIZE_URL =
@@ -105,6 +111,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
     const slowArticleFeedUrl = 'https://publisher.example/ridge.xml'
     const longFeedUrl = 'https://publisher.example/meadow.xml'
     const imageOnlyFeedUrl = 'https://publisher.example/comic.xml'
+    const ledgerFeedUrl = 'https://publisher.example/ledger.xml'
     const publishedAt = new Date()
     publishedAt.setUTCHours(7, 15, 0, 0)
     const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
@@ -180,6 +187,20 @@ export const test = base.extend<InstallationOptions & { installation: Installati
             </item>
           </channel></rss>`,
       })
+      .stub(ledgerFeedUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>Valley Ledger</title>
+            <item><guid>flood</guid><title>${LEDGER_LONG_TITLE}</title>
+              <pubDate>${publishedAt.toUTCString()}</pubDate>
+              <description>The water rose overnight.</description>
+            </item>
+            <item><guid>dry</guid><title>Dry again</title>
+              <pubDate>${new Date(publishedAt.getTime() - 60 * 60 * 1_000).toUTCString()}</pubDate>
+              <description>The road reopened.</description>
+            </item>
+          </channel></rss>`,
+      })
       .stub(longFeedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
         body: `<?xml version="1.0"?>
@@ -218,6 +239,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
         slowArticleFeedUrl,
         longFeedUrl,
         imageOnlyFeedUrl,
+        ledgerFeedUrl,
       })
     } finally {
       await service?.stop()

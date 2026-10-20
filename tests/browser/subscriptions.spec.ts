@@ -218,6 +218,24 @@ test.describe('phone Feed and Digest rendering', () => {
   })
 })
 
+test.describe('the Add feed sheet on a short phone', () => {
+  test.use({ viewport: { width: 375, height: 420 } })
+
+  test('scrolls back to its title when it is taller than the screen', async ({ page, installation }) => {
+    await claimToFeeds(page, installation)
+    await page.getByRole('button', { name: 'Add feed' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Add feed' })
+    await dialog.getByRole('textbox', { name: 'URL' }).fill(installation.siteUrl)
+    await expect(dialog.getByText('First light')).toBeVisible()
+
+    const sheet = page.locator('.dialog-viewport')
+    expect(await sheet.evaluate((viewport) => viewport.scrollHeight > viewport.clientHeight)).toBe(true)
+    await sheet.evaluate((viewport) => viewport.scrollTo(0, 0))
+    await expect(dialog.getByRole('heading', { name: 'Add feed' })).toBeInViewport({ ratio: 1 })
+    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeInViewport({ ratio: 1 })
+  })
+})
+
 test.describe('an opened Feed on the narrowest phone', () => {
   test.use({ viewport: { width: 320, height: 640 } })
 
