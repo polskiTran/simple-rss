@@ -182,18 +182,43 @@ function RailDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DayProps) {
  * it with the time trailing. Whitespace, not edges, separates Feeds. */
 function SourcesDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DayProps) {
   const feeds = [...Map.groupBy(group.items, (item) => item.feedId).values()]
+  const [only, setOnly] = useState<number>()
   return (
     <section className="p-src" aria-labelledby={`day-${group.date}`}>
       <DayHeading group={group} today={today} className="p-src-day" />
-      {feeds.map((items) => (
-        <SourceBlock
-          key={items[0]?.feedId}
-          items={items}
-          onOpenItem={onOpenItem}
-          onOpenFeed={onOpenFeed}
-          onSaved={onSaved}
-        />
-      ))}
+      {feeds.length > 1 ? (
+        <p className="p-src-roster" aria-label="Feeds on this day">
+          <span className="p-src-roster-lead">{counted(feeds.length, 'feed')}</span>
+          {feeds.map((items) => {
+            const first = items[0]
+            if (!first) return null
+            const pressed = only === first.feedId
+            return (
+              <button
+                key={first.feedId}
+                type="button"
+                className="p-src-roster-feed"
+                aria-pressed={pressed}
+                onClick={() => setOnly(pressed ? undefined : first.feedId)}
+              >
+                {first.feedTitle}
+                <span className="p-src-roster-count">{items.length}</span>
+              </button>
+            )
+          })}
+        </p>
+      ) : null}
+      {feeds
+        .filter((items) => only === undefined || items[0]?.feedId === only)
+        .map((items) => (
+          <SourceBlock
+            key={items[0]?.feedId}
+            items={items}
+            onOpenItem={onOpenItem}
+            onOpenFeed={onOpenFeed}
+            onSaved={onSaved}
+          />
+        ))}
     </section>
   )
 }
