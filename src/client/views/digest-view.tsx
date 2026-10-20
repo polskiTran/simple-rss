@@ -9,6 +9,9 @@ import { useResource, valueInView } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
 import { DigestMonth } from './digest-month.js'
 import { DigestList } from './digest-list.js'
+// PROTOTYPE — remove with the prototype.
+import { usePrototypeVariant } from '../components/prototype-switcher.js'
+import { DIGEST_VARIANT_KEYS, SourcesRoster } from './digest-day.prototype.js'
 
 interface DigestViewProps {
   readonly start: DigestStart
@@ -30,6 +33,7 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
   const shown = valueInView(calendar)
   const firstRun = shown?.subscriptions === 0
   const stream = useRef<HTMLDivElement>(null)
+  const variant = usePrototypeVariant(DIGEST_VARIANT_KEYS)
 
   const readFrom = (from: string | undefined) => {
     onStart({ from: from === shown?.today ? undefined : from })
@@ -72,7 +76,14 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
               onOpenFeed={onOpenFeed}
             />
           </div>
-          {shown ? <DigestMonth calendar={shown} selected={start.from ?? shown.today} onPick={readFrom} /> : null}
+          {shown && variant === 'D' ? (
+            <div className="p-src-aside">
+              <DigestMonth calendar={shown} selected={start.from ?? shown.today} onPick={readFrom} />
+              <SourcesRoster />
+            </div>
+          ) : shown ? (
+            <DigestMonth calendar={shown} selected={start.from ?? shown.today} onPick={readFrom} />
+          ) : null}
         </div>
       )}
     </div>

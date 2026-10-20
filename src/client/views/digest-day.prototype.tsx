@@ -2,11 +2,11 @@
 // switched with `?variant=` (or ← →) on the existing Digest route. Variant A is
 // the current `DigestDay`; B–E replace it. Lives on the prototype branch only.
 import { Button } from '@base-ui/react/button'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { DigestGroup, DigestItem } from '../../shared/api.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { counted, dayTitle, longDay, relativeDay } from '../day-names.js'
+import { counted, dayTitle, longDay, relativeDay, shortDay } from '../day-names.js'
 import { feedPath, readerPath } from '../routing.js'
 import './digest-day.prototype.css'
 
@@ -180,11 +180,63 @@ function RailDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DayProps) {
  * Grouped by Feed like today's shared box, without the box: the Feed name
  * hangs in a left column with its count, its titles run one per line beside
  * it with the time trailing. Whitespace, not edges, separates Feeds. */
+/**
+ * The roster's shared state: each Sources day registers its Feeds, and a Feed
+ * picked for a day filters that day — from the inline roster on a phone or the
+ * one under the calendar on desktop.
+ */
+interface RosterFeed {
+  readonly feedId: number
+  readonly title: string
+  readonly count: number
+}
+const rosterDays = new Map<string, { readonly label: string; readonly feeds: readonly RosterFeed[] }>()
+const rosterOnly = new Map<string, number | undefined>()
+const rosterListeners = new Set<() => void>()
+let rosterVersion = 0
+function rosterChanged() {
+  rosterVersion++
+  for (const listener of rosterListeners) listener()
+}
+function useRoster() {
+  return useSyncExternalStore(
+    (listener) => {
+      rosterListeners.add(listener)
+      return () => rosterListeners.delete(listener)
+    },
+    () => rosterVersion,
+  )
+}
+function pickRosterFeed(date: string, feedId: number) {
+  rosterOnly.set(date, rosterOnly.get(date) === feedId ? undefined : feedId)
+  rosterChanged()
+}
+
 function SourcesDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DayProps) {
   const feeds = [...Map.groupBy(group.items, (item) => item.feedId).values()]
-  const [only, setOnly] = useState<number>()
+  useRoster()
+  const only = rosterOnly.get(group.date)
+  const setOnly = (feedId: number | undefined) => {
+    rosterOnly.set(group.date, feedId)
+    rosterChanged()
+  }
+  const signature = feeds.map((items) => `${items[0]?.feedId}:${items.length}`).join()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: PROTOTYPE — re-register only when the day's Feeds change.
+  useEffect(() => {
+    rosterDays.set(group.date, {
+      label: dayTitle(group.date, today) === longDay(group.date) ? shortDay(group.date) : dayTitle(group.date, today),
+      feeds: feeds.flatMap((items) =>
+        items[0] ? [{ feedId: items[0].feedId, title: items[0].feedTitle, count: items.length }] : [],
+      ),
+    })
+    rosterChanged()
+    return () => {
+      rosterDays.delete(group.date)
+      rosterChanged()
+    }
+  }, [group.date, signature])
   return (
-    <section className="p-src" aria-labelledby={`day-${group.date}`}>
+    <section className="p-src" data-date={group.date} aria-labelledby={`day-${group.date}`}>
       <DayHeading group={group} today={today} className="p-src-day" />
       {feeds.length > 1 ? (
         <p className="p-src-roster" aria-label="Feeds on this day">
@@ -260,6 +312,57 @@ function SourceBlock({
         ) : null}
       </ul>
     </div>
+  )
+}
+
+/**
+ * Desktop: the roster of the day at the top of the screen, under the calendar,
+ * one Feed a line so a long day runs down the column instead of across the list.
+ */
+export function SourcesRoster() {
+  useRoster()
+  const [date, setDate] = useState<string>()
+  useEffect(() => {
+    const spy = () => {
+      const days = [...document.querySelectorAll<HTMLElement>('.p-src[data-date]')]
+      // The last day whose heading has reached the top third of the screen.
+      const line = window.innerHeight / 3
+      const current = days.findLast((day) => day.getBoundingClientRect().top <= line) ?? days[0]
+      setDate(current?.dataset.date)
+    }
+    spy()
+    window.addEventListener('scroll', spy, { passive: true })
+    const unlisten = () => window.removeEventListener('scroll', spy)
+    rosterListeners.add(spy)
+    return () => {
+      unlisten()
+      rosterListeners.delete(spy)
+    }
+  }, [])
+  const day = date === undefined ? undefined : rosterDays.get(date)
+  if (date === undefined || !day) return null
+  const only = rosterOnly.get(date)
+  return (
+    <section className="p-roster" aria-labelledby="p-roster-heading">
+      <h2 className="p-roster-heading" id="p-roster-heading">
+        {day.label} <span className="p-count">{counted(day.feeds.length, 'feed')}</span>
+      </h2>
+      <ul className="p-roster-list">
+        {day.feeds.map((feed) => (
+          <li key={feed.feedId}>
+            <button
+              type="button"
+              className="p-roster-feed"
+              aria-pressed={only === feed.feedId}
+              onClick={() => pickRosterFeed(date, feed.feedId)}
+            >
+              <span className="p-roster-name">{feed.title}</span>
+              <span className="p-roster-count">{feed.count}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
