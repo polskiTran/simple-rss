@@ -35,7 +35,7 @@ export function TimezoneChoice() {
         label="Installation timezone"
         value={held}
         options={timezoneOptions(held).map((zone) => ({ value: zone, label: zone }))}
-        disabled={saving}
+        busy={saving}
         onChange={change}
       />
       <p className="note note-error" role="status">

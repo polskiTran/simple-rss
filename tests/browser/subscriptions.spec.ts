@@ -129,6 +129,19 @@ test.describe('desktop Feed and Digest rendering', () => {
     await expectOpenFeed(page)
   })
 
+  test('keeps a busy control’s label in its own colours while it works', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    await page.route('**/api/feeds/*/refresh', () => {})
+    await page.getByRole('button', { name: 'Refresh now' }).click()
+
+    const busy = page.getByRole('button', { name: 'Refreshing…' })
+    await expect(busy).toHaveAttribute('aria-busy', 'true')
+    const colour = (name: string) =>
+      page.getByRole('button', { name, exact: true }).evaluate((button) => getComputedStyle(button).color)
+    expect(await colour('Refreshing…')).toBe(await colour('Edit'))
+  })
+
   test('changes the reading source by keyboard and keeps the server choice when the Feed is reopened', async ({
     page,
     installation,

@@ -177,7 +177,13 @@ function UndoLine({ item, onResaved }: { item: LibraryItem; onResaved: () => voi
       <span>
         {failed ? `“${item.title}” couldn’t be saved again. Try once more.` : `“${item.title}” is no longer saved.`}
       </span>
-      <Button className="button button-outline button-small" focusableWhenDisabled disabled={pending} onClick={undo}>
+      <Button
+        className="button button-outline button-small"
+        focusableWhenDisabled
+        disabled={pending}
+        aria-busy={pending}
+        onClick={undo}
+      >
         Undo
       </Button>
     </div>

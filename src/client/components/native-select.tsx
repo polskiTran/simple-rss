@@ -4,21 +4,22 @@ interface NativeSelectProps<Value extends string> {
   readonly label: string
   readonly value: NoInfer<Value>
   readonly options: readonly { readonly value: Value; readonly label: string }[]
-  readonly disabled?: boolean
+  readonly busy?: boolean
   onChange(value: NoInfer<Value>): void
 }
 
 /**
  * A grey button that opens the platform's own picker — on a phone, the native
- * wheel beats any listbox (ADR 0008). Disabled, it keeps keyboard focus, as
- * Button's `focusableWhenDisabled` does: it reads as disabled and ignores changes
- * rather than taking the native `disabled`, which drops focus to the body.
+ * wheel beats any listbox (ADR 0008). Busy while its caller saves, it keeps
+ * keyboard focus, as Button's `focusableWhenDisabled` does: it reads as disabled
+ * and ignores changes rather than taking the native `disabled`, which drops focus
+ * to the body.
  */
 export function NativeSelect<const Value extends string>({
   label,
   value,
   options,
-  disabled = false,
+  busy = false,
   onChange,
 }: NativeSelectProps<Value>) {
   return (
@@ -27,9 +28,10 @@ export function NativeSelect<const Value extends string>({
         className="select-control"
         aria-label={label}
         value={value}
-        aria-disabled={disabled}
+        aria-disabled={busy}
+        aria-busy={busy}
         onChange={(event) => {
-          if (disabled) return
+          if (busy) return
           const chosen = options.find((option) => option.value === event.target.value)
           if (chosen) onChange(chosen.value)
         }}

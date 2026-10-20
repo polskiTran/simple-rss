@@ -44,7 +44,14 @@ the page title's companion value, disabled controls and separator dots. On a
 selected filter's `ink` fill it clears 4.5:1 and carries that filter's count.
 The lowest step with items, `ramp-2`, is 3:1 against `ground`, so a day with
 one item never reads as empty. A day's number on the Digest month clears 4.5:1 on its
-fill: `ink` up to `ramp-2`, `ground` from `ramp-3`, in both modes.
+fill: `ink` up to `ramp-2`, `ground` from `ramp-3`, in both modes. Days of the
+months either side are plain `ink-3` numbers, as a day with nothing is — they
+are picked in their own month. `tests/client/design-foundation.test.ts` holds
+every ratio this section promises against the tokens.
+
+Under forced colours the fills and rings that mark a choice drop out, so a
+selected segment, the current section and a pressed chip take the system's
+`Highlight` instead, and a focused field its outline.
 
 ### Light
 
@@ -64,11 +71,11 @@ fill: `ink` up to `ramp-2`, `ground` from `ramp-3`, in both modes.
 | `rule-soft` | ink at `.07` | between rows |
 | `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
-| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.5% 0.11 277.5)` · `oklch(57% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
+| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.2% 0.11 277.5)` · `oklch(57% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
 | `away` | `ramp-5` | a Feed's host, wherever it is shown |
 | `feed-name` | `ramp-4` | the Feed name an item box links to |
-| `match` | `oklch(91.4% 0.032 277.9)` | search highlight, under `ink` text |
+| `match` | `oklch(91.4% 0.032 277.9)` | search highlight and selected text, under `ink` |
 | `scrim` | ink at `.24` | behind a dialog |
 
 ### Dark
@@ -182,11 +189,12 @@ Icons are Lucide's, at 16px from its 24px grid at a 2 stroke, with square caps
 and mitred joins.
 Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
 text. Disabled: `control` fill with `ink-3` text. A control that is busy
-keeps focus (`focusableWhenDisabled`) and says what it is doing: Refreshing…,
-Saving…. Icon-only: square, same height, with an accessible name. A select is
+keeps focus (`focusableWhenDisabled`), says what it is doing — Refreshing…,
+Saving… — and keeps its own colours (`aria-busy`), since that label must stay
+readable; only a control with nothing to do greys out. Icon-only: square, same height, with an accessible name. A select is
 a grey button with a trailing chevron, as wide as its chosen value. Pressed, a
-grey control fills with `toggle-off` and the primary one steps a further 12%
-from ink toward `ground`; nothing moves.
+grey control fills with `toggle-off`, a destructive one with `danger-fill`, and
+the primary one steps a further 12% from ink toward `ground`; nothing moves.
 
 **Switch.** A grey track with 3px padding and 2px gaps; the selected segment
 is `ground` with a hairline ring, the rest are `ink-off` and darken on hover.
@@ -293,7 +301,7 @@ today stands at its head, as Show more stands at its foot; the address keeps
 the day, so the way back from an article returns to it. Beside the list, a
 month of the whole Digest: its name with turns to the months before and after,
 the days Monday first, each shaded by its count against the calendar's other
-days, the day on show ringed, then the legend and that day's count. Any day
+days and those of the months either side plain, the day on show ringed, then the legend and that day's count. Any day
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the title's row opens the platform's own date picker, in

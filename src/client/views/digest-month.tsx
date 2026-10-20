@@ -66,18 +66,12 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
           </span>
         ))}
         {weeksOf(month).map((date) => {
-          const count = counts.get(date)
-          const outside = date.slice(0, 7) === month ? undefined : ''
+          // A day of the months either side is a plain number: it is picked in its own month.
+          const count = date.slice(0, 7) === month ? counts.get(date) : undefined
           const day = Number(date.slice(8, 10))
           if (count === undefined || count === 0) {
             return (
-              <span
-                key={date}
-                className="calendar-day"
-                data-level={count === 0 ? 0 : undefined}
-                data-outside={outside}
-                aria-hidden="true"
-              >
+              <span key={date} className="calendar-day" data-level={count} aria-hidden="true">
                 {day}
               </span>
             )
@@ -88,7 +82,6 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
               type="button"
               className="calendar-day"
               data-level={levelOf(count)}
-              data-outside={outside}
               aria-pressed={date === selected}
               aria-label={cadenceDayLabel({ date, count, level: levelOf(count) })}
               onClick={() => onPick(date)}

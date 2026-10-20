@@ -289,7 +289,13 @@ function Availability({
   return (
     <div className="feed-row-note">
       <p className="note">{unavailableNote(availability)}</p>
-      <Button className="button button-small" focusableWhenDisabled disabled={retrying} onClick={press}>
+      <Button
+        className="button button-small"
+        focusableWhenDisabled
+        disabled={retrying}
+        aria-busy={retrying}
+        onClick={press}
+      >
         <Icon name="refresh" />
         {retrying ? 'Retrying…' : 'Retry'}
       </Button>
