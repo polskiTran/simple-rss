@@ -239,7 +239,7 @@ function SourcesDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DayProps)
     <section className="p-src" data-date={group.date} aria-labelledby={`day-${group.date}`}>
       <DayHeading group={group} today={today} className="p-src-day" />
       {feeds.length > 1 ? (
-        <p className="p-src-roster" aria-label="Feeds on this day">
+        <p className="p-src-roster" data-filtering={only === undefined ? undefined : ''} aria-label="Feeds on this day">
           <span className="p-src-roster-lead">{counted(feeds.length, 'feed')}</span>
           {feeds.map((items) => {
             const first = items[0]
@@ -319,8 +319,17 @@ function SourceBlock({
  * Desktop: the roster of the day at the top of the screen, under the calendar,
  * one Feed a line so a long day runs down the column instead of across the list.
  */
+/** PROTOTYPE — which selected style the roster uses: `?sel=tint` (default), `grey` or `ring`. */
+function useSelectedStyle() {
+  useEffect(() => {
+    const sel = new URLSearchParams(window.location.search).get('sel') ?? 'tint'
+    document.documentElement.dataset.sel = sel
+  })
+}
+
 export function SourcesRoster() {
   useRoster()
+  useSelectedStyle()
   const [date, setDate] = useState<string>()
   useEffect(() => {
     const spy = () => {
@@ -347,7 +356,7 @@ export function SourcesRoster() {
       <h2 className="p-roster-heading" id="p-roster-heading">
         {day.label} <span className="p-count">{counted(day.feeds.length, 'feed')}</span>
       </h2>
-      <ul className="p-roster-list">
+      <ul className="p-roster-list" data-filtering={only === undefined ? undefined : ''}>
         {day.feeds.map((feed) => (
           <li key={feed.feedId}>
             <button

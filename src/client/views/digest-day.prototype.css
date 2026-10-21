@@ -341,18 +341,12 @@
 .p-src-roster-feed:hover {
   background: var(--color-control);
 }
-.p-src-roster-feed[aria-pressed='true'] {
-  background: var(--color-ink);
-  color: var(--color-ground);
-}
+
 .p-src-roster-count {
   color: var(--color-ink-2);
   font-weight: 400;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-}
-.p-src-roster-feed[aria-pressed='true'] .p-src-roster-count {
-  color: var(--color-ink-3);
 }
 
 /* Desktop moves the roster under the calendar; the inline one stays for phones. */
@@ -413,10 +407,7 @@
 .p-roster-feed:hover {
   background: var(--color-control);
 }
-.p-roster-feed[aria-pressed='true'] {
-  background: var(--color-ink);
-  color: var(--color-ground);
-}
+
 .p-roster-name {
   overflow: hidden;
   white-space: nowrap;
@@ -428,8 +419,38 @@
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
-.p-roster-feed[aria-pressed='true'] .p-roster-count {
+
+/* Selected feed in a roster — three candidates, picked with ?sel=.
+   tint: the picked name takes the Feed-name colour and the rest step back to
+         ink-3, so the choice reads by contrast, with no fill at all.
+   grey: the ordinary grey control fill, as a pressed grey button.
+   ring: the design system's pressed chip — ground with an ink ring. */
+:is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
+  color: var(--color-ink);
+}
+[data-sel='tint'] [data-filtering] :is(.p-roster-feed, .p-src-roster-feed):not([aria-pressed='true']) {
   color: var(--color-ink-3);
+}
+[data-sel='tint'] :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
+  color: var(--color-feed-name);
+  font-weight: 600;
+}
+[data-sel='tint']
+  :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true']
+  :is(.p-roster-count, .p-src-roster-count) {
+  color: var(--color-feed-name);
+}
+[data-sel='grey'] :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
+  background: var(--color-toggle-off);
+}
+[data-sel='grey']
+  :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true']
+  :is(.p-roster-count, .p-src-roster-count) {
+  color: var(--color-ink-off);
+}
+[data-sel='ring'] :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
+  background: var(--color-ground);
+  box-shadow: inset 0 0 0 1px var(--color-ink);
 }
 
 /* ── E · Columns ──────────────────────────────────────────────────────── */
