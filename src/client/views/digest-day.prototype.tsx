@@ -2,13 +2,15 @@
 // switched with `?variant=` (or ← →) on the existing Digest route. Variant A is
 // the current `DigestDay`; B–E replace it. Lives on the prototype branch only.
 import { Button } from '@base-ui/react/button'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 import type { DigestGroup, DigestItem } from '../../shared/api.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { counted, dayTitle, longDay, relativeDay, shortDay } from '../day-names.js'
 import { feedPath, readerPath } from '../routing.js'
 import './digest-day.prototype.css'
+import './prototype-fonts/departure-mono.css'
 
 export const DIGEST_VARIANTS = [
   { key: 'A', name: 'Current boxes' },
@@ -282,14 +284,29 @@ function SourceBlock({
   onSaved,
 }: Omit<DayProps, 'group' | 'today'> & { items: DigestItem[] }) {
   const [open, setOpen] = useState(false)
+  const block = useRef<HTMLDivElement>(null)
   const first = items[0]
   if (!first) return null
-  const folded = items.length > 5 && !open
+  const foldable = items.length > 5
+  const folded = foldable && !open
+  // Folding again keeps the reader's place: the head (and its Show less) sticks
+  // to the top while the open list scrolls past, and closing it scrolls back
+  // to the block if its top has left the screen, so the next Feed is right below.
+  const fold = () => {
+    flushSync(() => setOpen(false))
+    const top = block.current?.getBoundingClientRect().top ?? 0
+    if (top < 0) block.current?.scrollIntoView({ block: 'start', behavior: 'instant' })
+  }
   return (
-    <div className="p-src-block">
+    <div ref={block} className="p-src-block" data-open={foldable && open ? '' : undefined}>
       <div className="p-src-head">
         <FeedLink item={first} onOpenFeed={onOpenFeed} className="p-feed" />
         {items.length > 1 ? <span className="p-src-count">{counted(items.length, 'item')}</span> : null}
+        {foldable && open ? (
+          <Button className="p-src-more p-src-less" onClick={fold}>
+            Show less
+          </Button>
+        ) : null}
       </div>
       <ul className="p-src-items">
         {(folded ? items.slice(0, 3) : items).map((item) => (
@@ -303,16 +320,46 @@ function SourceBlock({
             <Save item={item} onSaved={onSaved} />
           </li>
         ))}
-        {items.length > 5 ? (
+        {folded ? (
           <li>
-            <Button className="p-src-more" onClick={() => setOpen(!open)}>
-              {folded ? `Show ${items.length - 3} more` : 'Show less'}
+            <Button className="p-src-more" onClick={() => setOpen(true)}>
+              Show {items.length - 3} more
             </Button>
           </li>
         ) : null}
       </ul>
     </div>
   )
+}
+
+const MONO_KEY = 'simple-rss.prototype-mono'
+
+/** PROTOTYPE — grey text in Departure Mono (default) or Instrument Sans; `?mono=0` or the bar's toggle. */
+export function useMonoMeta(): [boolean, () => void] {
+  const read = () => {
+    const param = new URLSearchParams(window.location.search).get('mono')
+    if (param !== null) return param !== '0'
+    try {
+      return sessionStorage.getItem(MONO_KEY) !== '0'
+    } catch {
+      return true
+    }
+  }
+  const [mono, setMono] = useState(read)
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-mono-meta', mono)
+  }, [mono])
+  const toggle = () => {
+    const next = !mono
+    const url = new URL(window.location.href)
+    url.searchParams.set('mono', next ? '1' : '0')
+    window.history.replaceState(window.history.state, '', url)
+    try {
+      sessionStorage.setItem(MONO_KEY, next ? '1' : '0')
+    } catch {}
+    setMono(next)
+  }
+  return [mono, toggle]
 }
 
 /**

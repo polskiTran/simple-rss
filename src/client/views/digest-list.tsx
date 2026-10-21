@@ -8,7 +8,13 @@ import { usePagedResource, valueInView } from '../use-resource.js'
 import { DigestDay } from './digest-day.js'
 // PROTOTYPE — remove with the prototype.
 import { PrototypeSwitcher, usePrototypeVariant } from '../components/prototype-switcher.js'
-import { DIGEST_VARIANT_KEYS, DIGEST_VARIANTS, DigestDayPrototype, useLogCursor } from './digest-day.prototype.js'
+import {
+  DIGEST_VARIANT_KEYS,
+  DIGEST_VARIANTS,
+  DigestDayPrototype,
+  useLogCursor,
+  useMonoMeta,
+} from './digest-day.prototype.js'
 
 interface DigestListProps {
   readonly start: DigestStart
@@ -33,6 +39,7 @@ export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: Di
   )
   const variant = usePrototypeVariant(DIGEST_VARIANT_KEYS)
   useLogCursor(variant === 'B')
+  const [mono, toggleMono] = useMonoMeta()
 
   const setSaved = (feedItemId: number, saved: boolean) =>
     set((digest) => ({
@@ -85,7 +92,15 @@ export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: Di
           ),
         )
       )}
-      <PrototypeSwitcher variants={DIGEST_VARIANTS} current={variant} />
+      <PrototypeSwitcher
+        variants={DIGEST_VARIANTS}
+        current={variant}
+        extra={
+          <button type="button" className="prototype-switcher-toggle" aria-pressed={mono} onClick={toggleMono}>
+            Grey: {mono ? 'Mono' : 'Sans'}
+          </button>
+        }
+      />
       <OlderItems nextCursor={digest.nextFrom} older={older} noun="items" onLoadOlder={loadMore} />
     </div>
   )

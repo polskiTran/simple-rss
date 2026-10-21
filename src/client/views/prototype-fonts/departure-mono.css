@@ -1,0 +1,10 @@
+/* PROTOTYPE — Departure Mono by Tobias Fried (rektdeckard/departure-mono),
+   SIL Open Font License 1.1. A pixel face drawn on an 11px grid, so it is set
+   at 11px or 22px to stay crisp. */
+@font-face {
+  font-family: 'Departure Mono';
+  src: url('./DepartureMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

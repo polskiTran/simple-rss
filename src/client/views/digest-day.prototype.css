@@ -429,6 +429,53 @@
   color: var(--color-ink-off);
 }
 
+/* An open block's head sticks while its list scrolls past, carrying Show less. */
+.p-src-block[data-open] .p-src-head {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+}
+.p-src-less {
+  align-self: flex-start;
+  margin-top: 10px;
+}
+@media (max-width: 1024px) {
+  .p-src-block[data-open] .p-src-head {
+    top: 0;
+    z-index: 2;
+    align-items: center;
+    margin: 0 -16px;
+    padding: 8px 16px;
+    background: var(--color-ground);
+  }
+  .p-src-less {
+    margin: 0 0 0 auto;
+  }
+}
+
+/* Grey text in Departure Mono — counts, times, day names beside headings.
+   Set at 11px, the face's pixel grid; uppercase never, tabular by design. */
+[data-mono-meta]
+:is(
+  .p-src-time,
+  .p-src-count,
+  .p-count,
+  .p-aside,
+  .p-src-roster-lead,
+  .p-src-roster-count,
+  .p-roster-count,
+  .p-log-time,
+  .p-rail-minute,
+  .p-col-meta time
+) {
+  font-family: 'Departure Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
 /* ── E · Columns ──────────────────────────────────────────────────────── */
 .p-col + .p-col {
   margin-top: 56px;
@@ -543,6 +590,15 @@
   color: #fff;
   font-size: 15px;
   cursor: pointer;
+}
+.prototype-switcher .prototype-switcher-toggle {
+  width: auto;
+  margin-left: 6px;
+  padding: 0 12px;
+  font:
+    500 12px / 1 ui-sans-serif,
+    system-ui,
+    sans-serif;
 }
 .prototype-switcher button:hover {
   background: #444;

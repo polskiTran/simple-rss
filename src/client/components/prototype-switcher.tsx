@@ -1,5 +1,5 @@
 // PROTOTYPE — throwaway. Lives on the prototype branch only; never merge to main.
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
 const PARAM = 'variant'
 const STORE = 'simple-rss.prototype-variant'
@@ -48,9 +48,12 @@ function pick(key: string) {
 export function PrototypeSwitcher({
   variants,
   current,
+  extra,
 }: {
   variants: readonly { readonly key: string; readonly name: string }[]
   current: string
+  /** More prototype knobs, drawn after the arrows. */
+  extra?: ReactNode
 }) {
   const index = Math.max(
     0,
@@ -94,6 +97,7 @@ export function PrototypeSwitcher({
       <button type="button" onClick={() => step(1)} aria-label="Next variant">
         →
       </button>
+      {extra}
     </div>
   )
 }
