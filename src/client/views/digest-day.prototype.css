@@ -420,37 +420,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Selected feed in a roster — three candidates, picked with ?sel=.
-   tint: the picked name takes the Feed-name colour and the rest step back to
-         ink-3, so the choice reads by contrast, with no fill at all.
-   grey: the ordinary grey control fill, as a pressed grey button.
-   ring: the design system's pressed chip — ground with an ink ring. */
+/* The selected Feed in a roster: a pressed grey control. */
 :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
+  background: var(--color-toggle-off);
   color: var(--color-ink);
 }
-[data-sel='tint'] [data-filtering] :is(.p-roster-feed, .p-src-roster-feed):not([aria-pressed='true']) {
-  color: var(--color-ink-3);
-}
-[data-sel='tint'] :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
-  color: var(--color-feed-name);
-  font-weight: 600;
-}
-[data-sel='tint']
-  :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true']
-  :is(.p-roster-count, .p-src-roster-count) {
-  color: var(--color-feed-name);
-}
-[data-sel='grey'] :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
-  background: var(--color-toggle-off);
-}
-[data-sel='grey']
-  :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true']
-  :is(.p-roster-count, .p-src-roster-count) {
+:is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] :is(.p-roster-count, .p-src-roster-count) {
   color: var(--color-ink-off);
-}
-[data-sel='ring'] :is(.p-roster-feed, .p-src-roster-feed)[aria-pressed='true'] {
-  background: var(--color-ground);
-  box-shadow: inset 0 0 0 1px var(--color-ink);
 }
 
 /* ── E · Columns ──────────────────────────────────────────────────────── */

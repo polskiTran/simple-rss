@@ -319,17 +319,8 @@ function SourceBlock({
  * Desktop: the roster of the day at the top of the screen, under the calendar,
  * one Feed a line so a long day runs down the column instead of across the list.
  */
-/** PROTOTYPE — which selected style the roster uses: `?sel=tint` (default), `grey` or `ring`. */
-function useSelectedStyle() {
-  useEffect(() => {
-    const sel = new URLSearchParams(window.location.search).get('sel') ?? 'tint'
-    document.documentElement.dataset.sel = sel
-  })
-}
-
 export function SourcesRoster() {
   useRoster()
-  useSelectedStyle()
   const [date, setDate] = useState<string>()
   useEffect(() => {
     const spy = () => {
