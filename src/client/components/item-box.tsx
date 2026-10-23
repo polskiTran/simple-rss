@@ -48,10 +48,12 @@ export function ItemBox({
       <div className="item-meta">
         {feed === undefined ? null : openFeed ? (
           <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => openFeed(feed.feedId)}>
-            {feed.title}
+            <FeedName title={feed.title} />
           </RoutedLink>
         ) : (
-          <span className="item-feed">{feed.title}</span>
+          <span className="item-feed">
+            <FeedName title={feed.title} />
+          </span>
         )}
         <time className="item-when" dateTime={when.dateTime}>
           {when.label}
@@ -68,5 +70,14 @@ export function ItemBox({
       </div>
       <SaveToggle feedItemId={feedItemId} title={title} saved={saved} onSaved={onSaved} />
     </article>
+  )
+}
+
+/** A Feed's name in a meta column, clamped to two lines; hovering shows the rest. */
+export function FeedName({ title }: { title: string }) {
+  return (
+    <span className="item-feed-name" title={title}>
+      {title}
+    </span>
   )
 }

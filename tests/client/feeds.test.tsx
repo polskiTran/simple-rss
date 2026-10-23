@@ -435,6 +435,17 @@ describe('Feed Availability', () => {
     expect(screen.getByText('Field Notes')).toBeDefined()
   })
 
+  it('names the year of a last success before the latest check’s year', async () => {
+    const lastYear = subscription({
+      availability: availability({ ...UNAVAILABLE_FEED.availability, lastSuccessDate: '2025-12-31' }),
+    })
+    stubApi().on('GET /api/feeds', { body: { subscriptions: [lastYear] } })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+
+    expect(await screen.findByText(/Last reached 31 Dec 2025\./)).toBeDefined()
+  })
+
   it('retries by hand and shows the restored Subscription at once', async () => {
     const api = stubApi().on('GET /api/feeds', { body: { subscriptions: [UNAVAILABLE_FEED] } })
     api.on('POST /api/feeds/1/refresh', () => {

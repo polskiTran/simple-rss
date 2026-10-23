@@ -51,7 +51,9 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
     <header className="page-head">
       <h1 className="page-title">
         Saved
-        {library ? <span className="page-title-companion">{library.total - unsaved.size}</span> : null}
+        {library ? (
+          <span className="page-title-companion">{(library.total - unsaved.size).toLocaleString('en-GB')}</span>
+        ) : null}
       </h1>
       {library && library.total > 0 ? (
         <div className="toolbar">

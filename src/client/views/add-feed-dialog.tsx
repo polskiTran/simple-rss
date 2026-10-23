@@ -329,7 +329,7 @@ function FoundFeeds({
   return (
     <div className="add-feed-found">
       <p className="feed-choices-lede" id={`${id}-lede`}>
-        {host} names {feeds.length} feeds. Choose one.
+        {host} names {feeds.length.toLocaleString('en-GB')} feeds. Choose one.
       </p>
       <RadioGroup
         className="feed-choices"

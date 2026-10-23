@@ -7,7 +7,7 @@ import type { DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { Icon } from '../components/icon.js'
 import { Group } from '../components/group.js'
-import { ItemBox } from '../components/item-box.js'
+import { FeedName, ItemBox } from '../components/item-box.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { counted, dayTitle, longDay, relativeDay } from '../day-names.js'
@@ -53,8 +53,9 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
         >
           <span className="note">{counted(feeds.length, 'feed')}</span>
           {feeds.map((feed) => (
-            <Toggle key={feed.feedId} className="chip" value={String(feed.feedId)}>
-              {feed.title} <span className="chip-count">{feed.items.length}</span>
+            <Toggle key={feed.feedId} className="chip" value={String(feed.feedId)} title={feed.title}>
+              <span className="chip-name">{feed.title}</span>{' '}
+              <span className="chip-count">{feed.items.length.toLocaleString('en-GB')}</span>
             </Toggle>
           ))}
         </ToggleGroup>
@@ -136,7 +137,7 @@ function FeedDayBox({
     <article ref={box} className="item feed-day">
       <div className="item-meta">
         <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => onOpenFeed(feed.feedId)}>
-          {feed.title}
+          <FeedName title={feed.title} />
         </RoutedLink>
         <span className="item-when">{counted(feed.items.length, 'item')}</span>
         <span className="item-when">
@@ -174,7 +175,7 @@ function FeedDayBox({
         </ul>
         {foldable ? (
           <Button className="button button-small" aria-expanded={unfolded} onClick={toggleFold}>
-            {folded ? `Show ${feed.items.length - FOLDED_ITEMS} more` : 'Show less'}
+            {folded ? `Show ${(feed.items.length - FOLDED_ITEMS).toLocaleString('en-GB')} more` : 'Show less'}
           </Button>
         ) : null}
       </div>

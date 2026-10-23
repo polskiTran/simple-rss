@@ -6,7 +6,7 @@ import {
 } from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError } from '../api.js'
-import { dayAndMonth } from '../day-names.js'
+import { shortDate } from '../day-names.js'
 
 const AVAILABILITY_COPY = {
   unreachable: 'The feed can’t be reached',
@@ -65,11 +65,16 @@ export function retryFailure(cause: unknown): string {
   return reason ? `Still unavailable. ${reason}` : 'Still unavailable. The feed couldn’t be retrieved.'
 }
 
-/** Why checking fails, when it last worked, and what stays: `… Last reached 5 Aug. Its items stay in your digest.` */
+/**
+ * Why checking fails, when it last worked, and what stays: `… Last reached 5 Aug. Its items stay in your digest.`
+ * The last success names its year when it differs from the latest check's, the
+ * one that found the Feed still down.
+ */
 export function unavailableNote(availability: FeedAvailability): string {
   const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'Checking isn’t working'
-  const lastSuccess = availability.lastSuccessDate
-    ? `Last reached ${dayAndMonth(availability.lastSuccessDate)}.`
+  const { lastSuccessDate, lastCheckedAt } = availability
+  const lastSuccess = lastSuccessDate
+    ? `Last reached ${shortDate(lastSuccessDate, lastCheckedAt?.slice(0, 10) ?? lastSuccessDate)}.`
     : 'Not reached since subscribing.'
 
   return `${reason}. ${lastSuccess} Its items stay in your digest.`

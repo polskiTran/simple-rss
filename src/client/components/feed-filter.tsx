@@ -46,7 +46,7 @@ export function FeedFilter({ id, title, feeds, shown, onChange }: FeedFilterProp
                   onChange={() => toggle(feed.feedId)}
                 />
                 <span className="filter-name">{feed.title}</span>
-                <span className="filter-count">{feed.count}</span>
+                <span className="filter-count">{feed.count.toLocaleString('en-GB')}</span>
               </label>
             </li>
           ))}

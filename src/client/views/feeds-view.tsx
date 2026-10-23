@@ -108,7 +108,9 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
         <div className="toolbar">
           <h1 className="page-title">
             Feeds
-            {subscriptions ? <span className="page-title-companion">{subscriptions.length}</span> : null}
+            {subscriptions ? (
+              <span className="page-title-companion">{subscriptions.length.toLocaleString('en-GB')}</span>
+            ) : null}
           </h1>
           <div className="toolbar-group feeds-actions">
             {subscriptions?.length === 0 ? null : (
@@ -129,7 +131,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
                 ? groups.map(({ rhythm, members }) => (
                     <Button key={rhythm} className="button" onClick={() => enterSection(rhythmAnchor(rhythm))}>
                       {RHYTHM_LABELS[rhythm]}
-                      <span className="button-count">{members.length}</span>
+                      <span className="button-count">{members.length.toLocaleString('en-GB')}</span>
                     </Button>
                   ))
                 : null}
@@ -231,7 +233,7 @@ function RhythmGroup({
       {hidden.length > 0 ? (
         <div className="more">
           <Button className="button" onClick={() => setExpanded(true)}>
-            Show {hidden.length} more
+            Show {hidden.length.toLocaleString('en-GB')} more
             <Icon name="chevron-down" />
           </Button>
           <p className="note more-names">{hidden.map((subscription) => subscription.title).join(', ')}</p>
