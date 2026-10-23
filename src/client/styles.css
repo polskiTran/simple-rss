@@ -107,6 +107,9 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     -webkit-tap-highlight-color: transparent;
+    /* Turned sideways, iOS would enlarge the text; the type scale stands. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   a {
@@ -138,6 +141,9 @@
 }
 
 @layer components {
+  /* The phone layout keeps a phone's column — 560px at most, centred like the
+     phone sheet — so a narrowed window or a tablet never stretches its
+     full-width controls across the screen. */
   .app {
     max-width: 1360px;
     min-height: 100dvh;
@@ -145,6 +151,7 @@
     padding-inline: 40px;
 
     @media (max-width: 1024px) {
+      max-width: calc(560px + 2 * 20px);
       padding-inline: 20px;
     }
   }

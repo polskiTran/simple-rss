@@ -81,7 +81,9 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
 
 /**
  * A phone's way to a day, where the month has no room beside the list: the
- * platform's own date picker, laid invisibly over a calendar button.
+ * platform's own date picker, laid invisibly over a calendar button. A tap
+ * opens it on a phone; a desktop browser in the narrow layout opens it only
+ * from the field's own picker icon, so a click asks for it by name.
  */
 function DayPicker({
   calendar,
@@ -101,6 +103,7 @@ function DayPicker({
         min={calendar.days[0]?.date}
         max={calendar.today}
         value={from ?? calendar.today}
+        onClick={(event) => event.currentTarget.showPicker()}
         onChange={(event) => {
           if (event.target.value) onFrom(event.target.value)
         }}

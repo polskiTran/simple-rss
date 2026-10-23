@@ -315,6 +315,19 @@ describe('the Digest from a day', () => {
     expect(window.location.search).toBe('')
   })
 
+  it('asks the platform for its date picker when the calendar button is clicked', async () => {
+    // jsdom has no picker; a desktop browser opens one only when asked.
+    const showPicker = vi.fn()
+    Object.defineProperty(HTMLInputElement.prototype, 'showPicker', { value: showPicker, configurable: true })
+    digestWithCalendar()
+    window.history.replaceState(null, '', '/digest')
+    render(<App />)
+
+    await userEvent.setup().click(await screen.findByLabelText('Start from a day'))
+    Reflect.deleteProperty(HTMLInputElement.prototype, 'showPicker')
+    expect(showPicker).toHaveBeenCalledOnce()
+  })
+
   it('keeps the list on show while the day it starts from loads', async () => {
     const picked = Promise.withResolvers<{ body: Digest }>()
     const api = digestWithCalendar().on('GET /api/digest?from=2026-08-03', () => picked.promise)
