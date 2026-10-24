@@ -416,8 +416,9 @@ frame, and nothing moves: a pressed control steps its fill, never its size.
 An item box steps to `row-hover` while pressed. Hover styles apply only where a
 pointer can hover, so a tap never leaves one behind.
 What the server sends — item boxes, Feed rows and cards, a group's heading, a
-title's companion value, a Feed's panels, what an address answers in Add feed
-— fades in over 150ms as it mounts, opacity only; an article over 200ms, and
+title's companion value, a Feed's panels, what an address answers in Add feed,
+the undo line an unsave leaves, the notice an action answers with — fades in
+over 150ms as it mounts, opacity only; an article over 200ms, and
 the Original webpage arriving over Feed Content is a new article that fades
 in, never text rewritten in place. A wait shorter than 400ms shows nothing;
 after that the waiting line fades in.
