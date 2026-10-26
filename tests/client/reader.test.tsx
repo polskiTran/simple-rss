@@ -55,7 +55,7 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(screen.getByText('Feed content for now')).toBeDefined()
     expect(screen.getByText('2 min read')).toBeDefined()
-    expect(screen.getByText('Shortened by simple. Open the original for the rest.')).toBeDefined()
+    expect(screen.getByText('Shortened by simple.')).toBeDefined()
     expect(screen.getByText('Reading the original webpage')).toBeDefined()
     pending.resolve()
     await screen.findByRole('button', { name: 'Retry' })
@@ -113,7 +113,7 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'Feed content' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('1 min read')).toBeDefined()
-    expect(screen.getByText('Shortened by simple. Open the original for the rest.')).toBeDefined()
+    expect(screen.getByText('Shortened by simple.')).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(0)
 
     await user.click(screen.getByRole('button', { name: 'Original webpage' }))

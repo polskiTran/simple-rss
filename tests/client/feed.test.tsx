@@ -193,7 +193,7 @@ describe('opening one Feed', () => {
 })
 
 describe('managing one Feed', () => {
-  it('changes the Polling Interval to another preset and says so', async () => {
+  it('changes the Polling Interval to another preset', async () => {
     const api = feedApi().on('PUT /api/feeds/1/interval', {
       body: { pollingIntervalMinutes: 360, nextPollAt: '2026-08-08T15:00:00.000Z' },
     })
@@ -205,8 +205,7 @@ describe('managing one Feed', () => {
     expect(select.value).toBe('120')
     await user.selectOptions(select, '6 hours')
 
-    expect(await screen.findByText('Now checked every 6 hours.')).toBeDefined()
-    expect(select.value).toBe('360')
+    await waitFor(() => expect(select.value).toBe('360'))
     expect(api.requestsTo('PUT /api/feeds/1/interval')).toMatchObject([{ body: { pollingIntervalMinutes: 360 } }])
   })
 
@@ -260,7 +259,7 @@ describe('managing one Feed', () => {
     render(<App />)
 
     expect(await screen.findByText(/the publisher is answering with an error/i)).toBeDefined()
-    expect(screen.getByText(/items stay in your digest/i)).toBeDefined()
+    expect(screen.getByText(/last reached/i)).toBeDefined()
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'Refresh now' })).toBeDefined()
   })
@@ -347,7 +346,7 @@ describe('the quiet states of one Feed', () => {
     window.history.replaceState(null, '', '/feeds/1')
     render(<App />)
 
-    expect(await screen.findByText('The feed didn’t load. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The feed didn’t load.')).toBeDefined()
   })
 })
 

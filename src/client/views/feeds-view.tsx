@@ -159,9 +159,7 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
       {state.kind === 'unavailable' || state.kind === 'unreachable' ? (
         <LoadFailure subject="Your feeds" kind={state.kind} onRetry={reload} />
       ) : null}
-      {subscriptions && subscriptions.length === 0 ? (
-        <p className="note">No feeds yet. Add one by its site or feed address, or import an OPML file.</p>
-      ) : null}
+      {subscriptions && subscriptions.length === 0 ? <p className="note">No feeds yet.</p> : null}
 
       {subscriptions && subscriptions.length > 0 ? (
         order === 'rhythm' ? (
@@ -222,13 +220,7 @@ function RhythmGroup({
   }
 
   return (
-    <Group
-      id={rhythmAnchor(rhythm)}
-      title={RHYTHM_LABELS[rhythm]}
-      count={subscriptions.length}
-      aside={rhythm === 'inactive' ? 'No items in 30 days' : undefined}
-      className="panel"
-    >
+    <Group id={rhythmAnchor(rhythm)} title={RHYTHM_LABELS[rhythm]} count={subscriptions.length} className="panel">
       <FeedRows subscriptions={shown} onRetry={onRetry} onOpen={onOpen} />
       {hidden.length > 0 ? (
         <div className="more">
@@ -236,7 +228,6 @@ function RhythmGroup({
             Show {hidden.length.toLocaleString('en-GB')} more
             <Icon name="chevron-down" />
           </Button>
-          <p className="note more-names">{hidden.map((subscription) => subscription.title).join(', ')}</p>
         </div>
       ) : expanded ? (
         <div className="more">

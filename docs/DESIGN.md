@@ -272,29 +272,29 @@ publisher.example" is the wait. A lone Feed stands under a rule, not in a box:
 its name and Cadence strip, a meta line — Last item 3 days ago · Weekly — its
 five newest titles in Literata 16, two lines at most, each with its day in
 meta, then the Feed's address. A page naming several says so — "publisher.example
-names 3 feeds. Choose one." — and gives each a box with its name, strip and
+names 3 feeds" — and gives each a box with its name, strip and
 meta line. The first is chosen, ringed in ink with no radio mark, and only the
 chosen box opens to its titles; arrow keys move the choice. A Feed with no item
-in 90 days says Last item 2 years ago in ink at 500 and, open, "Nothing new in
-2 years. It may have stopped publishing." One already followed says You follow
+in 90 days says Last item 2 years ago in ink at 500. One already followed says You follow
 this, and the primary action reads Already subscribed, disabled. A page that
 names no Feed, or an address that doesn't answer, is a field error with its
 reason; the second ends "Nothing was added." and turns the primary action to
 Retry. Subscribe is the one primary action, and its new row simply arrives in
-the list.
+the list. No field carries a note: the switch names both kinds of address, and
+the Import tab's only line under its file is a refusal.
 
 **Undo line.** Removing something from a list leaves a `row-hover` line in
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
 
 **Digest.** Today's short date as the title's companion, then one list, newest
-day first, each day a group headed with its count and, for Today and Yesterday,
-its date. Under the heading the day's Feeds stand as chips with their counts
-after a note of how many, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
+day first, each day a group headed with its count; the date is said once, in
+the title's companion or the heading itself. Under the heading the day's Feeds
+stand as chips with their counts, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
 alone, and pressing it again shows them all. Each Feed that published that day
 gets one box, the most recent first: a lone item is the ordinary item box; more
-share a box, the Feed's name, its count and its span of times in the meta
-column and each title on its own line with its time. Past 5 items the box shows
+share a box, the Feed's name and its count in the meta column and each title
+on its own line with its time. Past 5 items the box shows
 the newest 3 and Show N more, which turns to Show less once pressed. A Feed
 back after a week or more without items says so under its time — its last 14
 days of Cadence, then First item in 12 days. The list starts today, or from a
@@ -303,7 +303,7 @@ today stands at its head, as Show more stands at its foot; the address keeps
 the day, so the way back from an article returns to it. Beside the list, a
 month of the whole Digest: its name with turns to the months before and after,
 the days Monday first, each shaded by its count against the calendar's other
-days and those of the months either side plain, the day on show ringed, then the legend and that day's count. Any day
+days and those of the months either side plain, the day on show ringed, then the legend. Any day
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the title's row opens the platform's own date picker, in
@@ -315,17 +315,16 @@ the ellipsis when the title is cut — so the clamp never hides it. A lone box
 keeps its `saved-edge`. Pages are whole days,
 as many as reach fifty items, so Show more continues from the next day and
 names no number; Saved ends the same way. Before the first Subscription, the
-Digest is a note and Add feed as the primary action, with no chips and no
-month; with Subscriptions but nothing yet, the note says items arrive as the
-Feeds publish. The drawn Stream / By source switch is left out.
+Digest is "No feeds yet." and Add feed as the primary action, with no chips and no
+month; with Subscriptions but nothing yet, it is "Nothing yet." The drawn Stream / By source switch is left out.
 
 **Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
-rows to a group, then Show N more with the rest named beside it; opened,
+rows to a group, then Show N more; opened,
 Show fewer folds it back. With no Subscriptions there is nothing to export,
 so Export OPML gives way to Add feed alone. Jump buttons
 with each Rhythm's count reach the groups; By name lists everything
 alphabetically instead, and Recently added newest Subscription first. A row says when an imported Feed awaits its first check, or why
-checking fails, what it last reached and that its items stay, with Retry.
+checking fails and when it last reached the Feed, with Retry.
 
 **One Feed.** The way back, then the Feed's name, description and host (as in
 a Feed row) with Edit, Refresh now and Unsubscribe beside them on the title's
@@ -404,9 +403,21 @@ the shipped words are:
 | By source | By feed |
 
 Rhythm is shown as **Daily**, **Weekly**, **Monthly** and **Inactive** (no
-items in 30 days). Say what happened and what stays: "Not responding since
-7 Sep. Its items stay in your digest." Errors give a reason: "That password
-isn't right. Passwords are case-sensitive."
+items in 30 days). Say what happened: "The feed can't be reached. Last reached
+7 Sep." Errors give a reason: "That password isn't right. Passwords are
+case-sensitive."
+
+No taglines, helper notes or secondary labels. A heading, a value or a button
+names itself; a sentence that explains a control, repeats a value shown
+elsewhere on the screen, or tells the User to press the button beside it is
+cut, and if the screen does not make sense without it, its layout changes
+instead. What stays is a reason (an error), a consequence the User cannot see
+before acting (a dialog's description: Change password signs out every device;
+Unsubscribe keeps saves), or a state the screen cannot show otherwise ("Feed
+content for now", "Shortened by simple."). A control that changed shows its
+new value itself; no notice repeats it. The gate keeps its own words: Setup and
+Sign in their tagline, Can't reach simple its note, and Settings a note under
+each preference.
 
 ## 7. Motion
 

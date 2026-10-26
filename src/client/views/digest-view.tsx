@@ -49,7 +49,7 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
 
       {firstRun ? (
         <div className="first-run">
-          <p className="note">Nothing yet. Subscribe to a feed to start your digest.</p>
+          <p className="note">No feeds yet.</p>
           <AddFeedDialog onSubscribed={retryCalendar} onImported={retryCalendar} />
         </div>
       ) : (
@@ -65,9 +65,7 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
             <DigestList
               start={start}
               onRetry={retryCalendar}
-              empty={
-                start.from ? 'Nothing on or before this day.' : 'Nothing yet. Items arrive here as your feeds publish.'
-              }
+              empty={start.from ? 'Nothing on or before this day.' : 'Nothing yet.'}
               onOpenItem={onOpenItem}
               onOpenFeed={onOpenFeed}
             />

@@ -38,12 +38,7 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
   const title = dayTitle(group.date, today)
   const relative = relativeDay(group.date, today) !== undefined
   return (
-    <Group
-      id={`day-${group.date}`}
-      title={title}
-      count={group.items.length}
-      aside={relative ? longDay(group.date) : undefined}
-    >
+    <Group id={`day-${group.date}`} title={title} count={group.items.length}>
       {feeds.length > 1 ? (
         <ToggleGroup
           className="day-feeds"
@@ -51,7 +46,6 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
           value={only === undefined ? [] : [String(only)]}
           onValueChange={([chosen]) => setOnly(chosen === undefined ? undefined : Number(chosen))}
         >
-          <span className="note">{counted(feeds.length, 'feed')}</span>
           {feeds.map((feed) => (
             <Toggle key={feed.feedId} className="chip" value={String(feed.feedId)} title={feed.title}>
               <span className="chip-name">{feed.title}</span>{' '}
@@ -94,7 +88,7 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
 
 /**
  * A lone item is the ordinary item box. More share one box under the Feed's
- * name, each title opening its own item — on a phone, where the Digest has no
+ * name and count, each title opening its own item — on a phone, where the Digest has no
  * save squares, the time leads a title and a saved title ends with a bookmark; past `FOLD_OVER` the box opens folded,
  * and folds again on Show less — scrolled back to its head if that has left the
  * screen, so the reader stays at the box they closed.
@@ -132,7 +126,6 @@ function FeedDayBox({
     if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0)
       box.current?.scrollIntoView({ behavior: 'instant' })
   }
-  const oldest = feed.items.at(-1) ?? newest
   return (
     <article ref={box} className="item feed-day">
       <div className="item-meta">
@@ -140,9 +133,6 @@ function FeedDayBox({
           <FeedName title={feed.title} />
         </RoutedLink>
         <span className="item-when">{counted(feed.items.length, 'item')}</span>
-        <span className="item-when">
-          {oldest.displayTime}–{newest.displayTime}
-        </span>
         {note}
       </div>
       <div className="item-body">

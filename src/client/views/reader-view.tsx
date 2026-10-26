@@ -197,7 +197,7 @@ function OpenReader({
 
         {displayed?.source === 'feed-content' && displayed.content.truncated ? (
           <p className="note reader-truncated" role="status">
-            {item.link ? 'Shortened by simple. Open the original for the rest.' : 'Shortened by simple.'}
+            Shortened by simple.
           </p>
         ) : null}
         {displayed ? (
@@ -382,9 +382,7 @@ function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
           {item.link ? <OpenOriginal link={item.link} /> : null}
         </p>
       ) : null}
-      {waitSeconds !== undefined ? (
-        <p className="note">The last try was a moment ago. Wait {waitSeconds} seconds, then retry.</p>
-      ) : null}
+      {waitSeconds !== undefined ? <p className="note">Wait {waitSeconds} seconds, then retry.</p> : null}
     </div>
   )
 }

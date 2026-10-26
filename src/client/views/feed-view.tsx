@@ -39,7 +39,7 @@ import { OlderItems } from '../components/older-items.js'
 import { Row } from '../components/row.js'
 import { withSaved } from '../components/save-toggle.js'
 import { counted, dayOfYear, dayTitle } from '../day-names.js'
-import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS } from '../reading-source.js'
+import { READING_SOURCE_OPTIONS } from '../reading-source.js'
 import type { Origin } from '../routing.js'
 import { type OlderState, usePagedResource, useResource, valueInView, type Resource } from '../use-resource.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
@@ -97,7 +97,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       try {
         const schedule = await updatePollingInterval(feedId, pollingIntervalMinutes)
         set((detail) => ({ ...detail, schedule }))
-        setNotice(`Now checked ${INTERVALS[pollingIntervalMinutes].phrase}.`)
       } catch {
         setNotice('The interval couldn’t be changed.')
       }
@@ -111,7 +110,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       try {
         const preference = await updateReadingSource(feedId, readingSource)
         set((detail) => ({ ...detail, ...preference }))
-        setNotice(`Items now open with the ${READING_SOURCE_LABELS[readingSource].toLowerCase()}.`)
       } catch {
         setNotice('The reading source couldn’t be changed.')
       }
@@ -225,7 +223,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
                 value={String(detail.schedule.pollingIntervalMinutes)}
                 options={POLLING_INTERVAL_MINUTES.map((minutes) => ({
                   value: String(minutes),
-                  label: INTERVALS[minutes].label,
+                  label: INTERVALS[minutes],
                 }))}
                 busy={changing}
                 onChange={(chosen) => {
@@ -394,7 +392,6 @@ function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: 
           value={title}
           placeholder={detail.reportedTitle}
           maxLength={MAX_FEED_TITLE_LENGTH}
-          note={`Shown in your digest and feeds. The feed calls itself ${detail.reportedTitle}.`}
           onChange={setTitle}
         />
         <Field
@@ -403,7 +400,6 @@ function EditFeed({ detail, onSaved }: { detail: FeedDetail; onSaved: (details: 
           placeholder={detail.reportedDescription ?? undefined}
           maxLength={MAX_FEED_DESCRIPTION_LENGTH}
           multiline
-          note="Shown on this page. Left blank, the feed’s own description stands."
           onChange={setDescription}
         />
         <p className="note note-error" role="status">
@@ -504,12 +500,12 @@ const AGO_UNITS = [
   ['second', 1],
 ] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]
 
-/** Each Polling Interval as the select names it, and as the notice says it is now checked. */
+/** Each Polling Interval as the select names it. */
 const INTERVALS = {
-  30: { label: '30 minutes', phrase: 'every 30 minutes' },
-  60: { label: '1 hour', phrase: 'every hour' },
-  120: { label: '2 hours', phrase: 'every 2 hours' },
-  360: { label: '6 hours', phrase: 'every 6 hours' },
-  720: { label: '12 hours', phrase: 'every 12 hours' },
-  1440: { label: '1 day', phrase: 'once a day' },
-} as const satisfies Readonly<Record<PollingIntervalMinutes, { label: string; phrase: string }>>
+  30: '30 minutes',
+  60: '1 hour',
+  120: '2 hours',
+  360: '6 hours',
+  720: '12 hours',
+  1440: '1 day',
+} as const satisfies Readonly<Record<PollingIntervalMinutes, string>>

@@ -30,8 +30,6 @@ describe('the chronological Digest', () => {
     expect(screen.getByRole('heading', { name: 'Today 2' })).toBeDefined()
     expect(screen.getByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
     expect(screen.getByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
-    expect(within(screen.getByRole('region', { name: 'Today 2' })).getByText('Saturday 8 August')).toBeDefined()
-    expect(within(screen.getByRole('region', { name: 'Yesterday 1' })).getByText('Friday 7 August')).toBeDefined()
 
     const [first] = screen.getAllByRole('article')
     expect(
@@ -74,7 +72,6 @@ describe('the chronological Digest', () => {
 
     const box = await screen.findByRole('article')
     expect(within(box).getByText('7 items')).toBeDefined()
-    expect(within(box).getByText('03:00–09:00')).toBeDefined()
     expect(
       within(box)
         .getAllByRole('heading')
@@ -107,7 +104,6 @@ describe('the chronological Digest', () => {
     const user = userEvent.setup()
 
     const chips = await screen.findByRole('group', { name: 'Feeds on Saturday 8 August' })
-    expect(within(chips).getByText('2 feeds')).toBeDefined()
     const letters = within(chips).getByRole('button', { name: 'Letters 1' })
 
     await user.click(letters)
@@ -187,7 +183,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('Nothing yet. Subscribe to a feed to start your digest.')).toBeDefined()
+    expect(await screen.findByText('No feeds yet.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Add feed' })).toBeDefined()
     expect(screen.queryByRole('region', { name: 'August 2026' })).toBeNull()
     expect(screen.queryByLabelText('Start from a day')).toBeNull()
@@ -198,7 +194,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('Nothing yet. Items arrive here as your feeds publish.')).toBeDefined()
+    expect(await screen.findByText('Nothing yet.')).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Add feed' })).toBeNull()
   })
 
@@ -210,7 +206,7 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByText('The digest can’t be reached. Check the connection, then try again.')).toBeDefined()
+    expect(await screen.findByText('The digest can’t be reached.')).toBeDefined()
 
     api.on('GET /api/digest', { body: DIGEST })
     await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -223,7 +219,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('The digest didn’t load. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The digest didn’t load.')).toBeDefined()
   })
 
   it('names a server failure without dressing it up', async () => {
@@ -234,7 +230,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByText('The digest didn’t load. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The digest didn’t load.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
   })
 })
@@ -264,7 +260,9 @@ describe('the Digest from a day', () => {
 
     const month = await screen.findByRole('region', { name: 'August 2026' })
     await screen.findByRole('heading', { name: 'Today 2' })
-    expect(within(month).getByText('Saturday 8 August').nextSibling?.textContent).toBe('2 items')
+    expect(within(month).getByRole('button', { name: '2 items on 8 August 2026' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
     expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
 
     const monday = within(month).getByRole('button', { name: '4 items on 3 August 2026' })
@@ -273,7 +271,6 @@ describe('the Digest from a day', () => {
     expect(window.location.search).toBe('?from=2026-08-03')
     expect(await screen.findByRole('heading', { name: 'Monday 3 August 1' })).toBeDefined()
     expect(monday.getAttribute('aria-pressed')).toBe('true')
-    expect(within(month).getByText('Monday 3 August').nextSibling?.textContent).toBe('4 items')
 
     await user.click(screen.getByRole('button', { name: 'Back to today' }))
 

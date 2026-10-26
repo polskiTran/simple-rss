@@ -110,7 +110,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
     <div className="view" aria-busy={state.kind === 'loading'}>
       {head}
       {library.items.length === 0 ? (
-        <p className="note">Nothing saved yet. Save an item from the digest or a feed to keep it here.</p>
+        <p className="note">Nothing saved yet.</p>
       ) : (
         groups.map((group) => (
           <Group

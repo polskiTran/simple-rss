@@ -32,8 +32,9 @@ function section(page: Page, name: 'Digest' | 'Feeds' | 'Saved') {
 
 async function preferFeedContent(page: Page, feedTitle: string): Promise<void> {
   await page.getByRole('link', { name: feedTitle }).click()
-  await page.getByRole('button', { name: 'Feed content' }).click()
-  await expect(page.getByText('Items now open with the feed content.')).toBeVisible()
+  const feedContent = page.getByRole('button', { name: 'Feed content' })
+  await feedContent.click()
+  await expect(feedContent).toHaveAttribute('aria-pressed', 'true')
 }
 
 const rendererChunk = /article-renderer|article-markdown/
@@ -246,7 +247,7 @@ test.describe('Reader View', () => {
     await expect(page.getByText('Tide notes from the shore.')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Feed content')
-    await expect(page.getByText('Shortened by simple. Open the original for the rest.')).toBeVisible()
+    await expect(page.getByText('Shortened by simple.')).toBeVisible()
     const originals = page.getByRole('link', { name: 'Open original' })
     await expect(originals).toHaveCount(2)
     await expect(originals.first()).toHaveAttribute('href', 'https://publisher.example/slow-water')
@@ -362,7 +363,7 @@ test.describe('Reader View at phone width', () => {
     await page.getByRole('link', { name: 'Slow water' }).click()
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Coastal notes' })).toBeVisible()
-    await expect(page.getByText('Shortened by simple. Open the original for the rest.')).toBeVisible()
+    await expect(page.getByText('Shortened by simple.')).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Feed content')
     await expect(page.getByRole('link', { name: 'the coastal notebook' })).toHaveAttribute(
       'href',

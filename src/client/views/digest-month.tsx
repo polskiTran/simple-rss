@@ -5,8 +5,7 @@ import { cadenceDayLabel, relativeLevels } from '../cadence.js'
 import { CadenceLegend } from '../components/cadence-grid.js'
 import { Group } from '../components/group.js'
 import { Icon } from '../components/icon.js'
-import { Row } from '../components/row.js'
-import { counted, longDay, monthOfYear } from '../day-names.js'
+import { monthOfYear } from '../day-names.js'
 
 interface DigestMonthProps {
   readonly calendar: DigestCalendar
@@ -92,9 +91,6 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
         })}
       </div>
       <CadenceLegend />
-      <dl className="rows calendar-facts">
-        <Row label={longDay(selected)} value={counted(counts.get(selected) ?? 0, 'item')} />
-      </dl>
     </Group>
   )
 }

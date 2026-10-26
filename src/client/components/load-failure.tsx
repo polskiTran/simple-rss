@@ -12,9 +12,7 @@ export function LoadFailure({ subject, kind, onRetry }: LoadFailureProps) {
   return (
     <div className="load-failure">
       <p className="note note-error" role="status">
-        {kind === 'unreachable'
-          ? `${subject} can’t be reached. Check the connection, then try again.`
-          : `${subject} didn’t load. Try again in a moment.`}
+        {kind === 'unreachable' ? `${subject} can’t be reached.` : `${subject} didn’t load.`}
       </p>
       <Button className="button" onClick={onRetry}>
         Retry

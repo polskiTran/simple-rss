@@ -12,7 +12,6 @@ interface FieldProps {
   readonly placeholder?: string | undefined
   readonly maxLength?: number
   readonly multiline?: boolean
-  readonly note?: string | undefined
   readonly error?: string | undefined
   /** The input, for a form that moves focus to the field in error. */
   readonly ref?: Ref<HTMLInputElement>
@@ -20,8 +19,8 @@ interface FieldProps {
 }
 
 /**
- * A labelled control for one value. Base UI ties the label, and the note or
- * error under it, to the control. A password field carries its own reveal.
+ * A labelled control for one value. Base UI ties the label, and the error
+ * under it, to the control. A password field carries its own reveal.
  */
 export function Field({
   label,
@@ -32,7 +31,6 @@ export function Field({
   placeholder,
   maxLength,
   multiline,
-  note,
   error,
   ref,
   onChange,
@@ -72,8 +70,6 @@ export function Field({
       </span>
       {error !== undefined ? (
         <BaseField.Description className="field-note field-error">{error}</BaseField.Description>
-      ) : note !== undefined ? (
-        <BaseField.Description className="field-note">{note}</BaseField.Description>
       ) : null}
     </BaseField.Root>
   )

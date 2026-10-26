@@ -113,14 +113,14 @@ describe('the search line in the chrome', () => {
 
     const field = await screen.findByRole('searchbox', { name: 'Search your reading' })
     await user.type(field, 'drift')
-    expect(await screen.findByText('Search can’t be reached. Check the connection, then try again.')).toBeDefined()
+    expect(await screen.findByText('Search can’t be reached.')).toBeDefined()
 
     api.on('GET /api/search?q=driftless', {
       status: 503,
       body: { error: { code: 'unavailable', message: 'Unavailable' } },
     })
     await user.type(field, 'less')
-    expect(await screen.findByText('Search didn’t load. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('Search didn’t load.')).toBeDefined()
   })
 
   it('answers a shared search address with the results it names', async () => {

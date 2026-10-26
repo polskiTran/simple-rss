@@ -27,7 +27,7 @@ import { Choice } from '../components/choice.js'
 import { Field } from '../components/field.js'
 import { Icon } from '../components/icon.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { ago, daysBefore, lapse, localDay, relativeDay, shortDate } from '../day-names.js'
+import { ago, daysBefore, localDay, relativeDay, shortDate } from '../day-names.js'
 import { addFailure, feedAddressOf, NOT_AN_ADDRESS } from './feed-language.js'
 
 type Way = 'address' | 'opml'
@@ -221,7 +221,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
               placeholder="https://"
               autoComplete="off"
               autoFocus
-              note="A site address is enough; simple finds its feeds."
               error={error ?? failure?.reason}
               onChange={addressChanged}
             />
@@ -256,9 +255,11 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
                 }}
               />
             </label>
-            <p className={error ? 'field-note field-error' : 'field-note'} role={error ? 'alert' : undefined}>
-              {error ?? 'Records every feed the file lists; each is checked on its own schedule.'}
-            </p>
+            {error ? (
+              <p className="field-note field-error" role="alert">
+                {error}
+              </p>
+            ) : null}
           </div>
         )}
         <div className="dialog-footer">
@@ -329,7 +330,7 @@ function FoundFeeds({
   return (
     <div className="add-feed-found">
       <p className="feed-choices-lede" id={`${id}-lede`}>
-        {host} names {feeds.length.toLocaleString('en-GB')} feeds. Choose one.
+        {host} names {feeds.length.toLocaleString('en-GB')} feeds
       </p>
       <RadioGroup
         className="feed-choices"
@@ -394,12 +395,8 @@ function FeedHead({ feed, today, id }: { feed: FeedPreview; today: string; id: s
 }
 
 function FeedDetail({ feed, today }: { feed: FeedPreview; today: string }) {
-  const lastItem = lastDay(feed)
   return (
     <div className="feed-preview-detail">
-      {lastItem !== undefined && isSilent(lastItem, today) ? (
-        <p className="feed-preview-warning">Nothing new in {lapse(lastItem, today)}. It may have stopped publishing.</p>
-      ) : null}
       {feed.items.length > 0 ? (
         <ol className="feed-preview-items">
           {feed.items.map((item, index) => {

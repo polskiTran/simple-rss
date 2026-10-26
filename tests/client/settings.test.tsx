@@ -33,7 +33,7 @@ describe('the Settings timezone', () => {
     })
     openSettings()
 
-    expect(await screen.findByText('The timezone didn’t load. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('The timezone didn’t load.')).toBeDefined()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByLabelText('Installation timezone')).toHaveProperty('value', 'Pacific/Auckland')

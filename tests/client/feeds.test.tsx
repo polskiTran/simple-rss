@@ -78,7 +78,7 @@ describe('Add feed', () => {
 
     await lookUp(user, 'https://journal.example/')
 
-    const group = await screen.findByRole('radiogroup', { name: 'journal.example names 2 feeds. Choose one.' })
+    const group = await screen.findByRole('radiogroup', { name: 'journal.example names 2 feeds' })
     expect(group).toBeDefined()
     const first = screen.getByRole('radio', { name: 'Field Notes' })
     expect(first.getAttribute('aria-checked')).toBe('true')
@@ -121,7 +121,7 @@ describe('Add feed', () => {
     expect(screen.getByRole('button', { name: 'Subscribe' }).getAttribute('aria-disabled')).not.toBe('true')
   })
 
-  it('warns that a Feed silent for months may have stopped publishing', async () => {
+  it('says how long a silent Feed has gone without an item', async () => {
     const twoYearsAgo = '2024-08-01T12:00:00.000Z'
     stubApi().on('POST /api/subscriptions/preview', {
       body: {
@@ -136,7 +136,6 @@ describe('Add feed', () => {
     await lookUp(user, PREVIEWED.feedUrl)
 
     expect(await screen.findByText('Last item 2 years ago')).toBeDefined()
-    expect(screen.getByText('Nothing new in 2 years. It may have stopped publishing.')).toBeDefined()
     expect(screen.getByText('1 Aug 2024')).toBeDefined()
   })
 
@@ -430,7 +429,6 @@ describe('Feed Availability', () => {
 
     expect(await screen.findByText(/the publisher is answering with an error/i)).toBeDefined()
     expect(screen.getByText(/last reached/i)).toBeDefined()
-    expect(screen.getByText(/items stay in your digest/i)).toBeDefined()
     expect(screen.getByRole('button', { name: /^Retry$/ })).toBeDefined()
     expect(screen.getByText('Field Notes')).toBeDefined()
   })

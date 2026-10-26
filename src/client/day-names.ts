@@ -88,7 +88,7 @@ export function daysBefore(dateKey: string, today: string): number {
   return Math.round((Date.parse(today) - Date.parse(dateKey)) / 86_400_000)
 }
 
-export function lapse(dateKey: string, today: string): string {
+function lapse(dateKey: string, today: string): string {
   const days = daysBefore(dateKey, today)
   if (days < 45) return counted(days, 'day')
   if (days < 365) return counted(Math.round(days / 30), 'month')

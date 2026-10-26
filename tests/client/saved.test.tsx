@@ -159,9 +159,7 @@ describe('the Saved tab', () => {
     window.history.replaceState(null, '', '/saved')
     render(<App />)
 
-    expect(
-      await screen.findByText('Nothing saved yet. Save an item from the digest or a feed to keep it here.'),
-    ).toBeDefined()
+    expect(await screen.findByText('Nothing saved yet.')).toBeDefined()
   })
 
   it('tells a silent network apart from a refusing server, and offers the way back', async () => {
@@ -172,7 +170,7 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByText('Your saves can’t be reached. Check the connection, then try again.')).toBeDefined()
+    expect(await screen.findByText('Your saves can’t be reached.')).toBeDefined()
 
     api.on('GET /api/library', { body: LIBRARY })
     await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -185,6 +183,6 @@ describe('the Saved tab', () => {
     window.history.replaceState(null, '', '/saved')
     render(<App />)
 
-    expect(await screen.findByText('Your saves didn’t load. Try again in a moment.')).toBeDefined()
+    expect(await screen.findByText('Your saves didn’t load.')).toBeDefined()
   })
 })

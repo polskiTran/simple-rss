@@ -792,11 +792,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .group-aside {
-    font-size: 13px;
-    color: var(--color-ink-2);
-  }
-
   .panel .group-header {
     margin-bottom: 0;
     padding-bottom: 14px;
@@ -1354,18 +1349,6 @@
     margin: 8px 0 0;
   }
 
-  .more-names {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-
-    @media (max-width: 1024px) {
-      display: none;
-    }
-  }
-
   .add-feed-ways {
     display: flex;
   }
@@ -1497,12 +1480,6 @@
 
   .feed-choice .feed-preview-detail {
     padding: 0 16px 16px;
-  }
-
-  .feed-preview-warning {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.45;
   }
 
   .feed-preview-items {
@@ -2137,11 +2114,6 @@
     }
   }
 
-  .day-feeds > .note {
-    flex: none;
-    margin-inline-end: 8px;
-  }
-
   /* A row that scrolls on a phone fades at its trailing edge, as a day's chips do. */
   :is(.filter-list, .rhythm-jumps) {
     @media (max-width: 1024px) {
@@ -2452,11 +2424,6 @@
 
   .digest-calendar .cadence-legend {
     margin-top: 16px;
-  }
-
-  .calendar-facts {
-    margin-top: 20px;
-    border-top: 1px solid var(--color-rule);
   }
 
   /* A quiet spell's strip is its last 14 days; `:where` keeps it below the

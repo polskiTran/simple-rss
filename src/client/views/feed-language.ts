@@ -66,7 +66,7 @@ export function retryFailure(cause: unknown): string {
 }
 
 /**
- * Why checking fails, when it last worked, and what stays: `… Last reached 5 Aug. Its items stay in your digest.`
+ * Why checking fails, and when it last worked: `… Last reached 5 Aug.`
  * The last success names its year when it differs from the latest check's, the
  * one that found the Feed still down.
  */
@@ -77,7 +77,7 @@ export function unavailableNote(availability: FeedAvailability): string {
     ? `Last reached ${shortDate(lastSuccessDate, lastCheckedAt?.slice(0, 10) ?? lastSuccessDate)}.`
     : 'Not reached since subscribing.'
 
-  return `${reason}. ${lastSuccess} Its items stay in your digest.`
+  return `${reason}. ${lastSuccess}`
 }
 
 /**

@@ -30,7 +30,7 @@ async function subscribeFromSite(page: Page, installation: Installation): Promis
   const dialog = page.getByRole('dialog', { name: 'Add feed' })
   await dialog.getByRole('textbox', { name: 'URL' }).fill(installation.siteUrl)
 
-  await expect(dialog.getByRole('radiogroup', { name: 'publisher.example names 2 feeds. Choose one.' })).toBeVisible()
+  await expect(dialog.getByRole('radiogroup', { name: 'publisher.example names 2 feeds' })).toBeVisible()
   await expect(dialog.getByRole('radio', { name: 'Field Notes' })).toBeChecked()
   await expect(dialog.getByText('First light')).toBeVisible()
   await dialog.getByRole('radio', { name: 'Long Meadow' }).click()
@@ -97,7 +97,7 @@ async function expectOpenFeed(page: Page): Promise<void> {
   const interval = page.getByRole('combobox', { name: 'Check every' })
   await expect(interval).toHaveValue('120')
   await interval.selectOption({ label: '6 hours' })
-  await expect(page.getByText('Now checked every 6 hours.')).toBeVisible()
+  await expect(interval).toHaveValue('360')
   const refresh = page.getByRole('button', { name: 'Refresh now' })
   await refresh.click()
   await expect(page.getByText('Refreshed. The feed shows 1 item.')).toBeVisible()
@@ -157,7 +157,6 @@ test.describe('desktop Feed and Digest rendering', () => {
     await page.keyboard.press('Space')
 
     await expect(feedContent).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByText('Items now open with the feed content.')).toBeVisible()
     await page.getByRole('link', { name: 'Back to Feeds' }).click()
     await openFeed(page)
     await expect(page.getByRole('button', { name: 'Feed content' })).toHaveAttribute('aria-pressed', 'true')
