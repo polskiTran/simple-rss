@@ -2,8 +2,10 @@ import type { Locator, Page } from '@playwright/test'
 import {
   addFeed,
   expect,
+  expectContentWithinViewport,
   expectNoHorizontalOverflow,
   LEDGER_LONG_TITLE,
+  UNBROKEN_TITLE,
   USER_PASSWORD,
   SETUP_SECRET,
   test,
@@ -278,5 +280,43 @@ test.describe('the Digest at phone width', () => {
     await expect(page).toHaveURL(new RegExp(`\\?from=${daysAgo(1)}$`))
     await expect(page.getByRole('button', { name: 'Back to today' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
+  })
+})
+
+test.describe('an unbroken title on a phone', () => {
+  test.use({ viewport: { width: 320, height: 700 } })
+
+  test('stays inside the screen on the Digest and the Feed, and search focus does not shift sideways', async ({
+    page,
+    installation,
+  }) => {
+    await page.goto(installation.url)
+    await page.getByLabel('Setup secret').fill(SETUP_SECRET)
+    await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
+    await page.getByLabel('Confirm password').fill(USER_PASSWORD)
+    await page.getByRole('button', { name: 'Claim installation' }).click()
+    await page.getByRole('link', { name: 'Feeds', exact: true }).click()
+    await addFeed(page, installation.addressFeedUrl)
+    await expect(page.getByRole('heading', { name: 'Address Ledger' })).toBeVisible()
+    await addFeed(page, installation.feedUrl)
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+
+    await expect(page.getByRole('button', { name: 'Address Ledger 2' })).toBeVisible()
+    await expect(page.locator('.feed-day-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
+    await expect(page.locator('.day-items time')).toHaveCount(3)
+    for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
+    await expectContentWithinViewport(page)
+
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(page.getByRole('searchbox', { name: 'Search your reading' })).toBeFocused()
+    expect(await page.evaluate(() => window.scrollX)).toBe(0)
+    await expectContentWithinViewport(page)
+
+    await page.getByRole('button', { name: 'Close search' }).click()
+    await page.getByRole('link', { name: 'Address Ledger' }).click()
+    await expect(page.getByRole('heading', { name: 'Address Ledger' })).toBeVisible()
+    await expect(page.locator('.item-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
+    expect(await page.evaluate(() => window.scrollX)).toBe(0)
+    await expectContentWithinViewport(page)
   })
 })
