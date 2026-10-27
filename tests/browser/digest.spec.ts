@@ -43,7 +43,6 @@ function groundColour(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 }
 
-/** Space from each card to the visual left and right of the window. */
 async function cardSideGaps(page: Page): Promise<{ left: number; right: number }[]> {
   return page.locator('.item').evaluateAll((cards) =>
     cards.map((card) => {

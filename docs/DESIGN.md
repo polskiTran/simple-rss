@@ -262,7 +262,7 @@ there is something to submit. On a phone it is a hard-edged sheet, still at most
 a sheet taller than the screen scrolls, and scrolls back to its title. The
 scrim and the desktop panel fade in over 150ms and out over 120ms; the sheet
 rises in over 240ms and sinks out over 180ms, opaque, under the fading scrim.
-While one is open the page's scrollbar gutter takes the scrim's colour too,
+While one is open on the desktop layout, the page's scrollbar gutter takes the scrim's colour too,
 fading with it both ways, so no strip runs down the edge.
 
 **Add feed.** A dialog with a switch of Site or feed URL and Import OPML. The
