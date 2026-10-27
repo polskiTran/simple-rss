@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import {
   addFeed,
   expect,
@@ -164,6 +164,39 @@ test.describe('the Digest from a day', () => {
   })
 })
 
+async function sharedTitle(row: Locator) {
+  return row.evaluate((item) => {
+    const line = item.querySelector('.feed-day-line')
+    const title = item.querySelector('.feed-day-title')
+    const link = title?.querySelector('a')
+    if (!line || !title || !link) return null
+    const box = line.getBoundingClientRect()
+    const visible = [...link.getClientRects()].filter((rect) => {
+      const overlap = Math.min(rect.bottom, box.bottom) - Math.max(rect.top, box.top)
+      return overlap > rect.height / 2
+    })
+    const rows = [...new Map(visible.map((rect) => [Math.round(rect.top), rect])).values()].sort(
+      (one, other) => one.top - other.top,
+    )
+    const hole = rows.slice(1).some((rect, index) => rect.top - (rows[index]?.bottom ?? rect.top) > 2)
+    const mark = item.querySelector('[aria-label="Saved"]')?.getBoundingClientRect()
+    return {
+      lines: rows.length,
+      startsAtTop: rows[0] !== undefined && rows[0].top - box.top < 4,
+      noHole: !hole,
+      fits: rows.every((rect) => rect.width <= box.width + 1),
+      lineHoldsItsText: line.scrollHeight <= line.clientHeight + 1,
+      titleClamped: title.scrollHeight > title.clientHeight + 1,
+      markInside:
+        mark !== undefined &&
+        mark.width > 0 &&
+        mark.width < 40 &&
+        mark.top >= box.top - 1 &&
+        mark.bottom <= box.bottom + 1,
+    }
+  })
+}
+
 test.describe('the Digest at phone width', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
@@ -179,11 +212,39 @@ test.describe('the Digest at phone width', () => {
 
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save First light' })).toBeHidden()
+    await expect(page.locator('.day-items time')).toHaveCount(1)
+    await expect(page.locator('.day-items time')).toBeHidden()
   })
 
-  test('keeps a cut-off title’s bookmark in view, after its ellipsis', async ({ page, installation }) => {
+  test('wraps a shared title, hides its time, and keeps a saved bookmark in view', async ({ page, installation }) => {
     await claimAndSubscribe(page, installation, installation.ledgerFeedUrl, 'Valley Ledger')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
+
+    await expect(page.getByText('2 items')).toBeVisible()
+
+    const row = page.locator('.feed-day-item', { hasText: LEDGER_LONG_TITLE })
+    const short = page.locator('.feed-day-item', { hasText: 'Dry again' })
+    expect(await sharedTitle(row)).toEqual({
+      lines: 3,
+      startsAtTop: true,
+      noHole: true,
+      fits: true,
+      lineHoldsItsText: true,
+      titleClamped: true,
+      markInside: false,
+    })
+    expect(await sharedTitle(short)).toEqual({
+      lines: 1,
+      startsAtTop: true,
+      noHole: true,
+      fits: true,
+      lineHoldsItsText: true,
+      titleClamped: false,
+      markInside: false,
+    })
+    await expect(page.locator('.day-items time')).toHaveCount(2)
+    for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
+
     await page.getByRole('link', { name: LEDGER_LONG_TITLE }).click()
     await page.getByRole('button', { name: `Save ${LEDGER_LONG_TITLE}` }).click()
     await expect(page.getByRole('button', { name: `Saved ${LEDGER_LONG_TITLE}` })).toHaveAttribute(
@@ -192,21 +253,14 @@ test.describe('the Digest at phone width', () => {
     )
     await page.goBack()
 
-    const row = page.locator('.feed-day-item', { hasText: LEDGER_LONG_TITLE })
     await expect(row.getByRole('img', { name: 'Saved' })).toBeVisible()
-    const shown = await row.evaluate((item) => {
-      const line = item.querySelector('.feed-day-line')
-      const mark = item.querySelector('[aria-label="Saved"]')
-      const time = item.querySelector('time')
-      if (!line || !mark || !time) return null
-      const box = line.getBoundingClientRect()
-      const within = (part: Element) => {
-        const { top, bottom } = part.getBoundingClientRect()
-        return top >= box.top && bottom <= box.bottom + 0.5
-      }
-      return { cut: line.scrollHeight > line.clientHeight, time: within(time), mark: within(mark) }
+    expect(await sharedTitle(row)).toMatchObject({
+      lines: 3,
+      startsAtTop: true,
+      noHole: true,
+      lineHoldsItsText: true,
+      markInside: true,
     })
-    expect(shown).toEqual({ cut: true, time: true, mark: true })
   })
 
   test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {

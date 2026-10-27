@@ -86,13 +86,6 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
   )
 }
 
-/**
- * A lone item is the ordinary item box. More share one box under the Feed's
- * name and count, each title opening its own item — on a phone, where the Digest has no
- * save squares, the time leads a title and a saved title ends with a bookmark; past `FOLD_OVER` the box opens folded,
- * and folds again on Show less — scrolled back to its head if that has left the
- * screen, so the reader stays at the box they closed.
- */
 function FeedDayBox({
   feed,
   onOpenItem,

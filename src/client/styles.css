@@ -2187,10 +2187,13 @@
     }
   }
 
-  /* The Digest saves from the Reader alone on a phone, so its titles take the
-     whole row; a shared title’s time leads it, and the row holds three lines
-     as a lone title does. */
   .day-items .save-toggle {
+    @media (max-width: 1024px) {
+      display: none;
+    }
+  }
+
+  .day-items time.item-when {
     @media (max-width: 1024px) {
       display: none;
     }
@@ -2221,17 +2224,11 @@
       grid-area: 1 / 3;
     }
 
-    /* Stretched, the line has a definite height for its spacer to measure. */
     @media (max-width: 1024px) {
       display: flex;
-      align-items: stretch;
     }
   }
 
-  /* On desktop the line's parts are the row's grid cells. On a phone the time
-     leads and the title runs three lines at most; a saved title's bookmark
-     floats onto the last line the clamp shows, so the ellipsis stops before it —
-     the spacer, one line short of the clamped height, pushes it down there. */
   .feed-day-line {
     display: contents;
 
@@ -2240,27 +2237,11 @@
     }
 
     @media (max-width: 1024px) {
-      display: -webkit-box;
+      position: relative;
+      display: block;
       flex: 1;
       min-width: 0;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      overflow: hidden;
       font: 400 17px / 1.38 var(--font-read);
-
-      &::before {
-        content: '';
-        float: right;
-        width: 0;
-        height: calc(100% - 1lh);
-      }
-
-      & > time {
-        margin-inline-end: 8px;
-        font: 400 13px var(--font-ui);
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
     }
   }
 
@@ -2275,9 +2256,8 @@
     overflow: hidden;
 
     @media (max-width: 1024px) {
-      display: inline;
-      font-size: 17px;
-      line-height: 1.38;
+      font: inherit;
+      -webkit-line-clamp: 3;
     }
   }
 
@@ -2310,23 +2290,28 @@
     }
   }
 
-  /* Saved state on a phone, where the Digest has no save square to show it. */
   .feed-day-saved {
     display: none;
 
     @media (max-width: 1024px) {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
       display: inline-flex;
-      float: right;
-      clear: right;
       align-items: center;
       height: 1lh;
-      margin-inline-start: 8px;
       color: var(--color-saved);
 
       & .icon {
         width: 13px;
         height: 13px;
       }
+    }
+  }
+
+  .feed-day-item:has(.feed-day-saved) .feed-day-title {
+    @media (max-width: 1024px) {
+      padding-inline-end: 21px;
     }
   }
 

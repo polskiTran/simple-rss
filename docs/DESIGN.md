@@ -308,11 +308,10 @@ with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the title's row opens the platform's own date picker, in
 place of the month, and a day's chips run past the screen's edge. The phone Digest has no
-save squares, so its titles take the whole width of the box: in a shared box
-each title leads with its time in meta and runs three lines at most, and a
-saved title ends with the bookmark in `saved` on the last line shown — after
-the ellipsis when the title is cut — so the clamp never hides it. A lone box
-keeps its `saved-edge`. Pages are whole days,
+save squares and no entry times, so a title uses the width of the box. A lone
+title and a shared title each run three lines at most. A saved title in a
+shared box keeps its bookmark, in `saved`, on the first line, clear of the
+text. A lone box keeps its `saved-edge`. Pages are whole days,
 as many as reach fifty items, so Show more continues from the next day and
 names no number; Saved ends the same way. Before the first Subscription, the
 Digest is "No feeds yet." and Add feed as the primary action, with no chips and no
