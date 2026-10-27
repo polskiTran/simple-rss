@@ -288,9 +288,9 @@ test.describe('the Digest at phone width', () => {
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     const search = page.getByRole('searchbox', { name: 'Search your reading' })
     await expect(search).toBeFocused()
-    expect(await search.evaluate((input) => Number.parseFloat(getComputedStyle(input).fontSize))).toBeGreaterThanOrEqual(
-      16,
-    )
+    expect(
+      await search.evaluate((input) => Number.parseFloat(getComputedStyle(input).fontSize)),
+    ).toBeGreaterThanOrEqual(16)
     expect(await page.evaluate(() => window.scrollX)).toBe(0)
     for (const gap of await cardSideGaps(page)) expect(Math.abs(gap.left - gap.right)).toBeLessThanOrEqual(1)
   })
