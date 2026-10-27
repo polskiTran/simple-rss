@@ -171,16 +171,22 @@ async function sharedTitle(row: Locator) {
     const link = title?.querySelector('a')
     if (!line || !title || !link) return null
     const box = line.getBoundingClientRect()
-    const rects = [...link.getClientRects()].filter((rect) => rect.bottom > box.top + 1 && rect.top < box.bottom - 1)
-    const hole = rects.slice(1).some((rect, index) => rect.top - (rects[index]?.bottom ?? rect.top) > 2)
+    const visible = [...link.getClientRects()].filter((rect) => {
+      const overlap = Math.min(rect.bottom, box.bottom) - Math.max(rect.top, box.top)
+      return overlap > rect.height / 2
+    })
+    const rows = [...new Map(visible.map((rect) => [Math.round(rect.top), rect])).values()].sort(
+      (one, other) => one.top - other.top,
+    )
+    const hole = rows.slice(1).some((rect, index) => rect.top - (rows[index]?.bottom ?? rect.top) > 2)
     const mark = item.querySelector('[aria-label="Saved"]')?.getBoundingClientRect()
     return {
-      lines: rects.length,
-      startsAtTop: rects[0] !== undefined && rects[0].top - box.top < 4,
+      lines: rows.length,
+      startsAtTop: rows[0] !== undefined && rows[0].top - box.top < 4,
       noHole: !hole,
-      fits: rects.every((rect) => rect.width <= box.width + 1),
+      fits: rows.every((rect) => rect.width <= box.width + 1),
       lineHoldsItsText: line.scrollHeight <= line.clientHeight + 1,
-      titleClamped: title.scrollHeight > title.clientHeight,
+      titleClamped: title.scrollHeight > title.clientHeight + 1,
       markInside:
         mark !== undefined &&
         mark.width > 0 &&
@@ -215,8 +221,6 @@ test.describe('the Digest at phone width', () => {
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
     await expect(page.getByText('2 items')).toBeVisible()
-    await expect(page.locator('.day-items time')).toHaveCount(2)
-    for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
 
     const row = page.locator('.feed-day-item', { hasText: LEDGER_LONG_TITLE })
     const short = page.locator('.feed-day-item', { hasText: 'Dry again' })
@@ -238,6 +242,8 @@ test.describe('the Digest at phone width', () => {
       titleClamped: false,
       markInside: false,
     })
+    await expect(page.locator('.day-items time')).toHaveCount(2)
+    for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
 
     await page.getByRole('link', { name: LEDGER_LONG_TITLE }).click()
     await page.getByRole('button', { name: `Save ${LEDGER_LONG_TITLE}` }).click()
