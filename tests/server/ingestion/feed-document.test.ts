@@ -176,6 +176,100 @@ describe('parseFeedDocument', () => {
     expect(parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL, [entered]).homePageUrl).toBeNull()
   })
 
+  it('reads the item link from a permalink guid when the RSS item declares none', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0"><channel>
+        <title>TLDR AI Feed</title>
+        <link>https://bullrich.dev/tldr-rss/</link>
+        <item>
+          <title>Dessa</title>
+          <guid isPermaLink="true">https://block.xyz/dessa?utm_source=tldrai&amp;utm_medium=rss</guid>
+          <description>A conversational model. No markup.</description>
+        </item>
+        <item>
+          <title>Voice</title>
+          <guid isPermaLink="true">http://cloud.livekit.io/</guid>
+          <description>Plain text.</description>
+        </item>
+        <item>
+          <title>Default</title>
+          <guid>https://journal.example/default</guid>
+        </item>
+      </channel></rss>`
+    const parsed = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL)
+
+    expect(parsed.homePageUrl).toBe('https://bullrich.dev/tldr-rss/')
+    expect(parsed.items).toMatchObject([
+      {
+        title: 'Dessa',
+        link: 'https://block.xyz/dessa?utm_source=tldrai&utm_medium=rss',
+        dedupeKey: 'guid:https://block.xyz/dessa?utm_source=tldrai&utm_medium=rss',
+        identityKind: 'guid',
+      },
+      {
+        title: 'Voice',
+        link: 'http://cloud.livekit.io/',
+        dedupeKey: 'guid:http://cloud.livekit.io/',
+        identityKind: 'guid',
+      },
+      {
+        title: 'Default',
+        link: 'https://journal.example/default',
+        dedupeKey: 'guid:https://journal.example/default',
+        identityKind: 'guid',
+      },
+    ])
+  })
+
+  it('reads no item link from a guid that is not an absolute http(s) permalink', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0"><channel><title>Notes</title>
+        <item><title>Flagged off</title><guid isPermaLink="false">https://journal.example/not-a-link</guid></item>
+        <item><title>Opaque</title><guid>entry-1</guid></item>
+        <item><title>Relative</title><guid isPermaLink="true">/posts/one</guid></item>
+        <item><title>Other scheme</title><guid isPermaLink="true">urn:uuid:123</guid></item>
+      </channel></rss>`
+    const parsed = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL)
+
+    expect(parsed.items.map((item) => item.link)).toEqual([null, null, null, null])
+    expect(parsed.items[0]).toMatchObject({
+      identityKind: 'guid',
+      dedupeKey: 'guid:https://journal.example/not-a-link',
+    })
+  })
+
+  it('reads no item link from an Atom id, even when that id is an http URL', () => {
+    const xml = `<?xml version="1.0"?>
+      <feed xmlns="http://www.w3.org/2005/Atom"><title>Letters</title>
+        <entry><id>https://atom.example/letters/one</id><title>One</title></entry>
+      </feed>`
+    const [item] = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL).items
+
+    expect(item).toMatchObject({
+      link: null,
+      dedupeKey: 'guid:https://atom.example/letters/one',
+      identityKind: 'guid',
+    })
+  })
+
+  it('keeps a usable item link when a permalink guid names a different url', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0"><channel><title>Notes</title>
+        <item>
+          <title>Has both</title>
+          <link>https://journal.example/post#section</link>
+          <guid isPermaLink="true">https://other.example/post</guid>
+        </item>
+      </channel></rss>`
+    const [item] = parseFeedDocument(new TextEncoder().encode(xml), RESOLVED_URL).items
+
+    expect(item).toMatchObject({
+      link: 'https://journal.example/post',
+      dedupeKey: 'guid:https://other.example/post',
+      identityKind: 'guid',
+    })
+  })
+
   it('reads the Discussion an RSS item declares in <comments>, as Hacker News and Lobsters do', () => {
     const xml = `<?xml version="1.0"?>
       <rss version="2.0"><channel><title>Aggregator</title>
