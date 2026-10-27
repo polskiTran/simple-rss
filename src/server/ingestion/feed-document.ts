@@ -177,10 +177,11 @@ function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase,
   const title = boundedPlainText(recordField(record, ['title', 'atom:title']), MAX_TITLE_LENGTH)
   const itemBase = declaredBase(record, inherited)
   const linkElement = atom ? atomLinkElement(record, 'alternate') : recordField(record, ['link'])
-  const link = normalizeHttpUrl(
+  const declaredLink = normalizeHttpUrl(
     atom ? asRecord(linkElement)['@_href'] : linkElement,
     declaredBase(asRecord(linkElement), itemBase).xmlBase,
   )
+  const link = declaredLink ?? (atom ? null : permalinkGuid(record))
   // Declared XML bases outrank the item address; without one, HTML destinations use
   // the original page, then the Feed address as their natural context.
   const contentBase = { xmlBase: itemBase.xmlBase, linkBase: itemBase.linkBase ?? link ?? itemBase.xmlBase }
@@ -210,6 +211,27 @@ function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase,
     summary,
     feedContent,
   }
+}
+
+/**
+ * RSS defaults `isPermaLink` to true. `new URL` with no base admits only an
+ * absolute http(s) guid, so an opaque id is not joined onto the Feed URL.
+ */
+function permalinkGuid(record: Record<string, unknown>): string | null {
+  const guid = recordField(record, ['guid'])
+  const permanence = attributeOf(guid, 'isPermaLink')
+  if (permanence !== null && permanence.toLowerCase() !== 'true') return null
+  const raw = plainValue(guid)
+  if (!raw) return null
+
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  return normalizeHttpUrl(raw, url.href)
 }
 
 /**
