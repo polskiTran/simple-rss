@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import {
   addFeed,
   expect,
-  expectContentWithinViewport,
+  expectNoBoxPastTheSideEdge,
   expectNoHorizontalOverflow,
   LEDGER_LONG_TITLE,
   UNBROKEN_TITLE,
@@ -305,18 +305,18 @@ test.describe('an unbroken title on a phone', () => {
     await expect(page.locator('.feed-day-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
     await expect(page.locator('.day-items time')).toHaveCount(3)
     for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
-    await expectContentWithinViewport(page)
+    await expectNoBoxPastTheSideEdge(page)
 
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(page.getByRole('searchbox', { name: 'Search your reading' })).toBeFocused()
     expect(await page.evaluate(() => window.scrollX)).toBe(0)
-    await expectContentWithinViewport(page)
+    await expectNoBoxPastTheSideEdge(page)
 
     await page.getByRole('button', { name: 'Close search' }).click()
     await page.getByRole('link', { name: 'Address Ledger' }).click()
     await expect(page.getByRole('heading', { name: 'Address Ledger' })).toBeVisible()
     await expect(page.locator('.item-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
     expect(await page.evaluate(() => window.scrollX)).toBe(0)
-    await expectContentWithinViewport(page)
+    await expectNoBoxPastTheSideEdge(page)
   })
 })

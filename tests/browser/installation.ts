@@ -24,7 +24,6 @@ export interface Installation {
   readonly imageOnlyFeedUrl: string
   /** Two items today, one titled `LEDGER_LONG_TITLE`, so the Digest shares a box between them. */
   readonly ledgerFeedUrl: string
-  /** Two items today, one titled `UNBROKEN_TITLE`, so a phone can show a title with no break. */
   readonly addressFeedUrl: string
 }
 
@@ -32,7 +31,6 @@ export interface Installation {
 export const LEDGER_LONG_TITLE =
   'The morning the valley flooded, the road washed out and every one of us walked the ridge path home in the rain before the light came back'
 
-/** One token, wider than a phone's column when it cannot break. */
 export const UNBROKEN_TITLE =
   'https://publisher.example/archive/2026/the-long-unbroken-address-that-cannot-wrap-22a60ecb-ebf1'
 
@@ -309,11 +307,7 @@ export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   expect(overflow).toBeLessThanOrEqual(0)
 }
 
-/**
- * The page scrolls vertically. A row that is meant to scroll sideways may hang
- * past the column. Nothing else may, including a child an ancestor clips.
- */
-export async function expectContentWithinViewport(page: Page): Promise<void> {
+export async function expectNoBoxPastTheSideEdge(page: Page): Promise<void> {
   await expectNoHorizontalOverflow(page)
   const wide = await page.evaluate(() => {
     const viewport = document.documentElement.clientWidth
