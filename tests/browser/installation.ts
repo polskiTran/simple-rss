@@ -24,11 +24,15 @@ export interface Installation {
   readonly imageOnlyFeedUrl: string
   /** Two items today, one titled `LEDGER_LONG_TITLE`, so the Digest shares a box between them. */
   readonly ledgerFeedUrl: string
+  readonly addressFeedUrl: string
 }
 
 /** Long enough to run past three lines in a phone's Digest box. */
 export const LEDGER_LONG_TITLE =
   'The morning the valley flooded, the road washed out and every one of us walked the ridge path home in the rain before the light came back'
+
+export const UNBROKEN_TITLE =
+  'https://publisher.example/archive/2026/the-long-unbroken-address-that-cannot-wrap-22a60ecb-ebf1'
 
 const FIGURE_IMAGE_URL = 'https://cdn.publisher.example/image/fetch/$s_!9LbW!,w_424,c_limit,f_webp/valley.png'
 const FIGURE_FULL_SIZE_URL =
@@ -112,6 +116,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
     const longFeedUrl = 'https://publisher.example/meadow.xml'
     const imageOnlyFeedUrl = 'https://publisher.example/comic.xml'
     const ledgerFeedUrl = 'https://publisher.example/ledger.xml'
+    const addressFeedUrl = 'https://publisher.example/address.xml'
     const publishedAt = new Date()
     publishedAt.setUTCHours(7, 15, 0, 0)
     const publishedEarlier = new Date(publishedAt.getTime() - 24 * 60 * 60 * 1_000)
@@ -201,6 +206,20 @@ export const test = base.extend<InstallationOptions & { installation: Installati
             </item>
           </channel></rss>`,
       })
+      .stub(addressFeedUrl, {
+        headers: { 'content-type': 'application/rss+xml' },
+        body: `<?xml version="1.0"?>
+          <rss version="2.0"><channel><title>Address Ledger</title>
+            <item><guid>address</guid><title>${UNBROKEN_TITLE}</title>
+              <pubDate>${publishedAt.toUTCString()}</pubDate>
+              <description>The address is the whole title.</description>
+            </item>
+            <item><guid>harbour</guid><title>Harbour light</title>
+              <pubDate>${new Date(publishedAt.getTime() - 60 * 60 * 1_000).toUTCString()}</pubDate>
+              <description>The light stayed on.</description>
+            </item>
+          </channel></rss>`,
+      })
       .stub(longFeedUrl, {
         headers: { 'content-type': 'application/rss+xml' },
         body: `<?xml version="1.0"?>
@@ -240,6 +259,7 @@ export const test = base.extend<InstallationOptions & { installation: Installati
         longFeedUrl,
         imageOnlyFeedUrl,
         ledgerFeedUrl,
+        addressFeedUrl,
       })
     } finally {
       await service?.stop()
@@ -285,6 +305,30 @@ export async function addFeed(page: Page, url: string): Promise<void> {
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.body.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
+}
+
+export async function expectNoBoxPastTheSideEdge(page: Page): Promise<void> {
+  await expectNoHorizontalOverflow(page)
+  const wide = await page.evaluate(() => {
+    const viewport = document.documentElement.clientWidth
+    const sideways = '.day-feeds, .filter-list, .rhythm-jumps'
+    const found: string[] = []
+    for (const el of document.body.querySelectorAll('*')) {
+      const row = el.closest(sideways)
+      if (row !== null && row !== el) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.width < 1 || rect.height < 1) continue
+      if (rect.right <= viewport + 1 && rect.left >= -1) continue
+      const name = el.getAttribute('class')
+      const text = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 48)
+      found.push(
+        `${el.tagName.toLowerCase()}${name ? `.${name.split(/\s+/).join('.')}` : ''} ${rect.left.toFixed(0)}..${rect.right.toFixed(0)} ${text}`,
+      )
+      if (found.length === 6) break
+    }
+    return found
+  })
+  expect(wide).toEqual([])
 }
 
 function listen(server: Server): Promise<void> {

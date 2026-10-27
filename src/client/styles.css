@@ -973,6 +973,7 @@
      Literata a line — however wide its box runs. */
   :is(.item-title, .item-snippet) {
     max-inline-size: 32em;
+    overflow-wrap: anywhere;
   }
 
   .item-title {
@@ -2250,6 +2251,7 @@
     margin: 0;
     font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
+    overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
