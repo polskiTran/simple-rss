@@ -43,6 +43,15 @@ function groundColour(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 }
 
+async function cardSideGaps(page: Page): Promise<{ left: number; right: number }[]> {
+  return page.locator('.item').evaluateAll((cards) =>
+    cards.map((card) => {
+      const rect = card.getBoundingClientRect()
+      return { left: rect.left, right: window.innerWidth - rect.right }
+    }),
+  )
+}
+
 test.describe('the Digest presentation', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -263,6 +272,27 @@ test.describe('the Digest at phone width', () => {
       lineHoldsItsText: true,
       markInside: true,
     })
+  })
+
+  test('keeps the same space on both sides of each card, and focused search stays large enough not to zoom', async ({
+    page,
+    installation,
+  }) => {
+    await openDigest(page, installation)
+
+    const before = await cardSideGaps(page)
+    expect(before.length).toBeGreaterThan(0)
+    for (const gap of before) expect(Math.abs(gap.left - gap.right)).toBeLessThanOrEqual(1)
+    expect(await page.evaluate(() => window.scrollX)).toBe(0)
+
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    const search = page.getByRole('searchbox', { name: 'Search your reading' })
+    await expect(search).toBeFocused()
+    expect(
+      await search.evaluate((input) => Number.parseFloat(getComputedStyle(input).fontSize)),
+    ).toBeGreaterThanOrEqual(16)
+    expect(await page.evaluate(() => window.scrollX)).toBe(0)
+    for (const gap of await cardSideGaps(page)) expect(Math.abs(gap.left - gap.right)).toBeLessThanOrEqual(1)
   })
 
   test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {
