@@ -2066,9 +2066,13 @@
     }
   }
 
+  /* iOS Safari gives a date field a minimum width from its date text, so the
+     invisible field would run past the screen edge and let the page drag
+     sideways. The button clips it to its own box. */
   .day-picker {
     position: relative;
     display: none;
+    overflow: hidden;
 
     @media (max-width: 1024px) {
       display: inline-flex;
