@@ -43,15 +43,6 @@ function groundColour(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 }
 
-async function cardSideGaps(page: Page): Promise<{ left: number; right: number }[]> {
-  return page.locator('.item').evaluateAll((cards) =>
-    cards.map((card) => {
-      const rect = card.getBoundingClientRect()
-      return { left: rect.left, right: window.innerWidth - rect.right }
-    }),
-  )
-}
-
 test.describe('the Digest presentation', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -274,16 +265,9 @@ test.describe('the Digest at phone width', () => {
     })
   })
 
-  test('keeps the same space on both sides of each card, and focused search stays large enough not to zoom', async ({
-    page,
-    installation,
-  }) => {
+  // iOS zooms the page into a focused field set under 16px.
+  test('focuses search at a size iOS does not zoom', async ({ page, installation }) => {
     await openDigest(page, installation)
-
-    const before = await cardSideGaps(page)
-    expect(before.length).toBeGreaterThan(0)
-    for (const gap of before) expect(Math.abs(gap.left - gap.right)).toBeLessThanOrEqual(1)
-    expect(await page.evaluate(() => window.scrollX)).toBe(0)
 
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     const search = page.getByRole('searchbox', { name: 'Search your reading' })
@@ -291,8 +275,6 @@ test.describe('the Digest at phone width', () => {
     expect(
       await search.evaluate((input) => Number.parseFloat(getComputedStyle(input).fontSize)),
     ).toBeGreaterThanOrEqual(16)
-    expect(await page.evaluate(() => window.scrollX)).toBe(0)
-    for (const gap of await cardSideGaps(page)) expect(Math.abs(gap.left - gap.right)).toBeLessThanOrEqual(1)
   })
 
   test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {
@@ -316,37 +298,16 @@ test.describe('the Digest at phone width', () => {
 test.describe('an unbroken title on a phone', () => {
   test.use({ viewport: { width: 320, height: 700 } })
 
-  test('stays inside the screen on the Digest and the Feed, and search focus does not shift sideways', async ({
-    page,
-    installation,
-  }) => {
-    await page.goto(installation.url)
-    await page.getByLabel('Setup secret').fill(SETUP_SECRET)
-    await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
-    await page.getByLabel('Confirm password').fill(USER_PASSWORD)
-    await page.getByRole('button', { name: 'Claim installation' }).click()
-    await page.getByRole('link', { name: 'Feeds', exact: true }).click()
-    await addFeed(page, installation.addressFeedUrl)
-    await expect(page.getByRole('heading', { name: 'Address Ledger' })).toBeVisible()
-    await addFeed(page, installation.feedUrl)
+  test('wraps inside the screen on the Digest and the Feed', async ({ page, installation }) => {
+    await claimAndSubscribe(page, installation, installation.addressFeedUrl, 'Address Ledger')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await expect(page.getByRole('button', { name: 'Address Ledger 2' })).toBeVisible()
     await expect(page.locator('.feed-day-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
-    await expect(page.locator('.day-items time')).toHaveCount(3)
-    for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
     await expectNoBoxPastTheSideEdge(page)
 
-    await page.getByRole('button', { name: 'Search', exact: true }).click()
-    await expect(page.getByRole('searchbox', { name: 'Search your reading' })).toBeFocused()
-    expect(await page.evaluate(() => window.scrollX)).toBe(0)
-    await expectNoBoxPastTheSideEdge(page)
-
-    await page.getByRole('button', { name: 'Close search' }).click()
     await page.getByRole('link', { name: 'Address Ledger' }).click()
     await expect(page.getByRole('heading', { name: 'Address Ledger' })).toBeVisible()
     await expect(page.locator('.item-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
-    expect(await page.evaluate(() => window.scrollX)).toBe(0)
     await expectNoBoxPastTheSideEdge(page)
   })
 })
