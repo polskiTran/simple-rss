@@ -232,7 +232,7 @@ function OpenReader({
             <article className="item item-plain">
               <div className="item-meta">
                 <span className="item-feed">{next.feedTitle}</span>
-                <span className="item-when">{next.displayTime}</span>
+                {next.displayTime === null ? null : <span className="item-when">{next.displayTime}</span>}
               </div>
               <div className="item-body">
                 <h3 className="item-title">

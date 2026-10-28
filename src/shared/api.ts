@@ -338,7 +338,8 @@ const cadenceObservationSchema = z.object({
 export type CadenceObservation = z.infer<typeof cadenceObservationSchema>
 
 // `date` is the installation-timezone day the item is grouped under and the
-// cadence grid jumps to; `displayTime` is its time on that day.
+// cadence grid jumps to; `displayTime` is its time on that day, null on a
+// Release Date, which names no time.
 const feedItemRowSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -346,7 +347,7 @@ const feedItemRowSchema = z.object({
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   date: z.string(),
-  displayTime: z.string(),
+  displayTime: z.string().nullable(),
   saved: z.boolean(),
 })
 export type FeedItemRow = z.infer<typeof feedItemRowSchema>
@@ -384,7 +385,7 @@ const digestItemSchema = z.object({
   feedTitle: z.string(),
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
-  displayTime: z.string(),
+  displayTime: z.string().nullable(),
   /** Same-origin proxy path for the item's image; never a publisher URL. */
   imageUrl: z.string().nullable(),
   summary: z.string().nullable(),
@@ -631,9 +632,9 @@ const searchResultSchema = z.object({
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  /** The installation-timezone day it is listed under, and its time on that day. */
+  /** The installation-timezone day it is listed under, and its time on that day (null on a Release Date). */
   date: z.string(),
-  displayTime: z.string(),
+  displayTime: z.string().nullable(),
   saved: z.boolean(),
   // Plain-text fragment of the summary around the match; null when only the
   // title or Feed title matched — both already visible in the item shape.
@@ -680,7 +681,7 @@ const readerNextSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
   feedTitle: z.string(),
-  displayTime: z.string(),
+  displayTime: z.string().nullable(),
 })
 
 const feedContentSchema = z.object({

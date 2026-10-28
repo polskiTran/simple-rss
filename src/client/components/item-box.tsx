@@ -19,8 +19,8 @@ interface ItemBoxProps {
   readonly title: string
   readonly saved: boolean
   readonly feed?: ItemFeed | undefined
-  /** The time or date the meta column shows, and the instant it stands for. */
-  readonly when: { readonly label: string; readonly dateTime: string }
+  /** The time or date the meta column shows, and the instant it stands for; no label shows nothing. */
+  readonly when: { readonly label: string | null; readonly dateTime: string }
   /** Search results mark their matches; everything else shows the plain title. */
   readonly titleContent?: ReactNode
   readonly snippet?: ReactNode
@@ -55,9 +55,11 @@ export function ItemBox({
             <FeedName title={feed.title} />
           </span>
         )}
-        <time className="item-when" dateTime={when.dateTime}>
-          {when.label}
-        </time>
+        {when.label === null ? null : (
+          <time className="item-when" dateTime={when.dateTime}>
+            {when.label}
+          </time>
+        )}
         {note}
       </div>
       <div className="item-body">

@@ -18,7 +18,7 @@ const rss = (title: string, ...items: string[]) => `<?xml version="1.0"?>
 
 const minuteItems = (day: string, prefix: string, count: number) =>
   Array.from({ length: count }, (_, index) =>
-    item(`${prefix}-${index}`, `${prefix}-${index}`, `${day}T00:${String(index).padStart(2, '0')}:00.000Z`),
+    item(`${prefix}-${index}`, `${prefix}-${index}`, `${day}T01:${String(index).padStart(2, '0')}:00.000Z`),
   )
 
 const titlesDown = (prefix: string, from: number, to: number) =>

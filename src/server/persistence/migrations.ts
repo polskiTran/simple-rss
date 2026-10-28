@@ -334,6 +334,33 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE feed_items ADD COLUMN discussion_url TEXT;
     `,
   },
+  {
+    version: 19,
+    name: 'release-date-chronology',
+    sql: `
+      -- A publication time of exactly midnight UTC is a Release Date: the Feed
+      -- named only the day. Placing it at noon UTC keeps it on that day in any
+      -- installation timezone within eleven hours of UTC.
+      DROP INDEX feed_items_chronology;
+      DROP INDEX feed_items_feed_chronology;
+      ALTER TABLE feed_items DROP COLUMN chronology_at;
+      ALTER TABLE feed_items ADD COLUMN chronology_at TEXT NOT NULL GENERATED ALWAYS AS (
+        CASE
+          WHEN published_at IS NULL THEN first_seen_at
+          WHEN substr(published_at, 11) = 'T00:00:00.000Z' THEN
+            CASE
+              WHEN substr(published_at, 1, 10) || 'T12:00:00.000Z' <= strftime('%Y-%m-%dT%H:%M:%fZ', first_seen_at, '+1 day')
+              THEN substr(published_at, 1, 10) || 'T12:00:00.000Z'
+              ELSE first_seen_at
+            END
+          WHEN published_at <= strftime('%Y-%m-%dT%H:%M:%fZ', first_seen_at, '+1 day') THEN published_at
+          ELSE first_seen_at
+        END
+      ) VIRTUAL;
+      CREATE INDEX feed_items_chronology ON feed_items (chronology_at DESC, id DESC);
+      CREATE INDEX feed_items_feed_chronology ON feed_items (feed_id, chronology_at DESC, id DESC);
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `

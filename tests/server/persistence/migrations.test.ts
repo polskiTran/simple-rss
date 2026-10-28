@@ -204,6 +204,32 @@ describe('migrations', () => {
     db.$client.close()
   })
 
+  it('moves stored Feed Items dated only by their day to noon UTC on that day', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version < 19),
+    )
+    db.$client
+      .prepare(`INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
+        VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes', 'journal.example', '2026-01-01', '2026-01-01')`)
+      .run()
+    db.$client
+      .prepare(`INSERT INTO feed_items (feed_id, dedupe_key, identity_kind, published_at, first_seen_at, last_observed_at)
+        VALUES (1, 'release-date', 'guid', '2026-10-27T00:00:00.000Z', '2026-10-28T00:49:12.918Z', '2026-10-28T00:49:12.918Z'),
+               (1, 'timed', 'guid', '2026-10-27T17:08:00.000Z', '2026-10-28T00:49:12.918Z', '2026-10-28T00:49:12.918Z')`)
+      .run()
+
+    applyMigrations(db)
+
+    expect(db.$client.prepare('SELECT dedupe_key, chronology_at FROM feed_items ORDER BY id').all()).toEqual([
+      { dedupe_key: 'release-date', chronology_at: '2026-10-27T12:00:00.000Z' },
+      { dedupe_key: 'timed', chronology_at: '2026-10-27T17:08:00.000Z' },
+    ])
+    db.$client.close()
+  })
+
   it('carries an already-claimed volume through the rename to user_auth', async () => {
     const db = await openFreshDatabase()
     applyMigrations(

@@ -138,9 +138,11 @@ function FeedDayBox({
                     <Icon name="bookmark" filled />
                   </span>
                 ) : null}
-                <time className="item-when" dateTime={item.publishedAt ?? item.firstSeenAt}>
-                  {item.displayTime}
-                </time>
+                {item.displayTime === null ? null : (
+                  <time className="item-when" dateTime={item.publishedAt ?? item.firstSeenAt}>
+                    {item.displayTime}
+                  </time>
+                )}
                 <h3 className="feed-day-title">
                   <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpenItem(item.feedItemId)}>
                     {item.title}

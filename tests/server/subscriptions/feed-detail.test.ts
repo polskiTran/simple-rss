@@ -93,6 +93,27 @@ describe('one opened Feed', () => {
     expect(detail.cadence.at(-1)).toEqual({ date: '2026-08-08', count: 1 })
   })
 
+  it('files a Feed Item dated only by its day under that day, with no time of day', async () => {
+    const service = await startTestService()
+    service.upstream.stub(FEED_URL, {
+      headers: { 'content-type': 'application/rss+xml' },
+      body: rss(
+        item('issue', 'The morning issue', '2026-08-07T00:00:00.000Z'),
+        item('late', 'A late note', '2026-08-07T00:30:00.000Z'),
+      ),
+    })
+    const user = await claimedDevice(service)
+    service.settings.setTimezone('America/New_York', service.clock.now())
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+
+    const { items } = feedItemsSchema.parse(await (await user.get('/api/feeds/1/items')).json())
+
+    expect(items.map(({ title, date, displayTime }) => [title, date, displayTime])).toEqual([
+      ['The morning issue', '2026-08-07', null],
+      ['A late note', '2026-08-06', '20:30'],
+    ])
+  })
+
   it('answers not found for a Feed that is not subscribed', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

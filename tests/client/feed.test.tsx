@@ -118,6 +118,19 @@ describe('opening one Feed', () => {
     expect(await screen.findByRole('group', { name: /26 weeks of Cadence/i })).toBeDefined()
   })
 
+  it('shows no time for an item on a Release Date', async () => {
+    feedApi(
+      feedItems({
+        items: [feedItemRow({ feedItemId: 12, publishedAt: '2026-08-08T00:00:00.000Z', displayTime: null })],
+      }),
+    )
+    window.history.replaceState(null, '', '/feeds/1')
+    render(<App />)
+
+    const item = (await screen.findByRole('link', { name: 'First light' })).closest('article')
+    expect(item?.querySelector('time')).toBeNull()
+  })
+
   it('goes back to the list without losing the tab', async () => {
     feedApi().on('GET /api/feeds', { body: { subscriptions: [LIST_FEED] } })
     window.history.replaceState(null, '', '/feeds/1')

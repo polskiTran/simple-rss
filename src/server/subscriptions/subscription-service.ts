@@ -11,9 +11,10 @@ import type {
   UpdateFeedDetailsRequest,
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
+import { dateKey, dayKeysIn } from '../calendar.js'
 import type { Logger } from '../logger.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
+import { displayTimeOf } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import {
@@ -315,7 +316,7 @@ export class SubscriptionService {
         ...listedItemOf(row),
         link: row.link,
         date: dayOf(row.chronologyAt),
-        displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+        displayTime: displayTimeOf(row, timezone),
       })),
       nextFrom,
     }

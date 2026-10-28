@@ -64,6 +64,10 @@ _Avoid_: Site URL, website, channel link
 The description a Feed reports about itself in the Feed document, refreshed on each successful retrieval like the Feed's reported title.
 _Avoid_: Subtitle, blurb, about text
 
+**Release Date**:
+A Feed Item's publication time that names only a day: exactly midnight UTC, which a Feed writes when it records no time of day. The item sits at noon UTC on that day, so it falls on the named day in any installation timezone within eleven hours of UTC, and it shows no time.
+_Avoid_: Date-only, midnight timestamp, all-day item
+
 **Feed Window**:
 The set of Feed Items exposed by a Feed during its latest successful retrieval.
 _Avoid_: RSS fetch window, current batch

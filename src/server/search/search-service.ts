@@ -1,8 +1,9 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
 import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
-import { dateKey, dayKeysIn, timeLabel } from '../calendar.js'
+import { dateKey, dayKeysIn } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
+import { displayTimeOf } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
@@ -139,7 +140,7 @@ export class SearchService {
       feedId: row.feedId,
       feedTitle: row.feedTitle,
       date: dayOf(row.chronologyAt),
-      displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+      displayTime: displayTimeOf(row, timezone),
       snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
     }))
   }

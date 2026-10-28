@@ -50,6 +50,24 @@ const CASES = [
     firstSeenAt: '2026-08-08T23:30:00.500Z',
     chronologyAt: '2026-08-08T23:30:00.500Z',
   },
+  {
+    dedupeKey: 'release-date',
+    publishedAt: '2026-10-27T00:00:00.000Z',
+    firstSeenAt: '2026-10-28T00:49:12.918Z',
+    chronologyAt: '2026-10-27T12:00:00.000Z',
+  },
+  {
+    dedupeKey: 'release-date-ahead',
+    publishedAt: '2026-08-09T00:00:00.000Z',
+    firstSeenAt: '2026-08-08T13:00:00.000Z',
+    chronologyAt: '2026-08-09T12:00:00.000Z',
+  },
+  {
+    dedupeKey: 'release-date-past-the-day',
+    publishedAt: '2026-08-09T00:00:00.000Z',
+    firstSeenAt: '2026-08-08T09:00:00.000Z',
+    chronologyAt: '2026-08-08T09:00:00.000Z',
+  },
 ] as const
 
 function flat(sql: string): string {
@@ -68,10 +86,10 @@ function declaredChronologySql(): string {
 }
 
 describe('Feed Item chronology', () => {
-  it('uses the released generated expression in the schema', () => {
-    const migration = migrations.find((entry) => entry.version === 16)
+  it('uses the latest released generated expression in the schema', () => {
+    const migration = migrations.findLast((entry) => entry.sql.includes('ADD COLUMN chronology_at'))
     const expression = /GENERATED ALWAYS AS \(([\s\S]*?)\)\s*VIRTUAL/u.exec(migration?.sql ?? '')
-    if (!expression?.[1]) throw new Error('migration 16 has no chronology expression')
+    if (!expression?.[1]) throw new Error('no migration declares the chronology expression')
 
     expect(flat(declaredChronologySql())).toBe(flat(expression[1]))
   })

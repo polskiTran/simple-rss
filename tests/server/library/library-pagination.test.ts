@@ -18,7 +18,7 @@ const rss = (...items: string[]) => `<?xml version="1.0"?>
 
 const minuteItems = (count: number) =>
   Array.from({ length: count }, (_, index) =>
-    item(`note-${index}`, `note-${index}`, `2026-08-08T00:${String(index).padStart(2, '0')}:00.000Z`),
+    item(`note-${index}`, `note-${index}`, `2026-08-08T01:${String(index).padStart(2, '0')}:00.000Z`),
   )
 
 /** Subscribes to 55 items and saves them newest item first — against Digest order — `gapMs` apart. */

@@ -63,9 +63,11 @@ export function namedDay(dateKey: string, today: string): string {
   return sameYear(dateKey, today) ? longDay(dateKey) : `${longDay(dateKey)} ${dateKey.slice(0, 4)}`
 }
 
-export function dayAndTime(dateKey: string, time: string, today: string): string {
+/** A recent day with its time, when the item has one; an older day alone. */
+export function dayAndTime(dateKey: string, time: string | null, today: string): string {
   const relative = relativeDay(dateKey, today)
-  return relative ? `${relative}, ${time}` : dayOfYear(dateKey, today)
+  if (!relative) return dayOfYear(dateKey, today)
+  return time === null ? relative : `${relative}, ${time}`
 }
 
 export function dayBefore(dateKey: string): string {

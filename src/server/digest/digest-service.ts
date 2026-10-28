@@ -11,11 +11,12 @@ import {
 } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
+import { displayTimeOf } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
-import { dateKey, dayKeysIn, daysBetween, dayStartUtc, timeLabel } from '../calendar.js'
+import { dateKey, dayKeysIn, daysBetween, dayStartUtc } from '../calendar.js'
 import { wholeDayPage } from './whole-day-page.js'
 
 export class DigestService {
@@ -159,7 +160,7 @@ function digestItemOf(row: DigestRow, timezone: string): DigestItem {
     feedId: row.feedId,
     feedTitle: row.feedTitle,
     link: row.link,
-    displayTime: timeLabel(new Date(row.chronologyAt), timezone),
+    displayTime: displayTimeOf(row, timezone),
     imageUrl: row.imageUrl === null ? null : `/api/items/${row.feedItemId}/image`,
     summary: row.summary,
   }
