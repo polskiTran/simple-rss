@@ -85,15 +85,7 @@
   html {
     color-scheme: light dark;
     background: var(--color-ground);
-    /* A classic scrollbar reserves this gutter on the right only. The phone
-       layout drops it, or that side's margin is wider than the left. Overlay
-       scrollbars take no space either way. Desktop keeps it so a dialog scrim
-       can colour the strip the scrim cannot cover. */
     scrollbar-gutter: stable;
-
-    @media (max-width: 1024px) {
-      scrollbar-gutter: auto;
-    }
   }
 
   html[data-appearance='light'] {
@@ -650,11 +642,11 @@
     transition: opacity 150ms ease-out;
   }
 
-  /* The desktop layout keeps a scrollbar gutter the fixed scrim cannot
-     reach, and the gutter paints only the root's background colour. While a
-     dialog is open that colour is the scrim laid over the ground, mixed solid:
-     `scrim` is ink at .24 in light and black at .5 in dark. It fades with the
-     scrim, both ways, so no dark strip runs ahead of it or outlasts it. */
+  /* The page keeps a scrollbar gutter the fixed scrim cannot reach, and the
+     gutter paints only the root's background colour. While a dialog is open
+     that colour is the scrim laid over the ground, mixed solid: `scrim` is ink
+     at .24 in light and black at .5 in dark. It fades with the scrim, both
+     ways, so no dark strip runs ahead of it or outlasts it. */
   html:has(.dialog-backdrop) {
     background: light-dark(
       color-mix(in srgb, var(--color-ink) 24%, var(--color-ground)),
