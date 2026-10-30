@@ -202,13 +202,18 @@ export function previewFeed(url: string, signal: AbortSignal): Promise<FeedPrevi
   )
 }
 
-/** Retrieves the Feed again and records it only when it answers; a refusal carries the reason. */
-export function subscribeToFeed(url: string): Promise<CreateSubscriptionResponse> {
+/**
+ * Retrieves the Feed again and records it only when it answers; a refusal
+ * carries the reason. Aborting stops the server's retrieval, so nothing is
+ * recorded unless it already was.
+ */
+export function subscribeToFeed(url: string, signal?: AbortSignal): Promise<CreateSubscriptionResponse> {
   return sendJson(
     'POST',
     '/api/subscriptions',
     { url } satisfies CreateSubscriptionRequest,
     createSubscriptionResponseSchema,
+    signal,
   )
 }
 

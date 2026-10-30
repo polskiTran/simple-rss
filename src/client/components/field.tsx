@@ -12,6 +12,8 @@ interface FieldProps {
   readonly placeholder?: string | undefined
   readonly maxLength?: number
   readonly multiline?: boolean
+  /** Shows the value and keeps focus, but takes no edits: a form holding what it sent. */
+  readonly readOnly?: boolean
   readonly error?: string | undefined
   /** The input, for a form that moves focus to the field in error. */
   readonly ref?: Ref<HTMLInputElement>
@@ -31,6 +33,7 @@ export function Field({
   placeholder,
   maxLength,
   multiline,
+  readOnly,
   error,
   ref,
   onChange,
@@ -53,6 +56,7 @@ export function Field({
           spellCheck={type === 'text' ? undefined : false}
           placeholder={placeholder}
           maxLength={maxLength}
+          readOnly={readOnly}
           render={multiline ? <textarea rows={3} /> : undefined}
           onValueChange={onChange}
         />

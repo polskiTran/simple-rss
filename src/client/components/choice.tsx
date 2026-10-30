@@ -11,6 +11,7 @@ interface ChoiceProps<Value extends string> {
   readonly options: readonly ChoiceOption<Value>[]
   readonly value: NoInfer<Value>
   readonly className?: string
+  readonly disabled?: boolean
   onChange(value: NoInfer<Value>): void
 }
 
@@ -18,12 +19,20 @@ interface ChoiceProps<Value extends string> {
  * The switch: one value of a few, always exactly one. Arrow keys move between
  * segments under Base UI's roving tabindex.
  */
-export function Choice<const Value extends string>({ label, options, value, className, onChange }: ChoiceProps<Value>) {
+export function Choice<const Value extends string>({
+  label,
+  options,
+  value,
+  className,
+  disabled = false,
+  onChange,
+}: ChoiceProps<Value>) {
   return (
     <ToggleGroup
       className={className ? `switch ${className}` : 'switch'}
       aria-label={label}
       value={[value]}
+      disabled={disabled}
       onValueChange={(chosen) => {
         // Pressing the pressed segment would empty the group; a switch always
         // holds one value, so that press stays where it is.

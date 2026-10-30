@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FeedPreviewResponse, SubscriptionList } from '../../src/shared/api.js'
+import type { CreateSubscriptionResponse, FeedPreviewResponse, SubscriptionList } from '../../src/shared/api.js'
 import { App } from '../../src/client/app.js'
 import { availability, feedPreview, subscription, UNCHECKED } from './fixtures.js'
 import { stubApi, type Reply } from './stub-api.js'
@@ -290,6 +290,97 @@ describe('Add feed', () => {
     staleList.resolve({ body: { subscriptions: [] } })
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
     expect(screen.getByRole('link', { name: 'Field Notes' })).toBeDefined()
+  })
+
+  it('says a line is no address once typing pauses, never with a request', async () => {
+    const api = stubApi()
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Add feed' }))
+    await user.type(await screen.findByRole('textbox', { name: 'URL' }), 'field notes')
+
+    expect(
+      await screen.findByText('Enter a site or feed address, like lowtechmagazine.com.', {}, { timeout: 2000 }),
+    ).toBeDefined()
+    expect(api.requestsTo('POST /api/subscriptions/preview')).toHaveLength(0)
+  })
+
+  it('blames the reader, not the site, when the reader never answers', async () => {
+    stubApi().on('POST /api/subscriptions/preview', () => {
+      throw new TypeError('Failed to fetch')
+    })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await lookUp(user, 'journal.example')
+
+    expect(await screen.findByText('The reader is unavailable. Nothing was added.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
+  })
+
+  it('holds the address and the way to add while Subscribe runs, and adds the Feed it shows', async () => {
+    const created = Promise.withResolvers<Reply<CreateSubscriptionResponse>>()
+    const api = stubApi()
+      .on('POST /api/subscriptions/preview', { body: { kind: 'feed', feed: PREVIEWED } })
+      .on('POST /api/subscriptions', () => created.promise)
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await lookUp(user, PREVIEWED.feedUrl)
+    await user.click(await screen.findByRole('button', { name: 'Subscribe' }))
+    const field = screen.getByRole<HTMLInputElement>('textbox', { name: 'URL' })
+    await user.type(field, 'other.example')
+    await user.click(screen.getByRole('button', { name: 'Import OPML' }))
+
+    expect(field.value).toBe(PREVIEWED.feedUrl)
+    expect(screen.getByRole('button', { name: 'Subscribing…' })).toBeDefined()
+    created.resolve({ status: 201, body: { subscription: FEED } })
+    expect(await screen.findByRole('link', { name: 'Field Notes' })).toBeDefined()
+    expect(api.requestsTo('POST /api/subscriptions')).toMatchObject([{ body: { url: PREVIEWED.feedUrl } }])
+  })
+
+  it('clears a refused Subscribe when it is tried again', async () => {
+    const api = stubApi()
+      .on('POST /api/subscriptions/preview', { body: { kind: 'feed', feed: PREVIEWED } })
+      .on('POST /api/subscriptions', {
+        status: 502,
+        body: { error: { code: 'feed_unreachable', message: 'Feed could not be reached' } },
+      })
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await lookUp(user, PREVIEWED.feedUrl)
+    await user.click(await screen.findByRole('button', { name: 'Subscribe' }))
+    await screen.findByText('journal.example couldn’t be reached. Nothing was added.')
+    api.on('POST /api/subscriptions', () => new Promise(() => {}))
+    await user.click(await screen.findByRole('button', { name: 'Subscribe' }))
+
+    expect(await screen.findByRole('button', { name: 'Subscribing…' })).toBeDefined()
+    expect(screen.queryByText('journal.example couldn’t be reached. Nothing was added.')).toBeNull()
+  })
+
+  it('abandons a Subscribe when the dialog closes, and adds nothing', async () => {
+    const created = Promise.withResolvers<Reply<CreateSubscriptionResponse>>()
+    stubApi()
+      .on('POST /api/subscriptions/preview', { body: { kind: 'feed', feed: PREVIEWED } })
+      .on('POST /api/subscriptions', () => created.promise)
+    window.history.replaceState(null, '', '/feeds')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await lookUp(user, PREVIEWED.feedUrl)
+    await user.click(await screen.findByRole('button', { name: 'Subscribe' }))
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add feed' })).toBeNull())
+    created.resolve({ status: 201, body: { subscription: FEED } })
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(screen.queryByRole('link', { name: 'Field Notes' })).toBeNull()
   })
 })
 

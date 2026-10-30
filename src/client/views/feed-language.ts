@@ -41,10 +41,16 @@ const UNANSWERED_COPY = {
 /**
  * Why the Add feed dialog has nothing to subscribe to at `host` — a lookup or
  * a Subscribe refused — and whether trying again could help: a retrieval that
- * failed may answer next time, an address that is no address never will.
+ * failed may answer next time, an address that is no address never will. A
+ * request the reader never answered is the reader's failure, not the host's,
+ * unless it ran out of time waiting on the host.
  */
 export function addFailure(cause: unknown, host: string) {
-  const code = cause instanceof ApiError ? cause.code : 'feed_unreachable'
+  const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError'
+  if (!(cause instanceof ApiError) && !timedOut) {
+    return { reason: 'The reader is unavailable. Nothing was added.', retry: true }
+  }
+  const code = cause instanceof ApiError ? cause.code : 'feed_timeout'
   if (code === 'invalid_feed_url' || code === 'duplicate_subscription') {
     return { reason: SUBSCRIPTION_FAILURE_COPY[code], retry: false }
   }

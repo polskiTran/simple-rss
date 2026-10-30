@@ -480,6 +480,16 @@
     outline-offset: 0;
   }
 
+  /* A held switch keeps its chosen segment readable and dims the rest, as a
+     disabled button does. */
+  .switch-segment[data-disabled] {
+    cursor: not-allowed;
+
+    &:not([data-pressed]) {
+      color: var(--color-ink-3);
+    }
+  }
+
   /* On a phone a screen's switch spans the column, as the Reader's does. */
   .toolbar > .switch {
     @media (max-width: 1024px) {
@@ -541,6 +551,12 @@
     box-shadow: inset 0 0 0 1px var(--color-ink);
     outline: 2px solid transparent;
     outline-offset: -2px;
+  }
+
+  /* A held field keeps the value it sent readable, dimmed from what can be edited. */
+  .field-input:read-only {
+    color: var(--color-ink-2);
+    cursor: not-allowed;
   }
 
   .field[data-invalid] .field-input {
@@ -1431,7 +1447,8 @@
     cursor: pointer;
   }
 
-  .feed-choice[data-chosen] .feed-choice-head {
+  .feed-choice[data-chosen] .feed-choice-head,
+  .feed-choice-head[data-readonly] {
     cursor: default;
   }
 

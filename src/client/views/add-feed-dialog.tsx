@@ -32,25 +32,30 @@ import { addFailure, feedAddressOf, NOT_AN_ADDRESS } from './feed-language.js'
 
 type Way = 'address' | 'opml'
 
-/** How long typing pauses before the address is looked up; a paste or Enter goes at once. */
+/** How long typing pauses before the line is looked up, or refused as no address; a paste or Enter goes at once. */
 const LOOKUP_PAUSE_MS = 800
 
 /** A Feed with no item for longer than this is said to be silent: it may have stopped publishing. */
 const SILENT_AFTER_DAYS = 90
 
+/** What an address answered: at least one Feed, one of them chosen. */
+interface Answer {
+  readonly host: string
+  readonly feeds: readonly FeedPreview[]
+  readonly chosen: FeedPreview
+}
+
 /**
- * Where the address's lookup stands. A found answer holds at least one Feed,
- * one of them chosen; a page that names none is a failure no retry can mend.
+ * Where the address stands. Subscribing holds the answer, and the address
+ * with it, until the chosen Feed is recorded; a refused Subscribe returns to
+ * the answer with the reason. A page that names no Feed is a failure no retry
+ * can mend.
  */
 type Lookup =
   | { readonly kind: 'idle' }
   | { readonly kind: 'reading'; readonly host: string }
-  | {
-      readonly kind: 'found'
-      readonly host: string
-      readonly feeds: readonly FeedPreview[]
-      readonly chosen: FeedPreview
-    }
+  | (Answer & { readonly kind: 'found'; readonly refused: string | undefined })
+  | (Answer & { readonly kind: 'subscribing' })
   | { readonly kind: 'failed'; readonly reason: string; readonly retry: boolean }
 
 const IDLE: Lookup = { kind: 'idle' }
@@ -65,8 +70,9 @@ interface AddFeedDialogProps {
  * Adding by a site or feed address, or by an OPML file. The address is looked
  * up as it is entered, and what it answers arrives under the field: the Feed,
  * or the Feeds a page names to choose from, each with how lately and how often
- * it publishes. Nothing is recorded until Subscribe; a refusal stays in the
- * dialog beside what caused it, and a success closes it.
+ * it publishes. Nothing is recorded until Subscribe, which holds the form
+ * until it settles: a refusal stays in the dialog beside what caused it, a
+ * success closes it, and closing abandons it.
  */
 export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) {
   const [open, setOpen] = useState(false)
@@ -74,12 +80,12 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
   const [address, setAddress] = useState('')
   const [lookup, setLookup] = useState<Lookup>(IDLE)
   const [file, setFile] = useState<File | undefined>(undefined)
-  /** A refused Subscribe or Import. */
+  /** A refused Import. */
   const [error, setError] = useState<string | undefined>(undefined)
-  const [working, startWorking] = useTransition()
+  const [importing, startImporting] = useTransition()
   const inFlight = useRef<AbortController | undefined>(undefined)
 
-  /** Abandons the lookup in flight, so its answer is never shown, and stands at `next`. */
+  /** Abandons the lookup or Subscribe in flight, so its answer is never shown, and stands at `next`. */
   function settle(next: Lookup) {
     inFlight.current?.abort()
     inFlight.current = undefined
@@ -87,7 +93,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
   }
 
   async function lookUp(line: string) {
-    setError(undefined)
     const url = feedAddressOf(line)
     if (!url) {
       settle({ kind: 'failed', reason: NOT_AN_ADDRESS, retry: false })
@@ -107,13 +112,13 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
 
   const lookUpPaused = useEffectEvent((line: string) => void lookUp(line))
   useEffect(() => {
-    if (!open || way !== 'address' || lookup.kind !== 'idle' || !feedAddressOf(address)) return
+    if (!open || way !== 'address' || lookup.kind !== 'idle' || address.trim() === '') return
     const timer = window.setTimeout(() => lookUpPaused(address), LOOKUP_PAUSE_MS)
     return () => window.clearTimeout(timer)
   }, [open, way, address, lookup.kind])
 
   function openChanged(next: boolean) {
-    if (working) return
+    if (importing) return
     setOpen(next)
     settle(IDLE)
     if (next) {
@@ -127,28 +132,30 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
   function addressChanged(next: string) {
     const pasted = next.length - address.length > 1
     setAddress(next)
-    setError(undefined)
     if (pasted && feedAddressOf(next)) void lookUp(next)
     else settle(IDLE)
   }
 
-  function subscribe(feed: FeedPreview) {
-    startWorking(async () => {
-      try {
-        const created = await subscribeToFeed(feed.feedUrl)
-        setOpen(false)
-        onSubscribed(created)
-      } catch (cause) {
-        setError(addFailure(cause, new URL(feed.feedUrl).host).reason)
-      }
-    })
+  /** A Subscription that lands after the dialog closed still joins the list. */
+  async function subscribe({ host, feeds, chosen }: Answer) {
+    settle({ kind: 'subscribing', host, feeds, chosen })
+    const subscribing = new AbortController()
+    inFlight.current = subscribing
+    try {
+      const created = await subscribeToFeed(chosen.feedUrl, subscribing.signal)
+      onSubscribed(created)
+      if (!subscribing.signal.aborted) setOpen(false)
+    } catch (cause) {
+      if (subscribing.signal.aborted) return
+      const { reason } = addFailure(cause, new URL(chosen.feedUrl).host)
+      setLookup({ kind: 'found', host, feeds, chosen, refused: reason })
+    }
   }
 
   function proceed() {
-    if (working) return
     if (lookup.kind === 'found') {
-      if (!lookup.chosen.subscribed) subscribe(lookup.chosen)
-    } else if (lookup.kind !== 'reading') {
+      if (!lookup.chosen.subscribed) void subscribe(lookup)
+    } else if (lookup.kind !== 'reading' && lookup.kind !== 'subscribing') {
       void lookUp(address)
     }
   }
@@ -169,10 +176,10 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
       return
     }
 
-    if (working || !file) return
+    if (importing || !file) return
 
     setError(undefined)
-    startWorking(async () => {
+    startImporting(async () => {
       try {
         const report = await importOpml(await file.text())
         setOpen(false)
@@ -183,8 +190,10 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     })
   }
 
-  const chosen = lookup.kind === 'found' ? lookup.chosen : undefined
+  const answer = lookup.kind === 'found' || lookup.kind === 'subscribing' ? lookup : undefined
+  const subscribing = lookup.kind === 'subscribing'
   const failure = lookup.kind === 'failed' ? lookup : undefined
+  const fieldError = failure?.reason ?? (lookup.kind === 'found' ? lookup.refused : undefined)
   return (
     <ActionDialog
       open={open}
@@ -206,6 +215,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
             { value: 'opml', label: 'Import OPML' },
           ]}
           value={way}
+          disabled={importing || subscribing}
           onChange={(next) => {
             setWay(next)
             setError(undefined)
@@ -221,19 +231,20 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
               placeholder="https://"
               autoComplete="off"
               autoFocus
-              error={error ?? failure?.reason}
+              readOnly={subscribing}
+              error={fieldError}
               onChange={addressChanged}
             />
             <div className="add-feed-result" aria-live="polite">
               {lookup.kind === 'reading' ? <LoadingNote>{`Reading ${lookup.host}`}</LoadingNote> : null}
-              {lookup.kind === 'found' ? (
+              {answer ? (
                 <FoundFeeds
-                  host={lookup.host}
-                  feeds={lookup.feeds}
-                  chosen={lookup.chosen}
+                  host={answer.host}
+                  feeds={answer.feeds}
+                  chosen={answer.chosen}
+                  readOnly={subscribing}
                   onChoose={(feed) => {
-                    setError(undefined)
-                    setLookup({ ...lookup, chosen: feed })
+                    if (lookup.kind === 'found') setLookup({ ...lookup, chosen: feed, refused: undefined })
                   }}
                 />
               ) : null}
@@ -263,16 +274,16 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
           </div>
         )}
         <div className="dialog-footer">
-          <DialogCancel disabled={working} />
+          <DialogCancel disabled={importing} />
           {way === 'opml' ? (
             <Button
               className="button button-primary"
               type="submit"
               focusableWhenDisabled
-              disabled={!file || working}
-              aria-busy={working}
+              disabled={!file || importing}
+              aria-busy={importing}
             >
-              {working ? 'Importing…' : 'Import'}
+              {importing ? 'Importing…' : 'Import'}
             </Button>
           ) : failure?.retry ? (
             <Button className="button button-primary" type="submit">
@@ -283,10 +294,10 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
               className="button button-primary"
               type="submit"
               focusableWhenDisabled
-              disabled={!chosen || chosen.subscribed || working}
-              aria-busy={working}
+              disabled={!answer || answer.chosen.subscribed || subscribing}
+              aria-busy={subscribing}
             >
-              {chosen?.subscribed ? 'Already subscribed' : working ? 'Subscribing…' : 'Subscribe'}
+              {answer?.chosen.subscribed ? 'Already subscribed' : subscribing ? 'Subscribing…' : 'Subscribe'}
             </Button>
           )}
         </div>
@@ -296,23 +307,27 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
 }
 
 function found(preview: FeedPreviewResponse, host: string): Lookup {
-  if (preview.kind === 'feed') return { kind: 'found', host, feeds: [preview.feed], chosen: preview.feed }
+  if (preview.kind === 'feed') {
+    return { kind: 'found', host, feeds: [preview.feed], chosen: preview.feed, refused: undefined }
+  }
   const [first] = preview.feeds
   if (!first) {
     return { kind: 'failed', reason: `${preview.host} doesn’t name a feed. Try the feed’s own address.`, retry: false }
   }
-  return { kind: 'found', host: preview.host, feeds: preview.feeds, chosen: first }
+  return { kind: 'found', host: preview.host, feeds: preview.feeds, chosen: first, refused: undefined }
 }
 
 function FoundFeeds({
   host,
   feeds,
   chosen,
+  readOnly,
   onChoose,
 }: {
   host: string
   feeds: readonly FeedPreview[]
   chosen: FeedPreview
+  readOnly: boolean
   onChoose(feed: FeedPreview): void
 }) {
   const id = useId()
@@ -336,6 +351,7 @@ function FoundFeeds({
         className="feed-choices"
         aria-labelledby={`${id}-lede`}
         value={chosen.feedUrl}
+        readOnly={readOnly}
         onValueChange={(feedUrl) => {
           const next = feeds.find((feed) => feed.feedUrl === feedUrl)
           if (next) onChoose(next)
