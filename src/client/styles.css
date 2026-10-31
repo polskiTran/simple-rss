@@ -316,7 +316,6 @@
     white-space: nowrap;
   }
 
-  /* Words a phone’s narrower control can go without. */
   .wide-only {
     @media (max-width: 1024px) {
       display: none;
@@ -414,7 +413,6 @@
     padding: 0 10px;
     font-size: 13px;
 
-    /* A phone gives a small control its full height. */
     @media (max-width: 1024px) {
       height: var(--control);
     }
@@ -503,7 +501,6 @@
     }
   }
 
-  /* On a phone a screen's switch spans the column, as the Reader's does. */
   .toolbar > .switch {
     @media (max-width: 1024px) {
       display: flex;
@@ -874,7 +871,6 @@
     gap: 8px;
   }
 
-  /* The meta column sits on the title's first baseline, whatever their sizes. */
   .item {
     position: relative;
     --item-meta: 180px;
@@ -886,7 +882,6 @@
     border: 1px solid var(--color-edge);
     background: var(--color-ground);
 
-    /* On a phone the Feed name and time share one line above the title. */
     @media (max-width: 1024px) {
       grid-template-columns: minmax(0, 1fr) var(--control);
       column-gap: 8px;
@@ -1069,7 +1064,6 @@
     cursor: pointer;
     opacity: 0;
 
-    /* Always shown on a phone, beside the meta and title. */
     @media (max-width: 1024px) {
       grid-column: 2;
       grid-row: 1 / span 3;
@@ -1258,7 +1252,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* On a phone Add feed leads the actions, and the jump buttons scroll as one row. */
   .feeds-actions {
     @media (max-width: 1024px) {
       width: 100%;
@@ -1289,8 +1282,6 @@
       align-items: stretch;
     }
   }
-
-  /* A Feed is a thin-edged box, like an item: its name and Cadence, its host under them. */
 
   .feed-rows {
     display: grid;
@@ -1341,8 +1332,6 @@
     }
   }
 
-  /* A Feed's host, wherever a Feed is named: it leads away to the publisher, in
-     colour and marked ↗; grey text when there is no site. */
   .feed-host {
     justify-self: start;
     display: inline-flex;
@@ -1400,8 +1389,6 @@
     outline-offset: 2px;
   }
 
-  /* What the address answered, under a field that never moves: one Feed under
-     a rule, or a page's Feeds as boxes to choose between. */
   .add-feed-result {
     display: grid;
     min-width: 0;
@@ -1433,7 +1420,6 @@
     border-top: 1px solid var(--color-rule);
   }
 
-  /* Chosen is a 1px ink ring, as a current screen's button is; no radio mark. */
   .feed-choice {
     border: 1px solid var(--color-edge);
   }
@@ -1569,7 +1555,6 @@
     }
   }
 
-  /* The actions stand on the title's first line, as a title row's do on Feeds. */
   .feed-head {
     display: flex;
     align-items: start;
@@ -1577,7 +1562,6 @@
     gap: 24px 40px;
     margin-bottom: 48px;
 
-    /* On a phone: identity, then the actions as one row. */
     @media (max-width: 1024px) {
       flex-direction: column;
       align-items: stretch;
@@ -1730,7 +1714,6 @@
     color: var(--color-ink-2);
   }
 
-  /* The legend's squares are 10px; on a phone, the grid's own cells. */
   .cadence-legend .cadence-cell {
     --cell: 10px;
 
@@ -1750,7 +1733,6 @@
   .reader-source {
     margin-top: 24px;
 
-    /* On a phone the source switch spans the column. */
     @media (max-width: 1024px) {
       display: flex;
       margin-top: 20px;
@@ -1777,7 +1759,6 @@
     color: var(--color-saved);
   }
 
-  /* On a phone Open original, Discussion and Save are squares in the top bar. */
   .reader-original,
   .reader-discussion,
   .save-toggle.save-toggle-labelled {
@@ -2069,7 +2050,6 @@
     gap: 20px;
   }
 
-  /* On a phone the date picker stands at the end of the title’s row. */
   .digest-head {
     @media (max-width: 1024px) {
       grid-template-columns: minmax(0, 1fr) auto;
@@ -2118,7 +2098,6 @@
     cursor: pointer;
   }
 
-  /* The day on show, ringed apart from its neighbours. */
   .cadence-cell[data-selected] {
     box-shadow:
       0 0 0 1px var(--color-ground),
@@ -2141,7 +2120,6 @@
     scrollbar-width: thin;
     mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
 
-    /* On a phone the row runs past the page's edge, with no scrollbar. */
     @media (max-width: 1024px) {
       margin-inline: -20px;
       padding-inline-start: 20px;
@@ -2149,7 +2127,6 @@
     }
   }
 
-  /* A row that scrolls on a phone fades at its trailing edge, as a day's chips do. */
   :is(.filter-list, .rhythm-jumps) {
     @media (max-width: 1024px) {
       mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
@@ -2207,8 +2184,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A Feed's day in one box: its titles one to a line, each its own way in,
-     each with its own save square beside its time. */
   /* Folded from far down, the box comes back into view with room above it. */
   .feed-day {
     scroll-margin-top: 24px;
@@ -2355,7 +2330,6 @@
     margin-top: 12px;
   }
 
-  /* Back after a quiet spell: the fortnight drawn, then how long it was away. */
   .quiet-spell {
     display: grid;
     justify-items: start;
@@ -2376,8 +2350,6 @@
     }
   }
 
-  /* The month beside the Digest: seven columns of days, each shaded by its
-     count, the day on show ringed. */
   .calendar-turns {
     display: flex;
     gap: 4px;
@@ -2494,7 +2466,6 @@
     margin-bottom: 48px;
   }
 
-  /* A lone matching Feed spans the list, as wide as the items under it. */
   .search-feeds .feed-row:only-child {
     grid-column: 1 / -1;
   }
@@ -2603,7 +2574,6 @@
     padding: 18px 0;
     border-bottom: 1px solid var(--color-rule-soft);
 
-    /* On a phone each preference’s words stand above its control. */
     @media (max-width: 1024px) {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -2732,7 +2702,6 @@
     }
   }
 
-  /* A screen's toolbar: a row of its own under the header. */
   .chrome-toolbar {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -2830,7 +2799,6 @@
     }
   }
 
-  /* The current section among the buttons: a ring instead of a fill. */
   .section-button[aria-current='page'] {
     background: var(--color-ground);
     box-shadow: inset 0 0 0 1px var(--color-ink);

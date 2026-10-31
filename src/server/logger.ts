@@ -32,8 +32,8 @@ export interface LoggerOptions {
 const RANK = { debug: 0, info: 1, warn: 2, error: 3 } satisfies Record<LogLevel, number>
 
 /**
- * Flat JSON records to stdout. Callers pass event names (`server.started`),
- * never secrets, session tokens, Feed summaries, or Reader content.
+ * Callers pass event names (`server.started`), never secrets, session tokens,
+ * Feed summaries, or Reader content.
  */
 export function createLogger(options: LoggerOptions): Logger {
   const now = options.now ?? (() => new Date())

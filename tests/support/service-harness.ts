@@ -24,7 +24,7 @@ export interface HarnessOptions {
   readonly upstream?: UpstreamFixtures
   /** Scripts the outbound boundary's answers directly instead of serving `upstream` through it. */
   readonly retrieval?: Retrieval
-  /** Built client bundle to serve. Omitted means "no client on disk". */
+  /** Built client bundle to serve. Omitted means `defaultClientDir()`. */
   readonly clientDir?: string
   /** Shrinks the polling batch below the production default; nudges stay off unless a test turns them on. */
   readonly scheduling?: PollSchedulerLimits
