@@ -431,8 +431,8 @@ without a fade.
 An item box steps to `row-hover` while pressed. Hover styles apply only where a
 pointer can hover, so a tap never leaves one behind.
 What answers an action — what an address answers in Add feed, the undo line an
-unsave leaves, the notice an action answers with — fades in over 150ms as it
-mounts, opacity only. So does an article, and the Original webpage arriving
+unsave leaves, the notice or error an action answers with — fades in over 150ms
+as it mounts, opacity only. So does an article, and the Original webpage arriving
 over Feed Content is a new article that fades in, never text rewritten in
 place. A wait shorter than 400ms shows nothing; after that the waiting line
 fades in.
