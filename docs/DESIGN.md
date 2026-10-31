@@ -380,7 +380,9 @@ doubles up to a minute.
 
 **Notices.** A result the User waits on outside a dialog — an import, a
 refresh — is one line of meta text in an `aria-live` region under the control
-that started it. Errors give a reason, in danger text, never an apology.
+that started it. Errors give a reason, in danger text, never an apology. A
+failed save is the exception: rows and toolbars have no room and the toggle may
+have left the screen, so one dismissible line sticks to the top of the page.
 
 **Mark.** A 4×4 tile of 4px squares with 2px gaps drawn in the Cadence ramp,
 then the wordmark. The same tile, glinting, stands before every waiting line.
