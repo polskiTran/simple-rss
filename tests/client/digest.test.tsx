@@ -214,6 +214,16 @@ describe('the chronological Digest', () => {
     expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
   })
 
+  it('counts a request that ran out of time as unreached', async () => {
+    stubApi().on('GET /api/digest', () => {
+      throw new DOMException('The operation timed out', 'TimeoutError')
+    })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+
+    expect(await screen.findByText('The digest can’t be reached.')).toBeDefined()
+  })
+
   it('blames the reader, not the connection, when the answer fails its schema', async () => {
     stubApi().malformed('GET /api/digest')
     window.history.replaceState(null, '', '/')

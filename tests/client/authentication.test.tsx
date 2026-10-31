@@ -269,6 +269,16 @@ describe('coming back to a claimed installation', () => {
     expect(await screen.findByLabelText('Password')).toBeDefined()
   })
 
+  it('blames the server, not the connection, when the status fails its schema', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ unexpected: true })),
+    )
+    renderApp()
+
+    expect(await screen.findByRole('heading', { name: 'simple isn’t available' })).toBeDefined()
+  })
+
   it('asks again on its own when the connection comes back', async () => {
     vi.stubGlobal(
       'fetch',

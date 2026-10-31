@@ -135,7 +135,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     else settle(IDLE)
   }
 
-  /** A Subscription that lands after the dialog closed still joins the list. */
   async function subscribe({ host, feeds, chosen }: Answer) {
     settle({ kind: 'subscribing', host, feeds, chosen })
     const subscribing = new AbortController()
@@ -143,7 +142,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     try {
       const created = await subscribeToFeed(chosen.feedUrl, subscribing.signal)
       onSubscribed(created)
-      if (!subscribing.signal.aborted) setOpen(false)
+      setOpen(false)
     } catch (cause) {
       if (subscribing.signal.aborted) return
       const { reason } = addFailure(cause, new URL(chosen.feedUrl).host)

@@ -104,6 +104,16 @@ interface ApiRequestOptions extends RequestInit {
 
 type Schema<T> = z.ZodType<T, z.ZodTypeDef, unknown>
 
+/**
+ * Whether the server answered a failed request. A fetch that rejects and a
+ * request that runs out of time got no answer; a refusal or a body that fails
+ * its schema came from the server.
+ */
+export function failureKind(cause: unknown): 'unreachable' | 'unavailable' {
+  const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError'
+  return cause instanceof TypeError || timedOut ? 'unreachable' : 'unavailable'
+}
+
 async function request(path: string, options: ApiRequestOptions = {}): Promise<Response> {
   const { timeoutMs = REQUEST_TIMEOUT_MS, ...init } = options
   const deadline = AbortSignal.timeout(timeoutMs)

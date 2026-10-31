@@ -56,7 +56,7 @@ interface FeedViewProps {
 
 export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }: FeedViewProps) {
   const [state, { retry, set }] = useResource(String(feedId), (signal) => fetchFeedDetail(feedId, signal), {
-    retainOnNewKey: false,
+    dropOnNewKey: true,
   })
   const detail = valueInView(state)
   useScreenTitle(detail?.title)
@@ -64,7 +64,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     String(feedId),
     (cursor, signal) => fetchFeedItems(feedId, cursor ?? '', signal),
     (shown, page) => ({ ...shown, items: [...shown.items, ...page.items], nextFrom: page.nextFrom }),
-    { retainOnNewKey: false },
+    { dropOnNewKey: true },
   )
   const items = valueInView(itemsState)
   // A day picked on the cadence grid, waiting for the page that brings it.

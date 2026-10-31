@@ -1,8 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { failureKind } from './api.js'
 
 /**
  * What a view has of one server read. Loading the same key again carries the value
- * it replaces. A new key carries that value only when the caller asks to keep it.
+ * it replaces. A new key carries it too, unless the caller drops it.
  * The two failures carry the error so a view can still tell its own cases apart,
  * a missing Feed or a rate-limited extraction, without re-implementing the request.
  */
@@ -18,7 +19,7 @@ interface ResourceControls<T> {
 }
 
 interface ResourceOptions {
-  readonly retainOnNewKey?: boolean
+  readonly dropOnNewKey?: boolean
 }
 
 export type OlderState = 'idle' | 'loading' | 'failed'
@@ -38,7 +39,7 @@ export function useResource<T>(
   load: (signal: AbortSignal) => Promise<T>,
   options?: ResourceOptions,
 ): readonly [Resource<T>, ResourceControls<T>] {
-  const { held, retry, patch } = useHeld(key, load, options?.retainOnNewKey ?? true)
+  const { held, retry, patch } = useHeld(key, load, options?.dropOnNewKey ?? false)
   return [held.resource, { retry, set: (update) => patch(undefined, update) }]
 }
 
@@ -54,7 +55,7 @@ export function usePagedResource<T>(
   append: (shown: T, page: T) => T,
   options?: ResourceOptions,
 ): readonly [Resource<T>, PagedControls<T>] {
-  const { held, retry, patch } = useHeld(key, (signal) => load(undefined, signal), options?.retainOnNewKey ?? true)
+  const { held, retry, patch } = useHeld(key, (signal) => load(undefined, signal), options?.dropOnNewKey ?? false)
   const [older, setOlder] = useState<{ readonly load: number; readonly state: OlderState }>({
     load: 0,
     state: 'idle',
@@ -90,11 +91,6 @@ export function usePagedResource<T>(
   ]
 }
 
-/** A request that never reached the server fails with a TypeError; any other failure is the server's answer. */
-function failureKind(cause: unknown): 'unreachable' | 'unavailable' {
-  return cause instanceof TypeError ? 'unreachable' : 'unavailable'
-}
-
 export function valueInView<T>(resource: Resource<T>): T | undefined {
   if (resource.kind === 'loaded') return resource.value
   if (resource.kind === 'loading') return resource.previous
@@ -107,7 +103,7 @@ interface Held<T> {
   readonly load: number
 }
 
-function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, retainOnNewKey: boolean) {
+function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, dropOnNewKey: boolean) {
   const [held, setHeld] = useState<Held<T>>({
     key,
     resource: { kind: 'loading', previous: undefined },
@@ -126,7 +122,7 @@ function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, reta
       load: current.load,
       resource: {
         kind: 'loading',
-        previous: retainOnNewKey || current.key === key ? valueInView(current.resource) : undefined,
+        previous: dropOnNewKey && current.key !== key ? undefined : valueInView(current.resource),
       },
     }))
     void run(request.signal)
@@ -137,10 +133,10 @@ function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, reta
         if (!request.signal.aborted) setHeld({ key, resource: { kind: failureKind(cause), error: cause }, load: id })
       })
     return () => request.abort()
-  }, [key, attempt, retainOnNewKey])
+  }, [key, attempt, dropOnNewKey])
 
   const resource: Resource<T> =
-    held.key === key || retainOnNewKey ? held.resource : { kind: 'loading', previous: undefined }
+    dropOnNewKey && held.key !== key ? { kind: 'loading', previous: undefined } : held.resource
 
   const patch = (from: number | undefined, update: (current: T) => T) =>
     setHeld((current) => {

@@ -32,11 +32,14 @@ export class ImageService {
       .all()[0]
     if (!row?.imageUrl) return { kind: 'missing' }
 
-    // SAFETY: row.imageUrl is feed_items.image_url for the requested Feed Item.
-    return this.image(row.imageUrl as VouchedImageUrl, signal)
+    return this.#retrieveImage(row.imageUrl, signal)
   }
 
-  async image(url: VouchedImageUrl, signal?: AbortSignal): Promise<ImageOutcome> {
+  image(url: VouchedImageUrl, signal?: AbortSignal): Promise<ImageOutcome> {
+    return this.#retrieveImage(url, signal)
+  }
+
+  async #retrieveImage(url: string, signal?: AbortSignal): Promise<ImageOutcome> {
     const result = await this.#retrieval.retrieve({ url, operation: 'image', ...(signal ? { signal } : {}) })
     if (!result.ok) return { kind: 'retrieval-failed', failure: result }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AuthStatus } from '../shared/api.js'
-import { ApiError, fetchAuthStatus, onSessionEnded } from './api.js'
+import { failureKind, fetchAuthStatus, onSessionEnded } from './api.js'
 
 /**
  * `locked` asks for the password, `unclaimed` for the deployment's setup
@@ -34,7 +34,7 @@ export function useAccess(): Gate {
         (status) => setAccess(accessFor(status)),
         (error) =>
           setAccess((previous) => ({
-            kind: error instanceof ApiError ? 'unavailable' : 'unreachable',
+            kind: failureKind(error),
             attempts: 'attempts' in previous ? previous.attempts + 1 : 1,
           })),
       ),

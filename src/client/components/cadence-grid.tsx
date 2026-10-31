@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import { cadenceDayLabel, type CadenceGrid as Grid } from '../cadence.js'
 
 interface CadenceGridProps {
@@ -41,11 +40,8 @@ export function CadenceGrid({ grid, title, selected, onShowDay }: CadenceGridPro
       <div className="cadence-months" aria-hidden="true">
         {grid.columns.map((column, index) => {
           if (!column.monthLabel) return null
-          // SAFETY: React forwards CSS custom properties even though `CSSProperties`
-          // only declares standard CSS names.
-          const style = { '--column': index } as CSSProperties
           return (
-            <span key={column.cells[0]?.date ?? index} className="cadence-month" style={style}>
+            <span key={column.cells[0]?.date ?? index} className="cadence-month" style={{ '--column': index }}>
               {column.monthLabel}
             </span>
           )

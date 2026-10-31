@@ -101,9 +101,7 @@ export function settle(feed: PolledFeed, outcome: SettledPoll, now: Date): Settl
 
 /** True only where this installation refused the attempt, so the publisher was never contacted. */
 function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPoll, { kind: 'retrieval-failed' }> {
-  return (
-    outcome.kind === 'retrieval-failed' && (outcome.failure.code === 'busy' || outcome.failure.code === 'cancelled')
-  )
+  return outcome.kind === 'retrieval-failed' && outcome.failure.code === 'busy'
 }
 
 /**
