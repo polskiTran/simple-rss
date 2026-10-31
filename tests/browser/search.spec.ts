@@ -249,3 +249,74 @@ test.describe('searching at phone width', () => {
     await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
   })
 })
+
+test.describe('the search field on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  async function openField(page: Page, installation: Installation) {
+    await openDigest(page, installation)
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    return page.getByRole('searchbox', { name: 'Search your reading' })
+  }
+
+  async function expectReaderBar(page: Page) {
+    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
+    await expect(page.getByRole('searchbox')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible()
+  }
+
+  test('gives the bar back to the Reader when a result is opened', async ({ page, installation }) => {
+    const field = await openField(page, installation)
+    await field.fill('clear morning')
+    await page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'First light' }).click()
+
+    await expectReaderBar(page)
+  })
+
+  test('gives the bar back to the Reader when a post is opened with the field still empty', async ({
+    page,
+    installation,
+  }) => {
+    await openField(page, installation)
+    await page.getByRole('link', { name: 'First light' }).click()
+
+    await expectReaderBar(page)
+  })
+
+  test('gives the bar back to the Digest when the phone goes back from results', async ({ page, installation }) => {
+    const field = await openField(page, installation)
+    await field.fill('clear morning')
+    await expect(page).toHaveURL(/\/search/)
+
+    await page.goBack()
+
+    await expect(page).toHaveURL(/\/digest/)
+    await expect(field).toBeHidden()
+  })
+
+  test('gives the bar back to the Reader when the post it searched from is the result opened', async ({
+    page,
+    installation,
+  }) => {
+    await openDigest(page, installation)
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    await page.getByRole('searchbox').fill('clear morning')
+    await page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'First light' }).click()
+
+    await expectReaderBar(page)
+  })
+
+  test('stays open while its words are cleared', async ({ page, installation }) => {
+    const field = await openField(page, installation)
+    await field.fill('clear morning')
+    await expect(page).toHaveURL(/\/search\?q=clear\+morning/)
+
+    await page.getByRole('button', { name: 'Clear search' }).click()
+
+    await expect(page).toHaveURL(/\/digest/)
+    await expect(field).toBeFocused()
+  })
+})

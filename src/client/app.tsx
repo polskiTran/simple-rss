@@ -6,9 +6,10 @@ import { BackButton } from './components/back-button.js'
 import { ChromeToolbarSlot } from './components/chrome-toolbar.js'
 import { GlobalSearch } from './components/global-search.js'
 import { LoadingNote } from './components/loading-note.js'
+import { ReportSaveFailure, SaveFailureLine } from './components/save-failure.js'
 import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
-import { locationAt, originOf, scopeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
+import { locationAt, originOf, scopeOf, searchHomeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
 import { DigestView } from './views/digest-view.js'
 import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
@@ -27,6 +28,7 @@ export function App() {
   const back = open && (location.screen === 'feed' || location.screen === 'reader') ? location.origin : undefined
   const page = useRef<HTMLElement>(null)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null)
+  const [saveFailure, setSaveFailure] = useState<string>()
   useArrival(navigation.arrival, page)
 
   return (
@@ -38,6 +40,7 @@ export function App() {
           <>
             <SectionNav active={sectionOf(location)} onNavigate={navigation.navigate}>
               <GlobalSearch
+                key={searchHomeOf(location)}
                 query={location.screen === 'search' ? location.query : ''}
                 scope={scopeOf(location)}
                 onQueryChange={navigation.updateSearch}
@@ -48,9 +51,12 @@ export function App() {
         ) : null}
       </header>
       <ChromeToolbarSlot value={toolbarSlot}>
-        <main className="page" ref={page}>
-          {viewFor(gate, navigation)}
-        </main>
+        <ReportSaveFailure value={setSaveFailure}>
+          <main className="page" ref={page}>
+            {saveFailure ? <SaveFailureLine failure={saveFailure} onDismiss={() => setSaveFailure(undefined)} /> : null}
+            {viewFor(gate, navigation)}
+          </main>
+        </ReportSaveFailure>
       </ChromeToolbarSlot>
     </div>
   )
