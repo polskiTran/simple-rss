@@ -189,16 +189,17 @@
   }
 
   /* A screen and its lists are instant. Only an answer to an action — what an
-     address answered in Add feed, the undo line an unsave leaves, the notice
-     an action answers with — fades in once, as it mounts. A notice is cleared
-     before each action, so every answer leaves `display: none` and fades
-     afresh. Nothing here nests inside another, so no fade compounds. */
-  :is(.add-feed-found, .undo-line, :is(.feed-notices, .feeds-notices) > .note) {
+     address answered in Add feed, the words of the undo line an unsave leaves,
+     whose box takes the item's place at once, the notice an action answers
+     with — fades in once, as it mounts. A notice is cleared before each action,
+     so every answer leaves `display: none` and fades afresh. Nothing here nests
+     inside another, so no fade compounds. */
+  :is(.add-feed-found, .undo-line > *, :is(.feed-notices, .feeds-notices) > .note) {
     transition: opacity var(--duration-enter) var(--ease-out);
   }
 
   @starting-style {
-    :is(.add-feed-found, .undo-line, :is(.feed-notices, .feeds-notices) > .note) {
+    :is(.add-feed-found, .undo-line > *, :is(.feed-notices, .feeds-notices) > .note) {
       opacity: 0;
     }
   }
