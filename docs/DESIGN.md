@@ -445,10 +445,13 @@ not answered in the same frame.
 On Sign in and Setup the mark assembles along its diagonal, once, without
 holding up the form.
 
+On a touch phone the search field opens out of its square over 200ms and closes
+at once.
+
 A dialog is the one thing with an exit (see Dialog). Under
 `prefers-reduced-motion` there is less motion, not none: fades stay, nothing
-moves — the sheet fades in place instead of rising, and the waiting tile and the
-mark hold still.
+moves — the sheet fades in place instead of rising, the search field fades
+instead of opening, and the waiting tile and the mark hold still.
 
 ## 8. Not yet designed
 

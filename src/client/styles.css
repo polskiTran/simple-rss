@@ -2893,6 +2893,23 @@
     }
   }
 
+  /* On a touch phone the field opens out of the search square. The clip stops 4px
+     outside the field so its focus ring stays whole. A typed search is already
+     open when the bar mounts, so it does not play. Keyboards skip this: `/`
+     answers in the same frame. */
+  @media (max-width: 1024px) and (hover: none) {
+    .search[data-open]:not([data-filled]) .search-field {
+      clip-path: inset(-4px);
+      transition: clip-path 200ms var(--ease-out);
+    }
+
+    @starting-style {
+      .search[data-open]:not([data-filled]) .search-field {
+        clip-path: inset(-4px -4px -4px calc(100% - var(--control)));
+      }
+    }
+  }
+
   .search-input {
     flex: 1;
     min-width: 0;
@@ -2982,6 +2999,20 @@
 
   .wordmark-cell {
     animation: none;
+  }
+
+  @media (max-width: 1024px) and (hover: none) {
+    .search[data-open]:not([data-filled]) .search-field {
+      clip-path: none;
+      transition: opacity var(--duration-enter) var(--ease-out);
+    }
+
+    @starting-style {
+      .search[data-open]:not([data-filled]) .search-field {
+        clip-path: none;
+        opacity: 0;
+      }
+    }
   }
 }
 
