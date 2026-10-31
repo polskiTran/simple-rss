@@ -34,7 +34,7 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
   const readFrom = (from: string | undefined) => {
     onStart({ from: from === shown?.today ? undefined : from })
     // Picked below the fold, the day starts the list back at its top.
-    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo({ top: 0, behavior: 'instant' })
+    if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo({ top: 0 })
   }
 
   return (

@@ -180,37 +180,17 @@
     }
   }
 
-  /* Chrome is instant; data arrives. A screen's own title and controls are
-     there the moment it opens; what the server sends — item boxes, Feed rows,
-     a group's heading, a title's companion value, a Feed's panels, what an
+  /* A screen and its lists are instant. Only an answer to an action — what an
      address answered in Add feed, the undo line an unsave leaves, the notice
      an action answers with — fades in once, as it mounts. A notice is cleared
      before each action, so every answer leaves `display: none` and fades
      afresh. Nothing here nests inside another, so no fade compounds. */
-  :is(
-    .item,
-    .feed-row,
-    .group:not(.panel) > .group-header,
-    .page-title-companion,
-    .feed-panels,
-    .add-feed-found,
-    .undo-line,
-    :is(.feed-notices, .feeds-notices) > .note
-  ) {
+  :is(.add-feed-found, .undo-line, :is(.feed-notices, .feeds-notices) > .note) {
     transition: opacity 150ms ease-out;
   }
 
   @starting-style {
-    :is(
-        .item,
-        .feed-row,
-        .group:not(.panel) > .group-header,
-        .page-title-companion,
-        .feed-panels,
-        .add-feed-found,
-        .undo-line,
-        :is(.feed-notices, .feeds-notices) > .note
-      ) {
+    :is(.add-feed-found, .undo-line, :is(.feed-notices, .feeds-notices) > .note) {
       opacity: 0;
     }
   }
@@ -1189,12 +1169,6 @@
     }
   }
 
-  @keyframes mark-glint {
-    30% {
-      filter: brightness(1.35) saturate(0.7);
-    }
-  }
-
   @keyframes mark-glint-loop {
     0%,
     30%,
@@ -1204,12 +1178,6 @@
 
     12% {
       filter: brightness(1.35) saturate(0.7);
-    }
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    a.wordmark:hover .wordmark-cell {
-      animation: mark-glint 500ms cubic-bezier(0.23, 1, 0.32, 1) calc(var(--glint-step) * 60ms);
     }
   }
 
@@ -1835,7 +1803,7 @@
   .reader-fallback,
   .article-body {
     margin-top: 48px;
-    transition: opacity 200ms ease-out;
+    transition: opacity 150ms ease-out;
   }
 
   @starting-style {
@@ -2950,14 +2918,6 @@
     .search-clear:hover {
       color: var(--color-ink);
     }
-  }
-}
-
-/* A jump within a page glides; under reduced motion it cuts. A scroll that
-   restores a place asks for `instant` itself. */
-@media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
   }
 }
 

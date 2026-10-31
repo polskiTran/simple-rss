@@ -116,8 +116,7 @@ function FeedDayBox({
   const folded = foldable && !unfolded
   const toggleFold = () => {
     flushSync(() => setUnfolded(!unfolded))
-    if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0)
-      box.current?.scrollIntoView({ behavior: 'instant' })
+    if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0) box.current?.scrollIntoView()
   }
   return (
     <article ref={box} className="item feed-day">

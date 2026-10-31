@@ -89,29 +89,6 @@ test.describe('the mark', () => {
     await expect(page.getByRole('link', { name: 'Digest', exact: true })).toHaveAttribute('aria-current', 'page')
   })
 
-  test('glints across the tile on hover and settles back at rest', async ({ page, installation }) => {
-    await claim(page, installation)
-    const resting = await glintFrame(page)
-
-    await page.getByRole('link', { name: 'simple' }).hover()
-
-    await page.waitForTimeout(120)
-    expect(await glintFrame(page)).not.toEqual(resting)
-
-    await expect.poll(async () => glintFrame(page), { timeout: 2_000 }).toEqual(resting)
-  })
-
-  test('holds still for a User who asked for less motion', async ({ page, installation }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' })
-    await claim(page, installation)
-    const resting = await glintFrame(page)
-
-    await page.getByRole('link', { name: 'simple' }).hover()
-    await page.waitForTimeout(120)
-
-    expect(await glintFrame(page)).toEqual(resting)
-  })
-
   test('glints on the waiting line, and holds still in the chrome', async ({ page, installation }) => {
     await claim(page, installation)
     await hangTheDigest(page)

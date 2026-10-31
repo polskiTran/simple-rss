@@ -33,8 +33,7 @@ export function Group({ id, title, count, aside, className, children }: GroupPro
 
 /**
  * Takes the reader into the Group whose heading is `id`: focus lands on the
- * section without a jump, then the page scrolls it to the top — smoothly, unless
- * the User asks for less motion (styles.css).
+ * section without a jump, then the page scrolls it to the top.
  */
 export function enterSection(id: string) {
   const section = document.getElementById(id)?.closest('section')

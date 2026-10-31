@@ -18,7 +18,7 @@ function focusHeadingWithoutScroll(root: HTMLElement): boolean {
 }
 
 function scrollToRecordedPlace(target: number): boolean {
-  window.scrollTo({ top: target, behavior: 'instant' })
+  window.scrollTo({ top: target })
   return Math.abs(window.scrollY - target) < 1
 }
 

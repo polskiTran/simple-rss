@@ -422,25 +422,27 @@ each preference.
 
 ## 7. Motion
 
-Chrome is instant; data arrives. What the User presses or opens — a control, a
-switch, a screen with its title and toolbar, a hover — changes in the same
-frame, and nothing moves: a pressed control steps its fill, never its size.
+Screens and lists are instant. What the User presses or opens — a control, a
+switch, a screen with its title and toolbar, a hover, a jump within a page —
+changes in the same frame, and nothing moves: a pressed control steps its fill,
+never its size. The lists read many times a day — item boxes, Feed rows and
+cards, group headings, a title's companion value, a Feed's panels — appear
+without a fade.
 An item box steps to `row-hover` while pressed. Hover styles apply only where a
 pointer can hover, so a tap never leaves one behind.
-What the server sends — item boxes, Feed rows and cards, a group's heading, a
-title's companion value, a Feed's panels, what an address answers in Add feed,
-the undo line an unsave leaves, the notice an action answers with — fades in
-over 150ms as it mounts, opacity only; an article over 200ms, and
-the Original webpage arriving over Feed Content is a new article that fades
-in, never text rewritten in place. A wait shorter than 400ms shows nothing;
-after that the waiting line fades in.
+What answers an action — what an address answers in Add feed, the undo line an
+unsave leaves, the notice an action answers with — fades in over 150ms as it
+mounts, opacity only. So does an article, and the Original webpage arriving
+over Feed Content is a new article that fades in, never text rewritten in
+place. A wait shorter than 400ms shows nothing; after that the waiting line
+fades in.
 Stepping to another day keeps the one on show until the next answers, so the
 screen changes once rather than emptying first.
 
 A dialog is the one thing with an exit (see Dialog). Under
 `prefers-reduced-motion` there is less motion, not none: fades stay, nothing
-moves — the sheet fades in place instead of rising, jumps scroll instantly, and
-the waiting tile holds still.
+moves — the sheet fades in place instead of rising, and the waiting tile holds
+still.
 
 ## 8. Not yet designed
 

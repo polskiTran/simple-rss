@@ -69,7 +69,7 @@ test.describe('saving on a phone', () => {
     await page.getByRole('button', { name: 'Save First light' }).click()
     await expect(failedLine(page)).toBeVisible()
 
-    await page.evaluate(() => window.scrollTo({ top: 400, behavior: 'instant' }))
+    await page.evaluate(() => window.scrollTo({ top: 400 }))
 
     await expect(failedLine(page)).toBeInViewport()
   })
