@@ -1205,6 +1205,18 @@
     }
   }
 
+  /* The mark assembles along its diagonal where a User first meets it, on Sign in
+     and Setup. The form below never waits for it. */
+  .app:has(.gate) .chrome .wordmark-cell {
+    animation: mark-assemble 250ms var(--ease-out) calc(var(--glint-step) * 30ms) backwards;
+  }
+
+  @keyframes mark-assemble {
+    from {
+      opacity: 0;
+    }
+  }
+
   .loading-note {
     display: flex;
     align-items: center;
@@ -2953,7 +2965,7 @@
 }
 
 /* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
-   place instead of rising, and the waiting tile holds still. */
+   place instead of rising, and the waiting tile and the mark hold still. */
 @media (prefers-reduced-motion: reduce) {
   .dialog {
     transition: opacity var(--duration-enter) var(--ease-out);

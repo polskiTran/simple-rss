@@ -442,10 +442,13 @@ screen changes once rather than emptying first.
 A change of Appearance crossfades the screen over 200ms, the one press that is
 not answered in the same frame.
 
+On Sign in and Setup the mark assembles along its diagonal, once, without
+holding up the form.
+
 A dialog is the one thing with an exit (see Dialog). Under
 `prefers-reduced-motion` there is less motion, not none: fades stay, nothing
-moves — the sheet fades in place instead of rising, and the waiting tile holds
-still.
+moves — the sheet fades in place instead of rising, and the waiting tile and the
+mark hold still.
 
 ## 8. Not yet designed
 
