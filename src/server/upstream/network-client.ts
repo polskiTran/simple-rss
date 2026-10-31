@@ -209,7 +209,7 @@ function reasonFor(signal: AbortSignal): Error {
 /**
  * Watches the socket events behind one request. The returned snapshot, taken
  * when the response headers arrive, carries only the phases that actually ran:
- * a reused keep-alive socket fires none of them, so it reports no durations.
+ * a reused keep-alive socket fires none of them, so it reports only `ttfbMs`.
  */
 function observeConnection(outbound: ClientRequest): () => HttpTimings {
   const startedAt = performance.now()

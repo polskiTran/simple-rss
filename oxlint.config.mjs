@@ -68,6 +68,8 @@ export default defineConfig({
         'anti-slop/no-runtime-typeof': 'off',
       },
     },
+    // History state is whatever the browser hands back, so `trailOf` takes
+    // `unknown` and parses it.
     {
       files: ['src/client/routing.ts'],
       rules: {

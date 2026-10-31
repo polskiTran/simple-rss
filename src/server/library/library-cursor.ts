@@ -21,7 +21,6 @@ const libraryCursorSchema = z.tuple([
   z.number().int().positive(),
 ])
 
-/** `undefined` for anything this module never issued. */
 export function decodeLibraryCursor(value: string): LibraryCursor | undefined {
   try {
     const parsed = libraryCursorSchema.safeParse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')))

@@ -40,7 +40,7 @@ const envSchema = z.object({
    * sets this explicitly — the default only serves local development.
    */
   DATA_DIR: z.string().trim().min(1).default('./.data'),
-  /** Built client assets. Absent during `vite dev`, where Vite serves them. */
+  /** Built client assets. Absent means `defaultClientDir()`. */
   CLIENT_DIR: z.string().trim().min(1).optional(),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   /** How long in-flight requests may finish after SIGTERM. */

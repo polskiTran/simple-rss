@@ -2,7 +2,6 @@ import type { Logger } from '../logger.js'
 import type { FeedRefresh } from './feed-refresh.js'
 import type { SubscriptionService } from './subscription-service.js'
 
-/** The scheduler drives one bounded retention sweep per wake. */
 export interface RetentionSweeper {
   sweep(): void
 }

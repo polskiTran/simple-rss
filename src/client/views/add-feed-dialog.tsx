@@ -61,7 +61,6 @@ type Lookup =
 const IDLE: Lookup = { kind: 'idle' }
 
 interface AddFeedDialogProps {
-  /** A checked Subscription was recorded; it arrives with the list it joins. */
   onSubscribed(created: CreateSubscriptionResponse): void
   onImported(report: OpmlImportReport): void
 }

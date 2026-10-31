@@ -125,7 +125,6 @@ function allZero(bytes: Uint8Array, from: number, to: number): boolean {
   return true
 }
 
-/** Only called on text `isIP` has already accepted as dotted-quad. */
 function parseIpv4(address: string): Uint8Array | undefined {
   const parts = address.split('.')
   if (parts.length !== 4) return undefined
@@ -139,10 +138,7 @@ function parseIpv4(address: string): Uint8Array | undefined {
   return bytes
 }
 
-/**
- * Expands an IPv6 literal, including the `::` run and a trailing dotted-quad.
- * Only called on text `isIP` has already accepted.
- */
+/** Expands an IPv6 literal, including the `::` run and a trailing dotted-quad. */
 function parseIpv6(address: string): Uint8Array | undefined {
   const literal = withoutTrailingIpv4(address)
   if (literal === undefined) return undefined

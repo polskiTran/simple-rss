@@ -49,9 +49,6 @@ function chosenDataset(): Dataset {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Feeds
-
 const quietCadence = Array.from({ length: 30 }, () => 0)
 const busyCadence = Array.from({ length: 30 }, (_, day) => (day % 3 === 0 ? 1_284 : day % 2))
 const sparseCadence = Array.from({ length: 30 }, (_, day) => (day === 29 ? 1 : 0))
@@ -186,9 +183,6 @@ function feedsOf(dataset: Exclude<Dataset, 'demo'>): SubscriptionSummary[] {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Items
-
 const LONG_TITLE =
   'Why we rewrote our entire distributed job scheduler three times in eighteen months, what each rewrite taught us about consensus, backpressure and on-call fatigue, and why the fourth version is, against every instinct we had, a single SQLite file on one machine'
 // A Mastodon or Bluesky feed titles each item with the whole post; ingestion
@@ -231,7 +225,6 @@ const WORST_TODAY: readonly ItemSeed[] = [
     time: '16:00',
     summary: '<script>alert(1)</script>',
   },
-  // A Feed that publishes 1,284 items in one day (a firehose, a changelog bot).
   ...Array.from({ length: 1_284 }, (_, index) => ({
     feed: 2,
     title: `Build ${1_284 - index} passed on main — northwind-industries-holdings/monorepo@9f8e7d6c5b4a`,
@@ -422,9 +415,6 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
     nextFrom: null,
   }
 }
-
-// ---------------------------------------------------------------------------
-// The boundary
 
 function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string) {
   if (path === '/api/auth/status') return { claimed: true, authenticated: true }

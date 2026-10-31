@@ -46,10 +46,8 @@ type LiveCommand =
 
 /**
  * Operational commands over the mounted volume — the emergency-recovery shape
- * in `docs/ARCHITECTURE.md`: no HTTP surface, no Session. Arguments are
- * validated before the live database is touched; every command that touches
- * it then opens it and brings it to the current schema exactly once. Returns
- * the exit code so tests can drive it without spawning.
+ * in `docs/ARCHITECTURE.md`: no HTTP surface, no Session. Returns the exit
+ * code so tests can drive it without spawning.
  */
 export async function runCli(argv: readonly string[], context: CliContext): Promise<number> {
   const [command, ...rest] = argv

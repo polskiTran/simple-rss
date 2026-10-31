@@ -84,7 +84,6 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.use('*', securityHeaders())
   app.use('*', requestLogging(deps.logger))
-  // Text only — JSON, HTML, scripts; images and archives pass through as they are.
   app.use('*', compress())
 
   app.get('/health/live', (c) => c.json<Liveness>({ status: 'live' }))

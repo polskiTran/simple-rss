@@ -8,7 +8,6 @@ export type Validated<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly response: Response }
 
-/** Every API refusal goes out through here, so its code is one the contract lists. */
 export function apiError(
   c: Context,
   status: ContentfulStatusCode,

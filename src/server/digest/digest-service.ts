@@ -30,10 +30,6 @@ export class DigestService {
     this.#settings = options.settings
   }
 
-  /**
-   * One page of the Digest `from` a day, or from today: whole days, newest
-   * first, as `wholeDayPage` cuts them, so no Feed's day is split across pages.
-   */
   read(start: DigestStart): Digest {
     const timezone = this.#settings.effectiveTimezone()
     const dayOf = dayKeysIn(timezone)
