@@ -10,15 +10,12 @@ const PASSWORD_FAILURE_COPY = {
   invalid_credentials: 'That password isn’t right. Passwords are case-sensitive.',
 } satisfies Partial<Record<ApiErrorCode, string>>
 
-/** `copy` says a form's own words for any code, ahead of the shared ones. */
-export function describeFailure(cause: unknown, copy: Partial<Record<ApiErrorCode, string>> = {}): string {
+export function describeFailure(cause: unknown): string {
   if (!(cause instanceof ApiError)) return 'The reader is unavailable. Try again in a moment.'
   if (cause.code === 'too_many_attempts') {
     return `Too many attempts. Try again in ${describeWait(cause.retryAfterSeconds)}.`
   }
 
-  const own = hasOwn(copy, cause.code) ? copy[cause.code] : undefined
-  if (own) return own
   return hasOwn(PASSWORD_FAILURE_COPY, cause.code) ? PASSWORD_FAILURE_COPY[cause.code] : 'That didn’t work. Try again.'
 }
 

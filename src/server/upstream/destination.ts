@@ -21,8 +21,6 @@ export type DestinationFailureCode = 'invalid_url' | 'blocked_destination' | 'un
 export interface AllowedDestination {
   readonly ok: true
   readonly url: URL
-  /** The name asked of the resolver, without a trailing dot or brackets. */
-  readonly hostname: string
   /**
    * Every address the name answered with. Each one is public, or in
    * 198.18.0.0/15 when the dev opt-in is on. The socket may connect only to
@@ -90,7 +88,7 @@ export async function validateDestination(
   const literal = classifyAddress(hostname)
   if (literal !== 'invalid') {
     return allowsAddress(hostname, literal, policy)
-      ? { ok: true, url, hostname, addresses: [hostname] }
+      ? { ok: true, url, addresses: [hostname] }
       : { ok: false, code: 'blocked_destination', reason: `${literal} address` }
   }
 
@@ -115,7 +113,7 @@ export async function validateDestination(
     }
   }
 
-  return { ok: true, url, hostname, addresses }
+  return { ok: true, url, addresses }
 }
 
 function allowsAddress(address: string, classification: AddressClass, policy: DestinationPolicy): boolean {
