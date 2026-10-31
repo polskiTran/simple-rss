@@ -13,8 +13,10 @@ export function storedAppearance(): Appearance {
   }
 }
 
+/** A choice crossfades where the browser can; `applyAppearance` stays instant for boot. */
 export function chooseAppearance(appearance: Appearance): void {
-  applyAppearance(appearance)
+  if ('startViewTransition' in document) document.startViewTransition(() => applyAppearance(appearance))
+  else applyAppearance(appearance)
   try {
     if (appearance === 'system') localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, appearance)

@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyAppearance, chooseAppearance, storedAppearance } from '../../src/client/appearance.js'
 
 afterEach(() => {
   localStorage.clear()
   delete document.documentElement.dataset.appearance
+  Reflect.deleteProperty(document, 'startViewTransition')
 })
 
 describe('per-device appearance', () => {
@@ -18,6 +19,16 @@ describe('per-device appearance', () => {
 
     expect(document.documentElement.dataset.appearance).toBe('dark')
     expect(storedAppearance()).toBe('dark')
+  })
+
+  it('hands the change to a view transition where the browser has one', () => {
+    const startViewTransition = vi.fn((update: () => void) => update())
+    Object.assign(document, { startViewTransition })
+
+    chooseAppearance('dark')
+
+    expect(startViewTransition).toHaveBeenCalledOnce()
+    expect(document.documentElement.dataset.appearance).toBe('dark')
   })
 
   it('returns to system by forgetting the choice rather than storing a third state', () => {

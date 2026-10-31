@@ -2945,6 +2945,13 @@
   }
 }
 
+/* The change of Appearance, the one crossfade across the whole screen. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
+}
+
 /* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
    place instead of rising, and the waiting tile holds still. */
 @media (prefers-reduced-motion: reduce) {

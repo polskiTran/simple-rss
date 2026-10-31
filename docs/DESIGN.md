@@ -439,6 +439,9 @@ fades in.
 Stepping to another day keeps the one on show until the next answers, so the
 screen changes once rather than emptying first.
 
+A change of Appearance crossfades the screen over 200ms, the one press that is
+not answered in the same frame.
+
 A dialog is the one thing with an exit (see Dialog). Under
 `prefers-reduced-motion` there is less motion, not none: fades stay, nothing
 moves — the sheet fades in place instead of rising, and the waiting tile holds
