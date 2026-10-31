@@ -20,7 +20,10 @@ const SETTLE_MS = 250
 /**
  * The header's search field. A phone shows it only once its search square is
  * pressed or a search is under way; `data-open` says so, and the close square
- * clears the words and leaves.
+ * clears the words and leaves. Keyed by the screen its search belongs to, so
+ * moving to another screen shuts it, words or none. Words taken away from
+ * outside it, as by going back from the results, shut it too, even when that
+ * lands on the screen the search began from; clearing them here keeps it open.
  */
 export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps) {
   const input = useRef<HTMLInputElement>(null)
@@ -31,6 +34,7 @@ export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps)
   if (query !== settled) {
     setSettled(query)
     setDraft(query)
+    if (query === '' && draft.trim() !== '') setOpened(false)
   }
 
   const commit = useEffectEvent(onQueryChange)

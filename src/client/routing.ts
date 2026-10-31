@@ -141,6 +141,15 @@ export function originOf(location: ScreenLocation, feedTitle = 'Feed'): Origin {
   }
 }
 
+/**
+ * The address a search on `location` clears back to. Typing a search in and
+ * clearing it out keep this address; any other move changes it.
+ */
+export function searchHomeOf(location: ScreenLocation): string {
+  if (location.screen !== 'search') return originOf(location).path
+  return location.origin?.path ?? sectionPath('digest')
+}
+
 /** The tab a location reads under. The Reader takes the section it was opened from, and a search its scope's own. */
 export function sectionOf(location: ScreenLocation): Route {
   switch (location.screen) {
@@ -312,7 +321,7 @@ export function useNavigation(): Navigation {
         return
       }
       if (query.trim() === '') {
-        go(location.origin?.path ?? sectionPath('digest'), location.origin?.from)
+        go(searchHomeOf(location), location.origin?.from)
         return
       }
       // Refining a search rewrites its entry rather than stacking one per pause.

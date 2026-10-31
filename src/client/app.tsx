@@ -8,7 +8,7 @@ import { GlobalSearch } from './components/global-search.js'
 import { LoadingNote } from './components/loading-note.js'
 import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
-import { locationAt, originOf, scopeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
+import { locationAt, originOf, scopeOf, searchHomeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
 import { DigestView } from './views/digest-view.js'
 import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
@@ -38,6 +38,7 @@ export function App() {
           <>
             <SectionNav active={sectionOf(location)} onNavigate={navigation.navigate}>
               <GlobalSearch
+                key={searchHomeOf(location)}
                 query={location.screen === 'search' ? location.query : ''}
                 scope={scopeOf(location)}
                 onQueryChange={navigation.updateSearch}
