@@ -26,6 +26,14 @@
   --font-read: 'Literata Variable', Georgia, serif;
   --font-ui: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
 
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --duration-enter: 150ms;
+  --duration-exit: 120ms;
+  --duration-sheet-enter: 240ms;
+  --duration-sheet-exit: 180ms;
+
   --color-ground: light-dark(oklch(100% 0 0), oklch(18.2% 0 0));
   --color-ink: light-dark(oklch(17.8% 0 0), oklch(94.6% 0 0));
   --color-ink-2: light-dark(oklch(52.5% 0 0), oklch(68.6% 0 0));
@@ -186,7 +194,7 @@
      before each action, so every answer leaves `display: none` and fades
      afresh. Nothing here nests inside another, so no fade compounds. */
   :is(.add-feed-found, .undo-line, :is(.feed-notices, .feeds-notices) > .note) {
-    transition: opacity 150ms ease-out;
+    transition: opacity var(--duration-enter) var(--ease-out);
   }
 
   @starting-style {
@@ -645,7 +653,7 @@
     position: fixed;
     inset: 0;
     background: var(--color-scrim);
-    transition: opacity 150ms ease-out;
+    transition: opacity var(--duration-enter) var(--ease-out);
   }
 
   /* The page keeps a scrollbar gutter the fixed scrim cannot reach, and the
@@ -658,12 +666,12 @@
       color-mix(in srgb, var(--color-ink) 24%, var(--color-ground)),
       color-mix(in srgb, black 50%, var(--color-ground))
     );
-    transition: background-color 150ms ease-out;
+    transition: background-color var(--duration-enter) var(--ease-out);
   }
 
   html:has(.dialog-backdrop[data-ending-style]) {
     background: var(--color-ground);
-    transition-duration: 120ms;
+    transition-duration: var(--duration-exit);
   }
 
   .dialog-viewport {
@@ -691,7 +699,7 @@
       0 0 0 1px var(--color-edge),
       0 32px 64px -24px oklch(0% 0 0 / 0.28);
     outline: none;
-    transition: opacity 150ms ease-out;
+    transition: opacity var(--duration-enter) var(--ease-out);
 
     /* On a phone, a sheet that rises from the bottom edge under the fading scrim,
        and sinks back into it. The sheet stays opaque; only the scrim fades. It
@@ -700,7 +708,7 @@
       margin-top: auto;
       padding: 20px;
       box-shadow: none;
-      transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+      transition: transform var(--duration-sheet-enter) var(--ease-drawer);
     }
   }
 
@@ -718,12 +726,12 @@
 
   .dialog-backdrop[data-ending-style],
   .dialog[data-ending-style] {
-    transition-duration: 120ms;
+    transition-duration: var(--duration-exit);
   }
 
   .dialog[data-ending-style] {
     @media (max-width: 1024px) {
-      transition-duration: 180ms;
+      transition-duration: var(--duration-sheet-exit);
     }
   }
 
@@ -1189,7 +1197,7 @@
     font-size: 14px;
     color: var(--color-ink-2);
     /* A wait shorter than 400ms shows nothing; a longer one fades the line in. */
-    animation: note-arrive 150ms ease-out 400ms both;
+    animation: note-arrive var(--duration-enter) var(--ease-out) 400ms both;
   }
 
   @keyframes note-arrive {
@@ -1803,7 +1811,7 @@
   .reader-fallback,
   .article-body {
     margin-top: 48px;
-    transition: opacity 150ms ease-out;
+    transition: opacity var(--duration-enter) var(--ease-out);
   }
 
   @starting-style {
@@ -2925,7 +2933,7 @@
    place instead of rising, and the waiting tile holds still. */
 @media (prefers-reduced-motion: reduce) {
   .dialog {
-    transition: opacity 150ms ease-out;
+    transition: opacity var(--duration-enter) var(--ease-out);
   }
 
   .dialog:is([data-starting-style], [data-ending-style]) {
@@ -2934,7 +2942,7 @@
   }
 
   .dialog[data-ending-style] {
-    transition-duration: 120ms;
+    transition-duration: var(--duration-exit);
   }
 
   .wordmark-cell {
