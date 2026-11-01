@@ -145,9 +145,14 @@ test.describe('Reader View', () => {
 
     const codeLines = page.locator('.article-body pre code > span')
     await expect(codeLines).toHaveCount(4)
-    const firstLine = await codeLines.first().boundingBox()
-    const lastLine = await codeLines.last().boundingBox()
-    expect(lastLine?.y ?? 0).toBeGreaterThan(firstLine?.y ?? 0)
+    // One read per attempt: highlighting replaces the block's lines, so two reads can straddle it.
+    await expect
+      .poll(() =>
+        codeLines.evaluateAll(
+          (lines) => (lines.at(-1)?.getBoundingClientRect().y ?? 0) - (lines[0]?.getBoundingClientRect().y ?? 0),
+        ),
+      )
+      .toBeGreaterThan(0)
     await expect(page.locator('.article-body pre code span[style*="--shiki-dark"]').first()).toBeVisible()
 
     await expect(page.locator('.article-body .katex')).toHaveCount(2)
