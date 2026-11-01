@@ -207,6 +207,55 @@ test.describe('the global search line', () => {
     await expect(page.getByRole('searchbox', { name: 'Search this feed' })).toHaveValue('')
   })
 
+  test('gives a matching Feed its name’s width beside the narrowing column and on a small phone', async ({
+    page,
+    installation,
+  }) => {
+    const feed = (feedId: number, title: string) => ({
+      feedId,
+      title,
+      domain: 'publisher.example',
+      homePageUrl: null,
+      cadence: Array.from({ length: 30 }, () => 0),
+    })
+    const result = (feedItemId: number, feedId: number, feedTitle: string) => ({
+      feedItemId,
+      title: `Item ${feedItemId}`,
+      feedId,
+      feedTitle,
+      publishedAt: null,
+      firstSeenAt: '2026-10-21T13:36:00Z',
+      date: '2026-10-21',
+      displayTime: null,
+      saved: false,
+      snippet: null,
+    })
+    await page.route('**/api/search?*', (route) =>
+      route.fulfill({
+        json: {
+          scope: 'everywhere',
+          today: '2026-10-22',
+          subscriptions: [feed(1, 'ChinAI Newsletter'), feed(2, 'Stanford Encyclopedia of Philosophy')],
+          results: [result(1, 1, 'ChinAI Newsletter'), result(2, 2, 'Stanford Encyclopedia of Philosophy')],
+        },
+      }),
+    )
+    await openDigest(page, installation)
+
+    await page.getByRole('searchbox', { name: 'Search your reading' }).fill('newsletter')
+    await expect(page.getByRole('heading', { name: 'Narrow by feed' })).toBeVisible()
+    const jumpTo = page.getByRole('navigation', { name: 'matching subscriptions' })
+    const rows = jumpTo.getByRole('article')
+    await expect(rows).toHaveCount(2)
+    const list = await jumpTo.boundingBox()
+    for (const row of await rows.all()) expect((await row.boundingBox())?.width).toBe(list?.width)
+
+    await page.setViewportSize({ width: 320, height: 640 })
+    const row = await rows.first().boundingBox()
+    const name = await rows.first().getByRole('heading').boundingBox()
+    expect(name?.width).toBe((row?.width ?? 0) - 34)
+  })
+
   test('matches a Feed title and says plainly when nothing matches', async ({ page, installation }) => {
     await openDigest(page, installation)
 

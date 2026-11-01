@@ -1275,13 +1275,13 @@
     }
   }
 
+  /* Two columns only where each row can hold a name beside a whole strip. */
   .feed-rows {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
     gap: 8px;
 
     @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr);
       gap: 12px;
     }
   }
@@ -1292,25 +1292,32 @@
 
   .feed-row {
     display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-content: start;
-    gap: 4px;
-    padding: 16px;
+    gap: 4px 32px;
+    padding: 16px 24px;
     border: 1px solid var(--color-edge);
-  }
 
-  .feed-row-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-  }
+    /* A phone gives the name its own line and the strip the rest of the
+       host's, or a line of its own under a host too long to share. */
+    @media (max-width: 1024px) {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      column-gap: 16px;
+      padding: 16px;
+    }
 
-  .feed-row-head .cadence-strip {
-    flex: none;
-    margin-top: 7px;
+    & > .cadence-strip {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
   }
 
   .feed-row-name {
+    flex-basis: 100%;
     margin: 0;
     font: 400 19px / 1.2 var(--font-read);
     overflow-wrap: anywhere;
@@ -1326,9 +1333,7 @@
 
   .feed-host {
     justify-self: start;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
+    display: inline-block;
     max-width: 100%;
     font-size: 14px;
     line-height: 20px;
@@ -1347,12 +1352,18 @@
     }
   }
 
+  /* Inline, so a host that wraps keeps its mark at the end of its last line. */
   .feed-host .icon {
+    display: inline-block;
     width: 14px;
     height: 14px;
+    margin-inline-start: 2px;
+    vertical-align: -2px;
   }
 
   .feed-row-note {
+    grid-column: 1 / -1;
+    flex-basis: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;

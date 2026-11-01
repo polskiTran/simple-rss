@@ -241,12 +241,15 @@ width at rest. Where nothing hovers the word stays at the end of the meta line,
 except in the Digest, which saves from the Reader alone. The Reader's toolbar
 keeps its button, with the bookmark in `saved` once saved.
 
-**Feed row.** A thin-edged box with 16px padding: Feed name in Literata 19 with
-a Cadence strip on the right, and under it the Feed Home Page host in `away`,
-marked ↗ and underlined on hover — meta text when the Feed names no site. The
-host looks the same wherever a Feed is named; it opens a new tab, and its
-accessible name says so. Rows
-are two columns on desktop with 8px between them, one on a phone with 12px.
+**Feed row.** A thin-edged box with the item box's 24px side padding and 16px
+above and below: Feed name in Literata 19, under it the Feed Home Page host in
+`away`, marked ↗ and underlined on hover — meta text when the Feed names no
+site — and the Cadence strip centred on the right of both. The host looks the
+same wherever a Feed is named; it opens a new tab, and its accessible name says
+so. On a phone the box has 16px padding, the name takes the whole line and the
+strip shares the host's line, or drops under a host too long to share it. Rows
+are 8px apart in two columns wherever each gets 520px, and one column
+otherwise, so a strip never squeezes a name; on a phone they are 12px apart.
 
 **Label and value rows.** Label left in `ink-2`, value right in ink, 40px
 minimum height, `rule-soft` between. Used for a Feed's Info and Settings panels
@@ -380,7 +383,8 @@ and, for a save that outlived its Subscription, No longer subscribed.
 the Feed's name when scoped to one. A search begun in a scope (a Feed, Saved,
 Feeds) shows a switch of that scope and Everywhere, moving both ways; Best
 match and Newest sit at the other end wherever items answer. Matching
-Subscriptions lead as Feed rows, a lone one spanning the list; items follow
+Subscriptions lead as Feed rows, a lone one spanning the list, so beside Narrow
+by feed they stack in one column with their strips aligned; items follow
 with the query's words marked in `match`. Beside them, Narrow by feed lists the
 Feeds the results came from, with counts, and narrows the list to those ticked —
 a checkbox list on desktop, a row of chips on a phone.
