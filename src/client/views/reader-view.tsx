@@ -163,13 +163,7 @@ function OpenReader({
         <div className="toolbar-group">
           {item.link ? <OpenOriginal link={item.link} /> : null}
           {item.discussionUrl ? <DiscussionLink url={item.discussionUrl} /> : null}
-          <SaveToggle
-            feedItemId={item.feedItemId}
-            title={item.title}
-            saved={item.saved}
-            look="labelled"
-            onSaved={onSaved}
-          />
+          <SaveToggle feedItemId={item.feedItemId} title={item.title} saved={item.saved} labelled onSaved={onSaved} />
         </div>
       </ChromeToolbar>
 

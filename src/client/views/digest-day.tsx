@@ -138,14 +138,13 @@ function FeedDayBox({
             <h3 className="feed-day-title">
               <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpenItem(item.feedItemId)}>
                 {item.saved ? <span className="visually-hidden">Saved: </span> : null}
-                <span className="feed-day-text">{item.title}</span>
+                <span className="item-text">{item.title}</span>
               </RoutedLink>
             </h3>
             <SaveToggle
               feedItemId={item.feedItemId}
               title={item.title}
               saved={item.saved}
-              look="word"
               onSaved={(saved) => onSaved(item.feedItemId, saved)}
             />
           </li>

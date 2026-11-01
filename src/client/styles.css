@@ -63,12 +63,10 @@
   --color-ramp-4: light-dark(oklch(51.4% 0.197 270.9), oklch(73.5% 0.132 95.2));
   --color-ramp-5: light-dark(oklch(43.3% 0.24 267.6), oklch(85.8% 0.158 94.4));
   --color-saved: var(--color-ramp-5);
-  --color-saved-edge: var(--color-ramp-3);
-  --color-saved-tint: var(--color-match);
-  --color-quiet: light-dark(oklch(92% 0.1 97), oklch(38% 0.075 275));
+  --color-saved-tint: light-dark(oklch(91.4% 0.032 277.9), oklch(37.5% 0.063 97.7));
   --color-away: var(--color-ramp-5);
   --color-feed-name: var(--color-ramp-4);
-  --color-match: light-dark(oklch(91.4% 0.032 277.9), oklch(37.5% 0.063 97.7));
+  --color-match: light-dark(oklch(92% 0.1 97), oklch(38% 0.075 275));
 
   /* The Markdown renderer's tokens, under the names its classes ask for. */
   --color-background: var(--color-ground);
@@ -942,17 +940,17 @@
     position: relative;
     --item-meta: 180px;
     display: grid;
-    grid-template-columns: var(--item-meta) minmax(0, 1fr) var(--control);
+    grid-template-columns: var(--item-meta) minmax(0, 1fr);
     align-items: baseline;
     column-gap: 32px;
-    padding: 20px 20px 20px 24px;
+    padding: 20px 24px;
     border: 1px solid var(--color-edge);
     background: var(--color-ground);
 
     @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr) var(--control);
+      grid-template-columns: minmax(0, 1fr) auto;
       column-gap: 8px;
-      padding: 16px 12px 18px 16px;
+      padding: 16px 16px 18px;
     }
   }
 
@@ -963,27 +961,6 @@
 
   @media (hover: hover) {
     .item:hover {
-      border-color: var(--color-edge-hover);
-    }
-  }
-
-  .item[data-saved] {
-    border-color: var(--color-saved-edge);
-  }
-
-  @media (hover: hover) {
-    .item[data-saved]:hover {
-      border-color: var(--color-ramp-4);
-    }
-  }
-
-  /* On Saved every item is saved, so the saved edge would say nothing. */
-  .library-list .item[data-saved] {
-    border-color: var(--color-edge);
-  }
-
-  @media (hover: hover) {
-    .library-list .item[data-saved]:hover {
       border-color: var(--color-edge-hover);
     }
   }
@@ -1056,7 +1033,7 @@
     min-width: 0;
 
     @media (max-width: 1024px) {
-      grid-column: 1;
+      grid-column: 1 / -1;
     }
   }
 
@@ -1068,7 +1045,8 @@
   }
 
   .item-title {
-    margin: 0;
+    margin: 0 -0.2em;
+    padding-inline: 0.2em;
     font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
@@ -1087,7 +1065,7 @@
   }
 
   /* The title's link opens the Reader from anywhere in the box; the Feed
-     name and the save square sit above it and keep their own jobs. */
+     name and Save sit above it and keep their own jobs. */
   .item-title a::after {
     content: '';
     position: absolute;
@@ -1112,59 +1090,6 @@
   .match {
     background: var(--color-match);
     color: var(--color-ink);
-  }
-
-  .save-toggle {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: var(--control);
-    height: var(--control);
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--color-ink-2);
-    cursor: pointer;
-    opacity: 0;
-
-    @media (max-width: 1024px) {
-      grid-column: 2;
-      grid-row: 1 / span 3;
-      align-self: start;
-      opacity: 1;
-    }
-  }
-
-  @media (hover: hover) {
-    .save-toggle:hover {
-      background: var(--color-control);
-      color: var(--color-ink);
-    }
-  }
-
-  .save-toggle[data-pressed] {
-    color: var(--color-saved);
-  }
-
-  .item:focus-within > .save-toggle,
-  .save-toggle[data-pressed] {
-    opacity: 1;
-  }
-
-  @media (hover: hover) {
-    .item:hover > .save-toggle {
-      opacity: 1;
-    }
-  }
-
-  @media (hover: none) {
-    .save-toggle {
-      opacity: 1;
-    }
   }
 
   .undo-line {
@@ -1807,28 +1732,13 @@
   }
 
   /* The Reader's Save is a grey button, not an item box's square. */
-  .save-toggle.save-toggle-labelled {
-    width: auto;
-    margin: 0;
-    padding: 0 14px;
-    background: var(--color-control);
-    color: var(--color-ink);
-    opacity: 1;
-  }
-
-  @media (hover: hover) {
-    .save-toggle.save-toggle-labelled:hover {
-      background: var(--color-control-hover);
-    }
-  }
-
   .save-toggle-labelled[data-pressed] .icon {
     color: var(--color-saved);
   }
 
   .reader-original,
   .reader-discussion,
-  .save-toggle.save-toggle-labelled {
+  .save-toggle-labelled {
     @media (max-width: 1024px) {
       width: var(--control);
       padding: 0;
@@ -2326,7 +2236,7 @@
   .quiet-spell {
     margin-block: -2px;
     padding: 2px 6px;
-    background: var(--color-quiet);
+    background: var(--color-match);
     color: var(--color-ink);
     font-weight: 500;
     white-space: nowrap;
@@ -2466,10 +2376,12 @@
     }
   }
 
-  /* One sweep across the title's lines, first to last, reversing from wherever
+  /* A saved title's highlight, reading the toggle's own state so it answers on
+     the press. One sweep across the lines, first to last, reversing from wherever
      it has reached. Its height stays within a line, so a line the clamp hides
-     leaves no sliver under the last it shows. */
-  .feed-day-text {
+     leaves no sliver under the last it shows. On Saved every title is saved, so
+     it would say nothing. */
+  .item-text {
     margin-inline: -0.2em;
     padding-inline: 0.2em;
     background-image: linear-gradient(var(--color-saved-tint), var(--color-saved-tint));
@@ -2479,7 +2391,7 @@
     transition: background-size var(--duration-highlight) var(--ease-out);
   }
 
-  .feed-day-item:has(.save-word[data-pressed]) .feed-day-text {
+  :is(.feed-day-item, :not(.library-list) > .item):has(> .save-word[data-pressed]) .item-text {
     background-size: 100% 1.3em;
   }
 
@@ -2508,14 +2420,13 @@
     outline-offset: 2px;
   }
 
-  /* Saving floats over the end of its line on hover or focus, fading what is
-     under it, so it costs a title no width at rest. The phone Digest saves
-     from the Reader alone. */
+  /* Saving floats over the end of a title's first line on hover or keyboard
+     focus, fading what is under it, so it costs a title no width at rest. Where
+     nothing hovers, a list holds it in the open at the end of the meta line, and
+     the Digest saves from the Reader alone. */
   .save-word {
     position: absolute;
     z-index: 1;
-    inset-block-start: 0;
-    inset-inline-end: 0;
     height: 26.6px;
     padding: 0 0 0 48px;
     border: 0;
@@ -2526,33 +2437,51 @@
     cursor: pointer;
     opacity: 0;
 
-    @media (max-width: 1024px) {
-      display: none;
-    }
-
     &:active {
       color: var(--color-ink-2);
     }
   }
 
-  .feed-day-item:focus-within > .save-word {
+  /* Keyboard focus only: a click leaves focus on the word, which would hold it
+     in view after the pointer has gone. */
+  :is(.feed-day-item, .item):has(:focus-visible) > .save-word {
     opacity: 1;
   }
 
   @media (hover: hover) {
-    .feed-day-item:hover > .save-word {
+    :is(.feed-day-item, .item):hover > .save-word {
       opacity: 1;
     }
   }
 
-  /* A save square centres on its title's first line, a 26.6px line of a
-     19px title, overhanging it rather than spacing the titles apart. */
-  .item > .save-toggle {
-    align-self: start;
-    margin-block: calc((26.6px - var(--control)) / 2);
+  .feed-day-item > .save-word {
+    inset-block-start: 0;
+    inset-inline-end: 0;
 
-    @media (max-width: 1024px) {
-      margin-block: -10px 0;
+    @media (max-width: 1024px), (hover: none) {
+      display: none;
+    }
+  }
+
+  .item > .save-word {
+    inset-block-start: 20px;
+    inset-inline-end: 24px;
+
+    @media (max-width: 1024px), (hover: none) {
+      position: static;
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+      height: auto;
+      margin-block: -14px;
+      padding: 14px 0 14px 12px;
+      background: none;
+      color: var(--color-ink-2);
+      opacity: 1;
+    }
+
+    &[data-pressed] {
+      color: var(--color-ink);
     }
   }
 
@@ -3187,7 +3116,7 @@
 /* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
    place instead of rising, and the waiting tile and the mark hold still. */
 @media (prefers-reduced-motion: reduce) {
-  .feed-day-text {
+  .item-text {
     transition: none;
   }
 

@@ -131,9 +131,8 @@ test.describe('the global search line', () => {
 
     const field = page.getByRole('searchbox', { name: 'Search your reading' })
     await field.fill('clear morning')
-    const save = page.getByRole('button', { name: 'Save First light' })
-    await save.click()
-    await expect(save).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Save First light' }).click()
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
 
     await page.goBack()
     await expect(page).toHaveURL(`${installation.url}/settings`)

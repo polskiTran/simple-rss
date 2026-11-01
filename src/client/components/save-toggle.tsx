@@ -4,18 +4,12 @@ import { saveToLibrary, unsaveFromLibrary } from '../api.js'
 import { Icon } from './icon.js'
 import { ReportSaveFailure } from './save-failure.js'
 
-const LOOKS = {
-  square: 'save-toggle',
-  labelled: 'button save-toggle save-toggle-labelled',
-  word: 'save-word',
-} as const
-
 interface SaveToggleProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
-  /** A list's square; the Reader's toolbar spells the state out beside the icon; the Digest has only the word. */
-  readonly look?: keyof typeof LOOKS
+  /** The Reader's toolbar sets the word beside an icon, in a button; a list has only the word. */
+  readonly labelled?: boolean
   onSaved(saved: boolean): void
 }
 
@@ -23,10 +17,9 @@ interface SaveToggleProps {
  * Library membership, pressed while saved. A press shows at once; a failed toggle goes
  * back to the state as it was and says so through the App's line, since rows and
  * toolbars have no room for a sentence.
- * The name starts with the word on screen, Save or Saved, and the icon-only square
- * keeps a steady Save, leaving the state to `aria-pressed`.
+ * The name starts with the word on screen, Save or Saved.
  */
-export function SaveToggle({ feedItemId, title, saved, look = 'square', onSaved }: SaveToggleProps) {
+export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
   const [pending, startToggle] = useTransition()
   const [shown, show] = useOptimistic(saved)
   const report = use(ReportSaveFailure)
@@ -48,14 +41,19 @@ export function SaveToggle({ feedItemId, title, saved, look = 'square', onSaved 
   const word = shown ? 'Saved' : 'Save'
   return (
     <Toggle
-      className={LOOKS[look]}
+      className={labelled ? 'button save-toggle-labelled' : 'save-word'}
       pressed={shown}
-      aria-label={`${look !== 'square' && shown ? 'Saved' : 'Save'} ${title}`}
+      aria-label={`${word} ${title}`}
       onPressedChange={toggle}
     >
-      {look === 'word' ? null : <Icon name="bookmark" filled={shown} />}
-      {look === 'word' ? word : null}
-      {look === 'labelled' ? <span className="wide-only">{word}</span> : null}
+      {labelled ? (
+        <>
+          <Icon name="bookmark" filled={shown} />
+          <span className="wide-only">{word}</span>
+        </>
+      ) : (
+        word
+      )}
     </Toggle>
   )
 }

@@ -42,7 +42,7 @@ export function ItemBox({
 }: ItemBoxProps) {
   const openFeed = feed?.onOpen
   return (
-    <article className="item" data-saved={saved ? '' : undefined}>
+    <article className="item">
       <div className="item-meta">
         {feed === undefined ? null : openFeed ? (
           <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => openFeed(feed.feedId)}>
@@ -62,7 +62,7 @@ export function ItemBox({
       <div className="item-body">
         <h3 className="item-title">
           <RoutedLink href={readerPath(feedItemId)} onNavigate={() => onOpen(feedItemId)}>
-            {titleContent ?? title}
+            <span className="item-text">{titleContent ?? title}</span>
           </RoutedLink>
         </h3>
         {snippet ? <p className="item-snippet">{snippet}</p> : null}

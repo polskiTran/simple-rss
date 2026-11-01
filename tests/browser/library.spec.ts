@@ -24,6 +24,14 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
 
+/** Whether a title's highlight has any width. */
+function highlighted(page: Page, title: string): Promise<boolean> {
+  return page
+    .getByText(title, { exact: true })
+    .first()
+    .evaluate((text) => Number.parseFloat(getComputedStyle(text).backgroundSize) > 0)
+}
+
 test.describe('the Library', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -39,23 +47,53 @@ test.describe('the Library', () => {
     await section(page, 'Saved')
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
     await expect(page.locator('.item-meta')).toContainText('Field Notes')
-    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(() => highlighted(page, 'First light')).toBe(false)
 
     await page.reload()
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
 
     await section(page, 'Feeds')
     await page.getByRole('link', { name: 'Field Notes', exact: true }).click()
-    const feedToggle = page.getByRole('button', { name: 'Save First light' })
+    const feedToggle = page.getByRole('button', { name: 'Saved First light' })
     await expect(feedToggle).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(() => highlighted(page, 'First light')).toBe(true)
     await feedToggle.click()
-    await expect(feedToggle).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
 
     await section(page, 'Digest')
     await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
     await section(page, 'Saved')
     await expect(page.getByText(/Nothing saved yet/)).toBeVisible()
+  })
+
+  test('lets Save go once the pointer leaves a clicked row, and shows it for the keyboard', async ({
+    page,
+    installation,
+  }) => {
+    await subscribe(page, installation)
+    await section(page, 'Digest')
+
+    const word = page.getByRole('button', { name: /^Saved? First light$/ })
+    await page.getByRole('heading', { name: 'First light' }).hover()
+    await word.click()
+    await expect(word).toHaveAttribute('aria-pressed', 'true')
+    await page.mouse.move(0, 0)
+    await expect(word).toHaveCSS('opacity', '0')
+
+    await page.keyboard.press('Shift+Tab')
+    await page.keyboard.press('Tab')
+    await expect(word).toBeFocused()
+    await expect(word).toHaveCSS('opacity', '1')
+
+    await section(page, 'Feeds')
+    await page.getByRole('link', { name: 'Field Notes', exact: true }).click()
+    await page.getByRole('heading', { name: 'First light' }).hover()
+    await word.click()
+    await expect(word).toHaveAttribute('aria-pressed', 'false')
+    await page.mouse.move(0, 0)
+    await expect(word).toHaveCSS('opacity', '0')
   })
 
   test('unsaving in Saved leaves an undo line, and Undo keeps the save', async ({ page, installation }) => {
@@ -64,10 +102,10 @@ test.describe('the Library', () => {
     await page.getByRole('button', { name: 'Save First light' }).click()
     await section(page, 'Saved')
 
-    await page.getByRole('button', { name: 'Save First light' }).click()
+    await page.getByRole('button', { name: 'Saved First light' }).click()
     await expect(page.getByText('“First light” is no longer saved.')).toBeVisible()
     await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
 
     await page.reload()
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()

@@ -39,7 +39,7 @@ describe('the search line in the chrome', () => {
     expect(results.textContent).toContain('Field Notes')
     expect(results.textContent).toContain('Today, 07:15')
     expect(results.textContent).toContain('3 June')
-    expect(screen.getByRole('button', { name: 'Save Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Saved Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.queryByRole('heading', { name: TODAY_HEADING })).toBeNull()
 
     await user.clear(field)

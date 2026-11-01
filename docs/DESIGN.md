@@ -12,7 +12,8 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
    appears only in data — Cadence, saved state, search matches and a Feed's
    return — on a Feed's host, the one link that leaves for the publisher, and
    on the Feed name an item box links to. It is blue in light mode and yellow
-   in dark; a Feed's return swaps them, so it never reads as saved.
+   in dark; search matches and a Feed's return swap them, so neither reads as
+   saved.
 2. **One shape means you can press it.** Every control is a hard-edged block of
    the same height. Grey fill is an ordinary action, ink fill is the single
    primary action on a screen. Counts and status are plain grey text with no
@@ -74,12 +75,11 @@ selected segment, the current section and a pressed chip take the system's
 | `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
 | `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
 | `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.2% 0.11 277.5)` · `oklch(57% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
-| `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
+| `saved` | `ramp-5` | the saved icon in the Reader |
 | `away` | `ramp-5` | a Feed's host, wherever it is shown |
 | `feed-name` | `ramp-4` | the Feed name an item box links to |
-| `saved-tint` | `match` | the highlight on a saved title in the Digest |
-| `quiet` | `oklch(92% 0.1 97)` | the tag on a Feed back from a Quiet Spell |
-| `match` | `oklch(91.4% 0.032 277.9)` | search highlight and selected text, under `ink` |
+| `saved-tint` | `oklch(91.4% 0.032 277.9)` | the highlight on a saved title |
+| `match` | `oklch(92% 0.1 97)` | search matches, selected text and the tag on a Feed back from a Quiet Spell, under `ink` |
 | `scrim` | ink at `.24` | behind a dialog |
 
 ### Dark
@@ -99,11 +99,11 @@ selected segment, the current section and a pressed chip take the system's
 | reader body | `oklch(88.8% 0 0)` |
 | `danger` | `oklch(73.2% 0.164 27.1)` |
 | `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(49% 0.08 97)` · `oklch(61.3% 0.106 96.1)` · `oklch(73.5% 0.132 95.2)` · `oklch(85.8% 0.158 94.4)` |
-| `saved` / `saved-edge` | `ramp-5` / `ramp-3` |
-| `quiet` | `oklch(38% 0.075 275)` |
+| `saved` | `ramp-5` |
+| `saved-tint` | `oklch(37.5% 0.063 97.7)` |
 | `away` | `ramp-5` |
 | `feed-name` | `ramp-4` |
-| `match` | `oklch(37.5% 0.063 97.7)` |
+| `match` | `oklch(38% 0.075 275)` |
 
 Appearance follows the system unless the User picks Light or Dark in Settings;
 the choice is per device.
@@ -224,19 +224,22 @@ a 1px danger ring, and the reason under it in danger.
 
 **Item box.** A thin-edged box with 20px vertical padding. Desktop is a grid:
 a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
-the title, then a 36px save square; in a Feed's own list, which names no Feed,
-the meta column narrows to 56px for the time. The meta column sits on the
-title's first baseline, and the save square centres on its first line, however
-many lines the title runs to. A title or snippet holds a measure of 32em —
-about 66 characters a line — so a box as wide as the page keeps its edges with
-the page's and its lines short enough to read. The save square shows on hover
-and focus; a saved item shows it always, filled in `saved`, and keeps a
-`saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
-every item is saved and the edge would say nothing. On a phone the Feed name
-and time share one line above the title and the save square is always visible
-at 44px. The whole box opens the Reader; the Feed name inside it opens the
-Feed. In search results a snippet sits under the title with the matched words
-marked in `match`.
+the title; in a Feed's own list, which names no Feed, the meta column narrows to
+56px for the time. The meta column sits on the title's first baseline. A title
+or snippet holds a measure of 32em — about 66 characters a line — so a box as
+wide as the page keeps its edges with the page's and its lines short enough to
+read. On a phone the Feed name and time share one line above the title. The whole
+box opens the Reader; the Feed name inside it opens the Feed. In search results a
+snippet sits under the title with the matched words marked in `match`.
+
+**Saving in a list.** A saved title is highlighted in `saved-tint`, sweeping
+across its lines over 420ms as it is saved and reversing from wherever it has
+reached — except on Saved and in a search of it, where every title is saved and
+the highlight would say nothing. On hover or keyboard focus, Save or Saved floats over
+the end of a title's first line, fading what is under it, so saving costs a title no
+width at rest. Where nothing hovers the word stays at the end of the meta line,
+except in the Digest, which saves from the Reader alone. The Reader's toolbar
+keeps its button, with the bookmark in `saved` once saved.
 
 **Feed row.** A thin-edged box with 16px padding: Feed name in Literata 19 with
 a Cadence strip on the right, and under it the Feed Home Page host in `away`,
@@ -311,11 +314,8 @@ less once pressed. Nothing moves when it does, and while unfolded the first line
 sticks to the top of the screen, fading the titles that pass under it, so the
 control is in reach however far down the list. A Feed back after a week or more
 without items says so beside its name, First in 12 days, as a tag filled in
-`quiet`; beside Show all it takes its own line under the name. A saved title is
-highlighted in `saved-tint`, sweeping across its lines over 420ms as it is saved
-and reversing from wherever it has reached. On hover or focus, Save or Saved
-floats over the end of a title's first line, fading what is under it, so saving
-costs a title no width at rest. The list starts today, or from a
+`match`; beside Show all it takes its own line under the name. Saved titles are
+marked as in any list. The list starts today, or from a
 day picked on the month — that day and everything before it — and then Back to
 today stands at its head, as Show more stands at its foot; the address keeps
 the day, so the way back from an article returns to it. Beside the list, a

@@ -27,7 +27,7 @@ describe('the Saved tab', () => {
     expect(screen.getByText('Saved 28 July')).toBeDefined()
 
     for (const title of ['First light', 'A June letter']) {
-      const toggle = screen.getByRole('button', { name: `Save ${title}` })
+      const toggle = screen.getByRole('button', { name: `Saved ${title}` })
       expect(toggle.getAttribute('aria-pressed')).toBe('true')
       expect(toggle.getAttribute('aria-pressed')).toBe('true')
     }
@@ -44,7 +44,7 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Save First light' }))
+    await user.click(await screen.findByRole('button', { name: 'Saved First light' }))
 
     expect(await screen.findByText('“First light” is no longer saved.')).toBeDefined()
     expect(screen.queryByRole('heading', { name: 'First light' })).toBeNull()
@@ -53,7 +53,7 @@ describe('the Saved tab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Undo' }))
 
-    const toggle = await screen.findByRole('button', { name: 'Save First light' })
+    const toggle = await screen.findByRole('button', { name: 'Saved First light' })
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(api.requestsTo('PUT /api/library/3')).toHaveLength(1)
   })
@@ -67,7 +67,7 @@ describe('the Saved tab', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Save First light' }))
+    await user.click(await screen.findByRole('button', { name: 'Saved First light' }))
     await user.click(await screen.findByRole('button', { name: 'Undo' }))
 
     expect(await screen.findByText('“First light” couldn’t be saved again. Try once more.')).toBeDefined()
