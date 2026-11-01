@@ -33,6 +33,7 @@
   --duration-exit: 120ms;
   --duration-sheet-enter: 240ms;
   --duration-sheet-exit: 180ms;
+  --duration-highlight: 420ms;
 
   --color-ground: light-dark(oklch(100% 0 0), oklch(18.2% 0 0));
   --color-ink: light-dark(oklch(17.8% 0 0), oklch(94.6% 0 0));
@@ -62,10 +63,10 @@
   --color-ramp-4: light-dark(oklch(51.4% 0.197 270.9), oklch(73.5% 0.132 95.2));
   --color-ramp-5: light-dark(oklch(43.3% 0.24 267.6), oklch(85.8% 0.158 94.4));
   --color-saved: var(--color-ramp-5);
-  --color-saved-edge: var(--color-ramp-3);
+  --color-saved-tint: light-dark(oklch(91.4% 0.032 277.9), oklch(37.5% 0.063 97.7));
   --color-away: var(--color-ramp-5);
   --color-feed-name: var(--color-ramp-4);
-  --color-match: light-dark(oklch(91.4% 0.032 277.9), oklch(37.5% 0.063 97.7));
+  --color-match: light-dark(oklch(92% 0.1 97), oklch(38% 0.075 275));
 
   /* The Markdown renderer's tokens, under the names its classes ask for. */
   --color-background: var(--color-ground);
@@ -232,17 +233,19 @@
     }
   }
 
+  /* Every screen's title, and each Digest day's. The -2px pulls the big
+     glyphs' side bearing back to the column edge. */
   .page-title {
-    margin: 0;
+    margin: 0 0 0 -2px;
     font-weight: 500;
-    font-size: 40px;
+    font-size: 48px;
     line-height: 1.08;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.025em;
     overflow-wrap: anywhere;
     text-wrap: balance;
 
     @media (max-width: 1024px) {
-      font-size: 32px;
+      font-size: 36px;
     }
   }
 
@@ -253,7 +256,8 @@
     column-gap: 0.3em;
   }
 
-  .page-title-companion {
+  .page-title-companion,
+  .day-count {
     font-weight: 400;
     color: var(--color-ink-3);
   }
@@ -822,6 +826,67 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .digest-day + .digest-day {
+    margin-top: 64px;
+
+    @media (max-width: 1024px) {
+      margin-top: 48px;
+    }
+  }
+
+  .digest-day .group-header {
+    margin-bottom: 24px;
+
+    @media (max-width: 1024px) {
+      margin-bottom: 20px;
+    }
+  }
+
+  /* The sections of a whole screen, a step under its title. */
+  .app:is([data-screen='feeds'], [data-screen='saved']) .group-heading {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  /* Keeps the first date clear of the phone's day picker, which sits on its row. */
+  .digest-day:first-child .page-title {
+    @media (max-width: 1024px) {
+      padding-right: calc(var(--control) + 12px);
+    }
+  }
+
+  /* The 2px cancels the title's. */
+  .day-distance {
+    display: block;
+    margin-bottom: 8px;
+    margin-left: 2px;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: var(--color-ink-2);
+
+    @media (max-width: 1024px) {
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+  }
+
+  /* The first day's distance rises into the page's top padding, so the date
+     holds the line every other screen's title sits on. A phone's padding has
+     no room for it. */
+  .digest-day:first-child .day-distance {
+    margin-top: calc(-1lh - 8px);
+
+    @media (max-width: 1024px) {
+      margin-top: 0;
+    }
+  }
+
+  .day-count {
+    white-space: nowrap;
+  }
+
   .panel .group-header {
     margin-bottom: 0;
     padding-bottom: 14px;
@@ -879,17 +944,17 @@
     position: relative;
     --item-meta: 180px;
     display: grid;
-    grid-template-columns: var(--item-meta) minmax(0, 1fr) var(--control);
+    grid-template-columns: var(--item-meta) minmax(0, 1fr);
     align-items: baseline;
     column-gap: 32px;
-    padding: 20px 20px 20px 24px;
+    padding: 20px 24px;
     border: 1px solid var(--color-edge);
     background: var(--color-ground);
 
     @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr) var(--control);
+      grid-template-columns: minmax(0, 1fr) auto;
       column-gap: 8px;
-      padding: 16px 12px 18px 16px;
+      padding: 16px 16px 18px;
     }
   }
 
@@ -900,27 +965,6 @@
 
   @media (hover: hover) {
     .item:hover {
-      border-color: var(--color-edge-hover);
-    }
-  }
-
-  .item[data-saved] {
-    border-color: var(--color-saved-edge);
-  }
-
-  @media (hover: hover) {
-    .item[data-saved]:hover {
-      border-color: var(--color-ramp-4);
-    }
-  }
-
-  /* On Saved every item is saved, so the saved edge would say nothing. */
-  .library-list .item[data-saved] {
-    border-color: var(--color-edge);
-  }
-
-  @media (hover: hover) {
-    .library-list .item[data-saved]:hover {
       border-color: var(--color-edge-hover);
     }
   }
@@ -993,7 +1037,7 @@
     min-width: 0;
 
     @media (max-width: 1024px) {
-      grid-column: 1;
+      grid-column: 1 / -1;
     }
   }
 
@@ -1005,7 +1049,8 @@
   }
 
   .item-title {
-    margin: 0;
+    margin: 0 -0.2em;
+    padding-inline: 0.2em;
     font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
@@ -1024,7 +1069,7 @@
   }
 
   /* The title's link opens the Reader from anywhere in the box; the Feed
-     name and the save square sit above it and keep their own jobs. */
+     name and Save sit above it and keep their own jobs. */
   .item-title a::after {
     content: '';
     position: absolute;
@@ -1049,59 +1094,6 @@
   .match {
     background: var(--color-match);
     color: var(--color-ink);
-  }
-
-  .save-toggle {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: var(--control);
-    height: var(--control);
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--color-ink-2);
-    cursor: pointer;
-    opacity: 0;
-
-    @media (max-width: 1024px) {
-      grid-column: 2;
-      grid-row: 1 / span 3;
-      align-self: start;
-      opacity: 1;
-    }
-  }
-
-  @media (hover: hover) {
-    .save-toggle:hover {
-      background: var(--color-control);
-      color: var(--color-ink);
-    }
-  }
-
-  .save-toggle[data-pressed] {
-    color: var(--color-saved);
-  }
-
-  .item:focus-within > .save-toggle,
-  .save-toggle[data-pressed] {
-    opacity: 1;
-  }
-
-  @media (hover: hover) {
-    .item:hover > .save-toggle {
-      opacity: 1;
-    }
-  }
-
-  @media (hover: none) {
-    .save-toggle {
-      opacity: 1;
-    }
   }
 
   .undo-line {
@@ -1287,13 +1279,13 @@
     }
   }
 
+  /* Two columns only where each row can hold a name beside a whole strip. */
   .feed-rows {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
     gap: 8px;
 
     @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr);
       gap: 12px;
     }
   }
@@ -1304,25 +1296,32 @@
 
   .feed-row {
     display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-content: start;
-    gap: 4px;
-    padding: 16px;
+    gap: 4px 32px;
+    padding: 16px 24px;
     border: 1px solid var(--color-edge);
-  }
 
-  .feed-row-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-  }
+    /* A phone gives the name its own line and the strip the rest of the
+       host's, or a line of its own under a host too long to share. */
+    @media (max-width: 1024px) {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      column-gap: 16px;
+      padding: 16px;
+    }
 
-  .feed-row-head .cadence-strip {
-    flex: none;
-    margin-top: 7px;
+    & > .cadence-strip {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
   }
 
   .feed-row-name {
+    flex-basis: 100%;
     margin: 0;
     font: 400 19px / 1.2 var(--font-read);
     overflow-wrap: anywhere;
@@ -1338,9 +1337,7 @@
 
   .feed-host {
     justify-self: start;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
+    display: inline-block;
     max-width: 100%;
     font-size: 14px;
     line-height: 20px;
@@ -1359,12 +1356,18 @@
     }
   }
 
+  /* Inline, so a host that wraps keeps its mark at the end of its last line. */
   .feed-host .icon {
+    display: inline-block;
     width: 14px;
     height: 14px;
+    margin-inline-start: 2px;
+    vertical-align: -2px;
   }
 
   .feed-row-note {
+    grid-column: 1 / -1;
+    flex-basis: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1744,28 +1747,13 @@
   }
 
   /* The Reader's Save is a grey button, not an item box's square. */
-  .save-toggle.save-toggle-labelled {
-    width: auto;
-    margin: 0;
-    padding: 0 14px;
-    background: var(--color-control);
-    color: var(--color-ink);
-    opacity: 1;
-  }
-
-  @media (hover: hover) {
-    .save-toggle.save-toggle-labelled:hover {
-      background: var(--color-control-hover);
-    }
-  }
-
   .save-toggle-labelled[data-pressed] .icon {
     color: var(--color-saved);
   }
 
   .reader-original,
   .reader-discussion,
-  .save-toggle.save-toggle-labelled {
+  .save-toggle-labelled {
     @media (max-width: 1024px) {
       width: var(--control);
       padding: 0;
@@ -2054,12 +2042,12 @@
     gap: 20px;
   }
 
+  /* The first date is the page's title, so the head holds only the phone's day
+     picker, which sits beside that date. */
   .digest-head {
-    @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      column-gap: 12px;
-    }
+    position: relative;
+    height: 0;
+    margin-bottom: 0;
   }
 
   .newer {
@@ -2068,6 +2056,7 @@
     @media (max-width: 1024px) {
       display: flex;
       flex-direction: column;
+      margin-right: calc(var(--control) + 12px);
       margin-bottom: 24px;
     }
   }
@@ -2085,6 +2074,13 @@
       width: var(--control);
       height: var(--control);
     }
+  }
+
+  .digest-head .day-picker {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
   }
 
   .day-picker:has(:focus-visible) {
@@ -2188,80 +2184,186 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Folded from far down, the box comes back into view with room above it. */
+  /* A Feed's day in the Digest. Folded or unfolded its geometry is the same, so
+     a press moves nothing. Folded from far down, the box comes back into view
+     with room above it. */
   .feed-day {
+    --feed-day-inline: 24px;
+    position: relative;
     scroll-margin-top: 24px;
-  }
-
-  .feed-day .item-body {
-    grid-column: 2 / -1;
+    border: 1px solid var(--color-edge);
+    background: var(--color-ground);
 
     @media (max-width: 1024px) {
-      grid-column: 1 / -1;
+      --feed-day-inline: 16px;
     }
   }
 
-  .day-items .save-toggle {
-    @media (max-width: 1024px) {
-      display: none;
+  @media (hover: hover) {
+    .feed-day:hover {
+      border-color: var(--color-edge-hover);
     }
   }
 
-  .day-items time.item-when {
+  .feed-day-head {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 16px;
+    padding: 16px var(--feed-day-inline) 8px;
+    background: var(--color-ground);
+    font-size: 13px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+
     @media (max-width: 1024px) {
-      display: none;
+      padding-block-end: 12px;
     }
   }
 
-  .day-items > .item {
-    @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr);
-      padding-inline-end: 16px;
+  /* The name gives way first, ending in an ellipsis, so the count and the
+     control hold their places however long it runs. The Feed's page names it
+     in full. */
+  .feed-day-who {
+    display: flex;
+    align-items: baseline;
+    column-gap: 10px;
+    min-width: 0;
+
+    & > * {
+      flex: none;
     }
+
+    & > .item-feed {
+      flex: 0 1 auto;
+    }
+
+    & .item-feed-name {
+      display: block;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  /* A tag on the header's line. Its block padding is undone by its margin, so a
+     box with one is no taller than a box without. */
+  .quiet-spell {
+    margin-block: -2px;
+    padding: 2px 6px;
+    background: var(--color-match);
+    color: var(--color-ink);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* Beside the control, it takes the next line rather than the name's room. */
+  .feed-day-head > .quiet-spell {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-block-start: 4px;
+  }
+
+  /* Text on the header's line. Its hit area reaches past that line, to a
+     control's height on a phone, and stops short of the title below. */
+  .feed-day-fold {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink);
+    font: 500 13px / 1.45 var(--font-ui);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -5px -8px;
+
+      @media (max-width: 1024px) {
+        inset: -12px;
+      }
+    }
+
+    &:active {
+      color: var(--color-ink-2);
+    }
+
+    & .icon {
+      width: 14px;
+      height: 14px;
+      margin-inline-end: -2px;
+    }
+  }
+
+  /* Sized by the longer word, so the change of word moves neither edge. */
+  .feed-day-fold-label {
+    display: inline-grid;
+
+    &::after {
+      content: 'Show less';
+      height: 0;
+      visibility: hidden;
+    }
+  }
+
+  @media (hover: hover) {
+    .feed-day-fold:hover .feed-day-fold-label {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* Unfolded, the header sticks. Over ground its fade shows nothing; it appears
+     only as titles pass under it. */
+  .feed-day[data-unfolded] .feed-day-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 100% 0 auto;
+      height: 16px;
+      background: linear-gradient(var(--color-ground), transparent);
+      pointer-events: none;
+    }
+  }
+
+  /* A title reached by keyboard clears the stuck header. */
+  html:has(.feed-day[data-unfolded]) {
+    scroll-padding-block-start: 56px;
   }
 
   .feed-day-items {
-    margin: -7px 0 0;
-    padding: 0;
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0 var(--feed-day-inline) 18px;
     list-style: none;
+
+    @media (max-width: 1024px) {
+      gap: 12px;
+      padding-block-end: 16px;
+    }
   }
 
   .feed-day-item {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto var(--control);
-    align-items: baseline;
-    column-gap: 16px;
-    padding-block: 7px;
-    font-variant-numeric: tabular-nums;
-
-    & > .save-toggle {
-      grid-area: 1 / 3;
-    }
-
-    @media (max-width: 1024px) {
-      display: flex;
-    }
+    position: relative;
   }
 
-  .feed-day-line {
-    display: contents;
-
-    & > time {
-      grid-area: 1 / 2;
-    }
-
-    @media (max-width: 1024px) {
-      position: relative;
-      display: block;
-      flex: 1;
-      min-width: 0;
-      font: 400 17px / 1.38 var(--font-read);
-    }
-  }
-
+  /* Room either side of the text for the highlight to reach past it, undone by
+     the margin so a saved title starts where every other does. */
   .feed-day-title {
-    grid-area: 1 / 1;
-    margin: 0;
+    margin: 0 -0.2em;
+    padding-inline: 0.2em;
     font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     overflow-wrap: anywhere;
@@ -2271,7 +2373,8 @@
     overflow: hidden;
 
     @media (max-width: 1024px) {
-      font: inherit;
+      font-size: 17px;
+      line-height: 1.38;
       -webkit-line-clamp: 3;
     }
   }
@@ -2282,68 +2385,118 @@
       text-decoration-thickness: 1px;
       text-underline-offset: 3px;
     }
-  }
 
-  /* A save square centres on its title's first line, a 26.6px line of a
-     19px title, overhanging it rather than spacing the titles apart. */
-  :is(.item, .feed-day-item) > .save-toggle {
-    align-self: start;
-    margin-block: calc((26.6px - var(--control)) / 2);
-
-    @media (max-width: 1024px) {
-      margin-block: -10px 0;
+    .feed-day-item:has(.save-word[data-pressed]) .feed-day-title a:hover {
+      text-decoration: none;
     }
   }
 
-  .feed-day-item:focus-within .save-toggle {
+  /* A saved title's highlight, reading the toggle's own state so it answers on
+     the press. One sweep across the lines, first to last, reversing from wherever
+     it has reached. Its height stays within a line, so a line the clamp hides
+     leaves no sliver under the last it shows. On Saved every title is saved, so
+     it would say nothing. */
+  .item-text {
+    margin-inline: -0.2em;
+    padding-inline: 0.2em;
+    background-image: linear-gradient(var(--color-saved-tint), var(--color-saved-tint));
+    background-repeat: no-repeat;
+    background-position: 0 50%;
+    background-size: 0% 1.3em;
+    transition: background-size var(--duration-highlight) var(--ease-out);
+  }
+
+  :is(.feed-day-item, :not(.library-list) > .item):has(> .save-word[data-pressed]) .item-text {
+    background-size: 100% 1.3em;
+  }
+
+  /* A lone title opens the Reader from anywhere in its box, past its own row;
+     the box clips the reach, and the Feed name and Save sit above it. */
+  .feed-day:has(.feed-day-item:only-child) {
+    overflow: clip;
+  }
+
+  .feed-day-item:only-child .feed-day-title a {
+    outline: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -64px calc(-1 * var(--feed-day-inline)) -18px;
+    }
+  }
+
+  .feed-day:has(.feed-day-item:only-child .feed-day-title a:active) {
+    background: var(--color-row-hover);
+  }
+
+  .feed-day:has(.feed-day-item:only-child .feed-day-title a:focus-visible) {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  /* Saving floats over the end of a title's first line on hover or keyboard
+     focus, fading what is under it, so it costs a title no width at rest. Where
+     nothing hovers, a list holds it in the open at the end of the meta line, and
+     the Digest saves from the Reader alone. */
+  .save-word {
+    position: absolute;
+    z-index: 1;
+    height: 26.6px;
+    padding: 0 0 0 48px;
+    border: 0;
+    border-radius: 0;
+    background: linear-gradient(to right, transparent, var(--color-ground) 36px);
+    color: var(--color-ink);
+    font: 500 13px / 1 var(--font-ui);
+    cursor: pointer;
+    opacity: 0;
+
+    &:active {
+      color: var(--color-ink-2);
+    }
+  }
+
+  /* Keyboard focus only: a click leaves focus on the word, which would hold it
+     in view after the pointer has gone. */
+  :is(.feed-day-item, .item):has(:focus-visible) > .save-word {
     opacity: 1;
   }
 
   @media (hover: hover) {
-    .feed-day-item:hover .save-toggle {
+    :is(.feed-day-item, .item):hover > .save-word {
       opacity: 1;
     }
   }
 
-  .feed-day-saved {
-    display: none;
+  .feed-day-item > .save-word {
+    inset-block-start: 0;
+    inset-inline-end: 0;
 
-    @media (max-width: 1024px) {
-      position: absolute;
-      inset-block-start: 0;
-      inset-inline-end: 0;
-      display: inline-flex;
-      align-items: center;
-      height: 1lh;
-      color: var(--color-saved);
-
-      & .icon {
-        width: 13px;
-        height: 13px;
-      }
+    @media (max-width: 1024px), (hover: none) {
+      display: none;
     }
   }
 
-  .feed-day-item:has(.feed-day-saved) .feed-day-title {
-    @media (max-width: 1024px) {
-      padding-inline-end: 21px;
+  .item > .save-word {
+    inset-block-start: 20px;
+    inset-inline-end: 24px;
+
+    @media (max-width: 1024px), (hover: none) {
+      position: static;
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+      height: auto;
+      margin-block: -14px;
+      padding: 14px 0 14px 12px;
+      background: none;
+      color: var(--color-ink-2);
+      opacity: 1;
     }
-  }
 
-  .feed-day .item-body > .button {
-    margin-top: 12px;
-  }
-
-  .quiet-spell {
-    display: grid;
-    justify-items: start;
-    gap: 8px;
-    margin-top: 12px;
-    color: var(--color-ink-2);
-
-    @media (max-width: 1024px) {
-      flex-basis: 100%;
-      margin-top: 4px;
+    &[data-pressed] {
+      color: var(--color-ink);
     }
   }
 
@@ -2421,12 +2574,6 @@
 
   .digest-calendar .cadence-legend {
     margin-top: 16px;
-  }
-
-  /* A quiet spell's strip is its last 14 days; `:where` keeps it below the
-     strip's own day rules. */
-  :where(.quiet-spell) .cadence-day:nth-child(-n + 16) {
-    display: none;
   }
 
   .with-aside {
@@ -2605,6 +2752,7 @@
 
   .setting-stack {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: start;
     gap: 8px;
   }
@@ -2984,6 +3132,10 @@
 /* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
    place instead of rising, and the waiting tile and the mark hold still. */
 @media (prefers-reduced-motion: reduce) {
+  .item-text {
+    transition: none;
+  }
+
   .dialog {
     transition: opacity var(--duration-enter) var(--ease-out);
   }

@@ -20,15 +20,13 @@ export function FeedRow({
 }) {
   return (
     <article className="feed-row">
-      <div className="feed-row-head">
-        <h3 className="feed-row-name">
-          <RoutedLink href={feedPath(feed.feedId)} onNavigate={() => onOpen(feed.feedId)}>
-            {feed.title}
-          </RoutedLink>
-        </h3>
-        <CadenceStrip counts={feed.cadence} title={feed.title} />
-      </div>
+      <h3 className="feed-row-name">
+        <RoutedLink href={feedPath(feed.feedId)} onNavigate={() => onOpen(feed.feedId)}>
+          {feed.title}
+        </RoutedLink>
+      </h3>
       <HomePageLink domain={feed.domain} homePageUrl={feed.homePageUrl} />
+      <CadenceStrip counts={feed.cadence} title={feed.title} />
       {children}
     </article>
   )

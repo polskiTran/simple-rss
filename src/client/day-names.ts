@@ -13,10 +13,6 @@ export function shortMonth(dateKey: string): string {
   return format(dateKey, { month: 'long' }).slice(0, 3)
 }
 
-export function shortDay(dateKey: string): string {
-  return `${format(dateKey, { weekday: 'short' })} ${Number(dateKey.slice(8, 10))} ${shortMonth(dateKey)}`
-}
-
 export function dayAndMonth(dateKey: string): string {
   return `${Number(dateKey.slice(8, 10))} ${shortMonth(dateKey)}`
 }
@@ -63,6 +59,14 @@ export function namedDay(dateKey: string, today: string): string {
   return sameYear(dateKey, today) ? longDay(dateKey) : `${longDay(dateKey)} ${dateKey.slice(0, 4)}`
 }
 
+/**
+ * `namedDay` held together where a wrapped heading must not part `22` from
+ * `October`. The year stays free to wrap, so `31 December 2025` fits a phone.
+ */
+export function headingDay(dateKey: string, today: string): string {
+  return namedDay(dateKey, today).replace(/(\d+) /, '$1\u00a0')
+}
+
 /** A recent day with its time, when the item has one; an older day alone. */
 export function dayAndTime(dateKey: string, time: string | null, today: string): string {
   const relative = relativeDay(dateKey, today)
@@ -100,6 +104,15 @@ function lapse(dateKey: string, today: string): string {
 export function ago(dateKey: string, today: string): string {
   if (dateKey >= today) return 'today'
   return relativeDay(dateKey, today)?.toLowerCase() ?? `${lapse(dateKey, today)} ago`
+}
+
+/**
+ * A day's distance standing alone, where `ago` sits inside a sentence. An item
+ * can be placed up to a day past its first sighting, so a day can be tomorrow.
+ */
+export function dayDistance(dateKey: string, today: string): string {
+  if (dateKey > today) return 'Tomorrow'
+  return relativeDay(dateKey, today) ?? `${lapse(dateKey, today)} ago`
 }
 
 export function counted(count: number, noun: string): string {

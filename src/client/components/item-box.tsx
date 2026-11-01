@@ -24,7 +24,6 @@ interface ItemBoxProps {
   /** Search results mark their matches; everything else shows the plain title. */
   readonly titleContent?: ReactNode
   readonly snippet?: ReactNode
-  readonly note?: ReactNode
   onOpen(feedItemId: number): void
   onSaved(saved: boolean): void
 }
@@ -38,13 +37,12 @@ export function ItemBox({
   when,
   titleContent,
   snippet,
-  note,
   onOpen,
   onSaved,
 }: ItemBoxProps) {
   const openFeed = feed?.onOpen
   return (
-    <article className="item" data-saved={saved ? '' : undefined}>
+    <article className="item">
       <div className="item-meta">
         {feed === undefined ? null : openFeed ? (
           <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => openFeed(feed.feedId)}>
@@ -60,12 +58,11 @@ export function ItemBox({
             {when.label}
           </time>
         )}
-        {note}
       </div>
       <div className="item-body">
         <h3 className="item-title">
           <RoutedLink href={readerPath(feedItemId)} onNavigate={() => onOpen(feedItemId)}>
-            {titleContent ?? title}
+            <span className="item-text">{titleContent ?? title}</span>
           </RoutedLink>
         </h3>
         {snippet ? <p className="item-snippet">{snippet}</p> : null}

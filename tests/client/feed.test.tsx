@@ -72,7 +72,7 @@ describe('opening one Feed', () => {
     expect(screen.getByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
     expect(screen.getByText('07:15')).toBeDefined()
     expect(screen.getByRole('button', { name: /save First light/i }).getAttribute('aria-pressed')).toBe('false')
-    expect(screen.getByRole('button', { name: /save A June letter/i }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: /saved A June letter/i }).getAttribute('aria-pressed')).toBe('true')
     for (const meta of container.querySelectorAll('.feed-items .item-meta')) {
       expect(meta.textContent).not.toContain('Field Notes')
     }

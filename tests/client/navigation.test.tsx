@@ -16,6 +16,8 @@ import {
 } from './fixtures.js'
 import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
 
+const TODAY_HEADING = 'Today Saturday 8\u00a0August 1'
+
 const DETAIL = feedDetail({ subscribedDate: '2026-08-08', cadence: cadenceWindow({ '2026-08-08': 1 }) })
 
 const LIBRARY = library({
@@ -87,7 +89,7 @@ describe('a Feed Item’s attribution', () => {
     expect(wayBack().textContent).toBe('Digest')
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
   })
 
@@ -103,7 +105,7 @@ describe('a Feed Item’s attribution', () => {
     expect(wayBack().textContent).toBe('Digest')
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(window.location.pathname + window.location.search).toBe('/digest?from=2026-08-07')
     expect(screen.getByRole('button', { name: 'Back to today' })).toBeDefined()
   })
@@ -249,7 +251,7 @@ describe('the way back out of an opened screen', () => {
 
     await user.click(wayBack())
 
-    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
     expect(window.history.length).toBe(entries)
   })
@@ -261,7 +263,7 @@ describe('the way back out of an opened screen', () => {
     await openedArticle()
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
 
     window.history.back()
     expect(await openedArticle()).toBeDefined()
@@ -347,7 +349,7 @@ describe('the section an open article reads under', () => {
 
     await user.click(screen.getByRole('link', { name: 'Digest' }))
 
-    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(activeTab()).toBe('Digest')
   })
 })

@@ -12,7 +12,7 @@ import {
   type Installation,
 } from './installation.js'
 
-const TODAY_ONE = 'Today 1'
+const TODAY_ONE = /^Today .+ 1$/
 
 async function claimAndSubscribe(page: Page, installation: Installation, feedUrl: string, title: string) {
   await page.goto(installation.url)
@@ -53,6 +53,28 @@ test.describe('the Digest presentation', () => {
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
   })
 
+  test('sets the date on the line and in the style of every other screen’s title', async ({ page, installation }) => {
+    const titleLine = () =>
+      page.evaluate(() => {
+        const title = document.querySelector('.page-title:not(.visually-hidden)')
+        const words = [...(title?.childNodes ?? [])].find(
+          (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+        )
+        const range = document.createRange()
+        if (words) range.selectNode(words)
+        const { fontSize, fontWeight } = getComputedStyle(title as Element)
+        return { top: range.getBoundingClientRect().top, fontSize, fontWeight }
+      })
+
+    await openDigest(page, installation)
+    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    const date = await titleLine()
+
+    await page.getByRole('link', { name: 'Feeds', exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1, name: /^Feeds/ })).toBeVisible()
+    expect(await titleLine()).toEqual(date)
+  })
+
   test('lets the User pin dark on a light device, surviving a reload', async ({ page, installation }) => {
     await page.emulateMedia({ colorScheme: 'light' })
     await subscribe(page, installation)
@@ -87,11 +109,13 @@ test.describe('the Digest presentation', () => {
 
   test('changing the installation timezone recasts the same stored instant', async ({ page, installation }) => {
     await openDigest(page, installation)
+    await page.locator('main').getByRole('link', { name: 'Field Notes' }).click()
     await expect(page.locator('main').getByText('07:15')).toBeVisible()
+    const feed = page.url()
 
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByRole('combobox', { name: 'Installation timezone' }).selectOption('Pacific/Midway')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await page.goto(feed)
 
     await expect(page.locator('main').getByText('20:15')).toBeVisible()
     await expect(page.locator('main')).not.toContainText('07:15')
@@ -104,12 +128,12 @@ test.describe('the Digest presentation', () => {
     await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await expect(page.locator('main article.item')).toHaveCount(50)
+    await expect(page.locator('main .feed-day')).toHaveCount(50)
     const more = page.getByRole('button', { name: 'Show more' })
     await expect(more).toBeVisible()
 
     await more.click()
-    await expect(page.locator('main article.item')).toHaveCount(55)
+    await expect(page.locator('main .feed-day')).toHaveCount(55)
     await expect(more).toBeHidden()
   })
 
@@ -168,36 +192,75 @@ test.describe('the Digest from a day', () => {
 
 async function sharedTitle(row: Locator) {
   return row.evaluate((item) => {
-    const line = item.querySelector('.feed-day-line')
     const title = item.querySelector('.feed-day-title')
     const link = title?.querySelector('a')
-    if (!line || !title || !link) return null
-    const box = line.getBoundingClientRect()
+    if (!title || !link) return null
+    const box = title.getBoundingClientRect()
     const visible = [...link.getClientRects()].filter((rect) => {
       const overlap = Math.min(rect.bottom, box.bottom) - Math.max(rect.top, box.top)
       return overlap > rect.height / 2
     })
-    const rows = [...new Map(visible.map((rect) => [Math.round(rect.top), rect])).values()].sort(
-      (one, other) => one.top - other.top,
-    )
-    const hole = rows.slice(1).some((rect, index) => rect.top - (rows[index]?.bottom ?? rect.top) > 2)
-    const mark = item.querySelector('[aria-label="Saved"]')?.getBoundingClientRect()
+    const rows = [...new Map(visible.map((rect) => [Math.round(rect.top), rect])).values()]
     return {
       lines: rows.length,
-      startsAtTop: rows[0] !== undefined && rows[0].top - box.top < 4,
-      noHole: !hole,
       fits: rows.every((rect) => rect.width <= box.width + 1),
-      lineHoldsItsText: line.scrollHeight <= line.clientHeight + 1,
       titleClamped: title.scrollHeight > title.clientHeight + 1,
-      markInside:
-        mark !== undefined &&
-        mark.width > 0 &&
-        mark.width < 40 &&
-        mark.top >= box.top - 1 &&
-        mark.bottom <= box.bottom + 1,
     }
   })
 }
+
+test.describe('a Feed\u2019s day', () => {
+  test('folds from where it unfolded, moving no title, with the control in reach down the list', async ({
+    page,
+    installation,
+  }) => {
+    await page.route(
+      (url) => url.pathname === '/api/digest',
+      async (route) => {
+        const response = await route.fetch()
+        const digest = await response.json()
+        const [group] = digest.groups
+        if (group) {
+          const [item] = group.items
+          group.items = Array.from({ length: 40 }, (_, index) => ({
+            ...item,
+            feedItemId: item.feedItemId + index,
+            title: `Ledger entry ${index + 1}`,
+          }))
+        }
+        await route.fulfill({ response, json: digest })
+      },
+    )
+    await openDigest(page, installation)
+
+    const title = page.getByRole('heading', { name: 'Ledger entry 1', exact: true })
+    const more = page.getByRole('button', { name: 'Show all' })
+    const unfoldedFrom = await more.boundingBox()
+    const titleAt = await title.boundingBox()
+    await more.click()
+
+    const less = page.getByRole('button', { name: 'Show less' })
+    expect(await less.boundingBox()).toEqual(unfoldedFrom)
+    expect(await title.boundingBox()).toEqual(titleAt)
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2))
+    await expect(less).toBeInViewport()
+    await less.click()
+
+    await expect(title).toBeInViewport()
+    await expect(page.getByRole('heading', { name: 'Ledger entry 4', exact: true })).toHaveCount(0)
+  })
+
+  test('opens the Reader from anywhere in a lone box', async ({ page, installation }) => {
+    await openDigest(page, installation)
+
+    const box = page.locator('.feed-day')
+    const { width } = (await box.boundingBox()) ?? { width: 0 }
+    await box.click({ position: { x: width - 40, y: 12 } })
+
+    await expect(page).toHaveURL(/\/reader\//)
+  })
+})
 
 test.describe('the Digest at phone width', () => {
   test.use({ viewport: { width: 390, height: 760 } })
@@ -214,11 +277,9 @@ test.describe('the Digest at phone width', () => {
 
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save First light' })).toBeHidden()
-    await expect(page.locator('.day-items time')).toHaveCount(1)
-    await expect(page.locator('.day-items time')).toBeHidden()
   })
 
-  test('wraps a shared title, hides its time, and keeps a saved bookmark in view', async ({ page, installation }) => {
+  test('wraps a shared title and names it saved after a save from the Reader', async ({ page, installation }) => {
     await claimAndSubscribe(page, installation, installation.ledgerFeedUrl, 'Valley Ledger')
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
@@ -226,26 +287,8 @@ test.describe('the Digest at phone width', () => {
 
     const row = page.locator('.feed-day-item', { hasText: LEDGER_LONG_TITLE })
     const short = page.locator('.feed-day-item', { hasText: 'Dry again' })
-    expect(await sharedTitle(row)).toEqual({
-      lines: 3,
-      startsAtTop: true,
-      noHole: true,
-      fits: true,
-      lineHoldsItsText: true,
-      titleClamped: true,
-      markInside: false,
-    })
-    expect(await sharedTitle(short)).toEqual({
-      lines: 1,
-      startsAtTop: true,
-      noHole: true,
-      fits: true,
-      lineHoldsItsText: true,
-      titleClamped: false,
-      markInside: false,
-    })
-    await expect(page.locator('.day-items time')).toHaveCount(2)
-    for (const time of await page.locator('.day-items time').all()) await expect(time).toBeHidden()
+    expect(await sharedTitle(row)).toEqual({ lines: 3, fits: true, titleClamped: true })
+    expect(await sharedTitle(short)).toEqual({ lines: 1, fits: true, titleClamped: false })
 
     await page.getByRole('link', { name: LEDGER_LONG_TITLE }).click()
     await page.getByRole('button', { name: `Save ${LEDGER_LONG_TITLE}` }).click()
@@ -255,14 +298,8 @@ test.describe('the Digest at phone width', () => {
     )
     await page.goBack()
 
-    await expect(row.getByRole('img', { name: 'Saved' })).toBeVisible()
-    expect(await sharedTitle(row)).toMatchObject({
-      lines: 3,
-      startsAtTop: true,
-      noHole: true,
-      lineHoldsItsText: true,
-      markInside: true,
-    })
+    await expect(row.getByRole('heading', { name: `Saved: ${LEDGER_LONG_TITLE}` })).toBeVisible()
+    expect(await sharedTitle(row)).toMatchObject({ lines: 3, fits: true })
   })
 
   // iOS zooms the page into a focused field set under 16px.
@@ -283,7 +320,7 @@ test.describe('the Digest at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: 'Today 2' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Today .+ 2$/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Long Meadow 1' })).toBeVisible()
     await expect(page.locator('.digest-calendar')).toBeHidden()
     await expectNoHorizontalOverflow(page)

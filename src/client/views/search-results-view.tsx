@@ -129,7 +129,7 @@ export function SearchResultsView({
           <div>
             <MatchingFeeds subscriptions={subscriptions} onOpenFeed={onOpenFeed} />
             {filtered.length > 0 ? (
-              <div className="item-list">
+              <div className={answer.scope === 'saved' ? 'item-list library-list' : 'item-list'}>
                 {filtered.map((result) => (
                   <ItemBox
                     key={result.feedItemId}

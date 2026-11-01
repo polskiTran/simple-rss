@@ -288,7 +288,7 @@ test.describe('Reader View', () => {
     await subscribe(page, installation)
     await section(page, 'Digest').click()
 
-    await page.locator('.item-meta').getByRole('link', { name: 'Field Notes' }).click()
+    await page.locator('.feed-day-who').getByRole('link', { name: 'Field Notes' }).click()
     await expect(page).toHaveURL(/\/feeds\/\d+$/)
     await expect(page.getByRole('link', { name: 'Back to Digest' })).toBeVisible()
 

@@ -5,6 +5,8 @@ import { App } from '../../src/client/app.js'
 import { digest, searchResult } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
+const TODAY_HEADING = 'Today Saturday 8\u00a0August 1'
+
 const result = (feedItemId: number, title: string, date: string, saved = false) =>
   searchResult({ feedItemId, title, date, saved })
 
@@ -37,11 +39,11 @@ describe('the search line in the chrome', () => {
     expect(results.textContent).toContain('Field Notes')
     expect(results.textContent).toContain('Today, 07:15')
     expect(results.textContent).toContain('3 June')
-    expect(screen.getByRole('button', { name: 'Save Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.queryByRole('heading', { name: 'Today 1' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Saved Tide chronology' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('heading', { name: TODAY_HEADING })).toBeNull()
 
     await user.clear(field)
-    expect(await screen.findByRole('heading', { name: 'Today 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(screen.queryByRole('region', { name: 'search results' })).toBeNull()
     expect(window.location.pathname).toBe('/digest')
   })

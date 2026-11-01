@@ -8,7 +8,7 @@ interface SaveToggleProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
-  /** The Reader's toolbar spells the state out beside the icon, where there is room. */
+  /** The Reader's toolbar sets the word beside an icon, in a button; a list has only the word. */
   readonly labelled?: boolean
   onSaved(saved: boolean): void
 }
@@ -17,8 +17,7 @@ interface SaveToggleProps {
  * Library membership, pressed while saved. A press shows at once; a failed toggle goes
  * back to the state as it was and says so through the App's line, since rows and
  * toolbars have no room for a sentence.
- * The name starts with the word on screen — the labelled toggle's Save or Saved — and
- * the icon-only square keeps a steady Save, leaving the state to `aria-pressed`.
+ * The name starts with the word on screen, Save or Saved.
  */
 export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
   const [pending, startToggle] = useTransition()
@@ -39,15 +38,22 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
     })
   }
 
+  const word = shown ? 'Saved' : 'Save'
   return (
     <Toggle
-      className={labelled ? 'button save-toggle save-toggle-labelled' : 'save-toggle'}
+      className={labelled ? 'button save-toggle-labelled' : 'save-word'}
       pressed={shown}
-      aria-label={`${labelled && shown ? 'Saved' : 'Save'} ${title}`}
+      aria-label={`${word} ${title}`}
       onPressedChange={toggle}
     >
-      <Icon name="bookmark" filled={shown} />
-      {labelled ? <span className="wide-only">{shown ? 'Saved' : 'Save'}</span> : null}
+      {labelled ? (
+        <>
+          <Icon name="bookmark" filled={shown} />
+          <span className="wide-only">{word}</span>
+        </>
+      ) : (
+        word
+      )}
     </Toggle>
   )
 }
