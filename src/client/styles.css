@@ -233,17 +233,19 @@
     }
   }
 
+  /* Every screen's title, and each Digest day's. The -2px pulls the big
+     glyphs' side bearing back to the column edge. */
   .page-title {
-    margin: 0;
+    margin: 0 0 0 -2px;
     font-weight: 500;
-    font-size: 40px;
+    font-size: 48px;
     line-height: 1.08;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.025em;
     overflow-wrap: anywhere;
     text-wrap: balance;
 
     @media (max-width: 1024px) {
-      font-size: 32px;
+      font-size: 36px;
     }
   }
 
@@ -254,7 +256,8 @@
     column-gap: 0.3em;
   }
 
-  .page-title-companion {
+  .page-title-companion,
+  .day-count {
     font-weight: 400;
     color: var(--color-ink-3);
   }
@@ -839,29 +842,20 @@
     }
   }
 
-  .digest-day .group-heading {
-    margin-left: -2px;
-    font-weight: 600;
-    font-size: 48px;
-    line-height: 1.08;
-    letter-spacing: -0.025em;
-    overflow-wrap: anywhere;
-    text-wrap: balance;
-
-    @media (max-width: 1024px) {
-      font-size: 36px;
-    }
+  /* The sections of a whole screen, a step under its title. */
+  .app:is([data-screen='feeds'], [data-screen='saved']) .group-heading {
+    font-size: 20px;
+    line-height: 1.2;
   }
 
   /* Keeps the first date clear of the phone's day picker, which sits on its row. */
-  .digest-day:first-child .group-heading {
+  .digest-day:first-child .page-title {
     @media (max-width: 1024px) {
       padding-right: calc(var(--control) + 12px);
     }
   }
 
-  /* The heading's -2px pulls the big glyphs' side bearing back to the column
-     edge; this line's 2px cancels it. */
+  /* The 2px cancels the title's. */
   .day-distance {
     display: block;
     margin-bottom: 8px;
@@ -878,8 +872,18 @@
     }
   }
 
+  /* The first day's distance rises into the page's top padding, so the date
+     holds the line every other screen's title sits on. A phone's padding has
+     no room for it. */
+  .digest-day:first-child .day-distance {
+    margin-top: calc(-1lh - 8px);
+
+    @media (max-width: 1024px) {
+      margin-top: 0;
+    }
+  }
+
   .day-count {
-    color: var(--color-ink-3);
     white-space: nowrap;
   }
 

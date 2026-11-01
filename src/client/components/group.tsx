@@ -7,14 +7,24 @@ interface GroupProps {
   readonly count?: number | undefined
   readonly aside?: ReactNode
   readonly className?: string
+  /** For a Group that heads the page, in place of the group heading's own look. */
+  readonly headingClassName?: string
   readonly children: ReactNode
 }
 
-export function Group({ id, title, count, aside, className, children }: GroupProps) {
+export function Group({
+  id,
+  title,
+  count,
+  aside,
+  className,
+  headingClassName = 'group-heading',
+  children,
+}: GroupProps) {
   return (
     <section className={className ? `group ${className}` : 'group'} aria-labelledby={id}>
       <div className="group-header">
-        <h2 className="group-heading" id={id}>
+        <h2 className={headingClassName} id={id}>
           {title}
           {/* A real space, so the heading is announced "Today 14", not "Today14". */}
           {count === undefined ? null : (

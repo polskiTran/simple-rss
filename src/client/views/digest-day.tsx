@@ -39,10 +39,11 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
     <Group
       id={`day-${group.date}`}
       className="digest-day"
+      headingClassName="page-title"
       title={
         <>
           <span className="day-distance">{dayDistance(group.date, today)}</span> {headingDay(group.date, today)}{' '}
-          <span className="day-count">({group.items.length.toLocaleString('en-GB')})</span>
+          <span className="day-count">{group.items.length.toLocaleString('en-GB')}</span>
         </>
       }
     >

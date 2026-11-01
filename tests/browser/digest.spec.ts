@@ -12,7 +12,7 @@ import {
   type Installation,
 } from './installation.js'
 
-const TODAY_ONE = /^Today .+ \(1\)$/
+const TODAY_ONE = /^Today .+ 1$/
 
 async function claimAndSubscribe(page: Page, installation: Installation, feedUrl: string, title: string) {
   await page.goto(installation.url)
@@ -51,6 +51,28 @@ test.describe('the Digest presentation', () => {
 
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
+  })
+
+  test('sets the date on the line and in the style of every other screen’s title', async ({ page, installation }) => {
+    const titleLine = () =>
+      page.evaluate(() => {
+        const title = document.querySelector('.page-title:not(.visually-hidden)')
+        const words = [...(title?.childNodes ?? [])].find(
+          (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+        )
+        const range = document.createRange()
+        if (words) range.selectNode(words)
+        const { fontSize, fontWeight } = getComputedStyle(title as Element)
+        return { top: range.getBoundingClientRect().top, fontSize, fontWeight }
+      })
+
+    await openDigest(page, installation)
+    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    const date = await titleLine()
+
+    await page.getByRole('link', { name: 'Feeds', exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1, name: /^Feeds/ })).toBeVisible()
+    expect(await titleLine()).toEqual(date)
   })
 
   test('lets the User pin dark on a light device, surviving a reload', async ({ page, installation }) => {
@@ -298,7 +320,7 @@ test.describe('the Digest at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: /^Today .+ \(2\)$/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Today .+ 2$/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Long Meadow 1' })).toBeVisible()
     await expect(page.locator('.digest-calendar')).toBeHidden()
     await expectNoHorizontalOverflow(page)

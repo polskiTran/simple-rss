@@ -112,9 +112,8 @@ the choice is per device.
 
 | Role | Face | Size / line-height | Weight |
 | --- | --- | --- | --- |
-| Page title | Instrument Sans | 40/1.08 desktop, 32/1.08 phone, −0.015em | 500; companion value in `ink-3` at 400; an unbroken name wraps anywhere |
-| Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-2` at 400 |
-| Digest day heading | Instrument Sans | 48/1.08 desktop, 36/1.08 phone, −0.025em | 600; the day's distance above it at 17/1.2 400 in `ink-2` (16 on a phone); count in parentheses in `ink-3` |
+| Page title, and each Digest day | Instrument Sans | 48/1.08 desktop, 36/1.08 phone, −0.025em | 500; companion value in `ink-3` at 400; an unbroken name wraps anywhere; a day's distance above it at 17/1.2 400 in `ink-2` (16 on a phone) |
+| Group heading | Instrument Sans | 17/1 desktop, 16/1 phone; 20/1.2 for the sections of Feeds and Saved | 500; count beside it in `ink-2` at 400 |
 | Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
 | Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
 | Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
@@ -303,8 +302,10 @@ not jump.
 
 **Digest.** The date heading is the page's title, so the word Digest is kept for
 screen readers and shown only before the first Subscription. One list, newest
-day first, each day headed by its full date with the count in parentheses, how
-far back it is on a line above. Under the heading the day's Feeds
+day first, each day headed by its full date in the page title's style with the
+count as its companion, how far back it is on a line above. On desktop the
+first day's line rises into the page's padding, so the date sits where every
+other screen's title does. Under the heading the day's Feeds
 stand as chips with their counts, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
 alone, and pressing it again shows them all. Each Feed that published that day
 gets one thin-edged box, the most recent first. Its first line says who: the

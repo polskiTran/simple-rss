@@ -17,9 +17,9 @@ const JUNE = digestGroup({ date: '2026-06-03', items: [item(4, 'A June letter', 
 const DIGEST = digest({ groups: [TODAY, YESTERDAY, JUNE] })
 
 // A day heading's number and month are joined by a non-breaking space.
-const TODAY_HEADING = 'Today Saturday 8\u00a0August (2)'
-const YESTERDAY_HEADING = 'Yesterday Friday 7\u00a0August (1)'
-const JUNE_HEADING = '2 months ago Wednesday 3\u00a0June (1)'
+const TODAY_HEADING = 'Today Saturday 8\u00a0August 2'
+const YESTERDAY_HEADING = 'Yesterday Friday 7\u00a0August 1'
+const JUNE_HEADING = '2 months ago Wednesday 3\u00a0June 1'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -194,7 +194,7 @@ describe('the chronological Digest', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Tomorrow Sunday 9\u00a0August (1)' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Tomorrow Sunday 9\u00a0August 1' })).toBeDefined()
   })
 
   it('leads to Add feed before any Subscription, with no days to choose from', async () => {
@@ -307,7 +307,7 @@ describe('the Digest from a day', () => {
     await user.click(monday)
 
     expect(window.location.search).toBe('?from=2026-08-03')
-    expect(await screen.findByRole('heading', { name: '5 days ago Monday 3\u00a0August (1)' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: '5 days ago Monday 3\u00a0August 1' })).toBeDefined()
     expect(monday.getAttribute('aria-pressed')).toBe('true')
 
     await user.click(screen.getByRole('button', { name: 'Back to today' }))
