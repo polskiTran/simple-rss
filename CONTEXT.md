@@ -85,7 +85,7 @@ How often a Feed publishes, read from the last 30 days of its Cadence by countin
 _Avoid_: Frequency, tier, activity level
 
 **Quiet Spell**:
-At least seven installation-timezone days between a Feed's Feed Item and the one before it. The Digest marks the day a Feed comes back from one with how long it was quiet and its Cadence.
+At least seven installation-timezone days between a Feed's Feed Item and the one before it. The Digest marks the day a Feed comes back from one with how long it was quiet.
 _Avoid_: Hiatus, gap, dormancy
 
 **Digest**:

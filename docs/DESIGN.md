@@ -9,9 +9,10 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
 ## 1. Principles
 
 1. **Colour comes from the content.** The interface is greyscale. Colour
-   appears only in data — Cadence, saved state and search matches — on a
-   Feed's host, the one link that leaves for the publisher, and on the Feed
-   name an item box links to. It is blue in light mode and yellow in dark.
+   appears only in data — Cadence, saved state, search matches and a Feed's
+   return — on a Feed's host, the one link that leaves for the publisher, and
+   on the Feed name an item box links to. It is blue in light mode and yellow
+   in dark; a Feed's return swaps them, so it never reads as saved.
 2. **One shape means you can press it.** Every control is a hard-edged block of
    the same height. Grey fill is an ordinary action, ink fill is the single
    primary action on a screen. Counts and status are plain grey text with no
@@ -76,6 +77,8 @@ selected segment, the current section and a pressed chip take the system's
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` | saved icon, saved item edge |
 | `away` | `ramp-5` | a Feed's host, wherever it is shown |
 | `feed-name` | `ramp-4` | the Feed name an item box links to |
+| `saved-tint` | `match` | the highlight on a saved title in the Digest |
+| `quiet` | `oklch(92% 0.1 97)` | the tag on a Feed back from a Quiet Spell |
 | `match` | `oklch(91.4% 0.032 277.9)` | search highlight and selected text, under `ink` |
 | `scrim` | ink at `.24` | behind a dialog |
 
@@ -97,6 +100,7 @@ selected segment, the current section and a pressed chip take the system's
 | `danger` | `oklch(73.2% 0.164 27.1)` |
 | `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(49% 0.08 97)` · `oklch(61.3% 0.106 96.1)` · `oklch(73.5% 0.132 95.2)` · `oklch(85.8% 0.158 94.4)` |
 | `saved` / `saved-edge` | `ramp-5` / `ramp-3` |
+| `quiet` | `oklch(38% 0.075 275)` |
 | `away` | `ramp-5` |
 | `feed-name` | `ramp-4` |
 | `match` | `oklch(37.5% 0.063 97.7)` |
@@ -230,7 +234,7 @@ and focus; a saved item shows it always, filled in `saved`, and keeps a
 `saved-edge` border that deepens to `ramp-4` on hover — except on Saved, where
 every item is saved and the edge would say nothing. On a phone the Feed name
 and time share one line above the title and the save square is always visible
-at 44px — except in the Digest, which saves from the Reader alone. The whole box opens the Reader; the Feed name inside it opens the
+at 44px. The whole box opens the Reader; the Feed name inside it opens the
 Feed. In search results a snippet sits under the title with the matched words
 marked in `match`.
 
@@ -297,12 +301,21 @@ day first, each day headed by its full date with the count in parentheses, how
 far back it is on a line above. Under the heading the day's Feeds
 stand as chips with their counts, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
 alone, and pressing it again shows them all. Each Feed that published that day
-gets one box, the most recent first: a lone item is the ordinary item box; more
-share a box, the Feed's name and its count in the meta column and each title
-on its own line with its time. Past 5 items the box shows
-the newest 3 and Show N more, which turns to Show less once pressed. A Feed
-back after a week or more without items says so under its time — its last 14
-days of Cadence, then First item in 12 days. The list starts today, or from a
+gets one thin-edged box, the most recent first. Its first line says who: the
+Feed's name, ending in an ellipsis when it runs long so nothing beside it moves,
+then its count when there is more than one item. Under it each title runs across
+the whole box, two lines at most, with no time; the Reader has it. A lone item's
+box opens the Reader from anywhere in it. Past 5 items the box shows the newest
+3, with Show all and a chevron at the end of the first line, which turns to Show
+less once pressed. Nothing moves when it does, and while unfolded the first line
+sticks to the top of the screen, fading the titles that pass under it, so the
+control is in reach however far down the list. A Feed back after a week or more
+without items says so beside its name, First in 12 days, as a tag filled in
+`quiet`; beside Show all it takes its own line under the name. A saved title is
+highlighted in `saved-tint`, sweeping across its lines over 420ms as it is saved
+and reversing from wherever it has reached. On hover or focus, Save or Saved
+floats over the end of a title's first line, fading what is under it, so saving
+costs a title no width at rest. The list starts today, or from a
 day picked on the month — that day and everything before it — and then Back to
 today stands at its head, as Show more stands at its foot; the address keeps
 the day, so the way back from an article returns to it. Beside the list, a
@@ -312,11 +325,8 @@ days and those of the months either side plain, the day on show ringed, then the
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
 button at the end of the first date's row, or of Back to today's, opens the platform's own date picker, in
-place of the month, and a day's chips run past the screen's edge. The phone Digest has no
-save squares and no entry times, so a title uses the width of the box. A lone
-title and a shared title each run three lines at most. A saved title in a
-shared box keeps its bookmark, in `saved`, on the first line, clear of the
-text. A lone box keeps its `saved-edge`. Pages are whole days,
+place of the month, and a day's chips run past the screen's edge. The phone Digest saves
+from the Reader alone, and a title runs three lines at most. Pages are whole days,
 as many as reach fifty items, so Show more continues from the next day and
 names no number; Saved ends the same way. Before the first Subscription, the
 Digest is "No feeds yet." and Add feed as the primary action, with no chips and no
@@ -435,6 +445,8 @@ cards, group headings, a title's companion value, a Feed's panels — appear
 without a fade.
 An item box steps to `row-hover` while pressed. Hover styles apply only where a
 pointer can hover, so a tap never leaves one behind.
+A saved title's highlight sweeps in as it is saved, the one thing a list moves:
+it answers the press, and with reduced motion it appears at once.
 What answers an action — what an address answers in Add feed, the undo line an
 unsave leaves, the notice or error an action answers with — fades in over 150ms
 as it mounts, opacity only. So does an article, and the Original webpage arriving

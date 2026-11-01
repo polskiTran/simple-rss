@@ -42,7 +42,7 @@ describe('the chronological Digest', () => {
         .getByRole('link', { name: 'Field Notes' })
         .getAttribute('href'),
     ).toBe('/feeds/1')
-    expect(within(first as HTMLElement).getByText('07:15')).toBeDefined()
+    expect(within(first as HTMLElement).queryByText('07:15')).toBeNull()
     expect(screen.getByRole('button', { name: 'Save First light' }).getAttribute('aria-pressed')).toBe('false')
     expect(container.textContent).not.toMatch(/unread|mark|archive/i)
   })
@@ -83,7 +83,7 @@ describe('the chronological Digest', () => {
         .map((title) => title.textContent),
     ).toEqual(['One', 'Two', 'Three'])
 
-    await user.click(within(box).getByRole('button', { name: 'Show 4 more' }))
+    await user.click(within(box).getByRole('button', { name: 'Show all' }))
 
     expect(
       within(box)
@@ -95,7 +95,7 @@ describe('the chronological Digest', () => {
     await user.click(less)
 
     expect(within(box).getAllByRole('heading')).toHaveLength(3)
-    expect(document.activeElement).toBe(within(box).getByRole('button', { name: 'Show 4 more' }))
+    expect(document.activeElement).toBe(within(box).getByRole('button', { name: 'Show all' }))
   })
 
   it('shows one Feed of the day alone while its chip is pressed', async () => {
@@ -126,13 +126,7 @@ describe('the chronological Digest', () => {
         groups: [
           digestGroup({
             items: [item(5, 'A letter', '06:00', 2, 'Letters'), ...TODAY.items],
-            returns: [
-              {
-                feedId: 2,
-                quietDays: 12,
-                cadence: Array.from({ length: 30 }, (_, day) => (day === 17 || day === 29 ? 1 : 0)),
-              },
-            ],
+            returns: [{ feedId: 2, quietDays: 12 }],
           }),
         ],
       }),
@@ -141,8 +135,19 @@ describe('the chronological Digest', () => {
     render(<App />)
 
     const [back, other] = await screen.findAllByRole('article')
-    expect(within(back as HTMLElement).getByText('First item in 12 days')).toBeDefined()
-    expect(within(other as HTMLElement).queryByText(/^First item in/)).toBeNull()
+    expect(within(back as HTMLElement).getByText('First in 12 days')).toBeDefined()
+    expect(within(other as HTMLElement).queryByText(/^First in/)).toBeNull()
+  })
+
+  it('names a saved title as saved', async () => {
+    stubApi().on('GET /api/digest', {
+      body: digest({ groups: [digestGroup({ items: [{ ...item(3, 'First light', '07:15'), saved: true }] })] }),
+    })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Saved: First light' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Saved First light' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('flips save to saved in place once the server confirms, and back', async () => {

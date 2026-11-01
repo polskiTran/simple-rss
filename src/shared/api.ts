@@ -396,13 +396,11 @@ export type DigestItem = z.infer<typeof digestItemSchema>
 
 /**
  * A Feed publishing on a group's day after a quiet spell of at least
- * `QUIET_SPELL_DAYS`: how many days since its previous item, and its Cadence
- * over the 30 days ending that day.
+ * `QUIET_SPELL_DAYS`: how many days since its previous item.
  */
 const digestReturnSchema = z.object({
   feedId: z.number().int().positive(),
   quietDays: z.number().int().positive(),
-  cadence: cadenceStripSchema,
 })
 export type DigestReturn = z.infer<typeof digestReturnSchema>
 

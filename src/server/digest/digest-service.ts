@@ -1,6 +1,5 @@
 import { and, count, desc, eq, lt, max, or, type SQL } from 'drizzle-orm'
 import {
-  CADENCE_STRIP_DAYS,
   QUIET_SPELL_DAYS,
   type Digest,
   type DigestCalendar,
@@ -15,7 +14,7 @@ import { displayTimeOf } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
-import { cadenceByFeed, dailyCounts, gridDayKeys, trailingDayKeys } from './cadence-window.js'
+import { dailyCounts, gridDayKeys } from './cadence-window.js'
 import { dateKey, dayKeysIn, daysBetween, dayStartUtc } from '../calendar.js'
 import { wholeDayPage } from './whole-day-page.js'
 
@@ -127,8 +126,7 @@ export class DigestService {
       if (!previous) return []
       const quietDays = daysBetween(date, dayOf(previous))
       if (quietDays < QUIET_SPELL_DAYS) return []
-      const cadence = cadenceByFeed(this.#db, timezone, trailingDayKeys(date, CADENCE_STRIP_DAYS), [feedId])(feedId)
-      return [{ feedId, quietDays, cadence }]
+      return [{ feedId, quietDays }]
     })
   }
 }

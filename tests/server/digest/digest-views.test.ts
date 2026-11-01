@@ -83,9 +83,6 @@ describe('the Digest from a day', () => {
     const yesterday = digest.groups.find(({ date }) => date === '2026-08-07')
     expect(yesterday?.returns).toHaveLength(1)
     expect(yesterday?.returns[0]?.quietDays).toBe(12)
-    expect(yesterday?.returns[0]?.cadence.at(-1)).toBe(1)
-    expect(yesterday?.returns[0]?.cadence.at(-13)).toBe(1)
-    expect(yesterday?.returns[0]?.cadence.reduce((sum, count) => sum + count, 0)).toBe(2)
     expect(digest.groups.find(({ date }) => date === '2026-08-08')?.returns).toEqual([])
   })
 

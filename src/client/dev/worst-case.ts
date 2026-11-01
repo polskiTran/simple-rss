@@ -270,9 +270,9 @@ function digestOf(dataset: Exclude<Dataset, 'demo'>): Digest {
             date: TODAY,
             items: WORST_TODAY.map((seed) => digestItem(seed, TODAY, feeds)),
             returns: [
-              { feedId: 3, quietDays: 7, cadence: sparseCadence },
-              { feedId: 5, quietDays: 59, cadence: sparseCadence },
-              { feedId: 6, quietDays: 1_096, cadence: sparseCadence },
+              { feedId: 3, quietDays: 7 },
+              { feedId: 5, quietDays: 59 },
+              { feedId: 6, quietDays: 1_096 },
             ],
           },
           {

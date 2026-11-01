@@ -34,7 +34,7 @@ test.describe('the Library', () => {
     const toggle = page.getByRole('button', { name: 'Save First light' })
     await expect(toggle).toHaveAttribute('aria-pressed', 'false')
     await toggle.click()
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
 
     await section(page, 'Saved')
     await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
@@ -80,7 +80,7 @@ test.describe('the Library', () => {
     const toggle = page.getByRole('button', { name: 'Save First light' })
     await toggle.focus()
     await page.keyboard.press('Enter')
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
 
     const membership = await page.evaluate(async () => {
       const digest = await (await fetch('/api/digest', { credentials: 'same-origin' })).json()
