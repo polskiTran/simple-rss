@@ -10,7 +10,7 @@ import { Group } from '../components/group.js'
 import { FeedName, ItemBox } from '../components/item-box.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { counted, dayTitle, longDay, relativeDay } from '../day-names.js'
+import { counted, dayDistance, headingDay, longDay, namedDay, relativeDay } from '../day-names.js'
 import { feedPath, readerPath } from '../routing.js'
 
 /** A Feed with more items than this in one day is folded to its newest `FOLDED_ITEMS`. */
@@ -35,14 +35,22 @@ interface FeedDay {
 export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DigestDayProps) {
   const [only, setOnly] = useState<number>()
   const feeds = feedDaysOf(group)
-  const title = dayTitle(group.date, today)
-  const relative = relativeDay(group.date, today) !== undefined
+  const day = relativeDay(group.date, today) ? longDay(group.date) : namedDay(group.date, today)
   return (
-    <Group id={`day-${group.date}`} title={title} count={group.items.length}>
+    <Group
+      id={`day-${group.date}`}
+      className="digest-day"
+      title={
+        <>
+          <span className="day-distance">{dayDistance(group.date, today)}</span> {headingDay(group.date, today)}{' '}
+          <span className="day-count">({group.items.length.toLocaleString('en-GB')})</span>
+        </>
+      }
+    >
       {feeds.length > 1 ? (
         <ToggleGroup
           className="day-feeds"
-          aria-label={`Feeds on ${relative ? longDay(group.date) : title}`}
+          aria-label={`Feeds on ${day}`}
           value={only === undefined ? [] : [String(only)]}
           onValueChange={([chosen]) => setOnly(chosen === undefined ? undefined : Number(chosen))}
         >

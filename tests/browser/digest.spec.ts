@@ -12,7 +12,7 @@ import {
   type Installation,
 } from './installation.js'
 
-const TODAY_ONE = 'Today 1'
+const TODAY_ONE = /^Today .+ \(1\)$/
 
 async function claimAndSubscribe(page: Page, installation: Installation, feedUrl: string, title: string) {
   await page.goto(installation.url)
@@ -283,7 +283,7 @@ test.describe('the Digest at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: 'Today 2' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Today .+ \(2\)$/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Long Meadow 1' })).toBeVisible()
     await expect(page.locator('.digest-calendar')).toBeHidden()
     await expectNoHorizontalOverflow(page)

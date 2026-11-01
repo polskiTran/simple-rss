@@ -822,6 +822,66 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .digest-day + .digest-day {
+    margin-top: 64px;
+
+    @media (max-width: 1024px) {
+      margin-top: 48px;
+    }
+  }
+
+  .digest-day .group-header {
+    margin-bottom: 24px;
+
+    @media (max-width: 1024px) {
+      margin-bottom: 20px;
+    }
+  }
+
+  .digest-day .group-heading {
+    margin-left: -2px;
+    font-weight: 600;
+    font-size: 48px;
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+
+    @media (max-width: 1024px) {
+      font-size: 36px;
+    }
+  }
+
+  /* Keeps the first date clear of the phone's day picker, which sits on its row. */
+  .digest-day:first-child .group-heading {
+    @media (max-width: 1024px) {
+      padding-right: calc(var(--control) + 12px);
+    }
+  }
+
+  /* The heading's -2px pulls the big glyphs' side bearing back to the column
+     edge; this line's 2px cancels it. */
+  .day-distance {
+    display: block;
+    margin-bottom: 8px;
+    margin-left: 2px;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: var(--color-ink-2);
+
+    @media (max-width: 1024px) {
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+  }
+
+  .day-count {
+    color: var(--color-ink-3);
+    white-space: nowrap;
+  }
+
   .panel .group-header {
     margin-bottom: 0;
     padding-bottom: 14px;
@@ -2054,12 +2114,12 @@
     gap: 20px;
   }
 
+  /* The first date is the page's title, so the head holds only the phone's day
+     picker, which sits beside that date. */
   .digest-head {
-    @media (max-width: 1024px) {
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      column-gap: 12px;
-    }
+    position: relative;
+    height: 0;
+    margin-bottom: 0;
   }
 
   .newer {
@@ -2068,6 +2128,7 @@
     @media (max-width: 1024px) {
       display: flex;
       flex-direction: column;
+      margin-right: calc(var(--control) + 12px);
       margin-bottom: 24px;
     }
   }
@@ -2085,6 +2146,13 @@
       width: var(--control);
       height: var(--control);
     }
+  }
+
+  .digest-head .day-picker {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
   }
 
   .day-picker:has(:focus-visible) {

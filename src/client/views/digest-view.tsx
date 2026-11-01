@@ -4,7 +4,6 @@ import { useScreenTitle } from '../arrival.js'
 import type { DigestCalendar, DigestStart } from '../../shared/api.js'
 import { fetchDigestCalendar } from '../api.js'
 import { Icon } from '../components/icon.js'
-import { shortDay } from '../day-names.js'
 import { useResource, valueInView } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
 import { DigestMonth } from './digest-month.js'
@@ -21,8 +20,9 @@ interface DigestViewProps {
  * The Digest: one list, newest day first, that starts today or from a day
  * picked on the calendar — a month of the whole Digest beside the list on a
  * wide screen, the platform's date picker on a phone. With no Subscriptions it
- * offers only the way to the first; until the calendar answers, the Digest is
- * drawn as begun.
+ * offers only the way to the first, under a visible title; until the calendar
+ * answers, the Digest is drawn as begun. Otherwise the first date is the
+ * title, and the h1 stays for screen readers and to take focus on arrival.
  */
 export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestViewProps) {
   useScreenTitle('Digest')
@@ -39,11 +39,8 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
 
   return (
     <div className="view">
-      <header className="page-head digest-head">
-        <h1 className="page-title">
-          Digest
-          {shown ? <span className="page-title-companion">{shortDay(shown.today)}</span> : null}
-        </h1>
+      <header className={firstRun ? 'page-head' : 'page-head digest-head'}>
+        <h1 className={firstRun ? 'page-title' : 'visually-hidden'}>Digest</h1>
         {shown && !firstRun ? <DayPicker calendar={shown} from={start.from} onFrom={readFrom} /> : null}
       </header>
 

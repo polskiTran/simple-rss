@@ -16,20 +16,25 @@ const JUNE = digestGroup({ date: '2026-06-03', items: [item(4, 'A June letter', 
 
 const DIGEST = digest({ groups: [TODAY, YESTERDAY, JUNE] })
 
+// A day heading's number and month are joined by a non-breaking space.
+const TODAY_HEADING = 'Today Saturday 8\u00a0August (2)'
+const YESTERDAY_HEADING = 'Yesterday Friday 7\u00a0August (1)'
+const JUNE_HEADING = '2 months ago Wednesday 3\u00a0June (1)'
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('the chronological Digest', () => {
-  it('titles the page with today and heads each day with its count', async () => {
+  it('keeps its title for screen readers and heads each day with its distance, date and count', async () => {
     stubApi().on('GET /api/digest', { body: DIGEST })
     window.history.replaceState(null, '', '/')
     const { container } = render(<App />)
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Digest Sat 8 Aug' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Today 2' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1, name: 'Digest' }).className).toBe('visually-hidden')
+    expect(screen.getByRole('heading', { name: YESTERDAY_HEADING })).toBeDefined()
+    expect(screen.getByRole('heading', { name: JUNE_HEADING })).toBeDefined()
 
     const [first] = screen.getAllByRole('article')
     expect(
@@ -50,11 +55,11 @@ describe('the chronological Digest', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await screen.findByRole('heading', { name: 'Yesterday 1' })
+    await screen.findByRole('heading', { name: YESTERDAY_HEADING })
     await user.click(screen.getByRole('button', { name: 'Show more' }))
 
-    expect(await screen.findByRole('heading', { name: 'Wednesday 3 June 1' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: JUNE_HEADING })).toBeDefined()
+    expect(screen.getByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(api.requestsTo('GET /api/digest?from=2026-06-03')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull()
   })
@@ -178,6 +183,15 @@ describe('the chronological Digest', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
   })
 
+  it('names a day an item was placed ahead of today as tomorrow', async () => {
+    const ahead = digestGroup({ date: '2026-08-09', items: [item(5, 'Early release', '08:00')] })
+    stubApi().on('GET /api/digest', { body: digest({ groups: [ahead, TODAY] }) })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Tomorrow Sunday 9\u00a0August (1)' })).toBeDefined()
+  })
+
   it('leads to Add feed before any Subscription, with no days to choose from', async () => {
     stubApi().on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 0 } })
     window.history.replaceState(null, '', '/')
@@ -187,6 +201,15 @@ describe('the chronological Digest', () => {
     expect(screen.getByRole('button', { name: 'Add feed' })).toBeDefined()
     expect(screen.queryByRole('region', { name: 'August 2026' })).toBeNull()
     expect(screen.queryByLabelText('Start from a day')).toBeNull()
+  })
+
+  it('shows its title before any Subscription, with no date to stand for it', async () => {
+    stubApi().on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 0 } })
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+
+    await screen.findByText('No feeds yet.')
+    expect(screen.getByRole('heading', { level: 1, name: 'Digest' }).className).toBe('page-title')
   })
 
   it('says items are on their way when Subscriptions have yet to publish', async () => {
@@ -211,7 +234,7 @@ describe('the chronological Digest', () => {
     api.on('GET /api/digest', { body: DIGEST })
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-    expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
   })
 
   it('counts a request that ran out of time as unreached', async () => {
@@ -269,7 +292,7 @@ describe('the Digest from a day', () => {
     const user = userEvent.setup()
 
     const month = await screen.findByRole('region', { name: 'August 2026' })
-    await screen.findByRole('heading', { name: 'Today 2' })
+    await screen.findByRole('heading', { name: TODAY_HEADING })
     expect(within(month).getByRole('button', { name: '2 items on 8 August 2026' }).getAttribute('aria-pressed')).toBe(
       'true',
     )
@@ -279,13 +302,13 @@ describe('the Digest from a day', () => {
     await user.click(monday)
 
     expect(window.location.search).toBe('?from=2026-08-03')
-    expect(await screen.findByRole('heading', { name: 'Monday 3 August 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: '5 days ago Monday 3\u00a0August (1)' })).toBeDefined()
     expect(monday.getAttribute('aria-pressed')).toBe('true')
 
     await user.click(screen.getByRole('button', { name: 'Back to today' }))
 
     expect(window.location.search).toBe('')
-    expect(await screen.findByRole('heading', { name: 'Today 2' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
   })
 
@@ -316,7 +339,7 @@ describe('the Digest from a day', () => {
 
     fireEvent.change(picker, { target: { value: '2026-08-07' } })
     expect(window.location.search).toBe('?from=2026-08-07')
-    expect(await screen.findByRole('heading', { name: 'Yesterday 1' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: YESTERDAY_HEADING })).toBeDefined()
 
     fireEvent.change(picker, { target: { value: '2026-08-08' } })
     expect(window.location.search).toBe('')
@@ -342,7 +365,7 @@ describe('the Digest from a day', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await screen.findByRole('heading', { name: 'Today 2' })
+    await screen.findByRole('heading', { name: TODAY_HEADING })
     await user.click(screen.getByRole('button', { name: '4 items on 3 August 2026' }))
 
     await waitFor(() => expect(api.requestsTo('GET /api/digest?from=2026-08-03')).toHaveLength(1))

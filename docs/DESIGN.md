@@ -40,7 +40,8 @@ readable. A grey control darkens under the pointer and when pressed, past where
 button's count, an unselected segment — is `ink-off`, which clears 4.5:1 on
 every control fill: `control`, `control-hover`, `toggle-off` and a selected
 segment. On `ground`, `ink-3` clears only 3:1, so it is text only where that is enough:
-the page title's companion value, disabled controls and separator dots. On a
+the page title's companion value, a Digest day's count, disabled controls and
+separator dots. On a
 selected filter's `ink` fill it clears 4.5:1 and carries that filter's count.
 The lowest step with items, `ramp-2`, is 3:1 against `ground`, so a day with
 one item never reads as empty. A day's number on the Digest month clears 4.5:1 on its
@@ -60,7 +61,7 @@ selected segment, the current section and a pressed chip take the system's
 | `ground` | `oklch(100% 0 0)` | page, dialog panel, selected segment |
 | `ink` | `oklch(17.8% 0 0)` | text, primary button fill |
 | `ink-2` | `oklch(52.5% 0 0)` | meta, secondary text, counts, placeholders |
-| `ink-3` | `oklch(62% 0 0)` | title companion values, disabled text, separators |
+| `ink-3` | `oklch(62% 0 0)` | title companion values, a Digest day's count, disabled text, separators |
 | `ink-off` | `oklch(47.5% 0 0)` | grey text inside a control: unselected segments, chip and button counts |
 | `control` | `oklch(95.2% 0 0)` | grey buttons, fields, switch tracks |
 | `control-hover` | `oklch(91.9% 0 0)` | |
@@ -109,6 +110,7 @@ the choice is per device.
 | --- | --- | --- | --- |
 | Page title | Instrument Sans | 40/1.08 desktop, 32/1.08 phone, −0.015em | 500; companion value in `ink-3` at 400; an unbroken name wraps anywhere |
 | Group heading | Instrument Sans | 17/1 desktop, 16/1 phone | 500; count beside it in `ink-2` at 400 |
+| Digest day heading | Instrument Sans | 48/1.08 desktop, 36/1.08 phone, −0.025em | 600; the day's distance above it at 17/1.2 400 in `ink-2` (16 on a phone); count in parentheses in `ink-3` |
 | Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
 | Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
 | Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
@@ -118,7 +120,8 @@ the choice is per device.
 | Reader body | Literata | 19/1.7 desktop, 17/1.65 phone | 400, reader-body colour |
 | Wordmark | Literata italic | 21 desktop, 19 phone | 400 |
 
-Numbers in counts and meta use tabular figures.
+Numbers in counts and meta use tabular figures, except a Digest day's count,
+which takes the proportional figures of the date beside it.
 
 ## 4. Space and size
 
@@ -128,7 +131,8 @@ Numbers in counts and meta use tabular figures.
   title 64px below that.
 - Control height is 36px on desktop and 44px on a phone (48px for fields and
   sheet buttons). Small inline controls are 30px.
-- Item boxes are 8px apart; groups 56px; the title row and its toolbar 28px.
+- Item boxes are 8px apart; groups 56px; Digest days 64px, 48px on a phone; the
+  title row and its toolbar 28px.
 - The reading column is 680px, centred.
 - On desktop a 300px column beside a list — the Digest's month, a Feed filter —
   stands 64px from it, holds 24px from the top as the list scrolls, and scrolls
@@ -287,9 +291,10 @@ the Import tab's only line under its file is a refusal.
 its place saying what happened, with an outlined Undo button, so the list does
 not jump.
 
-**Digest.** Today's short date as the title's companion, then one list, newest
-day first, each day a group headed with its count; the date is said once, in
-the title's companion or the heading itself. Under the heading the day's Feeds
+**Digest.** The date heading is the page's title, so the word Digest is kept for
+screen readers and shown only before the first Subscription. One list, newest
+day first, each day headed by its full date with the count in parentheses, how
+far back it is on a line above. Under the heading the day's Feeds
 stand as chips with their counts, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
 alone, and pressing it again shows them all. Each Feed that published that day
 gets one box, the most recent first: a lone item is the ordinary item box; more
@@ -306,7 +311,7 @@ the days Monday first, each shaded by its count against the calendar's other
 days and those of the months either side plain, the day on show ringed, then the legend. Any day
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
-button at the end of the title's row opens the platform's own date picker, in
+button at the end of the first date's row, or of Back to today's, opens the platform's own date picker, in
 place of the month, and a day's chips run past the screen's edge. The phone Digest has no
 save squares and no entry times, so a title uses the width of the box. A lone
 title and a shared title each run three lines at most. A saved title in a
