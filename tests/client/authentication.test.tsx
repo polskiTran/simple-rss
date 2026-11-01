@@ -98,8 +98,11 @@ describe('an installation nobody has claimed', () => {
     const password = '界'.repeat(400)
 
     await fill('Setup secret', 'a-deployment-setup-secret')
-    await fill('Password', password)
-    await fill('Confirm password', password)
+    // Pasted: typing 800 characters takes most of the 5s test timeout on a CI runner.
+    await userEvent.click(screen.getByLabelText('Password'))
+    await userEvent.paste(password)
+    await userEvent.click(screen.getByLabelText('Confirm password'))
+    await userEvent.paste(password)
     await press('Claim installation')
 
     expect(await screen.findByText(/password is too long/i)).toBeDefined()
@@ -290,9 +293,11 @@ describe('coming back to a claimed installation', () => {
     await screen.findByRole('heading', { name: 'Can’t reach simple' })
 
     stubApi({ claimed: true, authenticated: false })
-    window.dispatchEvent(new Event('online'))
-
-    expect(await screen.findByLabelText('Password')).toBeDefined()
+    // A passive effect adds the listener after the heading paints, so an early event would be lost.
+    await waitFor(() => {
+      window.dispatchEvent(new Event('online'))
+      expect(screen.getByLabelText('Password')).toBeDefined()
+    })
   })
 })
 
