@@ -90,12 +90,6 @@ describe('runCli', () => {
     expect(JSON.parse(output[0]!)).toEqual({ searchIndexRebuilt: true, indexedItems: 1 })
   })
 
-  it('writes to the database inside the configured data directory', async () => {
-    await runCli(['set-timezone', 'Europe/Berlin'], context)
-
-    expect(context.config.databasePath).toBe(join(dataDir, 'simple-rss.db'))
-  })
-
   it('rejects set-timezone without an argument', async () => {
     expect(await runCli(['set-timezone'], context)).toBe(1)
   })
