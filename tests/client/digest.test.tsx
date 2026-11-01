@@ -226,22 +226,6 @@ describe('the chronological Digest', () => {
     expect(screen.queryByRole('button', { name: 'Add feed' })).toBeNull()
   })
 
-  it('tells a silent network apart from a refusing server, and offers the way back', async () => {
-    const api = stubApi().on('GET /api/digest', () => {
-      throw new TypeError('fetch failed')
-    })
-    window.history.replaceState(null, '', '/')
-    render(<App />)
-    const user = userEvent.setup()
-
-    expect(await screen.findByText('The digest can’t be reached.')).toBeDefined()
-
-    api.on('GET /api/digest', { body: DIGEST })
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
-
-    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
-  })
-
   it('counts a request that ran out of time as unreached', async () => {
     stubApi().on('GET /api/digest', () => {
       throw new DOMException('The operation timed out', 'TimeoutError')

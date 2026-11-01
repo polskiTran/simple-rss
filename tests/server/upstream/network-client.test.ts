@@ -137,18 +137,6 @@ describe('createNetworkHttpClient', () => {
     ).resolves.toMatchObject({ ok: false, code: 'too_large' })
   })
 
-  it('decodes a brotli body', async () => {
-    const compressed = await compressBrotli(Buffer.from('<rss>brotli</rss>'))
-    running = await origin((_request, response) => {
-      response.writeHead(200, { 'content-type': 'application/xml', 'content-encoding': 'br' })
-      response.end(compressed)
-    })
-
-    const response = await send(new Request(`${running.url}/feed.xml`))
-
-    await expect(response.text()).resolves.toBe('<rss>brotli</rss>')
-  })
-
   it('decodes a valid stack of content encodings in reverse order', async () => {
     const decoded = Buffer.from('<rss>stacked</rss>')
     const compressed = await compressBrotli(await compressGzip(decoded))

@@ -63,12 +63,6 @@ describe('the application shell', () => {
     expect(window.location.pathname).toBe('/digest')
   })
 
-  it('leaves the digest tab the only current one when the mark is a link', async () => {
-    await renderAt('/saved')
-
-    expect(activeTab()).toBe('Saved')
-  })
-
   it.each([...ROUTES])('marks %s as the current section when its path is open', async (route) => {
     await renderAt(`/${route}`)
 

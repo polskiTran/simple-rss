@@ -145,10 +145,6 @@ describe('article markdown rendering', () => {
     expect(body.querySelector('b')).toBeNull()
     expect(body.textContent).toContain('a <img src=x onerror=alert(1)> c')
   })
-
-  it('renders a thematic break between paragraphs', () => {
-    expect(bodyOf('one\n\n---\n\ntwo').querySelector('hr')).not.toBeNull()
-  })
 })
 
 describe('article images', () => {

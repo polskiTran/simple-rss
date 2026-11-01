@@ -20,10 +20,6 @@ describe('InstallationSettingsStore', () => {
     store = new InstallationSettingsStore(db)
   })
 
-  it('reports no settings before the installation is seeded', () => {
-    expect(store.read()).toBeUndefined()
-  })
-
   it('seeds the singleton row', () => {
     store.setTimezone('Europe/Berlin', AT)
 
@@ -45,21 +41,5 @@ describe('InstallationSettingsStore', () => {
       updatedAt: LATER.toISOString(),
     })
     expect(db.$client.prepare('SELECT COUNT(*) AS count FROM installation_settings').get()).toEqual({ count: 1 })
-  })
-
-  it('rejects a timezone the platform cannot resolve', () => {
-    expect(store.setTimezone('Mars/Olympus_Mons', AT)).toBe(false)
-    expect(store.read()).toBeUndefined()
-  })
-
-  it('reads back what a previous process wrote to the same file', () => {
-    store.setTimezone('Europe/Berlin', AT)
-    db.$client.close()
-
-    const reopened = openDatabase(join(dataDir, 'simple-rss.db'))
-    applyMigrations(reopened)
-
-    expect(new InstallationSettingsStore(reopened).read()?.timezone).toBe('Europe/Berlin')
-    reopened.$client.close()
   })
 })

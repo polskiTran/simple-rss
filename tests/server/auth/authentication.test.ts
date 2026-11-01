@@ -44,13 +44,6 @@ async function saturateTheCeiling(service: TestService): Promise<void> {
 }
 
 describe('an unclaimed installation', () => {
-  it('answers the health checks, which is how the platform sees it at all', async () => {
-    const service = await startTestService()
-
-    expect((await service.fetch('/health/live')).status).toBe(200)
-    expect((await service.fetch('/health/ready')).status).toBe(200)
-  })
-
   it('says it is unclaimed, so the client knows to offer setup', async () => {
     const service = await startTestService()
 

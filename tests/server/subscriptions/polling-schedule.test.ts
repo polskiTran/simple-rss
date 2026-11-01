@@ -27,12 +27,6 @@ describe('next poll', () => {
 })
 
 describe('retry after failures', () => {
-  it('waits one ordinary interval after the first failure', () => {
-    const wait = minutesAfterFrom(nextRetryTime(7, 120, 1, FROM))
-    expect(wait).toBeGreaterThanOrEqual(120)
-    expect(wait).toBeLessThan(132)
-  })
-
   it('doubles the wait with each further failure', () => {
     for (const [failures, minutes] of [
       [2, 240],

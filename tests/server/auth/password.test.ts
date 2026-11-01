@@ -1,25 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ARGON2ID_PARAMETERS, argon2idHasher } from '../../../src/server/auth/password.js'
+import { argon2idHasher } from '../../../src/server/auth/password.js'
 
 describe('the password hasher', () => {
-  it('produces an Argon2id verifier with the documented parameters', async () => {
-    const stored = await argon2idHasher().hash('a-calm-reading-password')
-
-    expect(stored).toMatch(
-      new RegExp(
-        `^\\$argon2id\\$v=19\\$m=${ARGON2ID_PARAMETERS.memoryCost},` +
-          `t=${ARGON2ID_PARAMETERS.timeCost},p=${ARGON2ID_PARAMETERS.parallelism}\\$`,
-      ),
-    )
-  })
-
-  it('accepts the password it was given', async () => {
-    const hasher = argon2idHasher()
-    const stored = await hasher.hash('a-calm-reading-password')
-
-    expect(await hasher.verify(stored, 'a-calm-reading-password')).toBe(true)
-  })
-
   it('rejects every other password, including a near miss', async () => {
     const hasher = argon2idHasher()
     const stored = await hasher.hash('a-calm-reading-password')

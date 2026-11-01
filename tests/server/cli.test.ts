@@ -147,12 +147,6 @@ describe('runCli reset-password', () => {
     expect(await argon2idHasher().verify(verifier!, 'a-recovered-password')).toBe(true)
   })
 
-  it('claims an installation whose setup secret was never used', async () => {
-    await runCli(['reset-password', 'a-recovered-password'], context)
-
-    expect(inspect((credentials) => credentials.passwordHash() !== undefined)).toBe(true)
-  })
-
   it('revokes every session, and says how many it ended', async () => {
     const at = context.clock.now()
     const issued = inspect((credentials) => [

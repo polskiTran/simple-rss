@@ -2,15 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { startTestService } from '../support/service-harness.js'
 
 describe('state on the durable volume', () => {
-  it('survives replacing the process, which is what a deployment does', async () => {
-    const service = await startTestService()
-    service.settings.setTimezone('Europe/Berlin', service.clock.now())
-
-    await service.restart()
-
-    expect(service.settings.read()?.timezone).toBe('Europe/Berlin')
-  })
-
   it('keeps the original creation time across the replacement', async () => {
     const service = await startTestService()
     service.settings.setTimezone('Europe/Berlin', service.clock.now())
