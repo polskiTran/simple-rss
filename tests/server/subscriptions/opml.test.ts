@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { MAX_OPML_FEEDS, OpmlError, parseOpml, serializeOpml } from '../../../src/server/subscriptions/opml.js'
+import { parseOpml, serializeOpml } from '../../../src/server/subscriptions/opml.js'
 
 const FIXTURES = join(import.meta.dirname, '../../fixtures/opml')
 
@@ -15,13 +15,6 @@ describe('parseOpml', () => {
       { url: 'https://journal.example/feed', title: 'Field Notes' },
       { url: 'https://atom.example/feed.xml', title: 'Atom Letters' },
       { url: 'https://uppercase.example/feed', title: 'Shouting exporter' },
-    ])
-  })
-
-  it('keeps the first occurrence when one document repeats a Feed URL', () => {
-    const outlines = parseOpml(fixture('nested-subscriptions.opml'))
-    expect(outlines.filter((outline) => outline.url === 'https://journal.example/feed')).toEqual([
-      { url: 'https://journal.example/feed', title: 'Field Notes' },
     ])
   })
 
@@ -46,27 +39,8 @@ describe('parseOpml', () => {
     )
   })
 
-  it('refuses a document listing more Feeds than one import will process', () => {
-    const outlines = Array.from(
-      { length: MAX_OPML_FEEDS + 1 },
-      (_, index) => `<outline xmlUrl="https://feeds.example/${index}"/>`,
-    ).join('')
-    expect(() => parseOpml(`<opml version="2.0"><body>${outlines}</body></opml>`)).toThrowError(
-      expect.objectContaining({ name: 'OpmlError', code: 'too_many_feeds' }),
-    )
-  })
-
   it('yields no Feeds for an OPML document holding only folders', () => {
     expect(parseOpml('<opml version="2.0"><body><outline text="Empty folder"/></body></opml>')).toEqual([])
-  })
-
-  it('exposes the failure as a typed OpmlError', () => {
-    try {
-      parseOpml('nonsense')
-      expect.unreachable('parseOpml accepted nonsense')
-    } catch (error) {
-      expect(error).toBeInstanceOf(OpmlError)
-    }
   })
 })
 

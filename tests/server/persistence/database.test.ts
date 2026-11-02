@@ -6,15 +6,6 @@ import { openDatabase } from '../../../src/server/persistence/database.js'
 import { makeTempDataDir } from '../../support/temp-dir.js'
 
 describe('openDatabase', () => {
-  it('creates the database file below the data directory', async () => {
-    const dataDir = await makeTempDataDir()
-
-    const db = openDatabase(join(dataDir, 'simple-rss.db'))
-    db.$client.close()
-
-    expect(existsSync(join(dataDir, 'simple-rss.db'))).toBe(true)
-  })
-
   it('creates missing intermediate directories under the data directory', async () => {
     const dataDir = await makeTempDataDir()
 

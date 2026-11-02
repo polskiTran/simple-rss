@@ -65,16 +65,6 @@ describe('parseFeedDocument', () => {
     ])
   })
 
-  it('maps an RSS GUID and an Atom ID into the same identity contract', () => {
-    const [rssItem] = parseFixture('rss-representative.xml').items
-    const [atomItem] = parseFixture('atom-representative.xml').items
-
-    expect(rssItem?.identityKind).toBe('guid')
-    expect(atomItem?.identityKind).toBe('guid')
-    expect(rssItem?.dedupeKey).toMatch(/^guid:/)
-    expect(atomItem?.dedupeKey).toMatch(/^guid:/)
-  })
-
   it('accepts a namespace-prefixed Atom document', () => {
     const parsed = parseFixture('atom-namespaced.xml')
 

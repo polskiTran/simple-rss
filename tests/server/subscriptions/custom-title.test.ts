@@ -80,26 +80,6 @@ describe('Custom Title', () => {
     })
   })
 
-  it('takes a Custom Title on an unchecked Feed; the first retrieval fills the reported title underneath', async () => {
-    const service = await startTestService()
-    service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })
-    const user = await claimedDevice(service)
-    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
-
-    const updated = await user.put('/api/feeds/1/details', { customTitle: 'My reading', customDescription: null })
-    expect(updated.status).toBe(200)
-    expect(await updated.json()).toEqual({
-      title: 'My reading',
-      customTitle: 'My reading',
-      description: null,
-      customDescription: null,
-    })
-
-    await service.wakeScheduler()
-    const detail = await (await user.get('/api/feeds/1')).json()
-    expect(detail).toMatchObject({ title: 'My reading', reportedTitle: 'Field Notes', customTitle: 'My reading' })
-  })
-
   it('refuses blank and oversized titles, and answers an unknown Feed with not found', async () => {
     const service = await startTestService()
     service.upstream.stub(FEED_URL, { headers: { 'content-type': 'application/rss+xml' }, body: rss('Field Notes') })

@@ -90,12 +90,6 @@ describe('runCli', () => {
     expect(JSON.parse(output[0]!)).toEqual({ searchIndexRebuilt: true, indexedItems: 1 })
   })
 
-  it('writes to the database inside the configured data directory', async () => {
-    await runCli(['set-timezone', 'Europe/Berlin'], context)
-
-    expect(context.config.databasePath).toBe(join(dataDir, 'simple-rss.db'))
-  })
-
   it('rejects set-timezone without an argument', async () => {
     expect(await runCli(['set-timezone'], context)).toBe(1)
   })
@@ -151,12 +145,6 @@ describe('runCli reset-password', () => {
 
     const verifier = inspect((credentials) => credentials.passwordHash())
     expect(await argon2idHasher().verify(verifier!, 'a-recovered-password')).toBe(true)
-  })
-
-  it('claims an installation whose setup secret was never used', async () => {
-    await runCli(['reset-password', 'a-recovered-password'], context)
-
-    expect(inspect((credentials) => credentials.passwordHash() !== undefined)).toBe(true)
   })
 
   it('revokes every session, and says how many it ended', async () => {

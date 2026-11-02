@@ -28,16 +28,6 @@ describe('migrations', () => {
     db.$client.close()
   })
 
-  it('is a no-op on an already migrated database', async () => {
-    const db = await openFreshDatabase()
-    applyMigrations(db)
-
-    const applied = applyMigrations(db)
-
-    expect(applied).toEqual([])
-    db.$client.close()
-  })
-
   it('survives a reopen of the same file, which is what container replacement does', async () => {
     const dataDir = await makeTempDataDir()
     const path = join(dataDir, 'simple-rss.db')

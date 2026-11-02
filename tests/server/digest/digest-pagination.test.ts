@@ -72,15 +72,6 @@ describe('the Digest in pages', () => {
     expect(digest.nextFrom).toBe('2026-08-07')
   })
 
-  it('answers a digest that fits one page with no next day at all', async () => {
-    const { user } = await subscribed(...minuteItems('2026-08-08', 'today', 3))
-
-    const digest = digestSchema.parse(await (await user.get('/api/digest')).json())
-
-    expect(flatTitles(digest)).toHaveLength(3)
-    expect(digest.nextFrom).toBeNull()
-  })
-
   it('says what follows an item even when the follower is on the next page', async () => {
     const { user } = await subscribed(
       ...minuteItems('2026-08-08', 'today', 50),

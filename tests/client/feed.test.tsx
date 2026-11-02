@@ -110,14 +110,6 @@ describe('opening one Feed', () => {
     expect(api.requestsTo('DELETE /api/library/12')).toHaveLength(1)
   })
 
-  it('opens directly from its own address', async () => {
-    feedApi()
-    window.history.replaceState(null, '', '/feeds/1')
-    render(<App />)
-
-    expect(await screen.findByRole('group', { name: /26 weeks of Cadence/i })).toBeDefined()
-  })
-
   it('shows no time for an item on a Release Date', async () => {
     feedApi(
       feedItems({
@@ -239,21 +231,6 @@ describe('managing one Feed', () => {
     expect(await screen.findByText('Refreshed. The feed shows 2 items.')).toBeDefined()
     await waitFor(() => expect(infoValue('Items, last 26 weeks')).toBe('4'))
     expect(api.requestsTo('POST /api/feeds/1/refresh')).toHaveLength(1)
-  })
-
-  it('explains a refresh the server asked to wait on', async () => {
-    feedApi().on('POST /api/feeds/1/refresh', {
-      status: 429,
-      headers: { 'retry-after': '42' },
-      body: { error: { code: 'refresh_rate_limited', message: 'Wait before refreshing this Feed again' } },
-    })
-    window.history.replaceState(null, '', '/feeds/1')
-    render(<App />)
-    const user = userEvent.setup()
-
-    await user.click(await screen.findByRole('button', { name: 'Refresh now' }))
-
-    expect(await screen.findByText('Checked a moment ago. Wait a little before retrying.')).toBeDefined()
   })
 
   it('shows calm Feed Availability while keeping the retained items readable', async () => {

@@ -124,13 +124,22 @@ test.describe('Reader View', () => {
   test('opens from the Digest, reads clean structured content, and returns', async ({ page, installation }) => {
     await subscribe(page, installation)
     await section(page, 'Digest').click()
+    const held = Promise.withResolvers<void>()
+    await page.route('**/api/items/*/reader', async (route) => {
+      await held.promise
+      await route.continue()
+    })
 
-    await page.getByRole('link', { name: 'First light' }).click()
-    await expect(page).toHaveURL(/\/reader\/\d+$/)
+    try {
+      await page.getByRole('link', { name: 'First light' }).click()
+      await expect(page).toHaveURL(/\/reader\/\d+$/)
 
-    await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
-    await expect(page.getByText('A clear morning.')).toBeVisible()
-    await expect(page.getByText('Reading the original webpage')).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeVisible()
+      await expect(page.getByText('A clear morning.')).toBeVisible()
+      await expect(page.getByText('Reading the original webpage')).toBeVisible()
+    } finally {
+      held.resolve()
+    }
     const meta = page.locator('.reader-meta')
     await expect(meta).toContainText('Field Notes')
     await expect(meta).toContainText(/\d+ min read/)
@@ -214,14 +223,20 @@ test.describe('Reader View', () => {
     await expect(page.getByRole('link', { name: 'First light' })).toBeVisible()
 
     const rendererRequested = page.waitForRequest(rendererChunk)
+    const held = Promise.withResolvers<void>()
     await page.route('**/reader', async (route) => {
       await rendererRequested
+      await held.promise
       await route.continue()
     })
 
-    await page.getByRole('link', { name: 'First light' }).click()
-    await expect(page.getByText('A clear morning.')).toBeVisible()
-    await expect(page.getByText('Reading the original webpage')).toBeVisible()
+    try {
+      await page.getByRole('link', { name: 'First light' }).click()
+      await expect(page.getByText('A clear morning.')).toBeVisible()
+      await expect(page.getByText('Reading the original webpage')).toBeVisible()
+    } finally {
+      held.resolve()
+    }
 
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByText('A clear morning.')).toHaveCount(0)
