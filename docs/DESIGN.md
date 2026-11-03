@@ -231,8 +231,8 @@ read. On a phone the Feed name and time share one line above the title. The whol
 box opens the Reader; the Feed name inside it opens the Feed. In search results a
 snippet sits under the title with the matched words marked in `match`.
 
-**Saving in a list.** A saved title is highlighted in `saved-tint`, sweeping
-across its lines over 420ms as it is saved and reversing from wherever it has
+**Saving in a list.** A saved title is highlighted in `saved-tint`, each line
+filled as a text selection fills it, sweeping across its lines over 420ms as it is saved and reversing from wherever it has
 reached — except on Saved and in a search of it, where every title is saved and
 the highlight would say nothing. On hover or keyboard focus, Save or Saved floats over
 the end of a title's first line, fading what is under it, so saving costs a title no
