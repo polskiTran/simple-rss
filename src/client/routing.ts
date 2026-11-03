@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   digestParamsOf,
   digestRequestSchema,
@@ -205,17 +205,54 @@ const historyOriginSchema = z.object({
 /**
  * What the app keeps on a history entry. `beneath` is the address of the entry
  * under this one, set when the app pushed it, so the way back can be the
- * browser's own Back. `scrollY` is where the page stood when the app left it.
+ * browser's own Back. `scrollY` is where the page stood when the app left it,
+ * and `kept` what its screen kept of how it was left (`useKept`).
  */
 const historyStateSchema = z.object({
   origin: z.unknown().optional(),
   beneath: z.string().optional(),
   scrollY: z.number().optional(),
+  kept: z.record(z.unknown()).optional(),
 })
 
 function historyState() {
   const parsed = historyStateSchema.safeParse(window.history.state)
   return parsed.success ? parsed.data : {}
+}
+
+const keptListeners = new Set<() => void>()
+
+function subscribeKept(listener: () => void) {
+  keptListeners.add(listener)
+  window.addEventListener('popstate', listener)
+  return () => {
+    keptListeners.delete(listener)
+    window.removeEventListener('popstate', listener)
+  }
+}
+
+function keptChanged() {
+  for (const listener of keptListeners) listener()
+}
+
+/**
+ * A value a screen keeps on its history entry, so coming back to the entry
+ * finds the screen as it was left: how far a list was read, which boxes stood
+ * unfolded. A pushed entry keeps nothing yet, nor does one replaced by another
+ * address. `name` is unique on its screen; `schema` reads back a primitive, so
+ * an unchanged value reads as the same one.
+ */
+export function useKept<T extends string | number | boolean>(name: string, schema: z.ZodType<T>) {
+  const value = useSyncExternalStore(subscribeKept, () => schema.safeParse(historyState().kept?.[name]).data)
+  const keep = useCallback(
+    (next: T | undefined) => {
+      const here = historyState()
+      window.history.replaceState({ ...here, kept: { ...here.kept, [name]: next } }, '')
+      keptChanged()
+    },
+    [name],
+  )
+  return [value, keep] as const
 }
 
 function currentPath(): string {
@@ -253,6 +290,12 @@ export interface Navigation {
   navigate(route: Route): void
   openFeed(feedId: number, from: Origin): void
   openReader(feedItemId: number, from: Origin): void
+  /**
+   * Steps the open Reader on to another item in place of this one, keeping its
+   * way back: Back, the app's or the browser's, leaves for the screen the first
+   * was opened from, as it was left.
+   */
+  stepReader(feedItemId: number): void
   /** Goes back to the entry beneath when it is the origin; otherwise walks to the origin's address. */
   returnTo(origin: Origin): void
   updateSearch(query: string): void
@@ -289,7 +332,9 @@ export function useNavigation(): Navigation {
       window.history.pushState({ origin, beneath: currentPath() }, '', path)
       setArrival({ scrollY: 0 })
     } else {
-      window.history.replaceState({ origin, beneath: here.beneath }, '', path)
+      const kept = path === currentPath() ? here.kept : undefined
+      window.history.replaceState({ origin, beneath: here.beneath, kept }, '', path)
+      keptChanged()
     }
     setLocation(locationOf(path, origin) ?? HOME)
   }, [])
@@ -302,6 +347,14 @@ export function useNavigation(): Navigation {
   const navigate = useCallback((next: Route) => go(sectionPath(next), undefined), [go])
   const openFeed = useCallback((feedId: number, from: Origin) => go(feedPath(feedId), from), [go])
   const openReader = useCallback((feedItemId: number, from: Origin) => go(readerPath(feedItemId), from), [go])
+  const stepReader = useCallback(
+    (feedItemId: number) => {
+      if (location.screen !== 'reader') return
+      place(readerPath(feedItemId), location.origin, 'replace')
+      setArrival({ scrollY: 0 })
+    },
+    [location, place],
+  )
   const returnTo = useCallback(
     (origin: Origin) => {
       if (historyState().beneath !== origin.path) {
@@ -354,6 +407,7 @@ export function useNavigation(): Navigation {
     navigate,
     openFeed,
     openReader,
+    stepReader,
     returnTo,
     updateSearch,
     searchIn,

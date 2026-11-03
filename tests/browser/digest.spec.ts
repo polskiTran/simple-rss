@@ -161,6 +161,45 @@ test.describe('the Digest presentation', () => {
     await expect(page).not.toHaveURL(/\/reader\//)
   })
 
+  test('comes back to an article Show more brought, with every day read above it', async ({ page, installation }) => {
+    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await page.getByRole('button', { name: 'Show more' }).click()
+    const older = page.getByRole('link', { name: 'Meadow note 53', exact: true })
+    await older.scrollIntoViewIfNeeded()
+    const left = await page.evaluate(() => window.scrollY)
+
+    await older.click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 53' })).toBeFocused()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+
+    await expect(page.locator('main .feed-day')).toHaveCount(55)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    await expect(older).toBeInViewport()
+  })
+
+  test('comes back past every next in the digest to the place it left', async ({ page, installation }) => {
+    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await page.getByRole('button', { name: 'Show more' }).click()
+    const older = page.getByRole('link', { name: 'Meadow note 52', exact: true })
+    await older.scrollIntoViewIfNeeded()
+    const left = await page.evaluate(() => window.scrollY)
+
+    await older.click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 52' })).toBeFocused()
+    const entries = await page.evaluate(() => history.length)
+    await page.getByRole('link', { name: 'Meadow note 53' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 53' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+    expect(await page.evaluate(() => history.length)).toBe(entries)
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+
+    await expect(page.locator('main .feed-day')).toHaveCount(55)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    expect(await page.evaluate(() => history.length)).toBe(entries)
+  })
+
   test('names a network loss plainly and recovers on Retry', async ({ page, installation }) => {
     await subscribe(page, installation)
 
@@ -209,28 +248,33 @@ async function sharedTitle(row: Locator) {
   })
 }
 
+/** Today's one Field Notes item, First light, answered as forty in one box led by it as `Ledger entry 1`. */
+function ledgerDay(page: Page) {
+  return page.route(
+    (url) => url.pathname === '/api/digest',
+    async (route) => {
+      const response = await route.fetch()
+      const digest = await response.json()
+      const [group] = digest.groups
+      if (group) {
+        const [item] = group.items
+        group.items = Array.from({ length: 40 }, (_, index) => ({
+          ...item,
+          feedItemId: item.feedItemId + index,
+          title: `Ledger entry ${index + 1}`,
+        }))
+      }
+      await route.fulfill({ response, json: digest })
+    },
+  )
+}
+
 test.describe('a Feed\u2019s day', () => {
   test('folds from where it unfolded, moving no title, with the control in reach down the list', async ({
     page,
     installation,
   }) => {
-    await page.route(
-      (url) => url.pathname === '/api/digest',
-      async (route) => {
-        const response = await route.fetch()
-        const digest = await response.json()
-        const [group] = digest.groups
-        if (group) {
-          const [item] = group.items
-          group.items = Array.from({ length: 40 }, (_, index) => ({
-            ...item,
-            feedItemId: item.feedItemId + index,
-            title: `Ledger entry ${index + 1}`,
-          }))
-        }
-        await route.fulfill({ response, json: digest })
-      },
-    )
+    await ledgerDay(page)
     await openDigest(page, installation)
 
     const title = page.getByRole('heading', { name: 'Ledger entry 1', exact: true })
@@ -251,6 +295,19 @@ test.describe('a Feed\u2019s day', () => {
 
     await expect(title).toBeInViewport()
     await expect(page.getByRole('heading', { name: 'Ledger entry 4', exact: true })).toHaveCount(0)
+  })
+
+  test('comes back from an article to its box still unfolded', async ({ page, installation }) => {
+    await ledgerDay(page)
+    await openDigest(page, installation)
+    await page.getByRole('button', { name: 'Show all' }).click()
+
+    await page.getByRole('link', { name: 'Ledger entry 1', exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeFocused()
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+
+    await expect(page.getByRole('button', { name: 'Show less' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Ledger entry 40', exact: true })).toBeVisible()
   })
 
   test('opens the Reader from anywhere in a lone box', async ({ page, installation }) => {

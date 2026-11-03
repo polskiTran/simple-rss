@@ -6,6 +6,8 @@ import { cadenceWindow } from './cadence-window.js'
 import type { SearchResults } from '../../src/shared/api.js'
 import {
   digest,
+  digestGroup,
+  digestItem,
   feedDetail,
   feedItems,
   library,
@@ -41,6 +43,8 @@ const LIBRARY = library({
 function reading(path: string): StubbedApi {
   const api = stubApi()
     .on('GET /api/digest', { body: digest() })
+    // Coming back asks again through the oldest day shown.
+    .on('GET /api/digest?through=2026-08-08', { body: digest() })
     .on('GET /api/feeds/1', { body: DETAIL })
     .on('GET /api/feeds/1/items', { body: feedItems() })
     .on('GET /api/items/3', { body: readerItem() })
@@ -97,6 +101,7 @@ describe('a Feed Item’s attribution', () => {
     reading('/digest?from=2026-08-07')
       .on('GET /api/digest/days', { body: { today: '2026-08-08', days: cadenceWindow(), subscriptions: 1 } })
       .on('GET /api/digest?from=2026-08-07', { body: digest() })
+      .on('GET /api/digest?from=2026-08-07&through=2026-08-08', { body: digest() })
     render(<App />)
     const user = userEvent.setup()
 
@@ -254,6 +259,29 @@ describe('the way back out of an opened screen', () => {
     expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
     expect(window.history.length).toBe(entries)
+  })
+
+  it('comes back to the Digest still showing the one Feed of the day it was narrowed to', async () => {
+    const twoFeeds = digest({
+      groups: [
+        digestGroup({
+          items: [digestItem(), digestItem({ feedItemId: 5, title: 'A letter', feedId: 2, feedTitle: 'Letters' })],
+        }),
+      ],
+    })
+    reading('/digest')
+      .on('GET /api/digest', { body: twoFeeds })
+      .on('GET /api/digest?through=2026-08-08', { body: twoFeeds })
+    render(<App />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Field Notes 1' }))
+    await user.click(screen.getByRole('link', { name: 'First light' }))
+    await openedArticle()
+
+    await user.click(wayBack())
+
+    expect((await screen.findByRole('button', { name: 'Field Notes 1' })).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('link', { name: 'A letter' })).toBeNull()
   })
 
   it('walks to the origin of an article opened by address, which the browser’s Back then leaves', async () => {

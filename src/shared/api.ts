@@ -434,38 +434,26 @@ export const dateKeySchema = z
   })
 
 /**
- * Where the Digest starts: `from` a day — that day and every one before it —
- * rather than today. `digestParamsOf` and `digestRequestSchema` are the two
- * directions of one encoding.
+ * Where a page of whole days starts: `from` a day — that day and every one
+ * before it — rather than today, and on `through` a day however many items it
+ * takes. The Digest and a Feed's items page by it alike: `through` lets the
+ * cadence grid show a day not yet loaded, and the Digest come back to every day
+ * it was read through, in one request. `digestParamsOf` and
+ * `digestRequestSchema` are the two directions of one encoding.
  */
 export interface DigestStart {
   readonly from?: string | undefined
+  readonly through?: string | undefined
 }
 
-export function digestParamsOf({ from }: DigestStart): URLSearchParams {
-  return new URLSearchParams(from ? { from } : {})
+export function digestParamsOf({ from, through }: DigestStart): URLSearchParams {
+  return new URLSearchParams({ ...(from ? { from } : {}), ...(through ? { through } : {}) })
 }
 
 export const digestRequestSchema = z.object({
   from: dateKeySchema.optional(),
-}) satisfies z.ZodType<DigestStart>
-
-/**
- * Where a page of a Feed's items starts, `from` a day as the Digest does, and
- * the day it must reach: a page runs on `through` that day however many items
- * it takes, so the cadence grid can show a day not yet loaded in one request.
- */
-export interface FeedItemsStart extends DigestStart {
-  readonly through?: string | undefined
-}
-
-export function feedItemsParamsOf({ from, through }: FeedItemsStart): URLSearchParams {
-  return new URLSearchParams({ ...(from ? { from } : {}), ...(through ? { through } : {}) })
-}
-
-export const feedItemsRequestSchema = digestRequestSchema.extend({
   through: dateKeySchema.optional(),
-}) satisfies z.ZodType<FeedItemsStart>
+}) satisfies z.ZodType<DigestStart>
 
 /**
  * The Digest's own cadence: every day of the grid window, with `today` ending

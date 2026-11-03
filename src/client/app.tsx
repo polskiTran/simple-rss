@@ -120,8 +120,7 @@ function signedInView(navigation: Navigation, gate: Gate) {
           feedItemId={location.feedItemId}
           origin={location.origin}
           onBack={navigation.returnTo}
-          // The next item replaces this one, so it keeps this one's way back.
-          onOpenItem={(next) => navigation.openReader(next, location.origin)}
+          onOpenItem={navigation.stepReader}
           onOpenFeed={openFeed}
         />
       )

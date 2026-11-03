@@ -1,9 +1,9 @@
 import { and, desc, eq, lte } from 'drizzle-orm'
 import type {
+  DigestStart,
   FeedDetail,
   FeedDetailsUpdate,
   FeedItems,
-  FeedItemsStart,
   PollingIntervalMinutes,
   PollingSchedule,
   ReadingSource,
@@ -288,7 +288,7 @@ export class SubscriptionService {
   }
 
   /** A page of a subscribed Feed's retained items, cut into whole installation-timezone days as the Digest is. */
-  items(feedId: number, start: FeedItemsStart): FeedItems | undefined {
+  items(feedId: number, start: DigestStart): FeedItems | undefined {
     const subscribed = this.#db
       .select({ feedId: subscriptions.feedId })
       .from(subscriptions)
