@@ -31,4 +31,3 @@ Preconditions:
 - The Feed page sits lower because of its Back button. It is left out of the line check on purpose.
 - A phone's Digest date sits 25px lower. Its 24px padding has no room for the distance, so the check leaves it out.
 - Sign in and Setup also use the title. The mock is always signed in, so route `/api/auth/status` in a spec to see them.
-- `konsekwencjach` breaks across lines in the Feed title at 320px. It is a real finding with worst-case data at 36px.
