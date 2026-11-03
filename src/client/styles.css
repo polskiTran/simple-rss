@@ -1049,8 +1049,7 @@
   }
 
   .item-title {
-    margin: 0 -0.2em;
-    padding-inline: 0.2em;
+    margin: 0;
     font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     display: -webkit-box;
@@ -2351,11 +2350,8 @@
     position: relative;
   }
 
-  /* Room either side of the text for the highlight to reach past it, undone by
-     the margin so a saved title starts where every other does. */
   .feed-day-title {
-    margin: 0 -0.2em;
-    padding-inline: 0.2em;
+    margin: 0;
     font: 400 19px / 1.4 var(--font-read);
     text-wrap: pretty;
     overflow-wrap: anywhere;
@@ -2385,21 +2381,22 @@
 
   /* A saved title's highlight, reading the toggle's own state so it answers on
      the press. One sweep across the lines, first to last, reversing from wherever
-     it has reached. Its height stays within a line, so a line the clamp hides
-     leaves no sliver under the last it shows. On Saved every title is saved, so
-     it would say nothing. */
+     it has reached. Like a text selection, each line is filled to the text's
+     edges and to the line's full height, and a line the clamp hides leaves no
+     sliver under the last it shows. The half pixel past the line closes the seam
+     that snapping each band to device pixels leaves between lines. On Saved every
+     title is saved, so it would say nothing. */
   .item-text {
-    margin-inline: -0.2em;
-    padding-inline: 0.2em;
+    --saved-band: calc(1lh + 0.5px);
     background-image: linear-gradient(var(--color-saved-tint), var(--color-saved-tint));
     background-repeat: no-repeat;
     background-position: 0 50%;
-    background-size: 0% 1.3em;
+    background-size: 0% var(--saved-band);
     transition: background-size var(--duration-highlight) var(--ease-out);
   }
 
   :is(.feed-day-item, :not(.library-list) > .item):has(> .save-word[data-pressed]) .item-text {
-    background-size: 100% 1.3em;
+    background-size: 100% var(--saved-band);
   }
 
   /* A lone title opens the Reader from anywhere in its box, past its own row;
