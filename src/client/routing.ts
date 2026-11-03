@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   digestParamsOf,
   digestRequestSchema,
@@ -205,17 +205,54 @@ const historyOriginSchema = z.object({
 /**
  * What the app keeps on a history entry. `beneath` is the address of the entry
  * under this one, set when the app pushed it, so the way back can be the
- * browser's own Back. `scrollY` is where the page stood when the app left it.
+ * browser's own Back. `scrollY` is where the page stood when the app left it,
+ * and `kept` what its screen kept of how it was left (`useKept`).
  */
 const historyStateSchema = z.object({
   origin: z.unknown().optional(),
   beneath: z.string().optional(),
   scrollY: z.number().optional(),
+  kept: z.record(z.unknown()).optional(),
 })
 
 function historyState() {
   const parsed = historyStateSchema.safeParse(window.history.state)
   return parsed.success ? parsed.data : {}
+}
+
+const keptListeners = new Set<() => void>()
+
+function subscribeKept(listener: () => void) {
+  keptListeners.add(listener)
+  window.addEventListener('popstate', listener)
+  return () => {
+    keptListeners.delete(listener)
+    window.removeEventListener('popstate', listener)
+  }
+}
+
+function keptChanged() {
+  for (const listener of keptListeners) listener()
+}
+
+/**
+ * A value a screen keeps on its history entry, so coming back to the entry
+ * finds the screen as it was left: how far a list was read, which boxes stood
+ * unfolded. A pushed entry keeps nothing yet, nor does one replaced by another
+ * address. `name` is unique on its screen; `schema` reads back a primitive, so
+ * an unchanged value reads as the same one.
+ */
+export function useKept<T extends string | number | boolean>(name: string, schema: z.ZodType<T>) {
+  const value = useSyncExternalStore(subscribeKept, () => schema.safeParse(historyState().kept?.[name]).data)
+  const keep = useCallback(
+    (next: T | undefined) => {
+      const here = historyState()
+      window.history.replaceState({ ...here, kept: { ...here.kept, [name]: next } }, '')
+      keptChanged()
+    },
+    [name],
+  )
+  return [value, keep] as const
 }
 
 function currentPath(): string {
@@ -289,7 +326,9 @@ export function useNavigation(): Navigation {
       window.history.pushState({ origin, beneath: currentPath() }, '', path)
       setArrival({ scrollY: 0 })
     } else {
-      window.history.replaceState({ origin, beneath: here.beneath }, '', path)
+      const kept = path === currentPath() ? here.kept : undefined
+      window.history.replaceState({ origin, beneath: here.beneath, kept }, '', path)
+      keptChanged()
     }
     setLocation(locationOf(path, origin) ?? HOME)
   }, [])

@@ -4,7 +4,7 @@ import {
   MAX_FEED_DESCRIPTION_LENGTH,
   MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
-  feedItemsParamsOf,
+  digestParamsOf,
   type FeedDetail,
   type FeedDetailsUpdate,
   type FeedItems,
@@ -123,7 +123,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       return
     }
     setShownDay(date)
-    pages.loadMore(feedItemsParamsOf({ from: items.nextFrom, through: date }).toString())
+    pages.loadMore(digestParamsOf({ from: items.nextFrom, through: date }).toString())
   }
 
   useEffect(() => {
@@ -326,7 +326,7 @@ function Items({
         nextCursor={page.nextFrom}
         older={older}
         noun="items"
-        onLoadOlder={(from) => onLoadOlder(feedItemsParamsOf({ from }).toString())}
+        onLoadOlder={(from) => onLoadOlder(digestParamsOf({ from }).toString())}
       />
     </div>
   )

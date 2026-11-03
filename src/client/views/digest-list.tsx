@@ -1,9 +1,11 @@
-import { digestParamsOf, type DigestStart } from '../../shared/api.js'
+import { useEffect } from 'react'
+import { dateKeySchema, digestParamsOf, type DigestStart } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems } from '../components/older-items.js'
 import { withSaved } from '../components/save-toggle.js'
+import { useKept } from '../routing.js'
 import { usePagedResource, valueInView } from '../use-resource.js'
 import { DigestDay } from './digest-day.js'
 
@@ -19,15 +21,22 @@ interface DigestListProps {
 
 /**
  * The Digest from one day, or from today, a day to a group; Show more goes on
- * from the day the page names. A new start keeps the old list in view until
+ * from the day the page names. The oldest day shown is kept on the history
+ * entry, so coming back asks for every day read through in one page, and the
+ * scroll lands where it was left. A new start keeps the old list in view until
  * its own first page answers.
  */
 export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: DigestListProps) {
+  const [through, keepThrough] = useKept('through', dateKeySchema)
   const [state, { retry, set, loadMore, older }] = usePagedResource(
     digestParamsOf(start).toString(),
-    (from, signal) => fetchDigest(from ? { from } : start, signal),
+    (from, signal) => fetchDigest(from ? { from } : { ...start, through }, signal),
     (shown, page) => ({ ...shown, groups: [...shown.groups, ...page.groups], nextFrom: page.nextFrom }),
   )
+  const oldestShown = state.kind === 'loaded' ? state.value.groups.at(-1)?.date : undefined
+  useEffect(() => {
+    if (oldestShown) keepThrough(oldestShown)
+  }, [oldestShown, keepThrough])
 
   const setSaved = (feedItemId: number, saved: boolean) =>
     set((digest) => ({

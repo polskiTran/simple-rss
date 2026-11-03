@@ -243,7 +243,7 @@ export function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<F
   return getJson(`/api/feeds/${feedId}`, feedDetailSchema, { signal })
 }
 
-/** `query` is a `feedItemsParamsOf` encoding, which is also the cursor a Feed's Show more pages by. */
+/** `query` is a `digestParamsOf` encoding, which is also the cursor a Feed's Show more pages by. */
 export function fetchFeedItems(feedId: number, query: string, signal?: AbortSignal): Promise<FeedItems> {
   return getJson(withQuery(`/api/feeds/${feedId}/items`, new URLSearchParams(query)), feedItemsSchema, { signal })
 }

@@ -2,7 +2,6 @@ import { Hono, type Context } from 'hono'
 import {
   createSubscriptionRequestSchema,
   digestRequestSchema,
-  feedItemsRequestSchema,
   feedPreviewRequestSchema,
   importOpmlRequestSchema,
   readingSourcePreferenceSchema,
@@ -110,7 +109,7 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   app.get('/feeds/:feedId/items', (c) => {
     const feedId = readId(c, 'feedId')
     if (!feedId.ok) return feedId.response
-    const start = feedItemsRequestSchema.safeParse({ from: c.req.query('from'), through: c.req.query('through') })
+    const start = digestRequestSchema.safeParse({ from: c.req.query('from'), through: c.req.query('through') })
     if (!start.success)
       return apiError(c, 400, 'invalid_request', "A Feed's items start from and run through days as YYYY-MM-DD")
 
@@ -178,9 +177,10 @@ export function feedRoutes(deps: FeedRouteDependencies): Hono {
   })
 
   app.get('/digest', (c) => {
-    const filter = digestRequestSchema.safeParse({ from: c.req.query('from') })
-    if (!filter.success) return apiError(c, 400, 'invalid_request', 'The Digest starts from a day as YYYY-MM-DD')
-    return c.json<Digest>(deps.digest.read(filter.data))
+    const start = digestRequestSchema.safeParse({ from: c.req.query('from'), through: c.req.query('through') })
+    if (!start.success)
+      return apiError(c, 400, 'invalid_request', 'The Digest starts from and runs through days as YYYY-MM-DD')
+    return c.json<Digest>(deps.digest.read(start.data))
   })
 
   app.get('/digest/days', (c) => c.json<DigestCalendar>(deps.digest.calendar()))

@@ -1,8 +1,9 @@
 import { Button } from '@base-ui/react/button'
 import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { flushSync } from 'react-dom'
+import { z } from 'zod'
 import type { DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
 import { Icon } from '../components/icon.js'
 import { Group } from '../components/group.js'
@@ -10,7 +11,7 @@ import { FeedName } from '../components/item-box.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { counted, dayDistance, headingDay, longDay, namedDay, relativeDay } from '../day-names.js'
-import { feedPath, readerPath } from '../routing.js'
+import { feedPath, readerPath, useKept } from '../routing.js'
 
 /** A Feed with more items than this in one day is folded to its newest `FOLDED_ITEMS`. */
 const FOLD_OVER = 5
@@ -25,6 +26,7 @@ interface DigestDayProps {
 }
 
 interface FeedDay {
+  readonly date: string
   readonly feedId: number
   readonly title: string
   readonly items: readonly [DigestItem, ...DigestItem[]]
@@ -32,7 +34,7 @@ interface FeedDay {
 }
 
 export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: DigestDayProps) {
-  const [only, setOnly] = useState<number>()
+  const [only, keepOnly] = useKept(`only ${group.date}`, z.number())
   const feeds = feedDaysOf(group)
   const day = relativeDay(group.date, today) ? longDay(group.date) : namedDay(group.date, today)
   return (
@@ -52,7 +54,7 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
           className="day-feeds"
           aria-label={`Feeds on ${day}`}
           value={only === undefined ? [] : [String(only)]}
-          onValueChange={([chosen]) => setOnly(chosen === undefined ? undefined : Number(chosen))}
+          onValueChange={([chosen]) => keepOnly(chosen === undefined ? undefined : Number(chosen))}
         >
           {feeds.map((feed) => (
             <Toggle key={feed.feedId} className="chip" value={String(feed.feedId)} title={feed.title}>
@@ -84,6 +86,7 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
     first
       ? [
           {
+            date: group.date,
             feedId: first.feedId,
             title: first.feedTitle,
             items: [first, ...rest] as const,
@@ -98,7 +101,8 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
  * A Feed's day: who on one line, then every title across the box. The saved
  * highlight reads the toggle's own state, so it answers on the press. Past
  * `FOLD_OVER`, the control stays in the header, which sticks while unfolded, so
- * folding is where unfolding was however far down the list.
+ * folding is where unfolding was however far down the list; unfolded is kept
+ * on the history entry, so the box is still open on the way back.
  */
 function FeedDayBox({
   feed,
@@ -106,12 +110,12 @@ function FeedDayBox({
   onOpenFeed,
   onSaved,
 }: Omit<DigestDayProps, 'group' | 'today'> & { feed: FeedDay }) {
-  const [unfolded, setUnfolded] = useState(false)
+  const [unfolded = false, keepUnfolded] = useKept(`unfolded ${feed.date} ${feed.feedId}`, z.boolean())
   const box = useRef<HTMLElement>(null)
   const foldable = feed.items.length > FOLD_OVER
   const folded = foldable && !unfolded
   const toggleFold = () => {
-    flushSync(() => setUnfolded(!unfolded))
+    flushSync(() => keepUnfolded(!unfolded))
     if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0) box.current?.scrollIntoView()
   }
   const quiet = feed.quiet ? <QuietSpell quietDays={feed.quiet.quietDays} /> : null

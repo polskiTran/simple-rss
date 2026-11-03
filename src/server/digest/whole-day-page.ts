@@ -1,5 +1,5 @@
 import { gte, lt, type SQL } from 'drizzle-orm'
-import type { FeedItemsStart } from '../../shared/api.js'
+import type { DigestStart } from '../../shared/api.js'
 import { dayAfter, dayKeysIn, dayStartUtc } from '../calendar.js'
 import { feedItems } from '../persistence/schema.js'
 
@@ -20,7 +20,7 @@ type NewestFirst<Row> = (conditions: readonly (SQL | undefined)[], limit?: numbe
  */
 export function wholeDayPage<Row extends { readonly chronologyAt: string }>(
   newestFirst: NewestFirst<Row>,
-  { from, through }: FeedItemsStart,
+  { from, through }: DigestStart,
   timezone: string,
 ) {
   const dayOf = dayKeysIn(timezone)

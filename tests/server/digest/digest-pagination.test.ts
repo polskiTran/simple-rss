@@ -72,6 +72,25 @@ describe('the Digest in pages', () => {
     expect(digest.nextFrom).toBe('2026-08-07')
   })
 
+  it('runs on through a day already read, so the way back brings every day in one page', async () => {
+    const { user } = await subscribed(
+      ...minuteItems('2026-08-08', 'today', 50),
+      ...minuteItems('2026-08-07', 'yesterday', 3),
+      ...minuteItems('2026-08-05', 'earlier', 3),
+      ...minuteItems('2026-08-03', 'oldest', 3),
+    )
+
+    const page = digestSchema.parse(await (await user.get('/api/digest?through=2026-08-05')).json())
+
+    expect(page.groups.map(({ date, items }) => [date, items.length])).toEqual([
+      ['2026-08-08', 50],
+      ['2026-08-07', 3],
+      ['2026-08-05', 3],
+    ])
+    expect(page.nextFrom).toBe('2026-08-03')
+    expect((await user.get('/api/digest?through=2026-02-30')).status).toBe(400)
+  })
+
   it('says what follows an item even when the follower is on the next page', async () => {
     const { user } = await subscribed(
       ...minuteItems('2026-08-08', 'today', 50),
