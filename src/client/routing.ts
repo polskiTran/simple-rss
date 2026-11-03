@@ -290,6 +290,12 @@ export interface Navigation {
   navigate(route: Route): void
   openFeed(feedId: number, from: Origin): void
   openReader(feedItemId: number, from: Origin): void
+  /**
+   * Steps the open Reader on to another item in place of this one, keeping its
+   * way back: Back, the app's or the browser's, leaves for the screen the first
+   * was opened from, as it was left.
+   */
+  stepReader(feedItemId: number): void
   /** Goes back to the entry beneath when it is the origin; otherwise walks to the origin's address. */
   returnTo(origin: Origin): void
   updateSearch(query: string): void
@@ -341,6 +347,14 @@ export function useNavigation(): Navigation {
   const navigate = useCallback((next: Route) => go(sectionPath(next), undefined), [go])
   const openFeed = useCallback((feedId: number, from: Origin) => go(feedPath(feedId), from), [go])
   const openReader = useCallback((feedItemId: number, from: Origin) => go(readerPath(feedItemId), from), [go])
+  const stepReader = useCallback(
+    (feedItemId: number) => {
+      if (location.screen !== 'reader') return
+      place(readerPath(feedItemId), location.origin, 'replace')
+      setArrival({ scrollY: 0 })
+    },
+    [location, place],
+  )
   const returnTo = useCallback(
     (origin: Origin) => {
       if (historyState().beneath !== origin.path) {
@@ -393,6 +407,7 @@ export function useNavigation(): Navigation {
     navigate,
     openFeed,
     openReader,
+    stepReader,
     returnTo,
     updateSearch,
     searchIn,
