@@ -237,11 +237,13 @@ test.describe('a Feed\u2019s day', () => {
     const more = page.getByRole('button', { name: 'Show all' })
     const unfoldedFrom = await more.boundingBox()
     const titleAt = await title.boundingBox()
+    const titleLooks = await title.screenshot()
     await more.click()
 
     const less = page.getByRole('button', { name: 'Show less' })
     expect(await less.boundingBox()).toEqual(unfoldedFrom)
     expect(await title.boundingBox()).toEqual(titleAt)
+    expect((await title.screenshot()).equals(titleLooks)).toBe(true)
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2))
     await expect(less).toBeInViewport()
