@@ -2320,21 +2320,13 @@
     }
   }
 
-  /* Unfolded, the header sticks. Over ground its fade shows nothing; it appears
-     only as titles pass under it. */
+  /* Unfolded, the header sticks. Its fade stays inside its bottom padding, so at
+     rest it covers no title and it shows only as titles pass under it. */
   .feed-day[data-unfolded] .feed-day-head {
     position: sticky;
     top: 0;
     z-index: 2;
-
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 100% 0 auto;
-      height: 16px;
-      background: linear-gradient(var(--color-ground), transparent);
-      pointer-events: none;
-    }
+    background: linear-gradient(to top, transparent, var(--color-ground) 8px);
   }
 
   /* A title reached by keyboard clears the stuck header. */
