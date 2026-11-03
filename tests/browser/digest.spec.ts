@@ -178,6 +178,28 @@ test.describe('the Digest presentation', () => {
     await expect(older).toBeInViewport()
   })
 
+  test('comes back past every next in the digest to the place it left', async ({ page, installation }) => {
+    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
+    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await page.getByRole('button', { name: 'Show more' }).click()
+    const older = page.getByRole('link', { name: 'Meadow note 52', exact: true })
+    await older.scrollIntoViewIfNeeded()
+    const left = await page.evaluate(() => window.scrollY)
+
+    await older.click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 52' })).toBeFocused()
+    const entries = await page.evaluate(() => history.length)
+    await page.getByRole('link', { name: 'Meadow note 53' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 53' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+    expect(await page.evaluate(() => history.length)).toBe(entries)
+    await page.getByRole('link', { name: 'Back to Digest' }).click()
+
+    await expect(page.locator('main .feed-day')).toHaveCount(55)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    expect(await page.evaluate(() => history.length)).toBe(entries)
+  })
+
   test('names a network loss plainly and recovers on Retry', async ({ page, installation }) => {
     await subscribe(page, installation)
 
