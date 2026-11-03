@@ -19,13 +19,16 @@ const MIN_FREE_MB = 1024
 
 const playwright = createRequire(join(ROOT, 'package.json'))('@playwright/test')
 
-/** Widths the session's bugs lived at: both sides of the 1024px break, a phone, the narrowest phone, 200% zoom. */
+/**
+ * Widths the session's bugs lived at: both sides of the 1024px break, a phone, the narrowest phone, 200% zoom.
+ * A phone target is a mobile browser: touch, and overlay scrollbars, so `scrollbar-gutter` reserves nothing.
+ */
 const TARGETS = {
   d1440: { width: 1440, height: 900, scheme: 'light' },
   d1180: { width: 1180, height: 900, scheme: 'light' },
   d1025: { width: 1025, height: 800, scheme: 'dark' },
-  p390: { width: 390, height: 844, scheme: 'light', touch: true },
-  p320: { width: 320, height: 640, scheme: 'dark', touch: true },
+  p390: { width: 390, height: 844, scheme: 'light', phone: true },
+  p320: { width: 320, height: 640, scheme: 'dark', phone: true },
   z200: { width: 640, height: 450, scheme: 'light', scale: 2 },
 }
 
@@ -282,7 +285,8 @@ async function sweep(args) {
       viewport: { width: target.width, height: target.height },
       deviceScaleFactor: target.scale ?? 1,
       colorScheme: target.scheme,
-      hasTouch: target.touch ?? false,
+      hasTouch: target.phone ?? false,
+      isMobile: target.phone ?? false,
       timezoneId: 'UTC',
     })
     await context.addInitScript(([key, chosen]) => sessionStorage.setItem(key, chosen), [DEV_STORE_KEY, data])

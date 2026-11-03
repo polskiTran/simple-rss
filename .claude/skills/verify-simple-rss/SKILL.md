@@ -110,3 +110,4 @@ Each of these happened in a real session:
 - `Save` stayed visible after a click because `:focus-within` matches mouse focus. No resting screenshot shows that.
 - Show all and Show less moved titles by 15px. Only measuring before and after the toggle shows that.
 - A check that needed data the mock lacks was skipped by hand. Search is now fixed data in `SEARCH_ANSWER`.
+- A Feed title broke `konsekwencjach` at 320px only because the phone targets drew a desktop scrollbar, which `scrollbar-gutter: stable` kept 15px for. Phones overlay their scrollbars, so the phone targets now emulate a mobile browser.
