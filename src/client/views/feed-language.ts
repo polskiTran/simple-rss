@@ -76,11 +76,11 @@ export function retryFailure(cause: unknown): string {
  * The last success names its year when it differs from the latest check's, the
  * one that found the Feed still down.
  */
-export function unavailableNote(availability: FeedAvailability): string {
-  const reason = availability.category ? AVAILABILITY_COPY[availability.category] : 'Checking isn’t working'
+export function unavailableNote(availability: Extract<FeedAvailability, { state: 'unavailable' }>): string {
+  const reason = AVAILABILITY_COPY[availability.category]
   const { lastSuccessDate, lastCheckedAt } = availability
   const lastSuccess = lastSuccessDate
-    ? `Last reached ${shortDate(lastSuccessDate, lastCheckedAt?.slice(0, 10) ?? lastSuccessDate)}.`
+    ? `Last reached ${shortDate(lastSuccessDate, lastCheckedAt.slice(0, 10))}.`
     : 'Not reached since subscribing.'
 
   return `${reason}. ${lastSuccess}`

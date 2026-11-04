@@ -3,7 +3,7 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CreateSubscriptionResponse, FeedPreviewResponse, SubscriptionList } from '../../src/shared/api.js'
 import { App } from '../../src/client/app.js'
-import { availability, feedPreview, subscription, UNCHECKED } from './fixtures.js'
+import { feedPreview, subscription, UNCHECKED, unavailable } from './fixtures.js'
 import { stubApi, type Reply } from './stub-api.js'
 
 const FEED = subscription()
@@ -16,12 +16,7 @@ const UNCHECKED_FEED = subscription({
 })
 
 const UNAVAILABLE_FEED = subscription({
-  availability: availability({
-    state: 'unavailable',
-    lastSuccessDate: '2026-08-05',
-    consecutiveFailures: 3,
-    category: 'http_error',
-  }),
+  availability: unavailable(),
 })
 
 const PREVIEWED = feedPreview()
@@ -526,7 +521,7 @@ describe('Feed Availability', () => {
 
   it('names the year of a last success before the latest check’s year', async () => {
     const lastYear = subscription({
-      availability: availability({ ...UNAVAILABLE_FEED.availability, lastSuccessDate: '2025-12-31' }),
+      availability: unavailable({ lastSuccessDate: '2025-12-31' }),
     })
     stubApi().on('GET /api/feeds', { body: { subscriptions: [lastYear] } })
     window.history.replaceState(null, '', '/feeds')

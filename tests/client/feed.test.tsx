@@ -3,7 +3,7 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow as cadence } from './cadence-window.js'
-import { availability, feedDetail, feedItemRow, feedItems, subscription } from './fixtures.js'
+import { feedDetail, feedItemRow, feedItems, subscription, unavailable } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const DETAIL = feedDetail({
@@ -237,12 +237,7 @@ describe('managing one Feed', () => {
     feedApi().on('GET /api/feeds/1', {
       body: {
         ...DETAIL,
-        availability: availability({
-          state: 'unavailable',
-          lastSuccessDate: '2026-08-05',
-          consecutiveFailures: 3,
-          category: 'http_error',
-        }),
+        availability: unavailable(),
       },
     })
     window.history.replaceState(null, '', '/feeds/1')
