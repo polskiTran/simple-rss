@@ -23,14 +23,10 @@ const ATTEMPTS_BEFORE_COOLDOWN = 5
 
 const STASH_TTL_MS = 60_000
 
+/** Failed attempts on one Feed Item, the latest within `RETRY_COOLDOWN_MS` of the one before. */
 interface FailureEpisode {
   readonly attempts: number
   readonly lastAttemptAt: number
-}
-
-interface StashedArticle {
-  readonly article: ReaderArticle
-  readonly expiresAt: number
 }
 
 export type ReaderArticleOutcome =
@@ -42,17 +38,32 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'deadline'; readonly stage: ReaderDeadlineStage }
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
-class InFlightExtraction {
+/**
+ * One retrieval and extraction, shared by every reader waiting on its Feed Item.
+ * `episode` is the failure run it started under, so its own failure extends it.
+ * `pastDeadline` turns true once a deadline answered a reader: from then the work
+ * runs on without readers, and its article is stashed for the refetch.
+ */
+class Extraction {
   readonly controller = new AbortController()
   readonly work: Promise<ReaderArticleOutcome>
   waiters = 0
   stage: ReaderDeadlineStage = 'publisher'
-  survivesAbandonment = false
+  pastDeadline = false
 
-  constructor(start: (extraction: InFlightExtraction) => Promise<ReaderArticleOutcome>) {
+  constructor(
+    readonly episode: FailureEpisode | undefined,
+    start: (extraction: Extraction) => Promise<ReaderArticleOutcome>,
+  ) {
     this.work = start(this)
   }
 }
+
+/** Where one Feed Item's Original webpage stands; a Feed Item with no entry has nothing pending. */
+type ReaderEntry =
+  | { readonly kind: 'extracting'; readonly extraction: Extraction }
+  | { readonly kind: 'stashed'; readonly article: ReaderArticle; readonly expiresAt: number }
+  | ({ readonly kind: 'failing' } & FailureEpisode)
 
 const ABANDONED_READER_OUTCOME = {
   kind: 'retrieval-failed',
@@ -71,9 +82,7 @@ export class ReaderService {
   readonly #extractor: ReaderExtractor
   readonly #logger: Logger
   readonly #budgetMs: number
-  readonly #inFlight = new Map<number, InFlightExtraction>()
-  readonly #failures = new Map<number, FailureEpisode>()
-  readonly #stash = new Map<number, StashedArticle>()
+  readonly #entries = new Map<number, ReaderEntry>()
 
   constructor(options: {
     db: DrizzleDatabase
@@ -102,41 +111,37 @@ export class ReaderService {
     const link = row.link
     if (!link) return { kind: 'no-link' }
 
-    this.#sweepStash()
-    const stashed = this.#stash.get(feedItemId)?.article
-    if (stashed) return { kind: 'extracted', article: stashed }
-
-    const inFlight = this.#inFlight.get(feedItemId)
-    if (inFlight) return this.#waitForExtraction(feedItemId, inFlight, signal)
-
     const now = this.#clock.now().getTime()
-    for (const [id, episode] of this.#failures) {
-      if (now - episode.lastAttemptAt >= RETRY_COOLDOWN_MS) this.#failures.delete(id)
-    }
-    const episode = this.#failures.get(feedItemId)
-    if (episode && episode.attempts >= ATTEMPTS_BEFORE_COOLDOWN) {
+    this.#sweep(now)
+    const entry = this.#entries.get(feedItemId)
+    if (entry?.kind === 'stashed') return { kind: 'extracted', article: entry.article }
+    if (entry?.kind === 'extracting') return this.#waitForExtraction(feedItemId, entry.extraction, signal)
+    if (entry?.kind === 'failing' && entry.attempts >= ATTEMPTS_BEFORE_COOLDOWN) {
       return {
         kind: 'rate-limited',
-        retryAfterSeconds: Math.ceil((RETRY_COOLDOWN_MS - (now - episode.lastAttemptAt)) / 1_000),
+        retryAfterSeconds: Math.ceil((RETRY_COOLDOWN_MS - (now - entry.lastAttemptAt)) / 1_000),
       }
     }
 
-    const extraction = new InFlightExtraction((created) => this.#extract(feedItemId, link, created))
-    this.#inFlight.set(feedItemId, extraction)
-    const finish = () => {
-      if (this.#inFlight.get(feedItemId) === extraction) this.#inFlight.delete(feedItemId)
+    const extraction = new Extraction(entry, (created) => this.#extract(feedItemId, link, created))
+    this.#entries.set(feedItemId, { kind: 'extracting', extraction })
+    const finish = (outcome?: ReaderArticleOutcome) => {
+      if (!this.#isExtracting(feedItemId, extraction)) return
+      this.#become(feedItemId, settled(extraction, outcome, this.#clock.now().getTime()))
     }
-    void extraction.work.then(finish, finish)
+    void extraction.work.then(finish, () => finish())
     return this.#waitForExtraction(feedItemId, extraction, signal)
   }
 
   async close(): Promise<void> {
-    for (const extraction of this.#inFlight.values()) extraction.controller.abort()
-    this.#inFlight.clear()
+    for (const entry of this.#entries.values()) {
+      if (entry.kind === 'extracting') entry.extraction.controller.abort()
+    }
+    this.#entries.clear()
     await this.#extractor.close()
   }
 
-  async #extract(feedItemId: number, link: string, extraction: InFlightExtraction): Promise<ReaderArticleOutcome> {
+  async #extract(feedItemId: number, link: string, extraction: Extraction): Promise<ReaderArticleOutcome> {
     // `reader.trace` carries the Reader's phases; the upstream phases are on
     // the `upstream.retrieval_*` record with the same `trace`.
     const trace = randomUUID()
@@ -164,7 +169,6 @@ export class ReaderService {
         ...hostField(link),
         ...(result.status === undefined ? {} : { status: result.status }),
       }
-      if (result.code !== 'cancelled' && result.code !== 'busy') this.#recordFailure(feedItemId)
       return finish(result.code, fields, { kind: 'retrieval-failed', failure: result })
     }
 
@@ -178,39 +182,31 @@ export class ReaderService {
       return finish('cancelled', answered, ABANDONED_READER_OUTCOME)
     }
     if (parsed.kind === 'failed') {
-      this.#recordFailure(feedItemId)
       return finish('worker_failed', answered, { kind: 'unreadable' })
     }
     if (parsed.kind !== 'extracted') {
-      this.#recordFailure(feedItemId)
       return finish('unreadable', { ...answered, ...parsed.timings }, { kind: 'unreadable' })
     }
 
-    this.#failures.delete(feedItemId)
     const article: ReaderArticle = {
       feedItemId,
       markdown: parsed.article.markdown,
       readingTimeMinutes: parsed.article.readingTimeMinutes,
-    }
-    if (extraction.survivesAbandonment) {
-      this.#stash.set(feedItemId, { article, expiresAt: this.#clock.now().getTime() + STASH_TTL_MS })
     }
     return finish('extracted', { ...answered, ...parsed.timings }, { kind: 'extracted', article })
   }
 
   async #waitForExtraction(
     feedItemId: number,
-    extraction: InFlightExtraction,
+    extraction: Extraction,
     signal: AbortSignal | undefined,
   ): Promise<ReaderArticleOutcome> {
     extraction.waiters += 1
     const release = () => {
       extraction.waiters -= 1
-      if (extraction.waiters > 0 || extraction.survivesAbandonment) return
-      if (this.#inFlight.get(feedItemId) === extraction) {
-        this.#inFlight.delete(feedItemId)
-        extraction.controller.abort()
-      }
+      if (extraction.waiters > 0 || extraction.pastDeadline || !this.#isExtracting(feedItemId, extraction)) return
+      this.#become(feedItemId, settled(extraction, undefined, this.#clock.now().getTime()))
+      extraction.controller.abort()
     }
 
     if (signal?.aborted) {
@@ -220,7 +216,7 @@ export class ReaderService {
 
     const answered = Promise.withResolvers<ReaderArticleOutcome>()
     const budget = setTimeout(() => {
-      extraction.survivesAbandonment = true
+      extraction.pastDeadline = true
       this.#logger.warn('reader.deadline', { feedItemId, stage: extraction.stage })
       answered.resolve({ kind: 'deadline', stage: extraction.stage })
     }, this.#budgetMs)
@@ -235,19 +231,55 @@ export class ReaderService {
     }
   }
 
-  #sweepStash(): void {
-    const now = this.#clock.now().getTime()
-    for (const [id, entry] of this.#stash) {
-      if (entry.expiresAt <= now) this.#stash.delete(id)
+  /** Forgets a stash past its minute and a failure episode past its cooldown. */
+  #sweep(now: number): void {
+    for (const [id, entry] of this.#entries) {
+      const over =
+        entry.kind === 'stashed'
+          ? entry.expiresAt <= now
+          : entry.kind === 'failing' && now - entry.lastAttemptAt >= RETRY_COOLDOWN_MS
+      if (over) this.#entries.delete(id)
     }
   }
 
-  #recordFailure(feedItemId: number): void {
-    this.#failures.set(feedItemId, {
-      attempts: (this.#failures.get(feedItemId)?.attempts ?? 0) + 1,
-      lastAttemptAt: this.#clock.now().getTime(),
-    })
+  #isExtracting(feedItemId: number, extraction: Extraction): boolean {
+    const entry = this.#entries.get(feedItemId)
+    return entry?.kind === 'extracting' && entry.extraction === extraction
   }
+
+  #become(feedItemId: number, next: ReaderEntry | undefined): void {
+    if (next) this.#entries.set(feedItemId, next)
+    else this.#entries.delete(feedItemId)
+  }
+}
+
+/**
+ * What an extraction leaves for its Feed Item once it ends. An article that a
+ * deadline already answered for is stashed for the refetch; a failure of the
+ * publisher or the page extends the episode; anything else, including work
+ * abandoned or thrown with no outcome, returns to the episode it began under.
+ */
+function settled(
+  extraction: Extraction,
+  outcome: ReaderArticleOutcome | undefined,
+  now: number,
+): ReaderEntry | undefined {
+  if (outcome?.kind === 'extracted') {
+    return extraction.pastDeadline
+      ? { kind: 'stashed', article: outcome.article, expiresAt: now + STASH_TTL_MS }
+      : undefined
+  }
+  const { episode } = extraction
+  if (outcome && countsAsFailure(outcome)) {
+    return { kind: 'failing', attempts: (episode?.attempts ?? 0) + 1, lastAttemptAt: now }
+  }
+  return episode ? { kind: 'failing', attempts: episode.attempts, lastAttemptAt: episode.lastAttemptAt } : undefined
+}
+
+/** A cancelled retrieval, or one this installation never sent, says nothing about the publisher or the page. */
+function countsAsFailure(outcome: ReaderArticleOutcome): boolean {
+  if (outcome.kind === 'unreadable') return true
+  return outcome.kind === 'retrieval-failed' && outcome.failure.code !== 'cancelled' && outcome.failure.code !== 'busy'
 }
 
 function hostField(url: string): LogFields {
