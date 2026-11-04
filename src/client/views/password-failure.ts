@@ -10,6 +10,29 @@ const PASSWORD_FAILURE_COPY = {
   invalid_credentials: 'That password isn’t right. Passwords are case-sensitive.',
 } satisfies Partial<Record<ApiErrorCode, string>>
 
+/**
+ * What a password form says after Submit, one reason at a time: on the field
+ * that has to change, or as the form's note when no field is to blame.
+ * Undefined says nothing.
+ */
+export type Feedback<Field extends string> =
+  | { readonly field: Field; readonly reason: string }
+  | { readonly note: string }
+  | undefined
+
+export function reasonOn<Field extends string>(feedback: Feedback<Field>, field: Field): string | undefined {
+  return feedback && 'field' in feedback && feedback.field === field ? feedback.reason : undefined
+}
+
+export function noteOf(feedback: Feedback<string>): string {
+  return feedback && 'note' in feedback ? feedback.note : ''
+}
+
+/** Editing a field answers its reason; a note about the whole form stays until the next Submit. */
+export function afterEdit<Field extends string>(feedback: Feedback<Field>): Feedback<Field> {
+  return feedback && 'field' in feedback ? undefined : feedback
+}
+
 export function describeFailure(cause: unknown): string {
   if (!(cause instanceof ApiError)) return 'The reader is unavailable. Try again in a moment.'
   if (cause.code === 'too_many_attempts') {

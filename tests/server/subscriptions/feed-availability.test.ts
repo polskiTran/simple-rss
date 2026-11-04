@@ -144,9 +144,16 @@ describe('presented Feed Availability', () => {
 
   it('stays available through two failures and turns unavailable at the third', () => {
     const succeeded = { ...never, lastPolledAt: START, lastSuccessAt: START }
-    expect(presented({ ...succeeded, consecutiveFailures: 2 }, 'UTC').state).toBe('available')
-    expect(presented({ ...succeeded, consecutiveFailures: 3 }, 'UTC').state).toBe('unavailable')
-    expect(presented({ ...never, consecutiveFailures: 3 }, 'UTC').state).toBe('unavailable')
+    const failing = { lastFailureCategory: 'timeout' } as const
+    expect(presented({ ...succeeded, ...failing, consecutiveFailures: 2 }, 'UTC').state).toBe('available')
+    expect(presented({ ...succeeded, ...failing, consecutiveFailures: 3 }, 'UTC').state).toBe('unavailable')
+    expect(presented({ ...never, ...failing, lastPolledAt: START, consecutiveFailures: 3 }, 'UTC').state).toBe(
+      'unavailable',
+    )
+  })
+
+  it('refuses a failure run recorded without its category, which settle never writes', () => {
+    expect(() => presented({ ...never, lastPolledAt: START, consecutiveFailures: 3 }, 'UTC')).toThrow()
   })
 
   it('names the last success by its day in the installation timezone', () => {

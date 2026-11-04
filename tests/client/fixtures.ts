@@ -23,7 +23,9 @@ import type {
 
 const TODAY = '2026-08-08'
 
-export const availability = (overrides: Partial<FeedAvailability> = {}): FeedAvailability => ({
+type AvailabilityIn<State extends FeedAvailability['state']> = Extract<FeedAvailability, { state: State }>
+
+export const availability = (overrides: Partial<AvailabilityIn<'available'>> = {}): FeedAvailability => ({
   state: 'available',
   lastCheckedAt: '2026-08-08T09:00:00.000Z',
   lastSuccessDate: TODAY,
@@ -32,11 +34,22 @@ export const availability = (overrides: Partial<FeedAvailability> = {}): FeedAva
   ...overrides,
 })
 
-export const UNCHECKED = availability({
+export const unavailable = (overrides: Partial<AvailabilityIn<'unavailable'>> = {}): FeedAvailability => ({
+  state: 'unavailable',
+  lastCheckedAt: '2026-08-08T09:00:00.000Z',
+  lastSuccessDate: '2026-08-05',
+  consecutiveFailures: 3,
+  category: 'http_error',
+  ...overrides,
+})
+
+export const UNCHECKED: FeedAvailability = {
   state: 'unchecked',
   lastCheckedAt: null,
   lastSuccessDate: null,
-})
+  consecutiveFailures: 0,
+  category: null,
+}
 
 const FEED = {
   feedId: 1,

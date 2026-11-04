@@ -256,17 +256,36 @@ export type FeedAvailabilityCategory = (typeof FEED_AVAILABILITY_CATEGORIES)[num
 
 const feedAvailabilityCategorySchema = z.enum(FEED_AVAILABILITY_CATEGORIES)
 
-// `unchecked`: no retrieval has succeeded yet. `unavailable` begins at
-// `FEED_UNAVAILABLE_AFTER_FAILURES` in a row; a Feed that simply publishes
-// nothing stays `available`. `lastSuccessDate` is the installation-timezone
-// day the Feed last answered, for the client to name.
-const feedAvailabilitySchema = z.object({
-  state: z.enum(['unchecked', 'available', 'unavailable']),
-  lastCheckedAt: z.string().nullable(),
-  lastSuccessDate: z.string().nullable(),
-  consecutiveFailures: z.number().int().nonnegative(),
-  category: feedAvailabilityCategorySchema.nullable(),
-})
+// Every state carries the same fields, each as narrow as that state allows.
+// `unchecked`: no retrieval has succeeded yet, though one may have failed.
+// `available`: the Feed has answered, possibly with a failure run under way.
+// `unavailable` begins at `FEED_UNAVAILABLE_AFTER_FAILURES` in a row and always
+// names why; a Feed that simply publishes nothing stays `available`.
+// `lastSuccessDate` is the installation-timezone day the Feed last answered.
+const failureRunSchema = z.number().int().nonnegative()
+const feedAvailabilitySchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.literal('unchecked'),
+    lastCheckedAt: z.string().nullable(),
+    lastSuccessDate: z.null(),
+    consecutiveFailures: failureRunSchema,
+    category: feedAvailabilityCategorySchema.nullable(),
+  }),
+  z.object({
+    state: z.literal('available'),
+    lastCheckedAt: z.string(),
+    lastSuccessDate: z.string(),
+    consecutiveFailures: failureRunSchema,
+    category: feedAvailabilityCategorySchema.nullable(),
+  }),
+  z.object({
+    state: z.literal('unavailable'),
+    lastCheckedAt: z.string(),
+    lastSuccessDate: z.string().nullable(),
+    consecutiveFailures: failureRunSchema.min(FEED_UNAVAILABLE_AFTER_FAILURES),
+    category: feedAvailabilityCategorySchema,
+  }),
+])
 export type FeedAvailability = z.infer<typeof feedAvailabilitySchema>
 
 export const CADENCE_STRIP_DAYS = 30

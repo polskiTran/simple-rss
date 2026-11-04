@@ -4,7 +4,7 @@ import { useScreenTitle } from '../arrival.js'
 import type { AuthStatus } from '../../shared/api.js'
 import { ApiError, signIn } from '../api.js'
 import { Field } from '../components/field.js'
-import { describeFailure } from './password-failure.js'
+import { afterEdit, describeFailure, noteOf, reasonOn, type Feedback } from './password-failure.js'
 
 interface LoginViewProps {
   onSignedIn(status: AuthStatus): void
@@ -18,13 +18,12 @@ interface LoginViewProps {
 export function LoginView({ onSignedIn }: LoginViewProps) {
   useScreenTitle('Sign in')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string>()
-  const [notice, setNotice] = useState('')
+  const [feedback, setFeedback] = useState<Feedback<'password'>>()
   const [signingIn, startSigningIn] = useTransition()
   const input = useRef<HTMLInputElement>(null)
 
   function refuse(reason: string) {
-    setError(reason)
+    setFeedback({ field: 'password', reason })
     input.current?.focus()
   }
 
@@ -36,15 +35,14 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
       return
     }
 
-    setError(undefined)
-    setNotice('')
+    setFeedback(undefined)
     startSigningIn(async () => {
       try {
         onSignedIn(await signIn(password))
       } catch (failure) {
         setPassword('')
         if (failure instanceof ApiError && failure.code === 'invalid_credentials') refuse(describeFailure(failure))
-        else setNotice(describeFailure(failure))
+        else setFeedback({ note: describeFailure(failure) })
       }
     })
   }
@@ -62,10 +60,10 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
         value={password}
         autoComplete="current-password"
         autoFocus
-        error={error}
+        error={reasonOn(feedback, 'password')}
         onChange={(value) => {
           setPassword(value)
-          setError(undefined)
+          setFeedback(afterEdit)
         }}
       />
       <Button
@@ -78,7 +76,7 @@ export function LoginView({ onSignedIn }: LoginViewProps) {
         {signingIn ? 'Signing in…' : 'Sign in'}
       </Button>
       <p className="note note-error" role="status">
-        {notice}
+        {noteOf(feedback)}
       </p>
     </form>
   )

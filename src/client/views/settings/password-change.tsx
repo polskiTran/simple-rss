@@ -4,7 +4,7 @@ import type { AuthStatus } from '../../../shared/api.js'
 import { ApiError, changePassword } from '../../api.js'
 import { ActionDialog, DialogCancel } from '../../components/action-dialog.js'
 import { Field } from '../../components/field.js'
-import { describeFailure, reasonToHold } from '../password-failure.js'
+import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedback } from '../password-failure.js'
 
 type PasswordField = 'current' | 'password' | 'confirmation'
 
@@ -17,8 +17,7 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
-  const [error, setError] = useState<{ readonly field: PasswordField; readonly reason: string }>()
-  const [notice, setNotice] = useState('')
+  const [feedback, setFeedback] = useState<Feedback<PasswordField>>()
   const [saving, startSaving] = useTransition()
   const inputs = {
     current: useRef<HTMLInputElement>(null),
@@ -27,14 +26,14 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
   }
 
   function refuse(field: PasswordField, reason: string) {
-    setError({ field, reason })
+    setFeedback({ field, reason })
     inputs[field].current?.focus()
   }
 
   function edited(update: (value: string) => void) {
     return (value: string) => {
       update(value)
-      setError(undefined)
+      setFeedback(afterEdit)
     }
   }
 
@@ -45,8 +44,7 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
       setCurrentPassword('')
       setNewPassword('')
       setConfirmation('')
-      setError(undefined)
-      setNotice('')
+      setFeedback(undefined)
     }
   }
 
@@ -60,15 +58,14 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
       return
     }
 
-    setError(undefined)
-    setNotice('')
+    setFeedback(undefined)
     startSaving(async () => {
       try {
         onChanged(await changePassword(currentPassword, newPassword))
       } catch (failure) {
         if (failure instanceof ApiError && failure.code === 'invalid_credentials')
           refuse('current', describeFailure(failure))
-        else setNotice(describeFailure(failure))
+        else setFeedback({ note: describeFailure(failure) })
       }
     })
   }
@@ -89,7 +86,7 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
           ref={inputs.current}
           value={currentPassword}
           autoComplete="current-password"
-          error={error?.field === 'current' ? error.reason : undefined}
+          error={reasonOn(feedback, 'current')}
           onChange={edited(setCurrentPassword)}
         />
         <Field
@@ -98,7 +95,7 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
           ref={inputs.password}
           value={newPassword}
           autoComplete="new-password"
-          error={error?.field === 'password' ? error.reason : undefined}
+          error={reasonOn(feedback, 'password')}
           onChange={edited(setNewPassword)}
         />
         <Field
@@ -107,11 +104,11 @@ export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): v
           ref={inputs.confirmation}
           value={confirmation}
           autoComplete="new-password"
-          error={error?.field === 'confirmation' ? error.reason : undefined}
+          error={reasonOn(feedback, 'confirmation')}
           onChange={edited(setConfirmation)}
         />
         <p className="note note-error" role="status">
-          {notice}
+          {noteOf(feedback)}
         </p>
         <div className="dialog-footer">
           <DialogCancel disabled={saving} />

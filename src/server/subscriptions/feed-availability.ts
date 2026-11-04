@@ -129,18 +129,21 @@ function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {
 /**
  * The presented state is derived from the stored run of failures, never stored
  * itself; the last success is named by its day in the installation timezone.
+ * A run long enough to be unavailable outranks a Feed that never answered.
+ * `settle` is the only writer, so a failure always has its category and every
+ * counted poll its time; a row that breaks either is a bug, refused here.
  */
 export function availabilityOf(record: RecordedAvailability, timezone: string): FeedAvailability {
-  return {
-    state:
-      record.consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES
-        ? 'unavailable'
-        : record.lastSuccessAt === null
-          ? 'unchecked'
-          : 'available',
-    lastCheckedAt: record.lastPolledAt,
-    lastSuccessDate: record.lastSuccessAt === null ? null : dateKey(new Date(record.lastSuccessAt), timezone),
-    consecutiveFailures: record.consecutiveFailures,
-    category: record.lastFailureCategory,
+  const { lastPolledAt, lastSuccessAt, consecutiveFailures, lastFailureCategory: category } = record
+  const lastSuccessDate = lastSuccessAt === null ? null : dateKey(new Date(lastSuccessAt), timezone)
+  if (consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES) {
+    if (lastPolledAt === null || category === null)
+      throw new Error('A failure run was recorded without its poll or its category')
+    return { state: 'unavailable', lastCheckedAt: lastPolledAt, lastSuccessDate, consecutiveFailures, category }
   }
+  if (lastSuccessDate === null) {
+    return { state: 'unchecked', lastCheckedAt: lastPolledAt, lastSuccessDate, consecutiveFailures, category }
+  }
+  if (lastPolledAt === null) throw new Error('A success was recorded without its poll')
+  return { state: 'available', lastCheckedAt: lastPolledAt, lastSuccessDate, consecutiveFailures, category }
 }

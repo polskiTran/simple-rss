@@ -121,17 +121,20 @@ function OpenReader({
 }) {
   const [viewSource, setViewSource] = useState<ReadingSource>(item.readingSource)
   const source = resolvedReadingSource(viewSource, item)
-  const [preparingStage, setPreparingStage] = useState<ReaderDeadlineStage>()
+  // The deadline the Original webpage's load is waiting out, held with that load's
+  // signal: a retry or another source aborts it, so its stage never outlives it.
+  const [waiting, setWaiting] = useState<{ readonly load: AbortSignal; readonly stage: ReaderDeadlineStage }>()
   const [sourceState, { retry: retrySource }] = useResource(
     `${item.feedItemId} ${source}`,
     async (signal): Promise<SourceResult> => {
-      setPreparingStage(undefined)
       if (source === 'feed-content' && item.feedContent) {
         return { source: 'feed-content', content: item.feedContent }
       }
       if (!item.link) throw new Error('the Feed Item has no original link')
       try {
-        const content = await fetchArticleThroughDeadlines(item.feedItemId, signal, setPreparingStage)
+        const content = await fetchArticleThroughDeadlines(item.feedItemId, signal, (stage) =>
+          setWaiting({ load: signal, stage }),
+        )
         return { source: 'original-webpage', content }
       } finally {
         if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
@@ -145,7 +148,7 @@ function OpenReader({
   const displayed: SourceResult | undefined =
     selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
   const next = item.nextInDigest
-  const waitingNote = preparingStage ? STAGE_NOTES[preparingStage] : 'Reading the original webpage'
+  const waitingNote = waiting && !waiting.load.aborted ? STAGE_NOTES[waiting.stage] : 'Reading the original webpage'
   const waitingContent = item.summary ? (
     <div className="reader-waiting">
       <p className="reader-summary">{item.summary}</p>
