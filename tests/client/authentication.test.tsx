@@ -256,6 +256,24 @@ describe('coming back to a claimed installation', () => {
     expect(await screen.findByText(/Too many attempts\. Try again in 10 minutes\./)).toBeDefined()
   })
 
+  it('shows one reason at a time, so a field’s reason replaces the note before it', async () => {
+    stubApi({ claimed: true, authenticated: false }).on('POST /api/auth/session', {
+      status: 429,
+      headers: { 'retry-after': '600' },
+      body: { error: { code: 'too_many_attempts', message: 'Too many attempts' } },
+    })
+    renderApp()
+    await screen.findByLabelText('Password')
+
+    await fill('Password', 'a-calm-reading-password')
+    await press('Sign in')
+    await screen.findByText(/Too many attempts/)
+    await press('Sign in')
+
+    expect(await screen.findByText('Enter your password.')).toBeDefined()
+    expect(screen.queryByText(/Too many attempts/)).toBeNull()
+  })
+
   it('says it cannot reach simple, and gets through on Retry once the server answers', async () => {
     vi.stubGlobal(
       'fetch',

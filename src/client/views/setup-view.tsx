@@ -4,7 +4,7 @@ import { useScreenTitle } from '../arrival.js'
 import { MIN_SETUP_SECRET_LENGTH, type AuthStatus } from '../../shared/api.js'
 import { ApiError, claimInstallation } from '../api.js'
 import { Field } from '../components/field.js'
-import { describeFailure, reasonToHold } from './password-failure.js'
+import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedback } from './password-failure.js'
 
 interface SetupViewProps {
   onClaimed(status: AuthStatus): void
@@ -24,8 +24,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
   const [setupSecret, setSetupSecret] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
-  const [error, setError] = useState<{ readonly field: SetupField; readonly reason: string }>()
-  const [notice, setNotice] = useState('')
+  const [feedback, setFeedback] = useState<Feedback<SetupField>>()
   const [claiming, startClaiming] = useTransition()
   const inputs = {
     secret: useRef<HTMLInputElement>(null),
@@ -34,14 +33,14 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
   }
 
   function refuse(field: SetupField, reason: string) {
-    setError({ field, reason })
+    setFeedback({ field, reason })
     inputs[field].current?.focus()
   }
 
   function edited(update: (value: string) => void) {
     return (value: string) => {
       update(value)
-      setError(undefined)
+      setFeedback(afterEdit)
     }
   }
 
@@ -58,25 +57,23 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
       return
     }
 
-    setError(undefined)
-    setNotice('')
+    setFeedback(undefined)
     startClaiming(async () => {
       try {
         onClaimed(await claimInstallation(setupSecret, password))
       } catch (failure) {
-        if (!(failure instanceof ApiError)) setNotice(describeFailure(failure))
+        if (!(failure instanceof ApiError)) setFeedback({ note: describeFailure(failure) })
         else if (failure.code === 'already_claimed') onAlreadyClaimed()
         else if (failure.code === 'invalid_credentials') refuse('secret', 'That setup secret isn’t right.')
         else if (failure.code === 'setup_unavailable')
-          setNotice(
-            `Setup needs SETUP_SECRET set to at least ${MIN_SETUP_SECRET_LENGTH} characters. Set it, then restart simple.`,
-          )
-        else setNotice(describeFailure(failure))
+          setFeedback({
+            note: `Setup needs SETUP_SECRET set to at least ${MIN_SETUP_SECRET_LENGTH} characters. Set it, then restart simple.`,
+          })
+        else setFeedback({ note: describeFailure(failure) })
       }
     })
   }
 
-  const errorOn = (field: SetupField) => (error?.field === field ? error.reason : undefined)
   return (
     <form className="view gate" aria-label="Claim this installation" onSubmit={submit}>
       <header className="gate-head">
@@ -91,7 +88,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
         value={setupSecret}
         autoComplete="off"
         autoFocus
-        error={errorOn('secret')}
+        error={reasonOn(feedback, 'secret')}
         onChange={edited(setSetupSecret)}
       />
       <Field
@@ -100,7 +97,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
         type="password"
         value={password}
         autoComplete="new-password"
-        error={errorOn('password')}
+        error={reasonOn(feedback, 'password')}
         onChange={edited(setPassword)}
       />
       <Field
@@ -109,7 +106,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
         type="password"
         value={confirmation}
         autoComplete="new-password"
-        error={errorOn('confirmation')}
+        error={reasonOn(feedback, 'confirmation')}
         onChange={edited(setConfirmation)}
       />
       <Button
@@ -122,7 +119,7 @@ export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
         {claiming ? 'Claiming…' : 'Claim installation'}
       </Button>
       <p className="note note-error" role="status">
-        {notice}
+        {noteOf(feedback)}
       </p>
     </form>
   )
