@@ -137,7 +137,8 @@ export function availabilityOf(record: RecordedAvailability, timezone: string): 
   const { lastPolledAt, lastSuccessAt, consecutiveFailures, lastFailureCategory: category } = record
   const lastSuccessDate = lastSuccessAt === null ? null : dateKey(new Date(lastSuccessAt), timezone)
   if (consecutiveFailures >= FEED_UNAVAILABLE_AFTER_FAILURES) {
-    if (lastPolledAt === null || category === null) throw new Error('A failure run was recorded without its poll')
+    if (lastPolledAt === null || category === null)
+      throw new Error('A failure run was recorded without its poll or its category')
     return { state: 'unavailable', lastCheckedAt: lastPolledAt, lastSuccessDate, consecutiveFailures, category }
   }
   if (lastSuccessDate === null) {
