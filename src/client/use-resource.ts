@@ -32,7 +32,7 @@ interface PagedControls<T> extends ResourceControls<T> {
 /**
  * One server read, loaded again whenever `key` changes or on `retry()`. `key` is
  * the whole of what makes the read stale: `load` may close over anything, but
- * only a new key asks again. Leaving the view, or a new key, cancels the read.
+ * only a new key asks again. Leaving the view, a new key, or a retry cancels the read.
  */
 export function useResource<T>(
   key: string,
