@@ -139,6 +139,12 @@
       "skillPath": "skills/review-animations/SKILL.md",
       "computedHash": "b1aca2c16876b8f00e2a1eb161714e63ec41099269d5f95c2f307230749b9dcd"
     },
+    "show-me": {
+      "source": "humanlayer/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/show-me/skills/show-me/SKILL.md",
+      "computedHash": "43766f53afe7eb9feba0bb7716590c35cbb8d39d4a91eddef50e9566a6f6ae19"
+    },
     "state-machine": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
