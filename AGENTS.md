@@ -78,6 +78,11 @@ Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CON
 `docs/DESIGN.md` is the design system, with the drawn screens in `docs/design/v2/` — greyscale interface with colour only in data, one hard-edged shape for every control, Literata to read and Instrument Sans to operate.
 </important>
 
+<important if="you need to see the client in a browser, screenshot it, or check how a screen renders">
+
+Use the `verify-simple-rss` skill, not a browser on the host or `pnpm dev`. It serves the client against the dev mock on `127.0.0.1:5199` with Playwright's own Chromium, so it needs no sign-in, no database and no published port. Never drive 5173 or 8080: those are the developer's `pnpm dev`, with their real Feeds and session. On a fresh machine, run `pnpm exec playwright install --with-deps chromium` once first.
+</important>
+
 <important if="you are writing comments, docstrings, or docs/ prose">
 
 Comments describe current behavior. When behavior changes, update its comments in the same commit; if you cannot make a comment true, delete it.
