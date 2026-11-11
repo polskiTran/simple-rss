@@ -11,10 +11,10 @@ ARG NODE_VERSION=22.22.1
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
 WORKDIR /app
 
-# better-sqlite3 falls back to compiling from source when no prebuilt binary
-# matches the platform, which needs a toolchain and Python.
+# No C toolchain: every native dependency ships a prebuilt binary for this
+# platform, and pnpm-workspace.yaml keeps better-sqlite3 from compiling anyway.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable
