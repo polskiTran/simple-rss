@@ -1,7 +1,9 @@
 # Simple RSS is deliberately one package. This file only carries pnpm
 # settings, which pnpm 11 no longer reads from package.json.
 allowBuilds:
-  better-sqlite3: true
+  # Ships a prebuilt binary for every platform we run on and loads it before any
+  # local build, so compiling only adds a C toolchain requirement.
+  better-sqlite3: false
   esbuild: true
 patchedDependencies:
   # Inline math as `$$…$$` so a currency `$` never opens math (667a7eb); tests/server/reader/reader.test.ts "returns the supported Reader dialect…" guards it.
