@@ -303,7 +303,10 @@ not jump.
 **Digest.** The date heading is the page's title, so the word Digest is kept for
 screen readers and shown only before the first Subscription. One list, newest
 day first, each day headed by its full date in the page title's style with the
-count as its companion, how far back it is on a line above. On desktop the
+count as its companion in parentheses — `Thursday 12 November (202)` — so the
+count never reads as the date's year, and how far back it is on a line above.
+On a phone the date shortens to `Thu 12 Nov (202)`, while screen readers still
+hear it in full. On desktop the
 first day's line rises into the page's padding, so the date sits where every
 other screen's title does. Under the heading the day's Feeds
 stand as chips with their counts, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box

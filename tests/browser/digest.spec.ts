@@ -12,7 +12,7 @@ import {
   type Installation,
 } from './installation.js'
 
-const TODAY_ONE = /^Today .+ 1$/
+const TODAY_ONE = /^Today .+ \(1\)$/
 
 async function claimAndSubscribe(page: Page, installation: Installation, feedUrl: string, title: string) {
   await page.goto(installation.url)
@@ -57,11 +57,12 @@ test.describe('the Digest presentation', () => {
     const titleLine = () =>
       page.evaluate(() => {
         const title = document.querySelector('.page-title:not(.visually-hidden)')
-        const words = [...(title?.childNodes ?? [])].find(
-          (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
-        )
+        // A Digest day's date is its own span; another screen's title is bare text.
+        const words =
+          title?.querySelector('.day-date') ??
+          [...(title?.childNodes ?? [])].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
         const range = document.createRange()
-        if (words) range.selectNode(words)
+        if (words) range.selectNodeContents(words)
         const { fontSize, fontWeight } = getComputedStyle(title as Element)
         return { top: range.getBoundingClientRect().top, fontSize, fontWeight }
       })
@@ -379,7 +380,7 @@ test.describe('the Digest at phone width', () => {
     await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
     await page.getByRole('link', { name: 'Digest', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: /^Today .+ 2$/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Today .+ \(2\)$/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Long Meadow 1' })).toBeVisible()
     await expect(page.locator('.digest-calendar')).toBeHidden()
     await expectNoHorizontalOverflow(page)

@@ -6,7 +6,7 @@ Every screen's title and every Digest day share one style, and on desktop they s
 
 - `title-style` sets every title at 48/500, 36 on a phone.
 - `title-line` keeps Digest, Feeds, Saved, Settings and Search on one line.
-- `title-count` shows a count as a bare grey number beside the title.
+- `title-count` shows a count as a bare grey number beside the title; a Digest day's sits in parentheses, so it never reads as a year.
 - `title-distance` shows how far back a day is on a line above its date.
 
 ## How to get to it (user POV)
@@ -23,7 +23,7 @@ Preconditions:
 
 - **Line and style.** Sweep the screens. Run `verify sweep --tag titles --screens digest,feeds,saved,settings,search`. No `title differs` finding appears, and each target's `title` values in `metrics.json` match exactly.
 - **Real path.** Run `spec tests/browser/digest.spec.ts -g "sets the date on the line"`. It passes against a real Digest.
-- **Long names.** Look at `titles/p320/digest.png`. The date wraps, and the count sits with it or on its own line.
+- **Long names.** Look at `titles/p390/digest.png` and `titles/p320/digest.png`. The date shows as `Thu 22 Oct`; at 390 it and its count share a line, at 320 the count may take its own.
 - **Proof.** Keep the tag's `metrics.json` and the screenshots of the screens you changed.
 
 ## Gotchas

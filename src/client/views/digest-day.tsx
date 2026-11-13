@@ -10,7 +10,7 @@ import { Group } from '../components/group.js'
 import { FeedName } from '../components/item-box.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { counted, dayDistance, headingDay, longDay, namedDay, relativeDay } from '../day-names.js'
+import { counted, dayDistance, headingDay, longDay, namedDay, relativeDay, shortHeadingDay } from '../day-names.js'
 import { feedPath, readerPath, useKept } from '../routing.js'
 
 /** A Feed with more items than this in one day is folded to its newest `FOLDED_ITEMS`. */
@@ -43,9 +43,14 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
       className="digest-day"
       headingClassName="page-title"
       title={
+        // Below 1024px the full date is hidden visually but stays the heading's name.
         <>
-          <span className="day-distance">{dayDistance(group.date, today)}</span> {headingDay(group.date, today)}{' '}
-          <span className="day-count">{group.items.length.toLocaleString('en-GB')}</span>
+          <span className="day-distance">{dayDistance(group.date, today)}</span>{' '}
+          <span className="day-date">{headingDay(group.date, today)}</span>
+          <span className="day-date-short" aria-hidden="true">
+            {shortHeadingDay(group.date, today)}
+          </span>{' '}
+          <span className="day-count">({group.items.length.toLocaleString('en-GB')})</span>
         </>
       }
     >

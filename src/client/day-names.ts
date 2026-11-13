@@ -67,6 +67,15 @@ export function headingDay(dateKey: string, today: string): string {
   return namedDay(dateKey, today).replace(/(\d+) /, '$1\u00a0')
 }
 
+/**
+ * `headingDay` shortened for a narrow title: `Thu 22 Oct`, with the year
+ * when it is not this one.
+ */
+export function shortHeadingDay(dateKey: string, today: string): string {
+  const day = `${format(dateKey, { weekday: 'short' })} ${Number(dateKey.slice(8, 10))}\u00a0${shortMonth(dateKey)}`
+  return sameYear(dateKey, today) ? day : `${day} ${dateKey.slice(0, 4)}`
+}
+
 /** A recent day with its time, when the item has one; an older day alone. */
 export function dayAndTime(dateKey: string, time: string | null, today: string): string {
   const relative = relativeDay(dateKey, today)

@@ -887,6 +887,27 @@
     white-space: nowrap;
   }
 
+  /* Where the title steps down to 36px, the date shortens to `Thu 22 Oct` so it
+     and its count fit a phone's line. The full date stays the heading's name. */
+  .day-date {
+    @media (max-width: 1024px) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  .day-date-short {
+    display: none;
+
+    @media (max-width: 1024px) {
+      display: inline;
+    }
+  }
+
   .panel .group-header {
     margin-bottom: 0;
     padding-bottom: 14px;

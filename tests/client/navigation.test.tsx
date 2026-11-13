@@ -18,7 +18,7 @@ import {
 } from './fixtures.js'
 import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
 
-const TODAY_HEADING = 'Today Saturday 8\u00a0August 1'
+const TODAY_HEADING = 'Today Saturday 8\u00a0August (1)'
 
 const DETAIL = feedDetail({ subscribedDate: '2026-08-08', cadence: cadenceWindow({ '2026-08-08': 1 }) })
 

@@ -5,7 +5,7 @@ import { App } from '../../src/client/app.js'
 import { digest, searchResult } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
-const TODAY_HEADING = 'Today Saturday 8\u00a0August 1'
+const TODAY_HEADING = 'Today Saturday 8\u00a0August (1)'
 
 const result = (feedItemId: number, title: string, date: string, saved = false) =>
   searchResult({ feedItemId, title, date, saved })
