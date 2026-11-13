@@ -141,10 +141,10 @@ which takes the proportional figures of the date beside it.
   stands 64px from it, holds 24px from the top as the list scrolls, and scrolls
   itself when taller than the window. Without one, a list runs the page's full
   width.
-- One breakpoint: `max-width: 1024px` is the phone layout. It keeps a
-  phone's column, 560px at most and centred like the phone sheet, so a
-  narrowed window or a tablet never stretches it. Below 375px the phone's top
-  bar drops its mark to keep every square whole.
+- One breakpoint: `max-width: 1024px` is the phone layout. It spans the
+  screen, 20px from the sides on a phone and widening with the screen to 32px
+  on a tablet, so its top bar and lists reach the same edges at every width.
+  Below 375px the phone's top bar drops its mark to keep every square whole.
 - A row that scrolls sideways fades over its trailing 32px, so what is past
   the edge reads as there: a day's Feed chips at every width, and on a phone
   the jump buttons and a Feed filter's chips.

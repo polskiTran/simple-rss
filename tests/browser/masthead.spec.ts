@@ -74,6 +74,20 @@ test.describe('the top bar on the narrowest phone', () => {
   })
 })
 
+test.describe('the top bar on a portrait tablet', () => {
+  test.use({ viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true })
+
+  test('spans the screen, the gutter from either edge', async ({ page, installation }) => {
+    await claim(page, installation)
+
+    const mark = await page.getByRole('link', { name: 'simple' }).boundingBox()
+    const settings = await page.getByRole('link', { name: 'Settings', exact: true }).boundingBox()
+    const screen = await page.evaluate(() => document.documentElement.clientWidth)
+    expect(mark?.x).toBe(32)
+    expect(screen - ((settings?.x ?? 0) + (settings?.width ?? 0))).toBe(32)
+  })
+})
+
 test.describe('the mark', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
