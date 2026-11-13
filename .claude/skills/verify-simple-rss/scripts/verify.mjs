@@ -20,13 +20,15 @@ const MIN_FREE_MB = 1024
 const playwright = createRequire(join(ROOT, 'package.json'))('@playwright/test')
 
 /**
- * Widths the session's bugs lived at: both sides of the 1024px break, a phone, the narrowest phone, 200% zoom.
+ * Widths the session's bugs lived at: both sides of the 1024px break, portrait tablets, a phone, the narrowest phone, 200% zoom.
  * A phone target is a mobile browser: touch, and overlay scrollbars, so `scrollbar-gutter` reserves nothing.
  */
 const TARGETS = {
   d1440: { width: 1440, height: 900, scheme: 'light' },
   d1180: { width: 1180, height: 900, scheme: 'light' },
   d1025: { width: 1025, height: 800, scheme: 'dark' },
+  t1024: { width: 1024, height: 1366, scheme: 'dark', phone: true },
+  t820: { width: 820, height: 1180, scheme: 'light', phone: true },
   p390: { width: 390, height: 844, scheme: 'light', phone: true },
   p320: { width: 320, height: 640, scheme: 'dark', phone: true },
   z200: { width: 640, height: 450, scheme: 'light', scale: 2 },

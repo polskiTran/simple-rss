@@ -45,7 +45,7 @@ node .claude/skills/verify-simple-rss/scripts/verify.mjs sweep --tag <name>
 | Flag | Values | Default |
 | --- | --- | --- |
 | `--tag` | Evidence folder name | `run` |
-| `--targets` | `d1440`, `d1180`, `d1025` (dark), `p390`, `p320` (dark), `z200` (200% zoom) | all |
+| `--targets` | `d1440`, `d1180`, `d1025` (dark), `t1024` (dark), `t820` (portrait tablets, touch), `p390`, `p320` (dark), `z200` (200% zoom) | all |
 | `--screens` | `digest`, `feeds`, `saved`, `feed`, `settings`, `search` | all |
 | `--data` | `worst`, `one`, `empty`, `huge` | `worst` |
 | `--param` | A URL parameter such as `variant=A`, repeatable | none |
