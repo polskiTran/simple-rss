@@ -6,6 +6,9 @@ text disagree. Interactive behavior — focus, keyboard, trapping, dismissal —
 comes from Base UI (ADR 0008); why this system replaced the first one is ADR
 0010.
 
+The project is young and this document moves with it: it records what the
+stylesheet does today, and a change that improves the product changes it.
+
 ## 1. Principles
 
 1. **Colour comes from the content.** The interface is greyscale. Colour
