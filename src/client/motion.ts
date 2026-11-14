@@ -15,8 +15,10 @@ function token(name: `--${string}`): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
+/** A duration token in milliseconds. The production build rewrites `240ms` as `.24s`, so both units are read. */
 function duration(name: `--duration-${string}`): number {
-  return Number.parseFloat(token(name))
+  const value = token(name)
+  return Number.parseFloat(value) * (value.endsWith('ms') ? 1 : 1000)
 }
 
 function reduced(): boolean {
