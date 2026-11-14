@@ -11,6 +11,7 @@ import { FeedName } from '../components/item-box.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { counted, dayDistance, headingDay, longDay, namedDay, relativeDay, shortHeadingDay } from '../day-names.js'
+import { playFold, playUnfold } from '../motion.js'
 import { feedPath, readerPath, useKept } from '../routing.js'
 
 /** A Feed with more items than this in one day is folded to its newest `FOLDED_ITEMS`. */
@@ -107,7 +108,11 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
  * highlight reads the toggle's own state, so it answers on the press. Past
  * `FOLD_OVER`, the control stays in the header, which sticks while unfolded, so
  * folding is where unfolding was however far down the list; unfolded is kept
- * on the history entry, so the box is still open on the way back.
+ * on the history entry, so the box is still open on the way back. Unfolding
+ * opens the list and fades in the titles it reveals; folding closes it over
+ * its titles before they are cut, so the ones that stay never move, and from
+ * far down the header stays where it was stuck while the page returns to the
+ * box's start.
  */
 function FeedDayBox({
   feed,
@@ -117,16 +122,33 @@ function FeedDayBox({
 }: Omit<DigestDayProps, 'group' | 'today'> & { feed: FeedDay }) {
   const [unfolded = false, keepUnfolded] = useKept(`unfolded ${feed.date} ${feed.feedId}`, z.boolean())
   const box = useRef<HTMLElement>(null)
+  const head = useRef<HTMLElement>(null)
+  const list = useRef<HTMLUListElement>(null)
   const foldable = feed.items.length > FOLD_OVER
   const folded = foldable && !unfolded
-  const toggleFold = () => {
-    flushSync(() => keepUnfolded(!unfolded))
-    if (unfolded && (box.current?.getBoundingClientRect().top ?? 0) < 0) box.current?.scrollIntoView()
+  const folding = useRef(false)
+  const toggleFold = async () => {
+    const items = list.current
+    if (!items || folding.current) return
+    if (!unfolded) {
+      const heightBefore = items.offsetHeight
+      flushSync(() => keepUnfolded(true))
+      playUnfold(items, heightBefore, FOLDED_ITEMS)
+      return
+    }
+    // Folded from far down, the page scrolls back to the box's start in the same
+    // frame, by exactly as much as leaves the stuck header where it is.
+    const stuck = head.current?.getBoundingClientRect().top ?? 0
+    const start = box.current ? box.current.getBoundingClientRect().top + box.current.clientTop : stuck
+    if (start < stuck) window.scrollBy(0, start - stuck)
+    folding.current = true
+    await playFold(items, FOLDED_ITEMS, () => flushSync(() => keepUnfolded(false)))
+    folding.current = false
   }
   const quiet = feed.quiet ? <QuietSpell quietDays={feed.quiet.quietDays} /> : null
   return (
     <article ref={box} className="feed-day" data-unfolded={foldable && unfolded ? '' : undefined}>
-      <header className="feed-day-head">
+      <header ref={head} className="feed-day-head">
         <div className="feed-day-who">
           <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => onOpenFeed(feed.feedId)}>
             <FeedName title={feed.title} />
@@ -142,7 +164,7 @@ function FeedDayBox({
         ) : null}
         {foldable ? quiet : null}
       </header>
-      <ul className="feed-day-items">
+      <ul ref={list} className="feed-day-items">
         {(folded ? feed.items.slice(0, FOLDED_ITEMS) : feed.items).map((item) => (
           <li key={item.feedItemId} className="feed-day-item">
             <h3 className="feed-day-title">

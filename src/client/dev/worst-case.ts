@@ -416,12 +416,29 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
   }
 }
 
-function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string) {
+function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string, query: URLSearchParams) {
   if (path === '/api/auth/status') return { claimed: true, authenticated: true }
   if (path === '/api/meta') return { name: 'simple-rss', version: '0.0.0-worst-case' }
   if (path === '/api/settings') return { timezone: 'America/Argentina/ComodRivadavia' }
   if (path === '/api/feeds') return { subscriptions: feedsOf(dataset) } satisfies SubscriptionList
-  if (path === '/api/digest') return digestOf(dataset)
+  if (path === '/api/digest') {
+    // A picked day starts the Digest there, as the server's does; Show more
+    // answers with two older days and ends the list.
+    const digest = digestOf(dataset)
+    const from = query.get('from')
+    if (!from) return digest
+    if (from !== digest.nextFrom) return { ...digest, groups: digest.groups.filter((group) => group.date <= from) }
+    const feeds = feedsOf(dataset)
+    return {
+      today: digest.today,
+      groups: [from, '2025-12-29'].map((date) => ({
+        date,
+        items: [1, 3].map((feed) => digestItem({ feed, title: `An older item, ${date}`, time: '08:00' }, date, feeds)),
+        returns: [],
+      })),
+      nextFrom: null,
+    } satisfies Digest
+  }
   if (path === '/api/digest/days') return calendarOf(dataset)
   if (path === '/api/library') return libraryOf(dataset)
   const library = path.match(/^\/api\/library\/(\d+)$/)
@@ -445,7 +462,7 @@ export function install() {
   window.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.href)
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
-    const body = answer(dataset, method, url.pathname)
+    const body = answer(dataset, method, url.pathname, url.searchParams)
     if (body === undefined) return realFetch(input, init)
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
   }

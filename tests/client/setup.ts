@@ -28,3 +28,17 @@ Element.prototype.scrollIntoView = () => {}
 // jsdom has no PointerEvent; Base UI's radio passes a press on to its hidden
 // input as one, and a MouseEvent carries everything that press needs.
 if (!('PointerEvent' in window)) Object.defineProperty(window, 'PointerEvent', { value: MouseEvent })
+
+// jsdom has no Web Animations or media queries. The DOM the client's motion
+// animates is already final, so an animation that has finished without playing
+// and a query that never matches stand in.
+const played: Pick<Animation, 'finished' | 'cancel'> = {
+  get finished() {
+    // SAFETY: the client awaits this and reads nothing from it.
+    return Promise.resolve(played as Animation)
+  },
+  cancel() {},
+}
+// SAFETY: the client only awaits `finished` and calls `cancel`.
+Element.prototype.animate = () => played as Animation
+window.matchMedia = (query) => ({ matches: false, media: query }) as MediaQueryList

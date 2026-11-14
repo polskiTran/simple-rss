@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { dateKeySchema, digestParamsOf, type DigestStart } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { OlderItems } from '../components/older-items.js'
 import { withSaved } from '../components/save-toggle.js'
+import { playArrivals, playDayChange } from '../motion.js'
 import { useKept } from '../routing.js'
 import { usePagedResource, valueInView } from '../use-resource.js'
 import { DigestDay } from './digest-day.js'
@@ -24,7 +25,9 @@ interface DigestListProps {
  * from the day the page names. The oldest day shown is kept on the history
  * entry, so coming back asks for every day read through in one page, and the
  * scroll lands where it was left. A new start keeps the old list in view until
- * its own first page answers.
+ * its own first page answers, then the new list moves in from the direction of
+ * time it went; the days Show more adds fade in. Arriving on the screen plays
+ * nothing.
  */
 export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: DigestListProps) {
   const [through, keepThrough] = useKept('through', dateKeySchema)
@@ -45,6 +48,19 @@ export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: Di
     }))
 
   const digest = valueInView(state)
+  const days = useRef<HTMLDivElement>(null)
+  const shownDays = useRef<{ first: string; count: number }>(undefined)
+  const firstDay = digest?.groups[0]?.date
+  const dayCount = digest?.groups.length ?? 0
+  useLayoutEffect(() => {
+    const before = shownDays.current
+    shownDays.current = firstDay === undefined ? undefined : { first: firstDay, count: dayCount }
+    if (!before || !days.current || firstDay === undefined) return
+    if (firstDay !== before.first) playDayChange(days.current, firstDay < before.first ? 'older' : 'newer')
+    else if (dayCount > before.count)
+      playArrivals([...days.current.querySelectorAll(':scope > .digest-day')].slice(before.count))
+  }, [firstDay, dayCount])
+
   if (!digest) {
     if (state.kind === 'unavailable' || state.kind === 'unreachable') {
       return (
@@ -62,7 +78,7 @@ export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: Di
   }
 
   return (
-    <div aria-busy={state.kind === 'loading'}>
+    <div ref={days} aria-busy={state.kind === 'loading'}>
       {digest.groups.length === 0 ? (
         <p className="note digest-empty">{empty}</p>
       ) : (

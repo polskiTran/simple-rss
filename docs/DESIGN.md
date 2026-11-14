@@ -320,7 +320,8 @@ then its count when there is more than one item. Under it each title runs across
 the whole box, two lines at most, with no time; the Reader has it. A lone item's
 box opens the Reader from anywhere in it. Past 5 items the box shows the newest
 3, with Show all and a chevron at the end of the first line, which turns to Show
-less once pressed. Nothing moves when it does, and while unfolded the first line
+less once pressed. The titles already on show never move when it does (see
+Motion), and while unfolded the first line
 sticks to the top of the screen, fading the titles that pass under it, so the
 control is in reach however far down the list. A Feed back after a week or more
 without items says so beside its name, First in 12 days, as a tag filled in
@@ -449,7 +450,8 @@ each preference.
 
 ## 7. Motion
 
-Screens and lists are instant. What the User presses or opens — a control, a
+Screens and lists are instant, but for the Digest's three changes of length
+below. What the User presses or opens — a control, a
 switch, a screen with its title and toolbar, a hover, a jump within a page —
 changes in the same frame, and nothing moves: a pressed control steps its fill,
 never its size. The lists read many times a day — item boxes, Feed rows and
@@ -466,7 +468,18 @@ over Feed Content is a new article that fades in, never text rewritten in
 place. A wait shorter than 400ms shows nothing; after that the waiting line
 fades in.
 Stepping to another day keeps the one on show until the next answers, so the
-screen changes once rather than emptying first.
+screen changes once rather than emptying first. The new list then fades in over
+240ms, moving 12px: up from below when the User went back in time, down from
+above when they came forward, as the list runs newest first. The days Show more
+adds fade in, 60ms apart, and move nothing.
+
+A Feed's day unfolds over 240ms and folds over 180ms. The list changes height so
+what sits below slides rather than jumps, the titles it reveals fade in
+together, and the titles already on show never move. Folding closes the list
+over its titles before they are cut. A list that runs past the screen travels
+only as far as the screen's bottom edge. Folded from far down, the page returns
+to the box's start in the frame of the press, and the header stays where it was
+stuck.
 
 A change of Appearance crossfades the screen over 200ms, the one press that is
 not answered in the same frame.
@@ -480,7 +493,8 @@ at once.
 A dialog is the one thing with an exit (see Dialog). Under
 `prefers-reduced-motion` there is less motion, not none: fades stay, nothing
 moves — the sheet fades in place instead of rising, the search field fades
-instead of opening, and the waiting tile and the mark hold still.
+instead of opening, a Feed's day changes height at once, another day only
+fades in, and the waiting tile and the mark hold still.
 
 ## 8. Not yet designed
 

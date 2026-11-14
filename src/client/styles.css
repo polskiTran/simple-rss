@@ -2211,12 +2211,11 @@
   }
 
   /* A Feed's day in the Digest. Folded or unfolded its geometry is the same, so
-     a press moves nothing. Folded from far down, the box comes back into view
-     with room above it. */
+     a press moves nothing. Folded from far down, the page returns to the box's
+     start under the header, which stays where it was stuck. */
   .feed-day {
     --feed-day-inline: 24px;
     position: relative;
-    scroll-margin-top: 24px;
     border: 1px solid var(--color-edge);
     background: var(--color-ground);
 
