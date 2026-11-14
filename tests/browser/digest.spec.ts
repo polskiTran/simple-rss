@@ -224,7 +224,7 @@ test.describe('the Digest from a day', () => {
     await page.goto(`${installation.url}/digest?from=${daysAgo(1)}`)
     await expect(page.getByText('Nothing on or before this day.')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Back to today' }).click()
+    await page.getByRole('button', { name: 'Today', exact: true }).click()
     await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
     await expect(page).toHaveURL(/\/digest$/)
   })
@@ -387,7 +387,7 @@ test.describe('the Digest at phone width', () => {
 
     await page.getByLabel('Start from a day').fill(daysAgo(1))
     await expect(page).toHaveURL(new RegExp(`\\?from=${daysAgo(1)}$`))
-    await expect(page.getByRole('button', { name: 'Back to today' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })
 })

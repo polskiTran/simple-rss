@@ -64,7 +64,7 @@ export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: Di
   return (
     <div aria-busy={state.kind === 'loading'}>
       {digest.groups.length === 0 ? (
-        <p className="note">{empty}</p>
+        <p className="note digest-empty">{empty}</p>
       ) : (
         digest.groups.map((group) => (
           <DigestDay

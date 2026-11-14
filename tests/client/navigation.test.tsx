@@ -112,7 +112,7 @@ describe('a Feed Item’s attribution', () => {
     await user.click(wayBack())
     expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
     expect(window.location.pathname + window.location.search).toBe('/digest?from=2026-08-07')
-    expect(screen.getByRole('button', { name: 'Back to today' })).toBeDefined()
+    expect(screen.queryAllByRole('button', { name: 'Today' })).not.toHaveLength(0)
   })
 
   it('opens its Feed from a search result, and that Feed returns to the results', async () => {

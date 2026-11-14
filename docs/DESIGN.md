@@ -326,16 +326,17 @@ control is in reach however far down the list. A Feed back after a week or more
 without items says so beside its name, First in 12 days, as a tag filled in
 `match`; beside Show all it takes its own line under the name. Saved titles are
 marked as in any list. The list starts today, or from a
-day picked on the month — that day and everything before it — and then Back to
-today stands at its head, as Show more stands at its foot; the address keeps
-the day, so the way back from an article returns to it. Beside the list, a
+day picked on the month — that day and everything before it — and the address
+keeps the day, so the way back from an article returns to it. Beside the list, a
 month of the whole Digest: its name with turns to the months before and after,
+and Today before the turns while a past day is on show,
 the days Monday first, each shaded by its count against the calendar's other
 days and those of the months either side plain, the day on show ringed, then the legend. Any day
 with items starts the list there. The Digest reads one way only: what a single
 Feed has published lately is that Feed's own screen. On a phone a calendar
-button at the end of the first date's row, or of Back to today's, opens the platform's own date picker, in
-place of the month, and a day's chips run past the screen's edge. The phone Digest saves
+button at the end of the first date's distance line opens the platform's own date picker, in
+place of the month, with Today before it while a past day is on show; that line is as tall as
+the button whether Today is there or not, and a day's chips run past the screen's edge. The phone Digest saves
 from the Reader alone, and a title runs three lines at most. Pages are whole days,
 as many as reach fifty items, so Show more continues from the next day and
 names no number; Saved ends the same way. Before the first Subscription, the

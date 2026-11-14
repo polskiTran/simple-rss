@@ -19,7 +19,8 @@ interface DigestViewProps {
 /**
  * The Digest: one list, newest day first, that starts today or from a day
  * picked on the calendar — a month of the whole Digest beside the list on a
- * wide screen, the platform's date picker on a phone. With no Subscriptions it
+ * wide screen, the platform's date picker on a phone. Today, the way back,
+ * stands beside whichever of the two is on screen, so it never moves the list. With no Subscriptions it
  * offers only the way to the first, under a visible title; until the calendar
  * answers, the Digest is drawn as begun. Otherwise the first date is the
  * title, and the h1 stays for screen readers and to take focus on arrival.
@@ -41,7 +42,17 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
     <div className="view">
       <header className={firstRun ? 'page-head' : 'page-head digest-head'}>
         <h1 className={firstRun ? 'page-title' : 'visually-hidden'}>Digest</h1>
-        {shown && !firstRun ? <DayPicker calendar={shown} from={start.from} onFrom={readFrom} /> : null}
+        {shown && !firstRun ? (
+          // A phone's day tools, on the first date's distance line: Today while a past day is on show.
+          <div className="day-tools">
+            {start.from ? (
+              <Button className="button" onClick={() => readFrom(undefined)}>
+                Today
+              </Button>
+            ) : null}
+            <DayPicker calendar={shown} from={start.from} onFrom={readFrom} />
+          </div>
+        ) : null}
       </header>
 
       {firstRun ? (
@@ -52,13 +63,6 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
       ) : (
         <div className="with-aside">
           <div ref={stream}>
-            {start.from ? (
-              <div className="newer">
-                <Button className="button" onClick={() => readFrom(undefined)}>
-                  Back to today
-                </Button>
-              </div>
-            ) : null}
             <DigestList
               start={start}
               onRetry={retryCalendar}
@@ -67,7 +71,14 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
               onOpenFeed={onOpenFeed}
             />
           </div>
-          {shown ? <DigestMonth calendar={shown} selected={start.from ?? shown.today} onPick={readFrom} /> : null}
+          {shown ? (
+            <DigestMonth
+              calendar={shown}
+              selected={start.from ?? shown.today}
+              onPick={readFrom}
+              onToday={start.from ? () => readFrom(undefined) : undefined}
+            />
+          ) : null}
         </div>
       )}
     </div>

@@ -11,6 +11,8 @@ interface DigestMonthProps {
   readonly calendar: DigestCalendar
   readonly selected: string
   onPick(date: string): void
+  /** Starts the Digest from today again; given while a past day is on show. */
+  readonly onToday?: (() => void) | undefined
 }
 
 /**
@@ -18,7 +20,7 @@ interface DigestMonthProps {
  * window's other days; a day with items starts the Digest there. It opens on
  * the month of the day on show and turns back as far as the window reaches.
  */
-export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
+export function DigestMonth({ calendar, selected, onPick, onToday }: DigestMonthProps) {
   const [month, setMonth] = useState(selected.slice(0, 7))
   const [following, setFollowing] = useState(selected)
   if (following !== selected) {
@@ -39,6 +41,11 @@ export function DigestMonth({ calendar, selected, onPick }: DigestMonthProps) {
       className="panel digest-calendar"
       aside={
         <div className="calendar-turns">
+          {onToday ? (
+            <Button className="button button-small day-today" onClick={onToday}>
+              Today
+            </Button>
+          ) : null}
           <Button
             className="button button-icon button-small"
             aria-label="Previous month"

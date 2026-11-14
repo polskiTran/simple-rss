@@ -285,7 +285,7 @@ describe('the Digest from a day', () => {
     expect(within(month).getByRole('button', { name: '2 items on 8 August 2026' }).getAttribute('aria-pressed')).toBe(
       'true',
     )
-    expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Today' })).toBeNull()
 
     const monday = within(month).getByRole('button', { name: '4 items on 3 August 2026' })
     await user.click(monday)
@@ -294,11 +294,12 @@ describe('the Digest from a day', () => {
     expect(await screen.findByRole('heading', { name: '5 days ago Monday 3\u00a0August (1)' })).toBeDefined()
     expect(monday.getAttribute('aria-pressed')).toBe('true')
 
-    await user.click(screen.getByRole('button', { name: 'Back to today' }))
+    // The month holds Today on a wide screen; a phone's sits beside its date picker.
+    await user.click(within(month).getByRole('button', { name: 'Today' }))
 
     expect(window.location.search).toBe('')
     expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
-    expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Today' })).toBeNull()
   })
 
   it('draws the days of the months either side as plain numbers, picked in their own month', async () => {
