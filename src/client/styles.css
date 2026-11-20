@@ -1070,7 +1070,6 @@
   .item-title {
     margin: 0;
     font: 400 19px / 1.4 var(--font-read);
-    text-wrap: pretty;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
@@ -1542,7 +1541,6 @@
 
   .feed-preview-title {
     font: 400 16px / 1.4 var(--font-read);
-    text-wrap: pretty;
     overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -2379,7 +2377,6 @@
   .feed-day-title {
     margin: 0;
     font: 400 19px / 1.4 var(--font-read);
-    text-wrap: pretty;
     overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-box-orient: vertical;
