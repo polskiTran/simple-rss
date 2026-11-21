@@ -12,7 +12,6 @@ import type { RetrievalFailure } from '../upstream/retrieval.js'
 import { loggableUrl } from './loggable-url.js'
 import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 
-/** What settling an attempt needs to know about the Feed that was just polled. */
 export interface PolledFeed {
   readonly feedId: number
   readonly resolvedUrl: string
@@ -20,7 +19,6 @@ export interface PolledFeed {
   readonly consecutiveFailures: number
 }
 
-/** Feed Availability as the `subscriptions` row holds it. Nothing is kept in memory. */
 export interface RecordedAvailability {
   readonly lastPolledAt: string | null
   readonly lastSuccessAt: string | null
@@ -28,33 +26,22 @@ export interface RecordedAvailability {
   readonly lastFailureCategory: FeedAvailabilityCategory | null
 }
 
-/** The two ways a poll ends badly: the boundary refused, or the document would not parse. */
 export type FailedPoll =
   | { readonly kind: 'retrieval-failed'; readonly failure: RetrievalFailure }
   | { readonly kind: 'invalid-feed'; readonly code: FeedDocumentError['code'] }
 
-/** A poll that reached its verdict: the Feed answered — well or badly — or this installation never asked. */
 export type SettledPoll = { readonly kind: 'updated' } | { readonly kind: 'not-modified' } | FailedPoll
 
 type SubscriptionRow = typeof subscriptions.$inferSelect
 
-/** The `subscriptions` columns one settled poll rewrites; every attempt moves the schedule. */
 export type AvailabilityPatch = Pick<SubscriptionRow, 'nextPollAt' | 'lastPolledAt'> &
   Partial<Pick<SubscriptionRow, 'lastSuccessAt' | 'consecutiveFailures' | 'lastFailureCategory'>>
 
 export interface Settlement {
   readonly patch: AvailabilityPatch
-  /** Absent for a success, which the poll's own ingestion record already tells. */
   readonly log?: { readonly level: 'info' | 'warn'; readonly message: string; readonly fields: LogFields }
 }
 
-/**
- * The Feed Availability rule, pure: what one poll outcome writes and logs.
- * A publisher that answered badly lengthens the wait without ever removing the
- * Subscription; a publisher this installation never asked (boundary saturated,
- * or the caller gave up) leaves Feed Availability untouched and moves one
- * Polling Interval on.
- */
 export function settle(feed: PolledFeed, outcome: SettledPoll, now: Date): Settlement {
   const lastPolledAt = now.toISOString()
   if (outcome.kind === 'updated' || outcome.kind === 'not-modified') {
@@ -99,15 +86,10 @@ export function settle(feed: PolledFeed, outcome: SettledPoll, now: Date): Settl
   }
 }
 
-/** True only where this installation refused the attempt, so the publisher was never contacted. */
 function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPoll, { kind: 'retrieval-failed' }> {
   return outcome.kind === 'retrieval-failed' && outcome.failure.code === 'busy'
 }
 
-/**
- * Everything the network refused to answer collapses into `unreachable`; the
- * finer distinctions are transport detail the User cannot act on.
- */
 function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {
   if (outcome.kind === 'invalid-feed') return 'invalid_feed'
   switch (outcome.failure.code) {
@@ -126,13 +108,6 @@ function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {
   }
 }
 
-/**
- * The presented state is derived from the stored run of failures, never stored
- * itself; the last success is named by its day in the installation timezone.
- * A run long enough to be unavailable outranks a Feed that never answered.
- * `settle` is the only writer, so a failure always has its category and every
- * counted poll its time; a row that breaks either is a bug, refused here.
- */
 export function availabilityOf(record: RecordedAvailability, timezone: string): FeedAvailability {
   const { lastPolledAt, lastSuccessAt, consecutiveFailures, lastFailureCategory: category } = record
   const lastSuccessDate = lastSuccessAt === null ? null : dateKey(new Date(lastSuccessAt), timezone)

@@ -1,10 +1,5 @@
 import type { Clock } from '../../src/server/clock.js'
 
-/**
- * Time under test control. Polling due times, backoff, session expiry, and
- * Digest date grouping are all driven from here, so a test states the instant
- * it cares about instead of sleeping.
- */
 export class ManualClock implements Clock {
   #current: Date
 

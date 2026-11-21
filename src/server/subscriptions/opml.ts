@@ -1,7 +1,6 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { arrayOf, asRecord, declaresXmlEntities } from '../ingestion/xml.js'
 
-/** Recording is local (ADR 0007), so this bounds parse work and the scheduler's first-check backlog. */
 export const MAX_OPML_FEEDS = 500
 
 const MAX_TITLE_LENGTH = 512
@@ -23,11 +22,6 @@ export class OpmlError extends Error {
   }
 }
 
-/**
- * Feeds the document lists, in document order, one entry per distinct URL. Outlines
- * without `xmlUrl` are folders or plain links and are walked through, not reported.
- * URLs are returned as written — Subscription creation owns validation.
- */
 export function parseOpml(text: string): readonly OpmlFeedOutline[] {
   if (declaresXmlEntities(text)) {
     throw new OpmlError('unsupported_opml', 'OPML DOCTYPE and ENTITY declarations are unsupported')
@@ -60,7 +54,6 @@ export function parseOpml(text: string): readonly OpmlFeedOutline[] {
   return [...feeds.values()]
 }
 
-/** Writes active Subscriptions as OPML 2.0, using the resolved URL — the endpoint that currently answers. */
 export function serializeOpml(
   subscriptions: readonly {
     readonly title: string
@@ -107,7 +100,6 @@ function collectFeeds(outline: unknown, feeds: Map<string, OpmlFeedOutline>): vo
   }
 }
 
-/** OPML in the wild disagrees on attribute casing; `xmlUrl` and `XMLURL` both occur. */
 function attributeIgnoringCase(record: Record<string, unknown>, name: string): string | null {
   const wanted = `@_${name}`.toLowerCase()
   for (const [key, value] of Object.entries(record)) {

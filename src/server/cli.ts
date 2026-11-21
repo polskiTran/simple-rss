@@ -35,7 +35,6 @@ export interface CliContext {
   readonly logger?: Logger
 }
 
-/** A command against the live database, its arguments already validated. */
 type LiveCommand =
   | { readonly name: 'migrate' }
   | { readonly name: 'show' }
@@ -44,11 +43,6 @@ type LiveCommand =
   | { readonly name: 'reset-password'; readonly password: string }
   | { readonly name: 'invalid'; readonly problem: string }
 
-/**
- * Operational commands over the mounted volume — the emergency-recovery shape
- * in `docs/ARCHITECTURE.md`: no HTTP surface, no Session. Returns the exit
- * code so tests can drive it without spawning.
- */
 export async function runCli(argv: readonly string[], context: CliContext): Promise<number> {
   const [command, ...rest] = argv
 
@@ -57,8 +51,6 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
     return command ? 0 : 1
   }
 
-  // Opening the live path first would create an empty database exactly where
-  // `restore` must refuse to find one and `backup` must find something real.
   if (command === 'backup') return backup(rest[0], context)
   if (command === 'restore') return restore(rest[0], context)
 
@@ -139,8 +131,6 @@ async function runLive(
       const authentication = createAuthentication({
         db,
         clock: context.clock,
-        // Audit output goes to stderr: stdout is this command's result channel,
-        // and a log line interleaved with the JSON report would break piping to `jq`.
         logger: context.logger ?? createLogger({ level: context.config.logLevel, stream: process.stderr }),
         setupSecret: context.config.setupSecret,
       })

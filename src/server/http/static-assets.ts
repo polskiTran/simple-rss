@@ -23,15 +23,12 @@ const CONTENT_TYPES = {
   '.woff2': 'font/woff2',
 } as const satisfies Readonly<Record<string, string>>
 
-/** Vite writes content-hashed file names here, so they can never go stale. */
 const IMMUTABLE_PREFIX = '/assets/'
 
 export interface StaticAssetsOptions {
-  /** Absolute path to the built client bundle. */
   readonly root: string
 }
 
-/** Serves the built client, falling back to `index.html` so client-side routes survive a reload. */
 export function staticAssets(options: StaticAssetsOptions): MiddlewareHandler {
   const root = resolve(options.root)
   const indexPath = join(root, 'index.html')

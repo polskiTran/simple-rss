@@ -2,7 +2,6 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { clientAliases } from './vite.config.js'
 
-// Container smoke tests live in vitest.smoke.config.ts: they need a Docker daemon.
 export default defineConfig({
   test: {
     projects: [

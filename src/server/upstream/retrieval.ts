@@ -26,9 +26,7 @@ export interface RetrievalCapacity {
 export interface RetrievalProfile {
   readonly accept: readonly string[]
   readonly maxBytes: number
-  /** Covers resolution, connection, every redirect hop, and the final response headers. */
   readonly timeoutMs: number
-  /** Separate from timeoutMs: a slow large body is not an unreachable host. */
   readonly bodyTimeoutMs: number
   readonly capacity: RetrievalCapacity
 }
@@ -43,7 +41,6 @@ export const RETRIEVAL_PROFILES = {
     bodyTimeoutMs: 60_000,
     capacity: { maxConcurrent: 4, maxQueued: 24 },
   },
-  /** An address the User entered to preview: a Feed, or a web page that may declare some. */
   discovery: {
     accept: [...FEED_MEDIA_TYPES, 'text/html', 'application/xhtml+xml'],
     maxBytes: MAX_FEED_SIZE_MIB * 1024 * 1024,
@@ -91,49 +88,39 @@ export type RetrievalFailureCode =
 export interface RetrievalRequest {
   readonly url: string | URL
   readonly operation: RetrievalOperation
-  /** Validators kept from an earlier answer, null when it sent none; a match is answered `notModified`. */
   readonly conditional?: { readonly etag: string | null; readonly lastModified: string | null }
   readonly signal?: AbortSignal
-  /** Joins this retrieval's `upstream.retrieval_*` log to the caller's own. */
   readonly trace?: string
 }
 
 export interface RetrievalSuccess {
   readonly ok: true
   readonly status: number
-  /** The final redirect hop, not the URL that was asked for. */
   readonly url: string
   readonly contentType: string
   readonly charset: string | undefined
-  /** Validators as the response sent them, in the shape `conditional` takes back. */
   readonly etag: string | null
   readonly lastModified: string | null
-  /** True when a conditional request was answered `304` and there is no body. */
   readonly notModified: boolean
-  /** Reading past the profile's byte ceiling errors the stream with a `RetrievalError`. */
   readonly body: ReadableStream<Uint8Array>
 }
 
 export interface RetrievalFailure {
   readonly ok: false
   readonly code: RetrievalFailureCode
-  /** Safe for logs and never shown raw to the User. */
   readonly reason: string
-  /** Present for `http_error`, so a caller can tell 404 from 503. */
   readonly status?: number
 }
 
 export type RetrievalResult = RetrievalSuccess | RetrievalFailure
 
 export interface RetrievalBytes extends Omit<RetrievalSuccess, 'body'> {
-  /** The bytes own their buffer: freshly allocated, offset 0, nothing else on it, so a caller may transfer `bytes.buffer`. */
   readonly bytes: Uint8Array<ArrayBuffer>
 }
 
 export type RetrievalBytesResult = RetrievalBytes | RetrievalFailure
 
 export interface Retrieval {
-  /** The caller must consume or cancel the body; that frees the capacity slot. */
   retrieve(request: RetrievalRequest): Promise<RetrievalResult>
   retrieveBytes(request: RetrievalRequest): Promise<RetrievalBytesResult>
 }
@@ -148,7 +135,6 @@ interface RetrievalOptions {
   readonly operationCapacity?: Partial<Record<RetrievalOperation, RetrievalCapacity>>
 }
 
-/** Thrown into a body stream when it cannot be finished. Carries the same categories. */
 export class RetrievalError extends Error {
   readonly code: RetrievalFailureCode
 
@@ -159,10 +145,6 @@ export class RetrievalError extends Error {
   }
 }
 
-/**
- * The single outbound HTTP boundary (ADR 0005). Callers name an operation;
- * the module owns its content, size, redirect, and capacity policy.
- */
 export function createRetrieval(options: RetrievalOptions): Retrieval {
   const logger = options.logger.child({ component: 'upstream' })
   const sharedCapacity = options.capacity ?? DEFAULT_CAPACITY
@@ -222,7 +204,6 @@ interface RunContext {
   readonly gates: readonly ConcurrencyGate[]
 }
 
-/** Where the time went, for the `upstream.retrieval_*` log only. */
 interface Phases {
   queueMs?: number
   dnsMs?: number
@@ -442,10 +423,6 @@ interface BoundedBodyOptions {
   readonly finish: (bytes: number, error: RetrievalError | undefined) => void
 }
 
-/**
- * Counts decoded bytes and tears the connection down past the ceiling.
- * `Content-Length` is only a hint: compressed bodies expand and hostile ones lie.
- */
 function boundedBody(response: Response, options: BoundedBodyOptions): ReadableStream<Uint8Array> {
   const source = response.body
   if (!source) {
@@ -500,8 +477,6 @@ function boundedBody(response: Response, options: BoundedBodyOptions): ReadableS
     },
   })
 
-  // The body deadline can fire while nobody is pulling; without this a stream
-  // that is never read would hold its slot forever.
   const abandon = (): void => {
     const reason = options.signal.reason
     stop(
@@ -636,10 +611,6 @@ class ConcurrencyGate {
   }
 }
 
-/**
- * The DNS gate stays occupied until the OS lookup settles, even after the
- * caller's deadline: a broken resolver cannot pile up unbounded lookups.
- */
 class BoundedResolver {
   readonly #resolve: ResolveAddresses
   readonly #gate: ConcurrencyGate

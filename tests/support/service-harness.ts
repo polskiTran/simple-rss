@@ -16,19 +16,13 @@ import { UpstreamFixtures } from './upstream-fixtures.js'
 export { SETUP_SECRET, USER_PASSWORD } from './boot-service.js'
 
 export interface HarnessOptions {
-  /** Reuse an existing data directory, e.g. to model a container replacement. */
   readonly dataDir?: string
-  /** Extra environment for `loadConfig`, so tests exercise real parsing. */
   readonly env?: Record<string, string>
   readonly clock?: ManualClock
   readonly upstream?: UpstreamFixtures
-  /** Scripts the outbound boundary's answers directly instead of serving `upstream` through it. */
   readonly retrieval?: Retrieval
-  /** Built client bundle to serve. Omitted means `defaultClientDir()`. */
   readonly clientDir?: string
-  /** Shrinks the polling batch below the production default; nudges stay off unless a test turns them on. */
   readonly scheduling?: PollSchedulerLimits
-  /** Shrinks the retention sweep batch below the production default. */
   readonly retention?: RetentionLimits
   readonly readerWorkerUrl?: URL
   readonly readerBudgetMs?: number
@@ -40,34 +34,19 @@ export interface TestService {
   readonly dataDir: string
   readonly clock: ManualClock
   readonly upstream: UpstreamFixtures
-  /** The outbound boundary the service was wired with: hardened over `upstream`, or the scripted one. */
   readonly retrieval: Retrieval
-  /** Throws when startup failed; a degraded-startup test reads `/health/ready` instead. */
   readonly settings: InstallationSettingsStore
-  /** Throws when startup failed; a degraded-startup test reads `/health/ready` instead. */
   readonly database: DrizzleDatabase
   readonly logs: readonly LogRecord[]
-  /**
-   * Every progressive login delay the service asked for, in order. Nothing
-   * actually waited, so rate-limit tests assert on this instead of the clock.
-   */
   readonly sleeps: readonly number[]
-  /** Same-origin request against the running service; `path` starts with `/`. */
   fetch(path: string, init?: RequestInit): Promise<Response>
-  /** One scheduler wake, driven explicitly instead of by the once-per-minute timer. */
   wakeScheduler(): Promise<void>
-  /** Stops the process and starts a new one on the same data directory — a container replacement. */
   restart(): Promise<void>
   stop(): Promise<void>
 }
 
 const running: BootedService[] = []
 
-/**
- * Boots the complete service through `bootService`, with time under test
- * control and every log record and login delay captured. Whatever a test
- * leaves running is stopped after it.
- */
 export async function startTestService(options: HarnessOptions = {}): Promise<TestService> {
   const dataDir = options.dataDir ?? (await makeTempDataDir())
   const clock = options.clock ?? new ManualClock()

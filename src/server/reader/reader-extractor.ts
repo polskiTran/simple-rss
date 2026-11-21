@@ -7,7 +7,6 @@ import { IMAGE_URL_KEY_BYTES } from '../images/image-url-signature.js'
 import type { ExtractedArticle, ExtractionTimings } from './extract-article.js'
 
 export interface ReaderExtractionInput {
-  /** Transferred to the worker, which detaches it from the caller. */
   readonly bytes: ArrayBuffer
   readonly charset?: string | undefined
   readonly url: string

@@ -43,7 +43,6 @@ const LIBRARY = library({
 function reading(path: string): StubbedApi {
   const api = stubApi()
     .on('GET /api/digest', { body: digest() })
-    // Coming back asks again through the oldest day shown.
     .on('GET /api/digest?through=2026-08-08', { body: digest() })
     .on('GET /api/feeds/1', { body: DETAIL })
     .on('GET /api/feeds/1/items', { body: feedItems() })

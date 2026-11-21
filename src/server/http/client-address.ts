@@ -3,11 +3,6 @@ import type { Context } from 'hono'
 
 const UNKNOWN = 'unknown'
 
-/**
- * Behind the platform proxy every socket shares one address, so the rightmost
- * `X-Forwarded-For` entry — the one the nearest proxy appended — wins;
- * anything further left is caller-supplied.
- */
 export function clientAddress(c: Context, trustProxyHeaders: boolean): string {
   if (trustProxyHeaders) {
     const forwarded = c.req

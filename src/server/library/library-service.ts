@@ -20,7 +20,6 @@ export class LibraryService {
     this.#settings = options.settings
   }
 
-  /** Idempotent: a repeated save keeps the existing saved time. `undefined` when no such Feed Item exists. */
   save(feedItemId: number): LibraryMembership | undefined {
     const exists = this.#db
       .select({ id: feedItems.id })
@@ -38,16 +37,11 @@ export class LibraryService {
     return this.#membership(feedItemId)
   }
 
-  /** Unsaving the already-unsaved — or already-pruned — simply confirms the requested state. */
   unsave(feedItemId: number): LibraryMembership {
     this.#db.delete(libraryItems).where(eq(libraryItems.feedItemId, feedItemId)).run()
     return { feedItemId, saved: false, savedAt: null }
   }
 
-  /**
-   * The Library by when each item was saved: newest save first, or oldest.
-   * Keyset pages over the saved time, ties by id (ADR 0011).
-   */
   list(order: LibraryOrder, cursor?: LibraryCursor): Library {
     const timezone = this.#settings.effectiveTimezone()
     const now = this.#clock.now()

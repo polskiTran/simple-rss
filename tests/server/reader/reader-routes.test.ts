@@ -11,8 +11,6 @@ function appAnswering(outcome: ReaderArticleOutcome) {
 }
 
 describe('Reader failure answers', () => {
-  // The per-code answers are the Original webpage table's; this proves the route reads it.
-  // No-store is the app's default for every /api answer, pinned in api.test.ts.
   it('answers a Retrieval failure from the Original webpage answers', async () => {
     const outcome: ReaderArticleOutcome = {
       kind: 'retrieval-failed',

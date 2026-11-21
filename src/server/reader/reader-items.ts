@@ -11,11 +11,6 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 
-/**
- * What Reader View opens a Feed Item with: its stored Feed Content, the
- * Subscription's Reading Source, and the next Feed Item in the Digest.
- * Original webpage extraction is `ReaderService`'s.
- */
 export class ReaderItems {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -72,7 +67,6 @@ export class ReaderItems {
       summary: row.summary,
       feedContent: row.feedContentMarkdown
         ? {
-            // Stored destinations are absolute; no original webpage is needed to refresh capabilities.
             markdown: applyReaderMarkdownPolicy(row.feedContentMarkdown, { images: this.#signImageUrl }),
             truncated: row.feedContentTruncated !== 0,
             readingTimeMinutes: readingTimeMinutes(row.feedContentMarkdown),

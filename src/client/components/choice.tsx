@@ -15,10 +15,6 @@ interface ChoiceProps<Value extends string> {
   onChange(value: NoInfer<Value>): void
 }
 
-/**
- * The switch: one value of a few, always exactly one. Arrow keys move between
- * segments under Base UI's roving tabindex.
- */
 export function Choice<const Value extends string>({
   label,
   options,
@@ -34,8 +30,6 @@ export function Choice<const Value extends string>({
       value={[value]}
       disabled={disabled}
       onValueChange={(chosen) => {
-        // Pressing the pressed segment would empty the group; a switch always
-        // holds one value, so that press stays where it is.
         const next = options.find((option) => option.value === chosen[0])
         if (next && next.value !== value) onChange(next.value)
       }}

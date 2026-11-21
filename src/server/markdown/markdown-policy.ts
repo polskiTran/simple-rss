@@ -30,7 +30,6 @@ const PARSER_OPTIONS = {
 const SERIALIZER_OPTIONS = {
   bullet: '-' as const,
   emphasis: '*' as const,
-  // Alignment padding multiplies one oversized cell across every row.
   extensions: [gfmTableToMarkdown({ tablePipeAlign: false }), mathToMarkdown({ singleDollarTextMath: false })],
   fence: '`' as const,
   fences: true,
@@ -43,16 +42,10 @@ const SERIALIZER_OPTIONS = {
 const CODE_LANGUAGE = /^[\w+#.-]+$/u
 
 export interface ReaderMarkdownPolicyOptions {
-  /** Relative destinations resolve here, after declared bases and Retrieval redirects; stored destinations are already absolute. */
   readonly baseUrl?: string
-  /** Keep durable destinations for storage, or sign them for Reader delivery. Omitted means no images. */
   readonly images?: 'preserve' | ((url: string) => string)
 }
 
-/**
- * Rebuilds Markdown from the Reader dialect's maintained AST nodes.
- * Unknown syntax and raw HTML are omitted rather than passed through.
- */
 export function applyReaderMarkdownPolicy(markdown: string, options: ReaderMarkdownPolicyOptions): string {
   const parsed = fromMarkdown(markdown, PARSER_OPTIONS)
   return serializeReaderMarkdown(readerMarkdownTree(parsed, options))
@@ -215,7 +208,6 @@ function absoluteHttpUrl(candidate: string, baseUrl: string | undefined): URL | 
   }
 }
 
-/** Feed conversion and original-page extraction share this allowlist. */
 export function readerMarkdownTree(root: Root, options: ReaderMarkdownPolicyOptions): Root {
   return { type: 'root', children: policyBlocks(root.children, options) }
 }

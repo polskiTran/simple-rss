@@ -30,7 +30,6 @@ export function buildUserExport(options: {
         domain: feeds.domain,
         homePageUrl: feeds.homePageUrl,
         createdAt: feeds.createdAt,
-        // Left-joined: Drizzle answers the whole object null for a Feed with no Subscription.
         subscription: {
           pollingIntervalMinutes: subscriptions.pollingIntervalMinutes,
           readingSource: subscriptions.readingSource,

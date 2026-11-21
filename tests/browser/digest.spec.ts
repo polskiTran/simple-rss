@@ -34,7 +34,6 @@ async function openDigest(page: Page, installation: Installation): Promise<void>
   await page.getByRole('link', { name: 'Digest', exact: true }).click()
 }
 
-/** The day `count` days before today, in the suite's pinned UTC. */
 function daysAgo(count: number): string {
   return new Date(Date.now() - count * 86_400_000).toISOString().slice(0, 10)
 }
@@ -57,7 +56,6 @@ test.describe('the Digest presentation', () => {
     const titleLine = () =>
       page.evaluate(() => {
         const title = document.querySelector('.page-title:not(.visually-hidden)')
-        // A Digest day's date is its own span; another screen's title is bare text.
         const words =
           title?.querySelector('.day-date') ??
           [...(title?.childNodes ?? [])].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
@@ -249,7 +247,6 @@ async function sharedTitle(row: Locator) {
   })
 }
 
-/** Today's one Field Notes item, First light, answered as forty in one box led by it as `Ledger entry 1`. */
 function ledgerDay(page: Page) {
   return page.route(
     (url) => url.pathname === '/api/digest',
@@ -362,7 +359,6 @@ test.describe('the Digest at phone width', () => {
     expect(await sharedTitle(row)).toMatchObject({ lines: 3, fits: true })
   })
 
-  // iOS zooms the page into a focused field set under 16px.
   test('focuses search at a size iOS does not zoom', async ({ page, installation }) => {
     await openDigest(page, installation)
 

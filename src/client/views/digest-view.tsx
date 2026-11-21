@@ -16,15 +16,6 @@ interface DigestViewProps {
   onOpenFeed(feedId: number): void
 }
 
-/**
- * The Digest: one list, newest day first, that starts today or from a day
- * picked on the calendar — a month of the whole Digest beside the list on a
- * wide screen, the platform's date picker on a phone. Today, the way back,
- * stands beside whichever of the two is on screen, so it never moves the list. With no Subscriptions it
- * offers only the way to the first, under a visible title; until the calendar
- * answers, the Digest is drawn as begun. Otherwise the first date is the
- * title, and the h1 stays for screen readers and to take focus on arrival.
- */
 export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestViewProps) {
   useScreenTitle('Digest')
   const [calendar, { retry: retryCalendar }] = useResource('calendar', fetchDigestCalendar)
@@ -34,7 +25,6 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
 
   const readFrom = (from: string | undefined) => {
     onStart({ from: from === shown?.today ? undefined : from })
-    // Picked below the fold, the day starts the list back at its top.
     if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo({ top: 0 })
   }
 
@@ -43,7 +33,6 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
       <header className={firstRun ? 'page-head' : 'page-head digest-head'}>
         <h1 className={firstRun ? 'page-title' : 'visually-hidden'}>Digest</h1>
         {shown && !firstRun ? (
-          // A phone's day tools, on the first date's distance line: Today while a past day is on show.
           <div className="day-tools">
             {start.from ? (
               <Button className="button" onClick={() => readFrom(undefined)}>
@@ -85,12 +74,6 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
   )
 }
 
-/**
- * A phone's way to a day, where the month has no room beside the list: the
- * platform's own date picker, laid invisibly over a calendar button. A tap
- * opens it on a phone; a desktop browser in the narrow layout opens it only
- * from the field's own picker icon, so a click asks for it by name.
- */
 function DayPicker({
   calendar,
   from,

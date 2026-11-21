@@ -1,6 +1,5 @@
 const FORBIDDEN_DECLARATION = /<!\s*(?:DOCTYPE|ENTITY)\b/i
 
-/** DOCTYPE and ENTITY declarations can smuggle external entities in; refused before parsing. */
 export function declaresXmlEntities(text: string): boolean {
   return FORBIDDEN_DECLARATION.test(text)
 }

@@ -24,7 +24,6 @@ interface SearchResultsViewProps {
   settledQuery: string
   scope: SearchScope
   sort: SearchSort
-  /** The scope of the screen the search left; the switch offers it beside everywhere. */
   originScope: SearchScope
   onScope(scope: SearchScope): void
   onSort(sort: SearchSort): void
@@ -66,7 +65,6 @@ export function SearchResultsView({
       onChange={(chosen) => onScope(chosen === 'everywhere' ? { kind: 'everywhere' } : scoped)}
     />
   ) : null
-  // The Feeds screen's answer is Subscriptions alone, in list order: nothing to rank.
   const sortSwitch =
     scope.kind === 'subscriptions' ? null : (
       <Choice
@@ -175,7 +173,6 @@ function feedsOf(results: readonly SearchResult[]) {
     .sort((left, right) => right.count - left.count || left.title.localeCompare(right.title))
 }
 
-/** Subscriptions the words matched by name or host, as a way into each Feed. */
 function MatchingFeeds({
   subscriptions,
   onOpenFeed,
@@ -198,7 +195,6 @@ function MatchingFeeds({
   )
 }
 
-/** The query's words, as the server's tokenizer would count them. */
 function wordsOf(line: string): string[] {
   return line
     .split(/\s+/)
@@ -206,13 +202,11 @@ function wordsOf(line: string): string[] {
     .filter((word) => word.length > 1)
 }
 
-/** The text with every occurrence of the words marked, whatever their case. */
 function marked(text: string, words: readonly string[]): ReactNode {
   if (words.length === 0) return text
   const pattern = new RegExp(`(${words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
   const parts = text.split(pattern)
   return parts.map((part, index) =>
-    // Split with one capture group: odd indices are the matches.
     index % 2 === 1 ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed string, in order — the position is the identity.
       <mark key={index} className="match">

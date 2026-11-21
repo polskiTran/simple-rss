@@ -17,7 +17,6 @@ export function TimezoneChoice() {
 
   function change(chosen: string) {
     if (saving) return
-    // Shown at once, outside the transition; a refusal puts the held timezone back.
     setNotice('')
     set((current) => ({ ...current, timezone: chosen }))
     startSaving(async () => {

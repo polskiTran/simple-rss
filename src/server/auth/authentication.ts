@@ -7,7 +7,6 @@ import { CredentialStore, type IssuedSession } from './credentials.js'
 import { argon2idHasher, type PasswordHasher } from './password.js'
 import { LoginRateLimiter, type AllowedAttempt } from './rate-limit.js'
 
-/** How Authentication waits out a delay; the harness records instead of waiting. */
 export type Sleeper = (milliseconds: number) => Promise<void>
 
 const realSleeper: Sleeper = (milliseconds) =>
@@ -20,7 +19,6 @@ export interface AuthenticationOptions {
   readonly sleep: Sleeper
   readonly clock: Clock
   readonly logger: Logger
-  /** From the deployment environment; absent on an unconfigured installation. */
   readonly setupSecret: string | undefined
 }
 
@@ -138,14 +136,12 @@ export class Authentication {
     return token ? this.#deps.credentials.touch(token, this.#deps.clock.now()) : false
   }
 
-  /** Ends this device's session and leaves every other device alone. */
   signOut(token: string | undefined): void {
     if (!token) return
     this.#deps.credentials.revoke(token)
     this.#deps.logger.info('auth.signed_out')
   }
 
-  /** Signs every device out — including the one asking. */
   async changePassword(
     input: Attempt & { readonly currentPassword: string; readonly newPassword: string },
   ): Promise<PasswordChangeOutcome> {

@@ -23,7 +23,6 @@ const ATTEMPTS_BEFORE_COOLDOWN = 5
 
 const STASH_TTL_MS = 60_000
 
-/** Failed attempts on one Feed Item, the latest within `RETRY_COOLDOWN_MS` of the one before. */
 interface FailureEpisode {
   readonly attempts: number
   readonly lastAttemptAt: number
@@ -38,12 +37,6 @@ export type ReaderArticleOutcome =
   | { readonly kind: 'deadline'; readonly stage: ReaderDeadlineStage }
   | { readonly kind: 'extracted'; readonly article: ReaderArticle }
 
-/**
- * One retrieval and extraction, shared by every reader waiting on its Feed Item.
- * `episode` is the failure run it started under, so its own failure extends it.
- * `pastDeadline` turns true once a deadline answered a reader: from then the work
- * runs on without readers, and its article is stashed for the refetch.
- */
 class Extraction {
   readonly controller = new AbortController()
   readonly work: Promise<ReaderArticleOutcome>
@@ -59,7 +52,6 @@ class Extraction {
   }
 }
 
-/** Where one Feed Item's Original webpage stands; a Feed Item with no entry has nothing pending. */
 type ReaderEntry =
   | { readonly kind: 'extracting'; readonly extraction: Extraction }
   | { readonly kind: 'stashed'; readonly article: ReaderArticle; readonly expiresAt: number }
@@ -70,11 +62,6 @@ const ABANDONED_READER_OUTCOME = {
   failure: { ok: false, code: 'cancelled', reason: 'the browser left the Reader' },
 } satisfies ReaderArticleOutcome
 
-/**
- * Reader View's Original webpage: retrieves and extracts it once per Feed Item
- * however many readers wait, cools down after repeated failures, and keeps for a
- * minute an article that finished after the deadline already answered its reader.
- */
 export class ReaderService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -142,8 +129,6 @@ export class ReaderService {
   }
 
   async #extract(feedItemId: number, link: string, extraction: Extraction): Promise<ReaderArticleOutcome> {
-    // `reader.trace` carries the Reader's phases; the upstream phases are on
-    // the `upstream.retrieval_*` record with the same `trace`.
     const trace = randomUUID()
     const signal = extraction.controller.signal
     const startedAt = performance.now()
@@ -231,7 +216,6 @@ export class ReaderService {
     }
   }
 
-  /** Forgets a stash past its minute and a failure episode past its cooldown. */
   #sweep(now: number): void {
     for (const [id, entry] of this.#entries) {
       const over =
@@ -253,12 +237,6 @@ export class ReaderService {
   }
 }
 
-/**
- * What an extraction leaves for its Feed Item once it ends. An article that a
- * deadline already answered for is stashed for the refetch; a failure of the
- * publisher or the page extends the episode; anything else, including work
- * abandoned or thrown with no outcome, returns to the episode it began under.
- */
 function settled(
   extraction: Extraction,
   outcome: ReaderArticleOutcome | undefined,
@@ -276,7 +254,6 @@ function settled(
   return episode ? { kind: 'failing', attempts: episode.attempts, lastAttemptAt: episode.lastAttemptAt } : undefined
 }
 
-/** A cancelled retrieval, or one this installation never sent, says nothing about the publisher or the page. */
 function countsAsFailure(outcome: ReaderArticleOutcome): boolean {
   if (outcome.kind === 'unreadable') return true
   return outcome.kind === 'retrieval-failed' && outcome.failure.code !== 'cancelled' && outcome.failure.code !== 'busy'

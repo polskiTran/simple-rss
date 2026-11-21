@@ -39,12 +39,6 @@ export function stripCadenceByFeed(
   return cadenceByFeed(db, timezone, trailingDayKeys(dateKey(now, timezone), CADENCE_STRIP_DAYS), feedIds)
 }
 
-/**
- * Feed Items under `scope` per installation-timezone day, counted in SQL: each
- * day is one range over the chronology index, so no row crosses into JavaScript.
- * `CROSS JOIN` is SQLite's order hint: without statistics the planner may
- * otherwise put the days inside and walk every item of every Feed against them.
- */
 function countRows(db: DrizzleDatabase, timezone: string, days: readonly string[], scope: SQL, byFeed = false) {
   const last = days.at(-1)
   if (last === undefined) return []
@@ -64,10 +58,6 @@ export function trailingDayKeys(todayKey: string, days: number): string[] {
   return Array.from({ length: days }, (_, index) => keyOf(today - (days - 1 - index) * DAY_MS))
 }
 
-/**
- * Date keys from the Monday opening the grid window through `todayKey`, oldest
- * first — always `CADENCE_GRID_WEEKS` columns, with today ending the last.
- */
 export function gridDayKeys(todayKey: string): string[] {
   const today = Date.parse(`${todayKey}T00:00:00.000Z`)
   const mondayOffset = (new Date(today).getUTCDay() + 6) % 7

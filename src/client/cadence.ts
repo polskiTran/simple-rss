@@ -7,7 +7,6 @@ interface CadenceCell {
   readonly level: 0 | 1 | 2 | 3 | 4
 }
 
-/** One week of the grid. The last column ends on today and may be short. */
 interface CadenceColumn {
   readonly cells: readonly CadenceCell[]
   readonly monthLabel: string | undefined
@@ -15,9 +14,7 @@ interface CadenceColumn {
 
 interface CadenceStats {
   readonly total: number
-  /** Undefined when nothing was published. */
   readonly busiestWeekday: string | undefined
-  /** The longest run of days without a Feed Item, 0 when there was none. */
   readonly longestQuiet: number
 }
 
@@ -34,10 +31,6 @@ export function cadenceLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
-/**
- * Levels for counts too large for one Feed's thresholds — the whole Digest's
- * days — split at the quartiles of `counts`' days with any items.
- */
 export function relativeLevels(counts: readonly number[]): (count: number) => 0 | 1 | 2 | 3 | 4 {
   const busy = counts.filter((count) => count > 0).toSorted((left, right) => left - right)
   const quartile = (fraction: number) => busy[Math.floor((busy.length - 1) * fraction)] ?? 0
@@ -77,7 +70,6 @@ function statsOf(days: readonly CadenceObservation[]): CadenceStats {
 
   const byWeekday = Array.from({ length: 7 }, () => 0)
   for (const { date, count } of days) {
-    // Monday first, so a tie goes to the earlier day of the week.
     const day = mondayFirst(date)
     byWeekday[day] = (byWeekday[day] ?? 0) + count
   }
@@ -94,7 +86,6 @@ function statsOf(days: readonly CadenceObservation[]): CadenceStats {
   return { total, busiestWeekday: total === 0 || !busiestDay ? undefined : weekday(busiestDay.date), longestQuiet }
 }
 
-/** The day of the week, Monday 0 to Sunday 6. */
 function mondayFirst(date: string): number {
   return (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7
 }

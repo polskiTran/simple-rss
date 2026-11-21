@@ -11,21 +11,13 @@ import { stripCadenceByFeed } from '../digest/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
-/** Everywhere, the jump-to group is a handful above the items; scoped to the Subscriptions it is the whole answer, uncapped. */
 export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
-// BM25 weights are positional, following the FTS5 column order.
 const ITEM_TITLE_WEIGHT = 4
 const SUMMARY_WEIGHT = 1
 const FEED_TITLE_WEIGHT = 2
 const RECENCY_DECAY_DAYS = 30
 
-// Snippets come from the summary column only — the title and Feed title are
-// already visible in the item shape, so a fragment of either proves nothing.
-// snippet() windows the column's opening tokens even when the match landed
-// elsewhere, so a bm25 probe weighted to the summary alone answers "did the
-// summary itself match": strictly negative means yes (FTS5 clamps idf above
-// zero), exactly zero means the match lives entirely in the other columns.
 const SNIPPET_COLUMN = 1
 const SNIPPET_TOKENS = 20
 
@@ -40,7 +32,6 @@ export class SearchService {
     this.#settings = options.settings
   }
 
-  /** Undefined when scoped to a Feed the User is not subscribed to — the screen that scope came from is gone too. */
   search(query: string, scope: SearchScope, sort: SearchSort): SearchResults | undefined {
     const words = wordsOf(query)
     const timezone = this.#settings.effectiveTimezone()
@@ -99,10 +90,6 @@ export class SearchService {
     if (words.length === 0) return []
     const match = matchExpressionOf(words)
 
-    // ADR 0009: BM25 match quality blended with recency decay, stated in SQL so
-    // the LIMIT bounds the right fifty. bm25() is more negative the better the
-    // match; dividing by the age factor shrinks it toward zero as the item ages.
-    // Sorted newest, the chronology alone orders — and bounds — the matches.
     const chronology = feedItems.chronologyAt
     const relevance = sql`bm25(${feedItemSearch}, ${ITEM_TITLE_WEIGHT}, ${SUMMARY_WEIGHT}, ${FEED_TITLE_WEIGHT})
       / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_DECAY_DAYS})`
@@ -180,7 +167,6 @@ export class SearchService {
   }
 }
 
-/** Case- and diacritic-insensitive, matching the FTS tokenizer's temperament. */
 function folded(value: string): string {
   return value
     .normalize('NFKD')
@@ -189,20 +175,12 @@ function folded(value: string): string {
 }
 
 function wordsOf(query: string): string[] {
-  return (
-    query
-      .split(/\s+/)
-      .map((word) => word.replaceAll('"', ''))
-      // A word with no letter or digit tokenizes to nothing; quoting it would hand FTS5 an empty phrase.
-      .filter((word) => /[\p{L}\p{N}]/u.test(word))
-  )
+  return query
+    .split(/\s+/)
+    .map((word) => word.replaceAll('"', ''))
+    .filter((word) => /[\p{L}\p{N}]/u.test(word))
 }
 
-/**
- * Every word becomes a quoted phrase — all must match, the last as a prefix for
- * search-as-you-type. FTS5 operators are deliberately not offered: a search line
- * is words, not syntax.
- */
 function matchExpressionOf(words: readonly string[]): string {
   return words.map((word, index) => (index === words.length - 1 ? `"${word}"*` : `"${word}"`)).join(' ')
 }

@@ -7,15 +7,6 @@ import { applyMigrations } from '../../../src/server/persistence/migrations.js'
 import * as schema from '../../../src/server/persistence/schema.js'
 import { makeTempDataDir } from '../../support/temp-dir.js'
 
-/**
- * Holds schema.ts' columns to a fully migrated database, so a query never names a
- * column the migrations did not create, nor types or defaults one differently.
- * Constraints and indexes belong to migrations alone and are not compared.
- *
- * Outside the comparison: `schema_migrations` (the runner's own ledger) and
- * `feed_item_search` with its FTS5 shadow tables, typed in search/search-schema.ts.
- */
-
 interface ColumnInfo {
   name: string
   type: string
@@ -34,7 +25,6 @@ beforeAll(async () => {
   return () => db.$client.close()
 })
 
-/** `120` and `0` come back bare; strings come back single-quoted, matching pragma output. */
 function literalOf(value: unknown): string | null {
   if (value === undefined) return null
   if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`
@@ -68,7 +58,6 @@ describe('schema.ts against the migrated database', () => {
 
         expect(column.getSQLType().toLowerCase(), at).toBe(real.type.toLowerCase())
         expect(column.primary, at).toBe(real.pk > 0)
-        // SQLite leaves even a PRIMARY KEY column's notnull flag at 0.
         if (real.pk === 0) expect(column.notNull, at).toBe(real.notnull === 1)
         expect(literalOf(column.default), at).toBe(real.dflt_value)
       }

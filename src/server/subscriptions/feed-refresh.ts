@@ -7,7 +7,6 @@ export type RefreshFeedOutcome =
   | IngestFeedOutcome
   | { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number }
 
-/** Coalesces concurrent refreshes and bounds deliberate repeat retrievals per Feed. */
 export class FeedRefresh {
   readonly #clock: Clock
   readonly #poll: Pick<FeedPoll, 'ingest'>

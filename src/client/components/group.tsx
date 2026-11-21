@@ -3,11 +3,9 @@ import type { ReactNode } from 'react'
 interface GroupProps {
   readonly id: string
   readonly title: ReactNode
-  /** The whole group's, or none — a partial count is a wrong one. */
   readonly count?: number | undefined
   readonly aside?: ReactNode
   readonly className?: string
-  /** For a Group that heads the page, in place of the group heading's own look. */
   readonly headingClassName?: string
   readonly children: ReactNode
 }
@@ -26,7 +24,6 @@ export function Group({
       <div className="group-header">
         <h2 className={headingClassName} id={id}>
           {title}
-          {/* A real space, so the heading is announced "Today 14", not "Today14". */}
           {count === undefined ? null : (
             <>
               {' '}
@@ -41,10 +38,6 @@ export function Group({
   )
 }
 
-/**
- * Takes the reader into the Group whose heading is `id`: focus lands on the
- * section without a jump, then the page scrolls it to the top.
- */
 export function enterSection(id: string) {
   const section = document.getElementById(id)?.closest('section')
   if (!section) return

@@ -59,8 +59,7 @@ describe('health endpoints', () => {
     const ready = await service.fetch('/health/ready')
 
     expect(readinessSchema.parse(await ready.json())).toEqual({ status: 'unready', reason: 'migrations failed' })
-    // SQLite removes the WAL when its last connection closes.
-    expect(existsSync(`${databasePath}-wal`)).toBe(false)
+    expect(existsSync(`${databasePath}-wal`), 'WAL removed, so the last connection closed').toBe(false)
   })
 
   it('refuses to start on a database a newer release has migrated, as after rolling the image back', async () => {

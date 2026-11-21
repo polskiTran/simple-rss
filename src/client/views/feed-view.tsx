@@ -48,9 +48,7 @@ interface FeedViewProps {
   readonly feedId: number
   readonly origin: Origin
   onBack(origin: Origin): void
-  /** Not the way back: that can point at an article of the Feed just left. */
   onUnsubscribed(): void
-  /** `feedTitle` rides along so the Reader's way back can name this Feed. */
   onOpenItem(feedItemId: number, feedTitle: string): void
 }
 
@@ -67,14 +65,11 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     { dropOnNewKey: true },
   )
   const items = valueInView(itemsState)
-  // A day picked on the cadence grid, waiting for the page that brings it.
   const [shownDay, setShownDay] = useState<string>()
   const [notice, setNotice] = useState('')
   const [refreshing, startRefresh] = useTransition()
   const [changing, startChange] = useTransition()
 
-  // Each action clears the notice before its transition starts, so the clearing
-  // shows at once and an answer repeated word for word is announced again.
   function refresh() {
     if (refreshing) return
     setNotice('')
@@ -263,10 +258,6 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   )
 }
 
-/**
- * The Feed's retained items, a day to a group, a page of whole days at a time;
- * Show more goes on from the day the page names.
- */
 function Items({
   feedId,
   feedTitle,
@@ -281,7 +272,6 @@ function Items({
 }: {
   feedId: number
   feedTitle: string
-  /** The Cadence's last day, which day titles count back from. */
   today: string
   state: Resource<FeedItems>
   page: FeedItems | undefined
@@ -301,7 +291,6 @@ function Items({
     return <p className="note feed-items-state">Nothing retained from this feed yet.</p>
   }
 
-  // Pages are whole days, so each day's count is whole.
   const days = Map.groupBy(page.items, (item) => item.date)
   return (
     <div className="feed-items">
@@ -484,7 +473,6 @@ function overrideOf(draft: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-/** `12 minutes ago`, `Yesterday` — how long since an instant, in its largest whole unit. */
 function ago(iso: string): string {
   const seconds = (Date.parse(iso) - Date.now()) / 1000
   const format = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' })
@@ -500,7 +488,6 @@ const AGO_UNITS = [
   ['second', 1],
 ] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]
 
-/** Each Polling Interval as the select names it. */
 const INTERVALS = {
   30: '30 minutes',
   60: '1 hour',

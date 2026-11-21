@@ -5,10 +5,6 @@ import { CadenceStrip } from './cadence-strip.js'
 import { HomePageLink } from './home-page-link.js'
 import { RoutedLink } from './routed-link.js'
 
-/**
- * A Subscription as a way into its Feed: its name, its last 30 days and its
- * site. The Feeds list adds what it knows of availability underneath.
- */
 export function FeedRow({
   feed,
   onOpen,

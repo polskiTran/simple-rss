@@ -445,7 +445,6 @@ function scriptedRetrieval(script: RetrievalBytesResult[]): Retrieval {
   }
 }
 
-/** Subscribes, spending the script's first answer on the check; each later poll spends the next. */
 async function subscribedOnScript(service: TestService, url: string): Promise<number> {
   const user = await claimedDevice(service)
   const response = await user.post('/api/subscriptions', { url })

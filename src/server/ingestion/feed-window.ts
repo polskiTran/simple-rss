@@ -3,22 +3,12 @@ import type { DatabaseTransaction } from '../persistence/database.js'
 import { feedItems, feeds, feedUrlAliases } from '../persistence/schema.js'
 import type { ParsedFeedDocument } from './feed-document.js'
 
-/**
- * Writes one Feed Window and the Feed metadata it reports, inside the caller's
- * transaction — the caller has already confirmed the Feed is still subscribed.
- * Re-ingesting an item corrects its mutable metadata; identity, first-seen time,
- * and Library membership stay untouched.
- */
 export function persistFeedWindow(
   tx: DatabaseTransaction,
   options: {
     feedId: number
     parsed: ParsedFeedDocument
     resolvedUrl: string
-    /**
-     * Stored verbatim, including absence, so a stale `ETag` is never replayed
-     * after a publisher stops sending one.
-     */
     validators: { etag: string | null; lastModified: string | null }
     now: string
   },

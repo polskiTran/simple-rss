@@ -1,12 +1,3 @@
-/**
- * Dev-only data toggle (break-ui). Swaps the API's answers at the fetch
- * boundary for realistic worst-case datasets, so every screen meets the data
- * production will hand it. `main.tsx` installs it only under `import.meta.env.DEV`.
- *
- * `?data=worst|empty|one|huge` picks a dataset; the choice is kept in
- * sessionStorage so in-app navigation (which rewrites the URL) keeps it.
- * `demo` passes every request through to the real server.
- */
 import type {
   DigestCalendar,
   Digest,
@@ -70,7 +61,6 @@ const available: SubscriptionSummary['availability'] = {
   category: null,
 }
 
-/** Spread across the first rows, one failure each, as real data mixes them. */
 const WORST_FEEDS: readonly FeedSeed[] = [
   {
     title:
@@ -81,7 +71,6 @@ const WORST_FEEDS: readonly FeedSeed[] = [
     homePageUrl: 'https://aleksandra.wisniewska-kowalczyk.example.com/notatki/',
     cadence: busyCadence,
   },
-  // A feed with no <title>: the publisher's host is all it reports.
   {
     title: 'northwind-industries-holdings.example.com',
     domain: 'ops.sub.department.region.northwind-industries-holdings.example.co.uk',
@@ -142,7 +131,6 @@ const WORST_FEEDS: readonly FeedSeed[] = [
       category: 'timeout',
     },
   },
-  // Identical names: two Subscriptions to the same publisher's different Feeds.
   { title: 'Engineering', domain: 'blog.example.com', homePageUrl: 'https://blog.example.com/', cadence: busyCadence },
   { title: 'Engineering', domain: 'eng.example.org', homePageUrl: 'https://eng.example.org/', cadence: busyCadence },
 ]
@@ -185,8 +173,6 @@ function feedsOf(dataset: Exclude<Dataset, 'demo'>): SubscriptionSummary[] {
 
 const LONG_TITLE =
   'Why we rewrote our entire distributed job scheduler three times in eighteen months, what each rewrite taught us about consensus, backpressure and on-call fatigue, and why the fourth version is, against every instinct we had, a single SQLite file on one machine'
-// A Mastodon or Bluesky feed titles each item with the whole post; ingestion
-// cuts it at MAX_TITLE_LENGTH (512), mid-word, as `feed-document.ts` does.
 const POST_TITLE =
   'Small thread on what happened to our deploy pipeline last night, because a few of you asked and I think the failure mode is genuinely interesting: at 02:14 the artifact cache filled up, the cleanup job that was supposed to run at 02:00 had been silently disabled in a config migration three weeks ago, and every build after that point started falling back to a cold cache, which pushed build times from four minutes to forty-one, which tripped the deploy timeout, which the on-call runbook told us to fix by retrying, which made it worse. 1/9 #devops #postmortem'.slice(
     0,
@@ -217,7 +203,6 @@ const WORST_TODAY: readonly ItemSeed[] = [
   { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
   { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
   { feed: 6, title: POST_TITLE, time: '17:45' },
-  // A feed item with no <title>: the server answers 'Untitled'.
   { feed: 8, title: 'Untitled', time: '17:15' },
   {
     feed: 9,
@@ -317,8 +302,6 @@ function digestOf(dataset: Exclude<Dataset, 'demo'>): Digest {
   }
 }
 
-// Days the Digest fixture fills report its real count, so the calendar and the
-// list never disagree; the rest are patterned filler.
 function calendarOf(dataset: Exclude<Dataset, 'demo'>): DigestCalendar {
   const listed = new Map(digestOf(dataset).groups.map((group) => [group.date, group.items.length]))
   const days = Array.from({ length: 26 * 7 }, (_, index) => {
@@ -371,7 +354,6 @@ function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
       return {
         today: TODAY,
         total: 1_000,
-        // The server pages the Library at 50 (LIBRARY_PAGE_SIZE), so 1,000 saves arrive 50 at a time.
         items: feeds
           .slice(0, 50)
           .map((feed) => item({ feed: feed.feedId, title: `${feed.title}: saved`, time: '12:00' }, TODAY)),
@@ -422,8 +404,6 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
   if (path === '/api/settings') return { timezone: 'America/Argentina/ComodRivadavia' }
   if (path === '/api/feeds') return { subscriptions: feedsOf(dataset) } satisfies SubscriptionList
   if (path === '/api/digest') {
-    // A picked day starts the Digest there, as the server's does; Show more
-    // answers with two older days and ends the list.
     const digest = digestOf(dataset)
     const from = query.get('from')
     if (!from) return digest
@@ -468,7 +448,6 @@ export function install() {
   }
 }
 
-/** Plain chrome, deliberately outside the design system: it is not under test. */
 function mountToggle(active: Dataset) {
   const bar = document.createElement('div')
   bar.setAttribute('role', 'radiogroup')

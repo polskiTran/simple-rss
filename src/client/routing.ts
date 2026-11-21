@@ -20,20 +20,12 @@ export const ROUTE_LABELS = {
   settings: 'Settings',
 } as const satisfies Record<Route, string>
 
-/**
- * The way back out of a nested screen, recursively. Kept in history state, so
- * it survives back, forward and reload.
- */
 export interface Origin {
   readonly path: string
   readonly label?: string
   readonly from: Origin | undefined
 }
 
-/**
- * Where the User stands: a section, or a screen nested under one. A Feed and
- * the Reader always have a way back; a search has one when it left a screen.
- */
 type ScreenLocation =
   | { readonly screen: 'digest'; readonly start: DigestStart }
   | { readonly screen: 'feeds' | 'saved' | 'settings' }
@@ -61,22 +53,15 @@ export function readerPath(feedItemId: number): string {
   return `/reader/${feedItemId}`
 }
 
-/** The Digest's address is its API request, so the way back returns to the same day. */
 function digestPath(start: DigestStart): string {
   const params = digestParamsOf(start)
   return params.size > 0 ? `/digest?${params}` : '/digest'
 }
 
-/** The search address is the API request: `/search?` followed by the same parameters. */
 function searchPath(query: string, scope: SearchScope, sort?: SearchSort): string {
   return `/search?${searchParamsOf(query, scope, sort)}`
 }
 
-/**
- * The one reading of an address, the inverse of the path builders above:
- * undefined for anything they could not have built. An unreadable Digest day
- * starts today; a nested screen opened by address takes its section as the way back.
- */
 function locationOf(path: string, origin: Origin | undefined): ScreenLocation | undefined {
   const cut = path.indexOf('?')
   const pathname = cut === -1 ? path : path.slice(0, cut)
@@ -110,7 +95,6 @@ function locationOf(path: string, origin: Origin | undefined): ScreenLocation | 
   }
 }
 
-/** The location at an address the app may not have built itself; anything unreadable is the Digest. */
 export function locationAt(path: string): ScreenLocation {
   return locationOf(path, undefined) ?? HOME
 }
@@ -119,7 +103,6 @@ function sectionOrigin(route: Route): Origin {
   return { path: sectionPath(route), label: ROUTE_LABELS[route], from: undefined }
 }
 
-/** The way back to `location`, for a screen opened from it. A Feed is named by its title once it is known. */
 export function originOf(location: ScreenLocation, feedTitle = 'Feed'): Origin {
   switch (location.screen) {
     case 'digest':
@@ -141,16 +124,11 @@ export function originOf(location: ScreenLocation, feedTitle = 'Feed'): Origin {
   }
 }
 
-/**
- * The address a search on `location` clears back to. Typing a search in and
- * clearing it out keep this address; any other move changes it.
- */
 export function searchHomeOf(location: ScreenLocation): string {
   if (location.screen !== 'search') return originOf(location).path
   return location.origin?.path ?? sectionPath('digest')
 }
 
-/** The tab a location reads under. The Reader takes the section it was opened from, and a search its scope's own. */
 export function sectionOf(location: ScreenLocation): Route {
   switch (location.screen) {
     case 'digest':
@@ -176,7 +154,6 @@ const SECTION_OF_SCOPE = {
   feed: 'feeds',
 } as const satisfies Record<SearchScope['kind'], Route>
 
-/** What the search line searches from a location. */
 export function scopeOf(location: ScreenLocation): SearchScope {
   switch (location.screen) {
     case 'search':
@@ -202,12 +179,6 @@ const historyOriginSchema = z.object({
   from: z.unknown().optional(),
 })
 
-/**
- * What the app keeps on a history entry. `beneath` is the address of the entry
- * under this one, set when the app pushed it, so the way back can be the
- * browser's own Back. `scrollY` is where the page stood when the app left it,
- * and `kept` what its screen kept of how it was left (`useKept`).
- */
 const historyStateSchema = z.object({
   origin: z.unknown().optional(),
   beneath: z.string().optional(),
@@ -235,13 +206,6 @@ function keptChanged() {
   for (const listener of keptListeners) listener()
 }
 
-/**
- * A value a screen keeps on its history entry, so coming back to the entry
- * finds the screen as it was left: how far a list was read, which boxes stood
- * unfolded. A pushed entry keeps nothing yet, nor does one replaced by another
- * address. `name` is unique on its screen; `schema` reads back a primitive, so
- * an unchanged value reads as the same one.
- */
 export function useKept<T extends string | number | boolean>(name: string, schema: z.ZodType<T>) {
   const value = useSyncExternalStore(subscribeKept, () => schema.safeParse(historyState().kept?.[name]).data)
   const keep = useCallback(
@@ -274,12 +238,6 @@ function currentLocation(): ScreenLocation {
   return locationOf(currentPath(), trailOf(historyState().origin)) ?? HOME
 }
 
-/**
- * Set each time the User arrives at a history entry — a push, or the browser
- * or the way back going back — and kept by an in-place replace. `scrollY` is
- * where the page should stand: the top of a new screen, where a returned-to one
- * was left, or undefined when this app never recorded it. Undefined on first load.
- */
 export interface Arrival {
   readonly scrollY: number | undefined
 }
@@ -290,28 +248,17 @@ export interface Navigation {
   navigate(route: Route): void
   openFeed(feedId: number, from: Origin): void
   openReader(feedItemId: number, from: Origin): void
-  /**
-   * Steps the open Reader on to another item in place of this one, keeping its
-   * way back: Back, the app's or the browser's, leaves for the screen the first
-   * was opened from, as it was left.
-   */
   stepReader(feedItemId: number): void
-  /** Goes back to the entry beneath when it is the origin; otherwise walks to the origin's address. */
   returnTo(origin: Origin): void
   updateSearch(query: string): void
-  /** Re-asks the same words in another scope; the origin stays, so clearing still lands there. */
   searchIn(scope: SearchScope): void
-  /** Re-asks the same words ranked another way, in place like `searchIn`. */
   sortSearch(sort: SearchSort): void
-  /** Starts the Digest from another day, in place: a day picked is not a trail to walk back. */
   showDigest(start: DigestStart): void
 }
 
 export function useNavigation(): Navigation {
   const [location, setLocation] = useState(currentLocation)
   const [arrival, setArrival] = useState<Arrival>()
-  // Set between asking the browser to go back and its popstate, so a double
-  // press cannot go back twice.
   const goingBack = useRef(false)
 
   useEffect(() => {
@@ -377,7 +324,6 @@ export function useNavigation(): Navigation {
         go(searchHomeOf(location), location.origin?.from)
         return
       }
-      // Refining a search rewrites its entry rather than stacking one per pause.
       place(searchPath(query, location.scope, location.sort), location.origin, 'replace')
     },
     [location, go, place],

@@ -43,9 +43,6 @@ function visitElements(node: Root | RootContent, visit: (element: Element) => vo
   if ('children' in node) for (const child of node.children) visitElements(child, visit)
 }
 
-// Prose blocks render as plain elements, styled by the stylesheet's
-// `.article-body` rules rather than Streamdown's utility classes. Code blocks
-// stay Streamdown's, for their highlighting.
 // SAFETY: Streamdown calls these overrides with the intrinsic element props
 // named by each key; its public `Components` type erases that key-to-props link.
 const COMPONENTS = {
@@ -70,7 +67,6 @@ const COMPONENTS = {
   img: ArticleImage,
 } as Components
 
-/** A table scrolls sideways inside the column rather than widening it. */
 function ArticleTable({ children }: ComponentProps<'table'>) {
   return (
     <div className="article-table">

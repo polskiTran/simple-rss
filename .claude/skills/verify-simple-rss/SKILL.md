@@ -22,7 +22,7 @@ Paths below are from the repo root.
 node .claude/skills/verify-simple-rss/scripts/verify.mjs up
 ```
 
-Starts a private Vite on `127.0.0.1:5199` with no proxy and its own dependency cache. Prints `ready` once a browser has rendered the Digest, about 3s warm and up to 60s cold. It needs no `.env`, no database and no server.
+Starts a private Vite on `127.0.0.1:5199` with no proxy and its own dependency cache. Prints `ready` once a browser has rendered the Digest, about 3s warm and up to 60s cold. It waits for a rendered screen, not for the port to answer, because on a cold cache Vite reloads the page once while it optimises dependencies. It needs no `.env`, no database and no server.
 
 Never drive 5173 or 8080. Those are the developer's own `pnpm dev`, with their real Feeds and session. Vite's proxy forwards anything unmocked to 8080, which is why this instance has none.
 
@@ -51,6 +51,8 @@ node .claude/skills/verify-simple-rss/scripts/verify.mjs sweep --tag <name>
 | `--param` | A URL parameter such as `variant=A`, repeatable | none |
 | `--browser` | `chromium`, `webkit` | `chromium` |
 | `--rtl` | `true` mirrors the page | off |
+
+The targets are the widths where layout bugs have turned up: both sides of the 1024px layout break (`d1025` and `t1024`), portrait tablets, a phone, the narrowest phone and 200% zoom. `t1024`, `t820`, `p390` and `p320` run as a mobile browser, with touch and overlay scrollbars, so `scrollbar-gutter` reserves no width there.
 
 `--browser webkit` needs `pnpm exec playwright install webkit` first. It is the nearest thing to Safari here, and `doctor` lists what is installed.
 

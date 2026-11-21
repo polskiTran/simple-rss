@@ -128,7 +128,6 @@ describe('searching retained reading metadata', () => {
     const [summaryMatch] = (await search(user, 'estuary')).results
     expect(summaryMatch?.snippet).toBe('Notes on tidal patterns along the estuary')
 
-    // A match deep in a long summary yields a fragment around it, not the opening tokens.
     const [deepMatch] = (await search(user, 'heron')).results
     expect(deepMatch?.snippet).toContain('the heron lifted')
     expect(deepMatch?.snippet).not.toContain('filler0')
@@ -186,7 +185,7 @@ describe('searching retained reading metadata', () => {
     expect(await foundTitles(user, 'estuary')).toEqual(['Estuary crossings', 'Morning links'])
   })
 
-  it('favors the recent Feed Item among comparable matches', async () => {
+  it('favors the recent Feed Item among comparable matches, against the id tie-break', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(
@@ -204,7 +203,6 @@ describe('searching retained reading metadata', () => {
       '2026-08-08T07:15:00.000Z',
       '2026-07-18T08:00:00.000Z',
     ])
-    // Recency alone can win this: the id tie-break prefers the higher id, and the recent item holds the lower.
     expect(results.map((result) => result.feedItemId)).toEqual([1, 2])
   })
 
@@ -575,7 +573,6 @@ describe('searching retained reading metadata', () => {
     expect((await user.put('/api/library/2')).status).toBe(200)
 
     expect(await foundTitles(user, 'estuary')).toEqual(['Estuary tides', 'Estuary crossings', 'Morning links'])
-    // The scope changes what is searched, never how it is ordered (ADR 0009).
     expect(await search(user, 'estuary', { kind: 'saved' })).toMatchObject({
       scope: 'saved',
       results: [{ title: 'Estuary crossings' }, { title: 'Morning links' }],
@@ -605,7 +602,6 @@ describe('searching retained reading metadata', () => {
     expect((await user.get('/api/search?q=slow&in=digest')).status).toBe(400)
     expect((await user.get('/api/search?q=slow&sort=oldest')).status).toBe(400)
 
-    // A Feed kept only by its saves has no screen to search from: its scope is refused as the Feed screen is.
     expect((await user.put('/api/library/1')).status).toBe(200)
     expect((await user.delete('/api/feeds/1')).status).toBe(204)
     expect((await user.get('/api/feeds/1')).status).toBe(404)

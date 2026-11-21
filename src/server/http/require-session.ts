@@ -3,10 +3,6 @@ import type { Authentication } from '../auth/authentication.js'
 import { apiError } from './requests.js'
 import { readSessionCookie } from './session-cookie.js'
 
-/**
- * The ADR 0004 allowlist: the only `/api` paths reachable without a Session,
- * because they are how a Session is obtained. Exact paths, never prefixes.
- */
 const PUBLIC_API_PATHS: ReadonlySet<string> = new Set(['/api/auth/status', '/api/auth/setup', '/api/auth/session'])
 
 export function requireSession(authentication: Authentication): MiddlewareHandler {

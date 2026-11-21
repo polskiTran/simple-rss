@@ -16,7 +16,6 @@ export type IngestFeedOutcome =
   | { readonly kind: 'updated'; readonly observedItems: number }
   | { readonly kind: 'not-modified' }
   | { readonly kind: 'missing' }
-  /** The retrieval revealed this Feed to be another subscribed Feed (ADR 0007). */
   | { readonly kind: 'merged'; readonly intoFeedId: number }
   | FailedPoll
 
@@ -33,20 +32,14 @@ interface PollableFeed extends PolledFeed {
   readonly lastModified: string | null
 }
 
-/** A retrieval read as a Feed document, before anything is written. */
 export type FeedAnswer =
   | FailedPoll
   | { readonly kind: 'parsed'; readonly retrieved: RetrievalBytes; readonly parsed: ParsedFeedDocument }
 
 type ParsedAnswer = Extract<FeedAnswer, { kind: 'parsed' }>
 
-/** What the publisher said to a poll, before anything is written. */
 type Answer = FeedAnswer | { readonly kind: 'not-modified'; readonly retrieved: RetrievalBytes }
 
-/**
- * Parses what a retrieval answered as a Feed. `priorUrls` are the addresses it
- * was reached through, so a Feed naming one of them as its site declares none.
- */
 export function readFeed(retrieved: RetrievalBytesResult, priorUrls: readonly string[]): FeedAnswer {
   if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
   try {
@@ -57,13 +50,6 @@ export function readFeed(retrieved: RetrievalBytesResult, priorUrls: readonly st
   }
 }
 
-/**
- * One retrieval of one Feed, end to end: the request, the parse, then every
- * write the answer earns in one transaction — the Feed Window, a merge the
- * retrieval revealed (ADR 0007), and the Feed Availability that `settle`
- * decides. `ingest` polls a subscribed Feed; `subscribe` checks a new one
- * (ADR 0012). Poll outcomes are written here and nowhere else.
- */
 export class FeedPoll {
   readonly #db: DrizzleDatabase
   readonly #retrieval: Retrieval
@@ -86,9 +72,6 @@ export class FeedPoll {
       const now = this.#clock.now()
       return this.#db.transaction((tx) => this.#record(tx, feed, answer, now))
     } catch (error) {
-      // A throw reaches no verdict, so Feed Availability stays as it was; the
-      // due time still moves one Polling Interval on, or a Feed that always
-      // throws would stay first on the due frontier and starve the rest.
       this.#db
         .update(subscriptions)
         .set({ nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, this.#clock.now()) })
@@ -98,13 +81,6 @@ export class FeedPoll {
     }
   }
 
-  /**
-   * Retrieves the Feed before recording anything, and records the Subscription
-   * only if it answers with RSS or Atom: the Feed Window is ingested and the
-   * success settled in the same transaction, so the Subscription never starts
-   * unchecked. Any failure writes nothing. An address belonging to a subscribed
-   * Feed — as entered, or where its redirects end — is a duplicate.
-   */
   async subscribe(enteredUrl: string, signal?: AbortSignal): Promise<SubscribeOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
@@ -142,11 +118,6 @@ export class FeedPoll {
     return readFeed(retrieved, [feed.enteredUrl, feed.resolvedUrl])
   }
 
-  /**
-   * Writes nothing when the Subscription is gone by the time the answer lands:
-   * unsubscribing takes effect immediately, and an in-flight poll must not
-   * resurrect what the User let go of.
-   */
   #record(tx: DatabaseTransaction, feed: PollableFeed, answer: Answer, now: Date): IngestFeedOutcome {
     const subscribed = tx
       .select({ feedId: subscriptions.feedId })
@@ -157,8 +128,6 @@ export class FeedPoll {
     if (!subscribed) return { kind: 'missing' }
 
     if (answer.kind === 'not-modified') {
-      // A 304 may still rotate the validators; keeping the newest ones keeps
-      // later requests conditional. No Feed Item row is touched.
       tx.update(feeds)
         .set({
           etag: answer.retrieved.etag ?? feed.etag,
@@ -196,8 +165,6 @@ export class FeedPoll {
       now: now.toISOString(),
     }
 
-    // Two entered URLs can hide one Feed; the retrieval is what reveals it.
-    // The later Subscription folds into the existing Feed (ADR 0007).
     const existingFeedId = aliasOwner(tx, retrieved.url)
     if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
       const survivor = this.#mergeInto(tx, feed, existingFeedId, retrieved.url, now)
@@ -224,12 +191,6 @@ export class FeedPoll {
     if (log) this.#logger[log.level](log.message, log.fields)
   }
 
-  /**
-   * Folds the duplicate's Subscription into the existing Feed: the URLs move,
-   * the duplicate's Subscription goes, and its Feed row is left for Retention
-   * to judge like any unsubscribed Feed. An unsubscribed survivor is revived
-   * with the duplicate's preferences. Returns the survivor as the poll settles it.
-   */
   #mergeInto(
     tx: DatabaseTransaction,
     duplicate: PollableFeed,

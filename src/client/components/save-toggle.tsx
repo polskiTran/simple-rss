@@ -8,17 +8,10 @@ interface SaveToggleProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
-  /** The Reader's toolbar sets the word beside an icon, in a button; a list has only the word. */
   readonly labelled?: boolean
   onSaved(saved: boolean): void
 }
 
-/**
- * Library membership, pressed while saved. A press shows at once; a failed toggle goes
- * back to the state as it was and says so through the App's line, since rows and
- * toolbars have no room for a sentence.
- * The name starts with the word on screen, Save or Saved.
- */
 export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
   const [pending, startToggle] = useTransition()
   const [shown, show] = useOptimistic(saved)

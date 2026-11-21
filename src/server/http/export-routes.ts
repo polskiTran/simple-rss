@@ -10,10 +10,6 @@ export interface ExportRouteDependencies {
   readonly clock: Clock
 }
 
-/**
- * The complete JSON export beside the OPML one. Mounted at `/api` behind
- * `requireSession`, never cached.
- */
 export function exportRoutes(deps: ExportRouteDependencies): Hono {
   const app = new Hono()
 

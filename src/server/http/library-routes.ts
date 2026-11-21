@@ -7,7 +7,6 @@ export interface LibraryRouteDependencies {
   readonly library: LibraryService
 }
 
-/** Save and unsave are idempotent: both answer with the membership state that now holds. */
 export function libraryRoutes(deps: LibraryRouteDependencies): Hono {
   const app = new Hono()
 

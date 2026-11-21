@@ -4,7 +4,6 @@ import { RoutedLink } from './routed-link.js'
 
 interface BackButtonProps {
   readonly origin: Origin
-  /** The phone bar draws it as an icon square; a view draws it with its label. */
   readonly className?: string
   onBack(origin: Origin): void
 }

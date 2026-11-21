@@ -16,7 +16,6 @@ const JUNE = digestGroup({ date: '2026-06-03', items: [item(4, 'A June letter', 
 
 const DIGEST = digest({ groups: [TODAY, YESTERDAY, JUNE] })
 
-// A day heading's number and month are joined by a non-breaking space.
 const TODAY_HEADING = 'Today Saturday 8\u00a0August (2)'
 const YESTERDAY_HEADING = 'Yesterday Friday 7\u00a0August (1)'
 const JUNE_HEADING = '2 months ago Wednesday 3\u00a0June (1)'
@@ -272,7 +271,7 @@ const digestWithCalendar = () =>
   stubApi().on('GET /api/digest', { body: DIGEST }).on('GET /api/digest/days', { body: CALENDAR })
 
 describe('the Digest from a day', () => {
-  it('starts from a day picked on the month, and goes back to today', async () => {
+  it('starts from a day picked on the month, and goes back to today from the month’s Today', async () => {
     digestWithCalendar().on('GET /api/digest?from=2026-08-03', {
       body: dayDigest('2026-08-03', ['Four letters']),
     })
@@ -294,7 +293,6 @@ describe('the Digest from a day', () => {
     expect(await screen.findByRole('heading', { name: '5 days ago Monday 3\u00a0August (1)' })).toBeDefined()
     expect(monday.getAttribute('aria-pressed')).toBe('true')
 
-    // The month holds Today on a wide screen; a phone's sits beside its date picker.
     await user.click(within(month).getByRole('button', { name: 'Today' }))
 
     expect(window.location.search).toBe('')
@@ -336,7 +334,6 @@ describe('the Digest from a day', () => {
   })
 
   it('asks the platform for its date picker when the calendar button is clicked', async () => {
-    // jsdom has no picker; a desktop browser opens one only when asked.
     const showPicker = vi.fn()
     Object.defineProperty(HTMLInputElement.prototype, 'showPicker', { value: showPicker, configurable: true })
     digestWithCalendar()

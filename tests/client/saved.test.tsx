@@ -91,7 +91,6 @@ describe('the Saved tab', () => {
     window.history.replaceState(null, '', '/saved')
     render(<App />)
 
-    // August has given way to July, so August is whole; July may go on past this page.
     expect(await screen.findByRole('heading', { level: 2, name: 'August 1' })).toBeDefined()
     expect(screen.getByRole('heading', { level: 2, name: 'July' })).toBeDefined()
   })

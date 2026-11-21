@@ -1,12 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { failureKind } from './api.js'
 
-/**
- * What a view has of one server read. Loading the same key again carries the value
- * it replaces. A new key carries it too, unless the caller drops it.
- * The two failures carry the error so a view can still tell its own cases apart,
- * a missing Feed or a rate-limited extraction, without re-implementing the request.
- */
 export type Resource<T> =
   | { readonly kind: 'loading'; readonly previous: T | undefined }
   | { readonly kind: 'loaded'; readonly value: T }
@@ -29,11 +23,6 @@ interface PagedControls<T> extends ResourceControls<T> {
   readonly older: OlderState
 }
 
-/**
- * One server read, loaded again whenever `key` changes or on `retry()`. `key` is
- * the whole of what makes the read stale: `load` may close over anything, but
- * only a new key asks again. Leaving the view, a new key, or a retry cancels the read.
- */
 export function useResource<T>(
   key: string,
   load: (signal: AbortSignal) => Promise<T>,
@@ -43,12 +32,6 @@ export function useResource<T>(
   return [held.resource, { retry, set: (update) => patch(undefined, update) }]
 }
 
-/**
- * A read that goes on in pages: `load(undefined)` is the first, `load(cursor)`
- * each one after, and `append` joins a page onto what is shown. A page that
- * answers after the key changed, or after a retry, is dropped — it belongs to
- * a list no longer in view.
- */
 export function usePagedResource<T>(
   key: string,
   load: (cursor: string | undefined, signal: AbortSignal) => Promise<T>,

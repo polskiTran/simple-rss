@@ -4,7 +4,6 @@ import type { DatabaseTransaction, DrizzleDatabase } from '../persistence/databa
 import { feeds, feedUrlAliases, subscriptions } from '../persistence/schema.js'
 import { loggableUrl } from './loggable-url.js'
 
-/** The form every Feed URL is compared in: HTTP(S), no credentials, no fragment. Undefined when it is not one. */
 export function canonicalFeedUrl(value: string): string | undefined {
   try {
     const url = new URL(value)
@@ -26,14 +25,6 @@ export function subscribedFeedId(db: DrizzleDatabase | DatabaseTransaction, url:
     .all()[0]?.feedId
 }
 
-/**
- * Records a Subscription for a canonical URL no subscribed Feed holds, due
- * immediately with every preference left to the column defaults. A retained
- * Feed holding the URL is revived under the same row — so Library items keep
- * the identity they were saved from — reclaiming the URL's alias if a merge
- * had moved it away. Otherwise a new Feed is named by its URL's host, or the
- * offered title, until a retrieval reports its own. Returns the Feed's id.
- */
 export function recordSubscription(
   tx: DatabaseTransaction,
   logger: Logger,
@@ -71,11 +62,6 @@ export function recordSubscription(
   return feedId
 }
 
-/**
- * An unsubscribed Feed holding a URL a new Feed would claim. Its aliases come
- * first; a duplicate whose aliases a merge moved away is still found by its
- * own URLs, which stay reserved until Retention retires the row.
- */
 function dormantFeedId(tx: DatabaseTransaction, requestedUrl: string, enteredUrl: string): number | undefined {
   const unsubscribed = isNull(subscriptions.feedId)
   return (

@@ -2,10 +2,7 @@ import { parseHTML } from 'linkedom'
 import type { BlockContent, ListItem, PhrasingContent, Root, RootContent, TableRow } from 'mdast'
 import { readerMarkdownTree, serializeReaderMarkdown } from '../markdown/markdown-policy.js'
 
-// A Feed document is already bounded by Retrieval. Each body's DOM and AST also
-// have ceilings so one entry cannot monopolize conversion or recursive traversal.
 const MAX_INPUT_CHARACTERS = 512 * 1024
-/** Durable Markdown budget; response-time image signatures add delivery overhead. */
 export const FEED_CONTENT_MAX_BYTES = 256 * 1024
 const MAX_CODE_LANGUAGE_CHARACTERS = 64
 const MAX_NODES = 20_000
@@ -35,8 +32,6 @@ function headingDepthOf(tag: string): (typeof HEADING_DEPTHS)[keyof typeof HEADI
   }
 }
 
-// Unknown elements are transparent so their prose survives; these carry no prose
-// a reader should see and drop with everything inside them.
 const NON_PROSE_ELEMENTS = new Set([
   'script',
   'style',
@@ -72,7 +67,6 @@ export interface NormalizedFeedContent {
   readonly plainText: string
 }
 
-/** Converts publisher HTML or literal Atom text once, keeping summary and body in agreement. */
 export function normalizeFeedContent(
   source: string,
   format: 'text' | 'html',
@@ -114,7 +108,6 @@ function consumeNode(budget: Budget, depth: number): boolean {
   return false
 }
 
-/** Exhaustion stops all walkers and records application truncation. */
 function exhaust(budget: Budget): void {
   budget.nodes = 0
   budget.truncated = true
@@ -307,7 +300,6 @@ function htmlPhrase(element: HtmlNode, context: FeedContentContext, budget: Budg
   return children
 }
 
-/** Bound both authored destinations and amplification from inherited bases. */
 function destination(candidate: string | null, baseUrl: string, budget: Budget): string | undefined {
   if (!candidate?.trim()) return undefined
   if (candidate.length > 4096) {
@@ -327,11 +319,6 @@ function destination(candidate: string | null, baseUrl: string, budget: Budget):
   }
 }
 
-/**
- * A declared `xml:base` resolves against the inherited XML base and also becomes
- * the link base. Feed documents start without a link base and let the item link
- * decide; content bodies always have one. Invalid declarations are ignored.
- */
 export function withXmlBase<Context extends { readonly xmlBase: string }>(
   context: Context,
   declared: string | null | undefined,
@@ -359,7 +346,6 @@ function textOf(node: Root | RootContent): string {
   return ''
 }
 
-/** Cut the AST, not serialized Markdown: fences, links, nesting and Unicode stay closed. */
 function boundedMarkdown(tree: Root, full: string) {
   if (Buffer.byteLength(full) <= FEED_CONTENT_MAX_BYTES) return { markdown: full, truncated: false }
   let low = 0
@@ -379,7 +365,6 @@ function boundedMarkdown(tree: Root, full: string) {
 
 function prefixTree<Node extends Root | RootContent>(node: Node, budget: { remaining: number }): Node {
   if (node.type === 'image') {
-    // Keep the destination whole; alternative text and title can form a readable prefix.
     budget.remaining -= node.url.length + 1
     const alt = unicodePrefix(node.alt ?? '', Math.max(0, budget.remaining))
     budget.remaining -= alt.length
@@ -412,7 +397,6 @@ function unicodePrefix(value: string, length: number): string {
   return value.slice(0, last >= 0xd800 && last <= 0xdbff ? end - 1 : end)
 }
 
-/** HTML parsing keeps XHTML prefixes in localName; the allowlist uses the local tag. */
 function localTag(element: HtmlNode): string {
   return element.localName.split(':').at(-1)?.toLowerCase() ?? ''
 }

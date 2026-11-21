@@ -24,7 +24,6 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
   await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
 }
 
-/** Whether a title's highlight has any width. */
 function highlighted(page: Page, title: string): Promise<boolean> {
   return page
     .getByText(title, { exact: true })

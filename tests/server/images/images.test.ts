@@ -260,7 +260,6 @@ async function signedInDevice(service: TestService, address: string): Promise<De
 }
 
 describe('destination policy', () => {
-  // Retrieval owns the policy and proves each case; this proves images go through it.
   it('refuses an image on a private address without asking for it', async () => {
     const service = await startTestService()
     const { user, withImage } = await imageSetup(service, 'https://192.168.1.20/hero.png')
@@ -362,8 +361,7 @@ function avifBytes(): Uint8Array {
   return bytes
 }
 
-describe('streaming', () => {
-  // The sniffed head is replayed in front of the rest; a failure after it must still reach the browser.
+describe('streaming past the sniffed head', () => {
   it('tears the stream down when the body grows past the ceiling', async () => {
     const service = await startTestService()
     const megabyte = 1024 * 1024

@@ -1,6 +1,5 @@
 import { isIP } from 'node:net'
 
-/** Only `public` may be connected to; every other class names a reason to refuse. */
 export type AddressClass =
   | 'public'
   | 'loopback'
@@ -11,11 +10,6 @@ export type AddressClass =
   | 'reserved'
   | 'invalid'
 
-/**
- * Mapped, 6to4, and NAT64 addresses are unwrapped and judged by the IPv4 they
- * reach: `::ffff:127.0.0.1` lands on loopback. Textual tricks (`0x7f000001`,
- * `127.1`) count as hostnames; the resolver's answers pass back through here.
- */
 export function classifyAddress(address: string): AddressClass {
   const family = isIP(address)
   if (family === 4) {
@@ -40,7 +34,6 @@ function isBenchmarkIpv4(first: number, second: number): boolean {
   return first === 198 && (second === 18 || second === 19)
 }
 
-/** `[::1]` is the same destination as `::1`; every rule here uses the unbracketed form. */
 export function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 }
@@ -54,9 +47,7 @@ function classifyIpv4(bytes: Uint8Array): AddressClass {
   if (a === 172 && b >= 16 && b <= 31) return 'private'
   if (a === 192 && b === 168) return 'private'
   if (a === 169 && b === 254) return 'link-local'
-  // 100.64/10 — carrier-grade NAT shared address space.
   if (a === 100 && b >= 64 && b <= 127) return 'reserved'
-  // IETF protocol assignments and documentation ranges.
   if (a === 192 && b === 0 && c === 0) return d === 9 || d === 10 ? 'public' : 'reserved'
   if (a === 192 && b === 0 && c === 2) return 'reserved'
   if (a === 192 && b === 88 && c === 99) return 'reserved'
@@ -64,7 +55,6 @@ function classifyIpv4(bytes: Uint8Array): AddressClass {
   if (a === 203 && b === 0 && c === 113) return 'reserved'
   if (isBenchmarkIpv4(a, b)) return 'reserved'
   if (a >= 224 && a <= 239) return 'multicast'
-  // 240/4, including the broadcast address at its top.
   if (a >= 240) return 'reserved'
 
   return 'public'
@@ -77,15 +67,12 @@ function classifyIpv6(bytes: Uint8Array): AddressClass {
   if (bytes[0] === 0xfe && ((bytes[1] ?? 0) & 0xc0) === 0x80) return 'link-local'
   if (((bytes[0] ?? 0) & 0xfe) === 0xfc) return 'private'
 
-  // ::ffff:0:0/96 — IPv4-mapped; judge the embedded IPv4 destination.
   if (allZero(bytes, 0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) {
     return classifyIpv4(bytes.subarray(12, 16))
   }
-  // 64:ff9b::/96 — globally reachable NAT64; judge the IPv4 destination.
   if (bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b && allZero(bytes, 4, 12)) {
     return classifyIpv4(bytes.subarray(12, 16))
   }
-  // 64:ff9b:1::/48 is a local-use translation prefix and is not global.
   if (
     bytes[0] === 0x00 &&
     bytes[1] === 0x64 &&
@@ -96,25 +83,20 @@ function classifyIpv6(bytes: Uint8Array): AddressClass {
   ) {
     return 'reserved'
   }
-  // 2002::/16 — 6to4; judge the public IPv4 endpoint it embeds.
   if (bytes[0] === 0x20 && bytes[1] === 0x02) {
     return classifyIpv4(bytes.subarray(2, 6))
   }
-  // Non-global allocations inside the otherwise global 2000::/3 space.
   if (bytes[0] === 0x20 && bytes[1] === 0x01) {
-    if (bytes[2] === 0x00 && bytes[3] === 0x00) return 'reserved' // Teredo
-    if (bytes[2] === 0x00 && bytes[3] === 0x02 && allZero(bytes, 4, 6)) return 'reserved' // benchmarking
-    if (bytes[2] === 0x00 && ((bytes[3] ?? 0) & 0xf0) === 0x10) return 'reserved' // deprecated ORCHID
-    if (bytes[2] === 0x0d && bytes[3] === 0xb8) return 'reserved' // documentation
+    if (bytes[2] === 0x00 && bytes[3] === 0x00) return 'reserved'
+    if (bytes[2] === 0x00 && bytes[3] === 0x02 && allZero(bytes, 4, 6)) return 'reserved'
+    if (bytes[2] === 0x00 && ((bytes[3] ?? 0) & 0xf0) === 0x10) return 'reserved'
+    if (bytes[2] === 0x0d && bytes[3] === 0xb8) return 'reserved'
   }
-  if (bytes[0] === 0x3f && ((bytes[1] ?? 0) & 0xf0) === 0xf0) return 'reserved' // documentation
+  if (bytes[0] === 0x3f && ((bytes[1] ?? 0) & 0xf0) === 0xf0) return 'reserved'
 
-  // 100::/64 discard-only and ::/96 IPv4-compatible.
   if (bytes[0] === 0x01 && bytes[1] === 0x00 && allZero(bytes, 2, 8)) return 'reserved'
   if (allZero(bytes, 0, 12)) return 'reserved'
 
-  // IANA currently allocates ordinary global unicast from 2000::/3. Anything
-  // else not handled above is non-global and must fail closed.
   return ((bytes[0] ?? 0) & 0xe0) === 0x20 ? 'public' : 'reserved'
 }
 
@@ -138,7 +120,6 @@ function parseIpv4(address: string): Uint8Array | undefined {
   return bytes
 }
 
-/** Expands an IPv6 literal, including the `::` run and a trailing dotted-quad. */
 function parseIpv6(address: string): Uint8Array | undefined {
   const literal = withoutTrailingIpv4(address)
   if (literal === undefined) return undefined

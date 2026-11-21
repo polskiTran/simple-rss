@@ -19,7 +19,6 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
   const [leaving, startLeaving] = useTransition()
   const [notice, setNotice] = useState('')
 
-  // Signed out only once the server ends the session; until then it is still valid.
   function leave() {
     if (leaving) return
     setNotice('')

@@ -37,7 +37,6 @@ export interface FeedRouteDependencies {
   readonly preview: FeedPreview
   readonly refresh: FeedRefresh
   readonly digest: DigestService
-  /** Asks the scheduler to look at the due frontier now rather than next wake, for an OPML Import's first checks. */
   readonly nudgeScheduler: () => void
 }
 

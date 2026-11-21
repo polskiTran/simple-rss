@@ -11,15 +11,9 @@ interface DigestMonthProps {
   readonly calendar: DigestCalendar
   readonly selected: string
   onPick(date: string): void
-  /** Starts the Digest from today again; given while a past day is on show. */
   readonly onToday?: (() => void) | undefined
 }
 
-/**
- * The whole Digest a month at a time, each day shaded by its count against the
- * window's other days; a day with items starts the Digest there. It opens on
- * the month of the day on show and turns back as far as the window reaches.
- */
 export function DigestMonth({ calendar, selected, onPick, onToday }: DigestMonthProps) {
   const [month, setMonth] = useState(selected.slice(0, 7))
   const [following, setFollowing] = useState(selected)
@@ -72,7 +66,6 @@ export function DigestMonth({ calendar, selected, onPick, onToday }: DigestMonth
           </span>
         ))}
         {weeksOf(month).map((date) => {
-          // A day of the months either side is a plain number: it is picked in its own month.
           const count = date.slice(0, 7) === month ? counts.get(date) : undefined
           const day = Number(date.slice(8, 10))
           if (count === undefined || count === 0) {
@@ -119,7 +112,6 @@ function shiftMonth(month: string, by: number): string {
   return new Date(Date.UTC(year ?? 0, (index ?? 1) - 1 + by, 1)).toISOString().slice(0, 7)
 }
 
-/** Every day of the weeks the month touches, Monday first. */
 function weeksOf(month: string): string[] {
   const first = Date.parse(`${month}-01T00:00:00Z`)
   const start = first - ((new Date(first).getUTCDay() + 6) % 7) * DAY_MS
