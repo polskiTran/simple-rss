@@ -96,8 +96,6 @@ export const articleCode: CodeHighlighterPlugin = {
 
     void ready(grammar)
       .then((highlighter) => {
-        // Both themes at once: tokens carry the light colour plus a
-        // `--shiki-dark`, the shape the renderer's `dark:` classes read.
         callback(highlighter.codeToTokens(code, { lang: grammar, themes: { light: THEMES[0], dark: THEMES[1] } }))
       })
       .catch(() => {})

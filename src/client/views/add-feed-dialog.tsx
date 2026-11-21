@@ -32,25 +32,16 @@ import { addFailure, feedAddressOf, NOT_AN_ADDRESS } from './feed-language.js'
 
 type Way = 'address' | 'opml'
 
-/** How long typing pauses before the line is looked up, or refused as no address; a paste or Enter goes at once. */
 const LOOKUP_PAUSE_MS = 800
 
-/** A Feed with no item for longer than this is said to be silent: it may have stopped publishing. */
 const SILENT_AFTER_DAYS = 90
 
-/** What an address answered: at least one Feed, one of them chosen. */
 interface Answer {
   readonly host: string
   readonly feeds: readonly FeedPreview[]
   readonly chosen: FeedPreview
 }
 
-/**
- * Where the address stands. Subscribing holds the answer, and the address
- * with it, until the chosen Feed is recorded; a refused Subscribe returns to
- * the answer with the reason. A page that names no Feed is a failure no retry
- * can mend.
- */
 type Lookup =
   | { readonly kind: 'idle' }
   | { readonly kind: 'reading'; readonly host: string }
@@ -65,26 +56,16 @@ interface AddFeedDialogProps {
   onImported(report: OpmlImportReport): void
 }
 
-/**
- * Adding by a site or feed address, or by an OPML file. The address is looked
- * up as it is entered, and what it answers arrives under the field: the Feed,
- * or the Feeds a page names to choose from, each with how lately and how often
- * it publishes. Nothing is recorded until Subscribe, which holds the form
- * until it settles: a refusal stays in the dialog beside what caused it, a
- * success closes it, and closing abandons it.
- */
 export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) {
   const [open, setOpen] = useState(false)
   const [way, setWay] = useState<Way>('address')
   const [address, setAddress] = useState('')
   const [lookup, setLookup] = useState<Lookup>(IDLE)
   const [file, setFile] = useState<File | undefined>(undefined)
-  /** A refused Import. */
   const [error, setError] = useState<string | undefined>(undefined)
   const [importing, startImporting] = useTransition()
   const inFlight = useRef<AbortController | undefined>(undefined)
 
-  /** Abandons the lookup or Subscribe in flight, so its answer is never shown, and stands at `next`. */
   function settle(next: Lookup) {
     inFlight.current?.abort()
     inFlight.current = undefined
@@ -127,7 +108,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     }
   }
 
-  /** What was found belongs to the old address; a paste is looked up at once. */
   function addressChanged(next: string) {
     const pasted = next.length - address.length > 1
     setAddress(next)
@@ -158,8 +138,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     }
   }
 
-  // Enter in the field proceeds itself: a form submits on Enter only through
-  // an enabled primary action, and Subscribe waits for a Feed to be chosen.
   function keyDown(event: KeyboardEvent) {
     if (way !== 'address' || event.key !== 'Enter' || event.nativeEvent.isComposing) return
     if (!(event.target instanceof HTMLInputElement)) return
@@ -385,10 +363,6 @@ function isSilent(lastItem: string | undefined, today: string): boolean {
   return lastItem === undefined || daysBefore(lastItem, today) > SILENT_AFTER_DAYS
 }
 
-/**
- * A Feed's name and Cadence, then its pulse: when it last published — in ink
- * once it has gone silent — its Rhythm, and whether it is already followed.
- */
 function FeedHead({ feed, today, id }: { feed: FeedPreview; today: string; id: string }) {
   const lastItem = lastDay(feed)
   return (

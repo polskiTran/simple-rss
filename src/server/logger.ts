@@ -1,10 +1,6 @@
 import type { JsonValue } from '../shared/json.js'
 import type { LogLevel } from './config.js'
 
-/**
- * Anything a caller has at hand — thrown values included. The serialiser is
- * total: it reduces every value to JSON and drops undefined fields.
- */
 export type LogFields = Readonly<Record<string, unknown>>
 
 export interface LogRecord extends Readonly<Record<string, JsonValue>> {
@@ -25,16 +21,11 @@ export interface LoggerOptions {
   level: LogLevel
   now?: () => Date
   sink?: (record: LogRecord) => void
-  /** Where JSON lines go when no `sink` is given. Defaults to stdout. */
   stream?: { write(chunk: string): void }
 }
 
 const RANK = { debug: 0, info: 1, warn: 2, error: 3 } satisfies Record<LogLevel, number>
 
-/**
- * Callers pass event names (`server.started`), never secrets, session tokens,
- * Feed summaries, or Reader content.
- */
 export function createLogger(options: LoggerOptions): Logger {
   const now = options.now ?? (() => new Date())
   const stream = options.stream ?? process.stdout
@@ -62,12 +53,10 @@ interface SerialisedFields {
   [key: string]: JsonValue
 }
 
-/** Converts every field to a value `JSON.stringify` can emit without throwing. */
 function serialiseFields(fields: LogFields | undefined): SerialisedFields {
   return fields ? serialiseEntries(Object.entries(fields), new WeakSet()) : {}
 }
 
-/** Undefined entries are dropped, as `JSON.stringify` would. */
 function serialiseEntries(entries: readonly (readonly [string, unknown])[], seen: WeakSet<object>): SerialisedFields {
   const out: SerialisedFields = {}
   for (const [key, value] of entries) {

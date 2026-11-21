@@ -63,7 +63,6 @@ import {
 import type { z } from 'zod'
 import type { JsonValue } from '../shared/json.js'
 
-/** An API refusal's `error.code`, or `unknown` when the answer carried no error body the client could read. */
 type FailureCode = ApiErrorCode | 'unknown'
 
 export class ApiError extends Error {
@@ -104,11 +103,6 @@ interface ApiRequestOptions extends RequestInit {
 
 type Schema<T> = z.ZodType<T, z.ZodTypeDef, unknown>
 
-/**
- * Whether the server answered a failed request. A fetch that rejects and a
- * request that runs out of time got no answer; a refusal or a body that fails
- * its schema came from the server.
- */
 export function failureKind(cause: unknown): 'unreachable' | 'unavailable' {
   const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError'
   return cause instanceof TypeError || timedOut ? 'unreachable' : 'unavailable'
@@ -201,7 +195,6 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
   )
 }
 
-/** What an address answers — a Feed, or a page and the Feeds it declares — with nothing recorded. */
 export function previewFeed(url: string, signal: AbortSignal): Promise<FeedPreviewResponse> {
   return sendJson(
     'POST',
@@ -212,11 +205,6 @@ export function previewFeed(url: string, signal: AbortSignal): Promise<FeedPrevi
   )
 }
 
-/**
- * Retrieves the Feed again and records it only when it answers; a refusal
- * carries the reason. Aborting stops the server's retrieval, so nothing is
- * recorded unless it already was.
- */
 export function subscribeToFeed(url: string, signal?: AbortSignal): Promise<CreateSubscriptionResponse> {
   return sendJson(
     'POST',
@@ -243,7 +231,6 @@ export function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<F
   return getJson(`/api/feeds/${feedId}`, feedDetailSchema, { signal })
 }
 
-/** `query` is a `digestParamsOf` encoding, which is also the cursor a Feed's Show more pages by. */
 export function fetchFeedItems(feedId: number, query: string, signal?: AbortSignal): Promise<FeedItems> {
   return getJson(withQuery(`/api/feeds/${feedId}/items`, new URLSearchParams(query)), feedItemsSchema, { signal })
 }
@@ -273,7 +260,6 @@ export function updateReadingSource(feedId: number, readingSource: ReadingSource
   )
 }
 
-/** Polling stops and the Feed's items leave the Digest; saved items stay in the Library. */
 export async function unsubscribeFromFeed(feedId: number): Promise<void> {
   await request(`/api/feeds/${feedId}`, { method: 'DELETE' })
 }

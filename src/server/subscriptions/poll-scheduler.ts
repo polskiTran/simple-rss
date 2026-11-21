@@ -26,13 +26,6 @@ export interface PollSchedulerOptions extends PollSchedulerLimits {
   readonly logger: Logger
 }
 
-/**
- * In-process background work (no cron, no queue). Each wake polls a bounded batch of
- * the persisted due-time frontier through `FeedRefresh` — so a Feed is never retrieved
- * twice concurrently — then sweeps retention, after the polls so this wake's
- * observations count before anything is judged expired. Due times are persisted, not
- * timers, so restart catch-up is the ordinary path.
- */
 export class PollScheduler {
   readonly #subscriptions: Pick<SubscriptionService, 'dueFeedIds'>
   readonly #refresh: Pick<FeedRefresh, 'refresh'>
@@ -57,15 +50,9 @@ export class PollScheduler {
   start(): void {
     if (this.#timer || this.#stopped) return
     this.#timer = setInterval(() => void this.tick(), WAKE_INTERVAL_MS)
-    // The timer must never hold the process open past a shutdown signal.
     this.#timer.unref()
   }
 
-  /**
-   * Refuses every later wake and resolves once the drain in flight has finished
-   * its polls, so the caller may close the database. A drain takes no new Feed
-   * after stop; the polls already started run to completion.
-   */
   stop(): Promise<void> {
     this.#stopped = true
     if (this.#timer) clearInterval(this.#timer)
@@ -73,13 +60,11 @@ export class PollScheduler {
     return this.#current ?? Promise.resolve()
   }
 
-  /** Checks the due frontier now, so a fresh Subscription's first retrieval doesn't wait out a wake. */
   nudge(): void {
     if (!this.#nudges) return
     void this.tick()
   }
 
-  /** A wake arriving while another drains joins it and earns one more drain, not a compounded batch bound. */
   tick(): Promise<void> {
     if (this.#stopped) return Promise.resolve()
     if (this.#current) {

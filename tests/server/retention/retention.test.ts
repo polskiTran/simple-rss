@@ -246,7 +246,7 @@ describe('history retention', () => {
     expect(storedFeedTitles(service)).toEqual([])
   })
 
-  it('revives a Feed retained for the Library when the User resubscribes', async () => {
+  it('revives a Feed retained for the Library when the User resubscribes, as a Subscription dated from now', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)
     await subscribed(user, service, rss(item('a', 'Saved essay'), item('b', 'Passing note')))
@@ -261,7 +261,6 @@ describe('history retention', () => {
     expect(revived.status).toBe(201)
     const body = (await revived.json()) as { subscription: { feedId: number; subscribedAt: string } }
     expect(body.subscription.feedId).toBe(1)
-    // The revived Subscription begins again: Recently added and the Feed page date it from today.
     expect(body.subscription.subscribedAt).toBe(service.clock.now().toISOString())
     service.clock.advance(60_000)
     await service.wakeScheduler()

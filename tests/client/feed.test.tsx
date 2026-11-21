@@ -24,7 +24,6 @@ const JUNE_LETTER = feedItemRow({
 
 const ITEMS = feedItems({ items: [feedItemRow({ feedItemId: 12 }), JUNE_LETTER] })
 
-/** Today's page alone, with June waiting behind Show more. */
 const TODAY_ONLY = feedItems({ items: [feedItemRow({ feedItemId: 12 })], nextFrom: '2026-06-03' })
 
 function feedApi(items = ITEMS) {

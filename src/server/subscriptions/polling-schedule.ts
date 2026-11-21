@@ -1,9 +1,5 @@
 const JITTER_CAP_MS = 15 * 60_000
 
-/**
- * Deterministic per-Feed offset in `[0, interval / 10)`: Subscriptions sharing a
- * preset spread out instead of bursting, and the offset survives restarts.
- */
 function pollingJitterMs(feedId: number, intervalMinutes: number): number {
   const windowMs = Math.min(Math.floor((intervalMinutes * 60_000) / 10), JITTER_CAP_MS)
   return hash32(feedId) % windowMs
@@ -31,7 +27,6 @@ export function nextRetryTime(
   return new Date(from.getTime() + waitMs).toISOString()
 }
 
-/** Finalizer of splitmix-style mixing: small consecutive ids scatter widely. */
 function hash32(value: number): number {
   let mixed = value >>> 0
   mixed = Math.imul(mixed ^ (mixed >>> 16), 0x45d9f3b)

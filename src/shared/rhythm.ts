@@ -1,8 +1,3 @@
-/**
- * A Feed's Rhythm, read from its Cadence strip (per-day counts, oldest first)
- * by the days that saw at least one Feed Item — so one busy day reads as the
- * burst it was, not as a daily habit.
- */
 export const RHYTHMS = ['daily', 'weekly', 'monthly', 'inactive'] as const
 export type Rhythm = (typeof RHYTHMS)[number]
 

@@ -1,18 +1,13 @@
 import { fitsPasswordBytes } from '../../shared/api.js'
 import { hash, verify, type Algorithm } from '@node-rs/argon2'
 
-// `2` is `Algorithm.Argon2id`: the binding's ambient `const enum` cannot be
-// imported under `verbatimModuleSyntax`.
 const ARGON2ID: Algorithm = 2
 
 export interface PasswordHasher {
-  /** The encoded verifier to store. Never the password. */
   hash(password: string): Promise<string>
-  /** Constant-time as far as the algorithm allows; false for any bad input. */
   verify(storedHash: string, password: string): Promise<boolean>
 }
 
-/** OWASP's second recommended Argon2id configuration. */
 export const ARGON2ID_PARAMETERS = {
   memoryCost: 19_456,
   timeCost: 2,

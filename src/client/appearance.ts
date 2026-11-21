@@ -13,7 +13,6 @@ export function storedAppearance(): Appearance {
   }
 }
 
-/** A choice crossfades where the browser can; `applyAppearance` stays instant for boot. */
 export function chooseAppearance(appearance: Appearance): void {
   if ('startViewTransition' in document) document.startViewTransition(() => applyAppearance(appearance))
   else applyAppearance(appearance)

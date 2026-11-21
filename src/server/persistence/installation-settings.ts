@@ -5,7 +5,6 @@ import { installationSettings } from './schema.js'
 const SINGLETON_ID = 1
 
 export interface InstallationSettings {
-  /** IANA zone that defines the User's Digest calendar groups. */
   readonly timezone: string
   readonly createdAt: string
   readonly updatedAt: string

@@ -2,12 +2,6 @@ import { parseHTML } from 'linkedom'
 
 const DECLARED_FEED_TYPES = new Set(['application/rss+xml', 'application/atom+xml'])
 
-/**
- * The Declared Feeds of a web page: its `<link rel="alternate">` elements typed
- * RSS or Atom, resolved against the page's `<base href>` and then `pageUrl`.
- * Only HTTP(S) addresses count; each is listed once, in page order, without its
- * fragment.
- */
 export function declaredFeeds(html: string, pageUrl: string): string[] {
   const { document } = parseHTML(html)
   const base = httpUrl(document.querySelector('base[href]')?.getAttribute('href'), pageUrl) ?? pageUrl

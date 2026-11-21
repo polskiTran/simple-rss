@@ -15,10 +15,6 @@ export interface SnapshotWriteReport {
   readonly bytes: number
 }
 
-/**
- * `VACUUM INTO` produces a compacted, transaction-consistent copy even while the WAL is
- * active — safe where a raw file copy of an open database is not.
- */
 export function writeSnapshot(source: string, destination: string): SnapshotWriteReport {
   if (!existsSync(source)) {
     throw new Error(`there is no database at ${source} to back up`)
@@ -48,7 +44,6 @@ export function writeSnapshot(source: string, destination: string): SnapshotWrit
   return { bytes: statSync(destination).size }
 }
 
-/** What a completed restore left on the volume, for the operator to verify. */
 export interface RestoreReport {
   readonly restored: true
   readonly migrationsApplied: number
@@ -60,13 +55,6 @@ export interface RestoreReport {
   readonly claimed: boolean
 }
 
-/**
- * All verification — integrity, migrations, the search rebuild, a real write — happens
- * on a staging copy renamed into place only after everything passed.
- *
- * The rebuild arrives as a dependency: it must run on the staging copy, before the
- * rename, but the derived index belongs to `search/` and persistence does not depend on it.
- */
 export function restoreSnapshot(
   backupPath: string,
   databasePath: string,
@@ -80,8 +68,6 @@ export function restoreSnapshot(
   if (existsSync(databasePath)) {
     throw new Error(`${databasePath} already exists; restore only initializes a fresh data directory`)
   }
-  // A stray sidecar from an earlier database would be adopted by the restored
-  // one and override its contents, so it disqualifies the directory too.
   for (const sidecar of sidecarsOf(databasePath)) {
     if (existsSync(sidecar)) {
       throw new Error(`${sidecar} already exists; restore only initializes a fresh data directory`)
@@ -119,7 +105,6 @@ export function restoreSnapshot(
       db.$client.close()
     }
 
-    // Closing checkpoints the WAL and removes the sidecars.
     for (const sidecar of sidecarsOf(staging)) {
       if (existsSync(sidecar)) {
         throw new Error('the staging copy left WAL sidecars behind')

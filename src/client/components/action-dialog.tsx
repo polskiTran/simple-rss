@@ -12,11 +12,6 @@ interface ActionDialogProps {
   onOpenChange(open: boolean): void
 }
 
-/**
- * A decision that must be resolved before continuing (ADR 0008): a panel on
- * desktop, a sheet from the bottom edge on a phone. Callers end their content
- * with a `.dialog-footer` holding `DialogCancel` and the primary action.
- */
 export function ActionDialog({ open, title, description, trigger, children, onOpenChange }: ActionDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -40,11 +35,6 @@ export function ActionDialog({ open, title, description, trigger, children, onOp
   )
 }
 
-/**
- * `Dialog.Close` accepts native button props alone, so it takes
- * `focusableWhenDisabled` from `Button` through `render` — a busy dialog keeps
- * focus on its Cancel.
- */
 export function DialogCancel({ disabled = false }: { readonly disabled?: boolean }) {
   return (
     <Dialog.Close className="button" disabled={disabled} render={<Button focusableWhenDisabled />}>

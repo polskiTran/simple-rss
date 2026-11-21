@@ -4,10 +4,8 @@ export const WINDOW_MS = 15 * 60 * 1000
 
 export const PER_CLIENT_FAILURES = 5
 
-/** Installation-wide failures past which every attempt pays the maximum delay. */
 export const GLOBAL_FAILURES = 20
 
-/** Installation-wide failures past which every attempt is refused, whoever sends it. */
 export const GLOBAL_LIMIT = 100
 
 const BASE_DELAY_MS = 250
@@ -17,13 +15,9 @@ const MAX_DELAY_MS = 2_000
 export type AttemptVerdict =
   | {
       readonly kind: 'allowed'
-      /** What a successful secret check costs, based on pressure already present. */
       readonly successDelayMs: number
-      /** Keeps the reservation as a failure and returns this attempt's delay. */
       recordFailure(): number
-      /** Clears this client's history after it proves it is the User. */
       recordSuccess(): void
-      /** Releases the reservation when the secret check could not finish. */
       cancel(): void
     }
   | { readonly kind: 'refused'; readonly delayMs: number; readonly retryAfterSeconds: number }
@@ -35,19 +29,6 @@ interface Reservation {
   readonly at: number
 }
 
-/**
- * Counts failed secret checks inside a sliding window, per client address and
- * across the installation.
- *
- * `begin` records the attempt's start time before the secret is checked, so
- * concurrent checks cannot exceed either limit; that record *is* the failure,
- * and a failure is measured from when its attempt began. The first outcome
- * wins: failure keeps the record, cancel removes it, success forgets the client.
- *
- * Every record lives in one list, oldest first. `GLOBAL_LIMIT` refuses before
- * the list can grow past it, so however many addresses a caller rotates
- * through, memory and each `begin` stay bounded.
- */
 export class LoginRateLimiter {
   #reservations: Reservation[] = []
   readonly #clock: Clock

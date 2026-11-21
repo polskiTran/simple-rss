@@ -121,8 +121,6 @@ function OpenReader({
 }) {
   const [viewSource, setViewSource] = useState<ReadingSource>(item.readingSource)
   const source = resolvedReadingSource(viewSource, item)
-  // The deadline the Original webpage's load is waiting out, held with that load's
-  // signal: a retry or another source aborts it, so its stage never outlives it.
   const [waiting, setWaiting] = useState<{ readonly load: AbortSignal; readonly stage: ReaderDeadlineStage }>()
   const [sourceState, { retry: retrySource }] = useResource(
     `${item.feedItemId} ${source}`,
@@ -144,7 +142,6 @@ function OpenReader({
 
   const loaded = sourceState.kind === 'loaded' ? sourceState.value : undefined
   const selectedLoaded = loaded?.source === source ? loaded : undefined
-  // Feed Content stands in while the Original webpage is pending or has failed.
   const displayed: SourceResult | undefined =
     selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
   const next = item.nextInDigest
@@ -205,8 +202,6 @@ function OpenReader({
         ) : null}
         {displayed ? (
           <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
-            {/* Keyed by source, so the Original webpage arriving over Feed Content is a
-                new article that fades in, never text rewritten under the reader. */}
             <ArticleMarkdown key={displayed.source} markdown={displayed.content.markdown} />
             {selectedLoaded ? <MarkdownCommitted /> : null}
           </Suspense>
@@ -252,11 +247,6 @@ function OpenReader({
   )
 }
 
-/**
- * Names the reading on screen only when it is not the one chosen: Feed Content
- * standing in while the Original webpage loads or fails, or the one reading a
- * Feed Item has when the chosen one is missing.
- */
 function ReadingNote({
   shown,
   resolved,
@@ -271,7 +261,6 @@ function ReadingNote({
   return null
 }
 
-/** The Original webpage, in a new tab: it leaves the installation, and says so with ↗. */
 function OpenOriginal({ link }: { link: string }) {
   return (
     <a

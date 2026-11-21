@@ -8,10 +8,6 @@ import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedba
 
 type PasswordField = 'current' | 'password' | 'confirmation'
 
-/**
- * Changing the password, as a dialog: it signs every device out, this one
- * included. A reason that belongs to one field goes on it and takes focus there.
- */
 export function PasswordChange({ onChanged }: { onChanged(status: AuthStatus): void }) {
   const [open, setOpen] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')

@@ -5,10 +5,8 @@ import type { VouchedImageUrl } from './image-service.js'
 
 export const READER_IMAGE_URL_LIFETIME_SECONDS = 2 * 86_400
 
-/** The least key length that signs image URLs; the installation mints exactly this many bytes. */
 export const IMAGE_URL_KEY_BYTES = 32
 
-/** Mints the signed same-origin proxy path for one approved image target. */
 export type SignImageUrl = (url: string) => string
 
 export type VerifiedImageUrl =

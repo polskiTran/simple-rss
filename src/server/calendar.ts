@@ -2,7 +2,6 @@ const DAY_MS = 24 * 60 * 60 * 1_000
 
 const formats = new Map<string, Intl.DateTimeFormat>()
 
-/** Building a DateTimeFormat costs far more than using one, so each shape is built once per timezone. */
 function formatIn(timezone: string, locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   const key = `${locale} ${timezone} ${JSON.stringify(options)}`
   let format = formats.get(key)
@@ -31,12 +30,6 @@ export function dayAfter(dayKey: string): string {
   return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10)
 }
 
-/**
- * `dateKey` for many stored instants in one timezone: Intl runs once per day
- * touched rather than once per instant, so grouping a whole Feed stays cheap.
- * Every offset is under a day, so the answer is the instant's UTC date or a
- * neighbour, settled against where those days begin.
- */
 export function dayKeysIn(timezone: string): (instant: string) => string {
   const starts = new Map<string, string>()
   const startOf = (day: string) => {
@@ -55,12 +48,6 @@ export function dayKeysIn(timezone: string): (instant: string) => string {
   }
 }
 
-/**
- * The UTC instant a timezone's calendar day begins: its midnight under the offset
- * from one side of the day or the other. A DST transition at midnight leaves
- * only one of the two on the day's first instant — where midnight is skipped,
- * the day begins at the transition itself.
- */
 export function dayStartUtc(dayKey: string, timezone: string): Date {
   const guess = Date.parse(`${dayKey}T00:00:00.000Z`)
   const candidates = [guess - DAY_MS, guess + DAY_MS].map((side) => guess - millisecondsAheadOfUtc(side, timezone))

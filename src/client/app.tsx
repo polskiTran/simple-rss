@@ -140,7 +140,6 @@ function signedInView(navigation: Navigation, gate: Gate) {
   }
 }
 
-/** Nothing has said whether this device may read: say why, and offer to ask again. */
 function Unanswered({ kind, onRetry }: { kind: 'unreachable' | 'unavailable'; onRetry(): Promise<void> }) {
   const [retrying, startRetry] = useTransition()
   return (

@@ -13,7 +13,6 @@ const CONTENT_SECURITY_POLICY = [
   "form-action 'self'",
 ].join('; ')
 
-/** Safe to send unconditionally: browsers ignore it on plain HTTP. */
 const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
 
 export function securityHeaders(): MiddlewareHandler {

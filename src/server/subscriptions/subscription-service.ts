@@ -69,11 +69,6 @@ const SUBSCRIBED_FEED_COLUMNS = {
   subscribedAt: subscriptions.createdAt,
 }
 
-/**
- * The User's Subscription changes — OPML Import, preferences, unsubscribing —
- * and the reads the UI is built from. Subscribing by hand and poll outcomes
- * are written by `FeedPoll`, which retrieves before it records (ADR 0012).
- */
 export class SubscriptionService {
   readonly #db: DrizzleDatabase
   readonly #clock: Clock
@@ -120,7 +115,6 @@ export class SubscriptionService {
     return { kind: 'report', added, alreadySubscribed, unusable }
   }
 
-  /** Records the Subscription without contacting the Feed (ADR 0007): unchecked and immediately due. */
   #record(enteredUrl: string, offeredTitle: string | null): 'recorded' | 'duplicate' | 'invalid-url' {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return 'invalid-url'
@@ -137,10 +131,6 @@ export class SubscriptionService {
     return serializeOpml(this.#subscribedFeeds(), this.#clock.now())
   }
 
-  /**
-   * The next due time is recomputed from the last completed poll: a shorter,
-   * already-overdue interval becomes due at the next wake; a longer one waits it out.
-   */
   setPollingInterval(feedId: number, pollingIntervalMinutes: PollingIntervalMinutes): PollingSchedule | undefined {
     const row = this.#db
       .select({ lastPolledAt: subscriptions.lastPolledAt, createdAt: subscriptions.createdAt })
@@ -174,7 +164,6 @@ export class SubscriptionService {
     return true
   }
 
-  /** Replaces both overrides; the Feed's reported title and description keep being tracked underneath. */
   setFeedDetails(feedId: number, overrides: UpdateFeedDetailsRequest): FeedDetailsUpdate | undefined {
     const row = this.#db
       .select({ reportedTitle: feeds.title, reportedDescription: feeds.description })
@@ -201,11 +190,6 @@ export class SubscriptionService {
     }
   }
 
-  /**
-   * Deletes only the Subscription row — polling and Digest membership hinge on it.
-   * Retained rows wait for the retention sweep, which keeps saves and their attribution.
-   * False when there was no Subscription.
-   */
   unsubscribe(feedId: number): boolean {
     const deleted = this.#db.delete(subscriptions).where(eq(subscriptions.feedId, feedId)).run()
     if (deleted.changes === 0) return false
@@ -243,7 +227,6 @@ export class SubscriptionService {
     return records.map((record) => summaryOf(record, cadenceOf, timezone))
   }
 
-  /** Days use the installation timezone, so the cadence grid reads in the User's own calendar. */
   detail(feedId: number): FeedDetail | undefined {
     const record = this.#db
       .select({
@@ -287,7 +270,6 @@ export class SubscriptionService {
     }
   }
 
-  /** A page of a subscribed Feed's retained items, cut into whole installation-timezone days as the Digest is. */
   items(feedId: number, start: DigestStart): FeedItems | undefined {
     const subscribed = this.#db
       .select({ feedId: subscriptions.feedId })
@@ -322,7 +304,6 @@ export class SubscriptionService {
     }
   }
 
-  /** Ordered by effective title — the order of the Feeds list and of OPML export alike. */
   #subscribedFeeds(): readonly SubscribedFeedRecord[] {
     return this.#db
       .select(SUBSCRIBED_FEED_COLUMNS)

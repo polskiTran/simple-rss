@@ -2,16 +2,10 @@ import { SESSION_COOKIE } from '../../src/server/http/session-cookie.js'
 import { USER_PASSWORD, SETUP_SECRET, type TestService } from './service-harness.js'
 
 export interface DeviceOptions {
-  /** The address a proxy would report for this device, for rate-limit tests. */
   readonly address?: string
-  /** Overrides the `Origin` header, so a test can forge or omit it. */
   readonly origin?: string | null
 }
 
-/**
- * One browser talking to the installation: it keeps its own cookie jar and
- * sends the headers a browser sends.
- */
 export class Device {
   readonly #service: TestService
   readonly #options: DeviceOptions

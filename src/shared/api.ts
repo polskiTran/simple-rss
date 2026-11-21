@@ -17,14 +17,9 @@ export const serviceMetaSchema = z.object({
 })
 export type ServiceMeta = z.infer<typeof serviceMetaSchema>
 
-/** The job a Reader deadline answer was still waiting on when it was sent. */
 const readerDeadlineStageSchema = z.enum(['publisher', 'parsing'])
 export type ReaderDeadlineStage = z.infer<typeof readerDeadlineStageSchema>
 
-/**
- * Every `error.code` the API answers with. The server cannot emit a code that
- * is not listed here, and the client can match on nothing else.
- */
 export const apiErrorCodeSchema = z.enum([
   'not_found',
   'internal_error',
@@ -70,7 +65,6 @@ export const apiErrorSchema = z.object({
   error: z.object({
     code: apiErrorCodeSchema,
     message: z.string(),
-    /** Carried only by `article_deadline_exceeded`. */
     stage: readerDeadlineStageSchema.optional(),
   }),
 })
@@ -78,10 +72,8 @@ export type ApiErrorBody = z.infer<typeof apiErrorSchema>
 
 export const MIN_PASSWORD_LENGTH = 12
 
-/** Shorter, a deployment's setup secret protects nothing, so setup refuses to start. */
 export const MIN_SETUP_SECRET_LENGTH = 16
 
-/** Argon2id hashes bytes, so the password bound that matters is in UTF-8 bytes. */
 export const MAX_PASSWORD_BYTES = 1024
 const MAX_PASSWORD_LENGTH = 512
 
@@ -99,16 +91,12 @@ function passwordSchema(minLength: number) {
     .refine(fitsPasswordBytes, { message: `Password must be at most ${MAX_PASSWORD_BYTES} UTF-8 bytes` })
 }
 
-/** A password being chosen: held to the length rule. */
 export const newPasswordSchema = passwordSchema(MIN_PASSWORD_LENGTH)
 
-/** A password being presented: any non-empty one is checked against the verifier. */
 const presentedPasswordSchema = passwordSchema(1)
 
 export const authStatusSchema = z.object({
-  /** Whether a User has claimed this installation. */
   claimed: z.boolean(),
-  /** Whether the caller presented a live Session. */
   authenticated: z.boolean(),
 })
 export type AuthStatus = z.infer<typeof authStatusSchema>
@@ -183,13 +171,10 @@ export const idParameterSchema = z
   .transform(Number)
   .refine(Number.isSafeInteger)
 
-/** Matches the bound the feeds table enforces on reported titles. */
 export const MAX_FEED_TITLE_LENGTH = 512
 
-/** One bound for both descriptions — the Feed Description and the Custom Description share the rule. */
 export const MAX_FEED_DESCRIPTION_LENGTH = 1024
 
-/** Replaces both overrides at once; null clears one so the reported value stands. */
 export const updateFeedDetailsRequestSchema = z.object({
   customTitle: z.string().trim().min(1).max(MAX_FEED_TITLE_LENGTH).nullable(),
   customDescription: z.string().trim().min(1).max(MAX_FEED_DESCRIPTION_LENGTH).nullable(),
@@ -197,10 +182,8 @@ export const updateFeedDetailsRequestSchema = z.object({
 export type UpdateFeedDetailsRequest = z.infer<typeof updateFeedDetailsRequestSchema>
 
 export const feedDetailsUpdateSchema = z.object({
-  /** Effective: the Custom Title when set, else the reported title. */
   title: z.string(),
   customTitle: z.string().nullable(),
-  /** Effective: the Custom Description when set, else the Feed Description. */
   description: z.string().nullable(),
   customDescription: z.string().nullable(),
 })
@@ -223,20 +206,15 @@ export type ImportOpmlRequest = z.infer<typeof importOpmlRequestSchema>
 export const opmlImportReportSchema = z.object({
   added: z.number().int().nonnegative(),
   alreadySubscribed: z.number().int().nonnegative(),
-  /** Outline URLs that could not become Subscriptions, verbatim from the file. */
   unusable: z.array(z.string()),
 })
 export type OpmlImportReport = z.infer<typeof opmlImportReportSchema>
 
 const feedSummarySchema = z.object({
   feedId: z.number().int().positive(),
-  /** Effective: the Custom Title when set, else the reported title. */
   title: z.string(),
-  /** Effective: the Custom Description when set, else the Feed Description; null when neither exists. */
   description: z.string().nullable(),
-  /** Host of the home page when the Feed declares one, else host of the Feed URL. */
   domain: z.string(),
-  /** The publisher's site, for linking the domain. Null until a retrieval finds one. */
   homePageUrl: z.string().nullable(),
   enteredUrl: z.string(),
   resolvedUrl: z.string(),
@@ -256,12 +234,6 @@ export type FeedAvailabilityCategory = (typeof FEED_AVAILABILITY_CATEGORIES)[num
 
 const feedAvailabilityCategorySchema = z.enum(FEED_AVAILABILITY_CATEGORIES)
 
-// Every state carries the same fields, each as narrow as that state allows.
-// `unchecked`: no retrieval has succeeded yet, though one may have failed.
-// `available`: the Feed has answered, possibly with a failure run under way.
-// `unavailable` begins at `FEED_UNAVAILABLE_AFTER_FAILURES` in a row and always
-// names why; a Feed that simply publishes nothing stays `available`.
-// `lastSuccessDate` is the installation-timezone day the Feed last answered.
 const failureRunSchema = z.number().int().nonnegative()
 const feedAvailabilitySchema = z.discriminatedUnion('state', [
   z.object({
@@ -290,12 +262,10 @@ export type FeedAvailability = z.infer<typeof feedAvailabilitySchema>
 
 export const CADENCE_STRIP_DAYS = 30
 
-/** Daily item counts, oldest to newest, in the installation timezone. */
 const cadenceStripSchema = z.array(z.number().int().nonnegative()).length(CADENCE_STRIP_DAYS)
 
 const subscriptionSummarySchema = feedSummarySchema.extend({
   readingSource: readingSourceSchema,
-  /** When this Subscription began; a revived one starts again. */
   subscribedAt: z.string(),
   cadence: cadenceStripSchema,
   availability: feedAvailabilitySchema,
@@ -307,25 +277,15 @@ export type FeedPreviewRequest = z.infer<typeof feedPreviewRequestSchema>
 
 export const FEED_PREVIEW_ITEMS = 5
 
-/**
- * A Feed as one retrieval found it, before anything is recorded. `feedUrl` is
- * the address to subscribe with; `cadence` is drawn from the Feed Window alone,
- * and `lastItemAt` and `items` follow the Digest's chronology, newest first.
- */
 const feedPreviewSchema = feedSummarySchema.pick({ title: true, domain: true, homePageUrl: true }).extend({
   feedUrl: z.string(),
   cadence: cadenceStripSchema,
   lastItemAt: z.string().nullable(),
   items: z.array(z.object({ title: z.string(), publishedAt: z.string().nullable() })).max(FEED_PREVIEW_ITEMS),
-  /** Whether the address is already one of a subscribed Feed's own. */
   subscribed: z.boolean(),
 })
 export type FeedPreview = z.infer<typeof feedPreviewSchema>
 
-/**
- * The address answered with a Feed, or with a web page and the Declared Feeds
- * that answered, in page order; a page declaring none answers an empty list.
- */
 export const feedPreviewResponseSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('feed'), feed: feedPreviewSchema }),
   z.object({ kind: z.literal('page'), host: z.string(), feeds: z.array(feedPreviewSchema) }),
@@ -349,16 +309,12 @@ export type RefreshFeedResponse = z.infer<typeof refreshFeedResponseSchema>
 
 export const CADENCE_GRID_WEEKS = 26
 
-/** Days are in the installation timezone. */
 const cadenceObservationSchema = z.object({
   date: z.string(),
   count: z.number().int().nonnegative(),
 })
 export type CadenceObservation = z.infer<typeof cadenceObservationSchema>
 
-// `date` is the installation-timezone day the item is grouped under and the
-// cadence grid jumps to; `displayTime` is its time on that day, null on a
-// Release Date, which names no time.
 const feedItemRowSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -371,28 +327,21 @@ const feedItemRowSchema = z.object({
 })
 export type FeedItemRow = z.infer<typeof feedItemRowSchema>
 
-// `cadence` runs oldest to newest from the grid window's first day through
-// today, so a fixed dataset always draws the same grid.
 export const feedDetailSchema = feedSummarySchema.extend({
-  /** What the Feed document says, kept underneath any Custom Title. */
   reportedTitle: z.string(),
   customTitle: z.string().nullable(),
-  /** The Feed Description as reported, kept underneath any Custom Description. */
   reportedDescription: z.string().nullable(),
   customDescription: z.string().nullable(),
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
   readingSource: readingSourceSchema,
-  /** The installation-timezone day this Subscription began. */
   subscribedDate: z.string(),
   cadence: z.array(cadenceObservationSchema),
 })
 export type FeedDetail = z.infer<typeof feedDetailSchema>
 
-/** One page of a Feed's retained items: whole days, newest first, like the Digest's (ADR 0011). */
 export const feedItemsSchema = z.object({
   items: z.array(feedItemRowSchema),
-  /** The day the next page starts `from`; null at the very end. */
   nextFrom: z.string().nullable(),
 })
 export type FeedItems = z.infer<typeof feedItemsSchema>
@@ -405,7 +354,6 @@ const digestItemSchema = z.object({
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   displayTime: z.string().nullable(),
-  /** Same-origin proxy path for the item's image; never a publisher URL. */
   imageUrl: z.string().nullable(),
   summary: z.string().nullable(),
   firstSeenAt: z.string(),
@@ -413,10 +361,6 @@ const digestItemSchema = z.object({
 })
 export type DigestItem = z.infer<typeof digestItemSchema>
 
-/**
- * A Feed publishing on a group's day after a quiet spell of at least
- * `QUIET_SPELL_DAYS`: how many days since its previous item.
- */
 const digestReturnSchema = z.object({
   feedId: z.number().int().positive(),
   quietDays: z.number().int().positive(),
@@ -425,7 +369,6 @@ export type DigestReturn = z.infer<typeof digestReturnSchema>
 
 export const QUIET_SPELL_DAYS = 7
 
-/** One whole installation-timezone day of the Digest, newest item first; the client names the day. */
 const digestGroupSchema = z.object({
   date: z.string(),
   items: z.array(digestItemSchema),
@@ -434,16 +377,12 @@ const digestGroupSchema = z.object({
 export type DigestGroup = z.infer<typeof digestGroupSchema>
 
 export const digestSchema = z.object({
-  /** The installation-timezone day. */
   today: z.string(),
-  /** Whole days, newest first: a page never ends mid-day. */
   groups: z.array(digestGroupSchema),
-  /** The day the next page starts `from`; null at the very end. */
   nextFrom: z.string().nullable(),
 })
 export type Digest = z.infer<typeof digestSchema>
 
-/** An installation-timezone calendar day, `2026-09-01`, that exists. */
 export const dateKeySchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -452,14 +391,6 @@ export const dateKeySchema = z
     return Number.isFinite(time) && new Date(time).toISOString().startsWith(value)
   })
 
-/**
- * Where a page of whole days starts: `from` a day — that day and every one
- * before it — rather than today, and on `through` a day however many items it
- * takes. The Digest and a Feed's items page by it alike: `through` lets the
- * cadence grid show a day not yet loaded, and the Digest come back to every day
- * it was read through, in one request. `digestParamsOf` and
- * `digestRequestSchema` are the two directions of one encoding.
- */
 export interface DigestStart {
   readonly from?: string | undefined
   readonly through?: string | undefined
@@ -474,10 +405,6 @@ export const digestRequestSchema = z.object({
   through: dateKeySchema.optional(),
 }) satisfies z.ZodType<DigestStart>
 
-/**
- * The Digest's own cadence: every day of the grid window, with `today` ending
- * it, and how many Subscriptions feed it — none means the Digest has yet to begin.
- */
 export const digestCalendarSchema = z.object({
   today: z.string(),
   days: z.array(cadenceObservationSchema),
@@ -490,13 +417,11 @@ const libraryItemSchema = z.object({
   title: z.string(),
   feedId: z.number().int().positive(),
   feedTitle: z.string(),
-  /** False once the Feed was unsubscribed; the save and attribution remain. */
   subscribed: z.boolean(),
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   savedAt: z.string(),
-  /** The installation-timezone day it was saved. */
   savedDate: z.string(),
 })
 export type LibraryItem = z.infer<typeof libraryItemSchema>
@@ -504,26 +429,20 @@ export type LibraryItem = z.infer<typeof libraryItemSchema>
 const LIBRARY_ORDERS = ['newest', 'oldest'] as const
 export type LibraryOrder = (typeof LIBRARY_ORDERS)[number]
 
-/** `?order=oldest` turns the Library around; absent is newest save first. */
 export const libraryRequestSchema = z.object({
   order: z.enum(LIBRARY_ORDERS).default('newest'),
 })
 
 export const librarySchema = z.object({
-  /** The installation-timezone day, so saves read as today or yesterday. */
   today: z.string(),
-  /** Every save, not just this page's. */
   total: z.number().int().nonnegative(),
-  /** By saved time, in the requested order. */
   items: z.array(libraryItemSchema),
-  /** Opaque cursor; null at the very end. */
   nextCursor: z.string().nullable(),
 })
 export type Library = z.infer<typeof librarySchema>
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-/** Version 4 adds the per-Subscription Reading Source. */
 export const USER_EXPORT_VERSION = 4
 
 const userExportItemSchema = z.object({
@@ -540,11 +459,9 @@ const userExportItemSchema = z.object({
 })
 export type UserExportItem = z.infer<typeof userExportItemSchema>
 
-/** `subscription` is null for a Feed kept only because Library saves still attribute to it. */
 const userExportFeedSchema = z.object({
   enteredUrl: z.string(),
   resolvedUrl: z.string(),
-  /** The reported title and Feed Description; the User's overrides live on `subscription`. */
   title: z.string(),
   description: z.string().nullable(),
   domain: z.string(),
@@ -577,33 +494,15 @@ export const MAX_SEARCH_QUERY_LENGTH = 256
 
 const searchQuerySchema = z.string().min(1).max(MAX_SEARCH_QUERY_LENGTH)
 
-/**
- * The Search Scope: the part of the reading a search answers from, taken from
- * the screen the line was invoked on. An opened Feed answers its own Feed
- * Items, the Library its saved ones, and the Feeds screen only its
- * Subscriptions. The Digest, the Reader and settings search everywhere.
- */
 export type SearchScope =
   | { readonly kind: 'everywhere' }
   | { readonly kind: 'saved' }
   | { readonly kind: 'subscriptions' }
   | { readonly kind: 'feed'; readonly feedId: number }
 
-/**
- * How a search ranks what it found: best match (ADR 0009) or newest first.
- * Either way it answers at most fifty — the newest fifty matches, not the best
- * fifty re-sorted.
- */
 const SEARCH_SORTS = ['best', 'newest'] as const
 export type SearchSort = (typeof SEARCH_SORTS)[number]
 
-/**
- * How a search travels, in the client address and the API request alike: `q`
- * for the words, then at most one scope parameter beside it — `feed=<id>` or
- * `in=saved|subscriptions` — and `sort=newest` when not ranked by best match.
- * Everywhere needs no scope. `searchParamsOf` and `searchRequestSchema` are the
- * two directions of one encoding.
- */
 export function searchParamsOf(query: string, scope: SearchScope, sort: SearchSort = 'best'): URLSearchParams {
   const params = new URLSearchParams({ q: query })
   if (scope.kind === 'feed') params.set('feed', String(scope.feedId))
@@ -637,18 +536,13 @@ const searchResultSchema = z.object({
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  /** The installation-timezone day it is listed under, and its time on that day (null on a Release Date). */
   date: z.string(),
   displayTime: z.string().nullable(),
   saved: z.boolean(),
-  // Plain-text fragment of the summary around the match; null when only the
-  // title or Feed title matched — both already visible in the item shape.
   snippet: z.string().nullable(),
 })
 export type SearchResult = z.infer<typeof searchResultSchema>
 
-// A current Subscription the query matched by effective title or domain —
-// never the Feed Description.
 const searchSubscriptionMatchSchema = feedSummarySchema
   .pick({ feedId: true, title: true, domain: true, homePageUrl: true })
   .extend({ cadence: cadenceStripSchema })
@@ -681,7 +575,6 @@ export const IMAGE_CACHE_SECONDS = 7 * 86_400
 
 export const READER_IMAGE_PATH = '/api/reader/image'
 
-/** The Feed Item that follows in Digest order, so reading never dead-ends. */
 const readerNextSchema = z.object({
   feedItemId: z.number().int().positive(),
   title: z.string(),
@@ -702,11 +595,9 @@ export const readerItemSchema = z.object({
   feedId: z.number().int().positive(),
   feedTitle: z.string(),
   link: z.string().nullable(),
-  /** The Discussion the Feed declares, on a page other than the item's own. */
   discussionUrl: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  /** The installation-timezone day it is listed under, and that timezone's today. */
   date: z.string(),
   today: z.string(),
   summary: z.string().nullable(),

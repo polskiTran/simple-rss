@@ -91,14 +91,13 @@ describe('an installation nobody has claimed', () => {
     expect(api.requestsTo('POST /api/auth/setup')).toHaveLength(0)
   })
 
-  it('rejects a password beyond the UTF-8 hashing limit before sending it', async () => {
+  it('rejects a pasted password beyond the UTF-8 hashing limit before sending it', async () => {
     const api = stubApi({ claimed: false, authenticated: false })
     renderApp()
     await screen.findByLabelText('Setup secret')
     const password = '界'.repeat(400)
 
     await fill('Setup secret', 'a-deployment-setup-secret')
-    // Pasted: typing 800 characters takes most of the 5s test timeout on a CI runner.
     await userEvent.click(screen.getByLabelText('Password'))
     await userEvent.paste(password)
     await userEvent.click(screen.getByLabelText('Confirm password'))
@@ -300,7 +299,7 @@ describe('coming back to a claimed installation', () => {
     expect(await screen.findByRole('heading', { name: 'simple isn’t available' })).toBeDefined()
   })
 
-  it('asks again on its own when the connection comes back', async () => {
+  it('asks again on its own when the connection comes back after the offline screen is listening', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -311,7 +310,6 @@ describe('coming back to a claimed installation', () => {
     await screen.findByRole('heading', { name: 'Can’t reach simple' })
 
     stubApi({ claimed: true, authenticated: false })
-    // A passive effect adds the listener after the heading paints, so an early event would be lost.
     await waitFor(() => {
       window.dispatchEvent(new Event('online'))
       expect(screen.getByLabelText('Password')).toBeDefined()

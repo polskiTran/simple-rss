@@ -15,19 +15,16 @@ const SLOW_RIDGE_DELAY_MS = 2 * READER_DEADLINE_BUDGET_MS
 
 export interface Installation {
   readonly url: string
-  /** The publisher's site, a page that declares Field Notes and then Long Meadow. */
   readonly siteUrl: string
   readonly feedUrl: string
   readonly brokenArticleFeedUrl: string
   readonly slowArticleFeedUrl: string
   readonly longFeedUrl: string
   readonly imageOnlyFeedUrl: string
-  /** Two items today, one titled `LEDGER_LONG_TITLE`, so the Digest shares a box between them. */
   readonly ledgerFeedUrl: string
   readonly addressFeedUrl: string
 }
 
-/** Long enough to run past three lines in a phone's Digest box. */
 export const LEDGER_LONG_TITLE =
   'The morning the valley flooded, the road washed out and every one of us walked the ridge path home in the rain before the light came back'
 
@@ -278,8 +275,6 @@ export const test = base.extend<InstallationOptions & { installation: Installati
     const { port } = server.address() as AddressInfo
 
     try {
-      // `localhost` and `127.0.0.1` are different origins to a browser even on
-      // the same port, so this is genuinely somebody else's site.
       await use({
         url: `http://localhost:${port}`,
         serve: (html) => {

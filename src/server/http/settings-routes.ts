@@ -9,7 +9,6 @@ export interface SettingsRouteDependencies {
   readonly clock: Clock
 }
 
-/** Installation preferences, mounted at `/api` behind `requireSession`. */
 export function settingsRoutes(deps: SettingsRouteDependencies): Hono {
   const app = new Hono()
 

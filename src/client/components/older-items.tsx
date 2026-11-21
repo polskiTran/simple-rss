@@ -1,11 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import type { OlderState } from '../use-resource.js'
 
-/**
- * The way further along a paged list, in whichever order it runs; absent once
- * the list has ended. It says Show more rather than a number: a page may finish
- * the last day shown and run on into others, and nothing counts what remains.
- */
 export function OlderItems({
   nextCursor,
   older,

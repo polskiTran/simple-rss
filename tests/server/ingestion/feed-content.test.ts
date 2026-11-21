@@ -411,14 +411,12 @@ describe('Feed Content conversion limits', () => {
     expect(imagePaths(content?.markdown ?? '')).toHaveLength(1)
     expect(content?.markdown).toContain('朝🌄 ')
     expect(content?.markdown).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u)
-    // The signature is delivery overhead, not part of the stored body budget.
     expect(Buffer.byteLength(content?.markdown ?? '')).toBeGreaterThan(FEED_CONTENT_MAX_BYTES)
     const path = imagePaths(content?.markdown ?? '')[0]
     if (!path) throw new Error('No bounded image')
     const durable = content?.markdown.replace(path.replaceAll('&', '\\&'), 'https://journal.example/panel.png') ?? ''
     expect(Buffer.byteLength(durable)).toBeLessThanOrEqual(FEED_CONTENT_MAX_BYTES)
   })
-  // Reading this list re-parses its Markdown in quadratic time, which can pass the 5s default on a busy CI runner.
   it('records a list cut at the node limit even when no later block follows', { timeout: 20_000 }, async () => {
     const { read } = await ingest(rss(`<description><![CDATA[<ul>${'<li>x</li>'.repeat(20_001)}</ul>]]></description>`))
     expect((await read()).feedContent).toMatchObject({ truncated: true })

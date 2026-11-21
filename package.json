@@ -20,8 +20,11 @@
     "test:watch": "vitest",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:browser": "pnpm build:client && playwright test",
-    "lint": "biome check --error-on-warnings . && pnpm lint:anti-slop",
+    "lint": "biome check --error-on-warnings . && pnpm lint:anti-slop && pnpm comments:check",
     "lint:anti-slop": "node --import=tsx node_modules/oxlint/bin/oxlint --config oxlint.config.mjs .",
+    "comments:check": "node --import=tsx tools/comments/main.ts check",
+    "comments:lock": "node --import=tsx tools/comments/main.ts lock",
+    "comments:list": "node --import=tsx tools/comments/main.ts list",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tools/oxlint/anti-slop",
     "cli": "tsx src/server/cli-main.ts"

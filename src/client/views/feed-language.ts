@@ -17,7 +17,6 @@ const AVAILABILITY_COPY = {
   invalid_feed: 'The feed is returning unusable XML',
 } satisfies Readonly<Record<FeedAvailabilityCategory, string>>
 
-/** The Add feed field's answer to a line that is no address at all. */
 export const NOT_AN_ADDRESS = 'Enter a site or feed address, like lowtechmagazine.com.'
 
 const SUBSCRIPTION_FAILURE_COPY = {
@@ -31,20 +30,12 @@ const SUBSCRIPTION_FAILURE_COPY = {
   feed_unreachable: 'That feed couldn’t be reached.',
 } as const satisfies Partial<Record<ApiErrorCode, string>>
 
-/** What the address's host failed to do, when it never gave an answer to read. */
 const UNANSWERED_COPY = {
   feed_unreachable: 'couldn’t be reached.',
   feed_timeout: 'took too long to respond.',
   feed_body_timeout: 'took too long to download.',
 } as const satisfies Partial<Record<ApiErrorCode, string>>
 
-/**
- * Why the Add feed dialog has nothing to subscribe to at `host` — a lookup or
- * a Subscribe refused — and whether trying again could help: a retrieval that
- * failed may answer next time, an address that is no address never will. A
- * request the reader never answered is the reader's failure, not the host's,
- * unless it ran out of time waiting on the host.
- */
 export function addFailure(cause: unknown, host: string) {
   const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError'
   if (!(cause instanceof ApiError) && !timedOut) {
@@ -71,11 +62,6 @@ export function retryFailure(cause: unknown): string {
   return reason ? `Still unavailable. ${reason}` : 'Still unavailable. The feed couldn’t be retrieved.'
 }
 
-/**
- * Why checking fails, and when it last worked: `… Last reached 5 Aug.`
- * The last success names its year when it differs from the latest check's, the
- * one that found the Feed still down.
- */
 export function unavailableNote(availability: Extract<FeedAvailability, { state: 'unavailable' }>): string {
   const reason = AVAILABILITY_COPY[availability.category]
   const { lastSuccessDate, lastCheckedAt } = availability
@@ -86,10 +72,6 @@ export function unavailableNote(availability: Extract<FeedAvailability, { state:
   return `${reason}. ${lastSuccess}`
 }
 
-/**
- * What the Add feed field sends: the address as typed, or a bare host given
- * `https://`. Anything else is no address at all, and is refused before any request.
- */
 export function feedAddressOf(line: string): string | undefined {
   const address = line.trim()
   if (/^https?:\/\/\S+$/i.test(address)) return address

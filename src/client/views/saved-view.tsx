@@ -28,14 +28,12 @@ const ORDER_OPTIONS = [
 export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   useScreenTitle('Saved')
   const [order, setOrder] = useState<Order>('newest')
-  // By feed groups the newest-first pages; only the two save orders ask anew.
   const fetchOrder = order === 'feed' ? 'newest' : order
   const [state, { retry, loadMore, older }] = usePagedResource(
     fetchOrder,
     (cursor, signal) => fetchLibrary(fetchOrder, cursor, signal),
     (shown, page) => ({ ...page, items: [...shown.items, ...page.items] }),
   )
-  // Unsaved here but kept in place as an undo line until the Library is read again.
   const [unsaved, setUnsaved] = useState<ReadonlySet<number>>(new Set())
 
   const mark = (feedItemId: number, saved: boolean) =>
@@ -95,14 +93,12 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
           id: `saved-feed-${feedId}`,
           title: items[0]?.feedTitle ?? '',
           items,
-          // Any Feed may have saves further down the list.
           complete,
         }))
       : [...Map.groupBy(library.items, (item) => item.savedDate.slice(0, 7))].map(([month, items], index, all) => ({
           id: `saved-${month}`,
           title: monthName(`${month}-01`, library.today),
           items,
-          // Pages run by save time, so a month is whole once a later one has begun.
           complete: complete || index < all.length - 1,
         }))
 

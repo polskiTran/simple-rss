@@ -21,7 +21,6 @@ export interface NormalizedFeedItem {
   readonly identityKind: FeedItemIdentityKind
   readonly title: string | null
   readonly link: string | null
-  /** Where the item is discussed, when the Feed declares a page other than the item's own. */
   readonly discussionUrl: string | null
   readonly publishedAt: string | null
   readonly imageUrl: string | null
@@ -32,7 +31,6 @@ export interface NormalizedFeedItem {
 export interface ParsedFeedDocument {
   readonly title: string
   readonly description: string | null
-  /** The site the Feed points at, absent when it declares nothing but its own URL. */
   readonly homePageUrl: string | null
   readonly items: readonly NormalizedFeedItem[]
 }
@@ -49,13 +47,6 @@ export class FeedDocumentError extends Error {
   }
 }
 
-/**
- * XML declarations able to introduce external entities are rejected before parsing;
- * publisher HTML becomes safe Feed Content and a separate plain-text summary.
- *
- * `priorUrls` are the other URLs this retrieval was reached through — entered and
- * requested — so a declared site naming a pre-redirect address is still the Feed itself.
- */
 export function parseFeedDocument(
   bytes: Uint8Array,
   resolvedUrl: string,
@@ -152,13 +143,6 @@ function parseRdf(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
   return { title, description, homePageUrl, items }
 }
 
-/**
- * A Feed whose declared site is its own URL has declared nothing — the `rel="self"`
- * mistake, common enough that linking to it would send the User back to the XML.
- * Matched loosely and against every URL the Feed was reached by, because a Feed
- * that moved is likely to still name the URL it was pasted from: the same page
- * over http, with a trailing slash, or before the redirect that led here.
- */
 function homePageUrlOf(value: unknown, baseUrl: string, feedUrls: readonly string[]): string | null {
   const url = normalizeHttpUrl(value, baseUrl)
   return url && feedUrls.some((feedUrl) => samePage(url, feedUrl)) ? null : url
@@ -182,8 +166,6 @@ function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase,
     declaredBase(asRecord(linkElement), itemBase).xmlBase,
   )
   const link = declaredLink ?? (atom ? null : permalinkGuid(record))
-  // Declared XML bases outrank the item address; without one, HTML destinations use
-  // the original page, then the Feed address as their natural context.
   const contentBase = { xmlBase: itemBase.xmlBase, linkBase: itemBase.linkBase ?? link ?? itemBase.xmlBase }
   const preferred = recordField(record, atom ? ['content', 'atom:content'] : ['content:encoded'])
   const summaryField = recordField(record, atom ? ['summary', 'atom:summary'] : ['description'])
@@ -213,10 +195,6 @@ function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase,
   }
 }
 
-/**
- * RSS defaults `isPermaLink` to true. `new URL` with no base admits only an
- * absolute http(s) guid, so an opaque id is not joined onto the Feed URL.
- */
 function permalinkGuid(record: Record<string, unknown>): string | null {
   const guid = recordField(record, ['guid'])
   const permanence = attributeOf(guid, 'isPermaLink')
@@ -234,11 +212,6 @@ function permalinkGuid(record: Record<string, unknown>): string | null {
   return normalizeHttpUrl(raw, url.href)
 }
 
-/**
- * RSS `<comments>` (Hacker News, Lobsters) or an Atom `replies` link to an HTML
- * page (RFC 4685). A discussion that is the item's own page — WordPress points
- * `<comments>` at `#respond` — declares nothing new, so it is dropped.
- */
 function discussionOf(
   record: Record<string, unknown>,
   atom: boolean,
@@ -257,11 +230,6 @@ function discussionOf(
   return url && !(link && samePage(url, link)) ? url : null
 }
 
-/**
- * Guid wins, then link, then a fingerprint of the content. The fingerprint
- * leaves the summary out: publishers correct it most, and hashing it would turn
- * every correction into a new identity instead of an update.
- */
 function itemIdentity(guid: string | null, link: string | null, title: string | null, publishedAt: string | null) {
   return guid
     ? { kind: 'guid' as const, key: `guid:${guid}` }
@@ -338,7 +306,6 @@ function boundedPlainText(value: unknown, limit: number): string | null {
   const raw = plainValue(value)
   if (!raw) return null
 
-  // Stop nodes arrive raw; unwrap CDATA and decode only the surrounding XML text.
   const source = decodeXmlText(raw)
 
   const text = convert(source, {
@@ -378,7 +345,6 @@ function decodeXmlEntities(text: string): string {
   })
 }
 
-/** Decode each XML text segment once; CDATA may be interleaved with escaped text. */
 function decodeXmlText(text: string): string {
   return text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>|&(?:#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, cdata) =>
     typeof cdata === 'string' ? cdata : decodeXmlEntities(match),
@@ -434,7 +400,6 @@ function decodeXml(bytes: Uint8Array): string {
   }
 }
 
-/** The XML base in scope; `linkBase` is set only once a document or item declares one. */
 type DocumentBase = { readonly xmlBase: string; readonly linkBase?: string }
 
 function declaredBase(record: Record<string, unknown>, inherited: DocumentBase): DocumentBase {

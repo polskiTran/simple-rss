@@ -30,8 +30,7 @@ const YEAR_END = Date.parse('2027-01-01T00:00:00.000Z')
 const QUARTER_HOUR_MS = 15 * 60 * 1_000
 
 describe('dayKeysIn', () => {
-  // Half- and quarter-hour offsets, the date line, and zones whose DST turns over at midnight.
-  const zones = [
+  const edgeZones = [
     'UTC',
     'America/New_York',
     'Asia/Kolkata',
@@ -42,9 +41,9 @@ describe('dayKeysIn', () => {
     'America/Havana',
   ]
 
-  it('names the same day as dateKey for every quarter hour of a year', () => {
+  it('names the same day as dateKey for every quarter hour of a year, in half-hour, quarter-hour, date-line and midnight-DST zones', () => {
     const disagreements: string[] = []
-    for (const timezone of zones) {
+    for (const timezone of edgeZones) {
       const keyOf = dayKeysIn(timezone)
       for (let time = Date.parse('2026-01-01T00:00:00.000Z'); time < YEAR_END; time += QUARTER_HOUR_MS) {
         const instant = new Date(time)

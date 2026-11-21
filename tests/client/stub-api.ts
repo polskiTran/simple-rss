@@ -24,11 +24,6 @@ import type {
 } from '../../src/shared/api.js'
 import { digest, library } from './fixtures.js'
 
-/**
- * What each route answers when it succeeds, so a fixture that drifts from the
- * contract fails to compile rather than leaving a screen "didn't load".
- * `undefined` is a route that answers with no body.
- */
 interface Answers {
   'GET /api/auth/status': AuthStatus
   'POST /api/auth/setup': AuthStatus
@@ -97,7 +92,6 @@ export class StubbedApi {
     return this
   }
 
-  /** Answers with a body no schema accepts: the server breaking its contract. */
   malformed(route: RouteKey): this {
     this.#routes.set(route, { body: { unexpected: true } })
     return this

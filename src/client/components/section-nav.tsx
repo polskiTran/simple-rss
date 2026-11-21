@@ -6,16 +6,9 @@ import { RoutedLink } from './routed-link.js'
 interface SectionNavProps {
   readonly active: Route
   readonly onNavigate: (route: Route) => void
-  /** What stands between the switch and the buttons: the header's search. */
   readonly children?: ReactNode
 }
 
-/**
- * The four sections as links whose URLs are the routing state: Digest and
- * Feeds as a switch, then `children` — the search — then Saved and Settings as
- * buttons, so focus moves in the order the header shows them. A phone keeps
- * them in its one top row, the two buttons as icon squares.
- */
 export function SectionNav({ active, onNavigate, children }: SectionNavProps) {
   const link = (route: Route, className: string, icon?: IconName) => (
     <RoutedLink

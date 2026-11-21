@@ -4,17 +4,11 @@ import { ApiError } from '../api.js'
 
 const TOO_SHORT = `A password needs at least ${MIN_PASSWORD_LENGTH} characters.`
 
-/** What the forms that send a password — setup, sign-in, password change — say about a refusal. */
 const PASSWORD_FAILURE_COPY = {
   invalid_request: TOO_SHORT,
   invalid_credentials: 'That password isn’t right. Passwords are case-sensitive.',
 } satisfies Partial<Record<ApiErrorCode, string>>
 
-/**
- * What a password form says after Submit, one reason at a time: on the field
- * that has to change, or as the form's note when no field is to blame.
- * Undefined says nothing.
- */
 export type Feedback<Field extends string> =
   | { readonly field: Field; readonly reason: string }
   | { readonly note: string }
@@ -28,7 +22,6 @@ export function noteOf(feedback: Feedback<string>): string {
   return feedback && 'note' in feedback ? feedback.note : ''
 }
 
-/** Editing a field answers its reason; a note about the whole form stays until the next Submit. */
 export function afterEdit<Field extends string>(feedback: Feedback<Field>): Feedback<Field> {
   return feedback && 'field' in feedback ? undefined : feedback
 }
@@ -42,7 +35,6 @@ export function describeFailure(cause: unknown): string {
   return hasOwn(PASSWORD_FAILURE_COPY, cause.code) ? PASSWORD_FAILURE_COPY[cause.code] : 'That didn’t work. Try again.'
 }
 
-/** Why a new password can't be sent yet, on the field that has to change: the password before its confirmation. */
 export function reasonToHold(
   password: string,
   confirmation: string,

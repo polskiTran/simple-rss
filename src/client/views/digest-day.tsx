@@ -14,7 +14,6 @@ import { counted, dayDistance, headingDay, longDay, namedDay, relativeDay, short
 import { playFold, playUnfold } from '../motion.js'
 import { feedPath, readerPath, useKept } from '../routing.js'
 
-/** A Feed with more items than this in one day is folded to its newest `FOLDED_ITEMS`. */
 const FOLD_OVER = 5
 const FOLDED_ITEMS = 3
 
@@ -44,7 +43,6 @@ export function DigestDay({ group, today, onOpenItem, onOpenFeed, onSaved }: Dig
       className="digest-day"
       headingClassName="page-title"
       title={
-        // Below 1024px the full date is hidden visually but stays the heading's name.
         <>
           <span className="day-distance">{dayDistance(group.date, today)}</span>{' '}
           <span className="day-date">{headingDay(group.date, today)}</span>
@@ -103,17 +101,6 @@ function feedDaysOf(group: DigestGroup): FeedDay[] {
   )
 }
 
-/**
- * A Feed's day: who on one line, then every title across the box. The saved
- * highlight reads the toggle's own state, so it answers on the press. Past
- * `FOLD_OVER`, the control stays in the header, which sticks while unfolded, so
- * folding is where unfolding was however far down the list; unfolded is kept
- * on the history entry, so the box is still open on the way back. Unfolding
- * opens the list and fades in the titles it reveals; folding closes it over
- * its titles before they are cut, so the ones that stay never move, and from
- * far down the header stays where it was stuck while the page returns to the
- * box's start.
- */
 function FeedDayBox({
   feed,
   onOpenItem,
@@ -136,8 +123,6 @@ function FeedDayBox({
       playUnfold(items, heightBefore, FOLDED_ITEMS)
       return
     }
-    // Folded from far down, the page scrolls back to the box's start in the same
-    // frame, by exactly as much as leaves the stuck header where it is.
     const stuck = head.current?.getBoundingClientRect().top ?? 0
     const start = box.current ? box.current.getBoundingClientRect().top + box.current.clientTop : stuck
     if (start < stuck) window.scrollBy(0, start - stuck)

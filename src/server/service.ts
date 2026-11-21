@@ -28,7 +28,6 @@ import { createNetworkRetrieval, type Retrieval } from './upstream/retrieval.js'
 
 export interface ServiceOptions {
   readonly config: Config
-  /** Overrides `config.port`. Tests pass 0 for any free port; `config.ts` still refuses 0 from a host. */
   readonly port?: number
   readonly logger?: Logger
   readonly clock?: Clock
@@ -40,25 +39,15 @@ export interface ServiceOptions {
   readonly readerBudgetMs?: number
 }
 
-/** A listening service. `stop()` is the only way down: it drains before closing the database. */
 export interface RunningService {
-  /** Undefined when startup failed: `/health/ready` answers 503 with the reason and `/api` answers 503. */
   readonly services: Services | undefined
-  /** The port actually bound, which differs from the request when it was 0. */
   readonly port: number
-  /** Origin a client can call, e.g. `http://127.0.0.1:53124`. */
   readonly url: string
   stop(): Promise<void>
 }
 
 const IDLE_SWEEP_MS = 20
 
-/**
- * The composition root. A startup failure is reported rather than thrown: the
- * process listens anyway, `/health/live` stays green, `/health/ready` answers
- * 503 with the step that failed, and `/api` answers 503 so no traffic reaches a
- * half-built installation. Only a socket that cannot bind rejects.
- */
 export async function startService(options: ServiceOptions): Promise<RunningService> {
   const { config } = options
   const logger = options.logger ?? createLogger({ level: config.logLevel })
@@ -82,10 +71,6 @@ export async function startService(options: ServiceOptions): Promise<RunningServ
   const { server, port } = await listen(app, options.port ?? config.port)
   logger.info('server.started', { port, dataDir: config.dataDir })
 
-  /**
-   * Whatever outlives the grace period is cut off, because a platform that
-   * sent SIGTERM sends SIGKILL next.
-   */
   const shutdown = async (): Promise<void> => {
     const graceMs = config.shutdownGraceMs
     logger.info('server.stopping', { graceMs })
@@ -110,11 +95,6 @@ export async function startService(options: ServiceOptions): Promise<RunningServ
   }
 }
 
-/**
- * Builds every domain service once. The reason names the step that failed;
- * the log carries the error itself. Whatever was opened before the failure
- * is closed again, so a failed startup holds no database handle or worker.
- */
 function compose(
   options: ServiceOptions,
   { logger, clock, retrieval }: { readonly logger: Logger; readonly clock: Clock; readonly retrieval: Retrieval },
@@ -199,7 +179,6 @@ interface ListeningServer {
   readonly port: number
 }
 
-/** `serve` defaults to Node's HTTP/1 server when no custom server factory is supplied. */
 function listen(app: Hono, port: number): Promise<ListeningServer> {
   const { promise, resolve, reject } = Promise.withResolvers<ListeningServer>()
   const candidate = serve({ fetch: app.fetch, port }, (address) => {
@@ -214,7 +193,6 @@ function listen(app: Hono, port: number): Promise<ListeningServer> {
   return promise
 }
 
-/** Resolves once every connection has closed, forcing the stragglers after `graceMs`. */
 function drain(server: Server, graceMs: number, logger: Logger): Promise<void> {
   return new Promise<void>((resolve) => {
     const forceTimer = setTimeout(() => {
@@ -223,8 +201,6 @@ function drain(server: Server, graceMs: number, logger: Logger): Promise<void> {
     }, graceMs)
     forceTimer.unref()
 
-    // A keep-alive socket goes idle only after its response flushes; a single
-    // sweep would miss connections still writing and wait out the full grace.
     const sweep = setInterval(() => server.closeIdleConnections(), IDLE_SWEEP_MS)
     sweep.unref()
 

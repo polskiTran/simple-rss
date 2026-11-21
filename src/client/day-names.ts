@@ -1,14 +1,7 @@
-/**
- * Every word the client says about a calendar day, month, or count. The server
- * places days in the installation timezone and sends their keys (`2026-08-08`);
- * a key is a date, not an instant, so it is read and written in UTC and no
- * timezone — the browser's included — can move it.
- */
 function format(dateKey: string, options: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(new Date(`${dateKey}T12:00:00Z`))
 }
 
-/** `Aug`. Cut to three letters by hand: en-GB's own short September is `Sept`. */
 export function shortMonth(dateKey: string): string {
   return format(dateKey, { month: 'long' }).slice(0, 3)
 }
@@ -59,24 +52,15 @@ export function namedDay(dateKey: string, today: string): string {
   return sameYear(dateKey, today) ? longDay(dateKey) : `${longDay(dateKey)} ${dateKey.slice(0, 4)}`
 }
 
-/**
- * `namedDay` held together where a wrapped heading must not part `22` from
- * `October`. The year stays free to wrap, so `31 December 2025` fits a phone.
- */
 export function headingDay(dateKey: string, today: string): string {
   return namedDay(dateKey, today).replace(/(\d+) /, '$1\u00a0')
 }
 
-/**
- * `headingDay` shortened for a narrow title: `Thu 22 Oct`, with the year
- * when it is not this one.
- */
 export function shortHeadingDay(dateKey: string, today: string): string {
   const day = `${format(dateKey, { weekday: 'short' })} ${Number(dateKey.slice(8, 10))}\u00a0${shortMonth(dateKey)}`
   return sameYear(dateKey, today) ? day : `${day} ${dateKey.slice(0, 4)}`
 }
 
-/** A recent day with its time, when the item has one; an older day alone. */
 export function dayAndTime(dateKey: string, time: string | null, today: string): string {
   const relative = relativeDay(dateKey, today)
   if (!relative) return dayOfYear(dateKey, today)
@@ -87,13 +71,7 @@ export function dayBefore(dateKey: string): string {
   return new Date(Date.parse(`${dateKey}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
 }
 
-/**
- * The key of the browser's own calendar day an instant falls on. Only for
- * instants the server sends without a day — a Feed it has not recorded yet —
- * since every recorded day already arrives as a key.
- */
 export function localDay(instant: string | Date): string {
-  // en-CA writes a date as its key: `2026-08-08`.
   return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(
     new Date(instant),
   )
@@ -115,10 +93,6 @@ export function ago(dateKey: string, today: string): string {
   return relativeDay(dateKey, today)?.toLowerCase() ?? `${lapse(dateKey, today)} ago`
 }
 
-/**
- * A day's distance standing alone, where `ago` sits inside a sentence. An item
- * can be placed up to a day past its first sighting, so a day can be tomorrow.
- */
 export function dayDistance(dateKey: string, today: string): string {
   if (dateKey > today) return 'Tomorrow'
   return relativeDay(dateKey, today) ?? `${lapse(dateKey, today)} ago`

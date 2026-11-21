@@ -25,7 +25,6 @@ async function subscribeTo(page: Page, feedUrl: string): Promise<void> {
   await addFeed(page, feedUrl)
 }
 
-/** A section's link in the chrome; exact, since a back button names the same section. */
 function section(page: Page, name: 'Digest' | 'Feeds' | 'Saved') {
   return page.getByRole('link', { name, exact: true })
 }
@@ -154,12 +153,13 @@ test.describe('Reader View', () => {
 
     const codeLines = page.locator('.article-body pre code > span')
     await expect(codeLines).toHaveCount(4)
-    // One read per attempt: highlighting replaces the block's lines, so two reads can straddle it.
     await expect
-      .poll(() =>
-        codeLines.evaluateAll(
-          (lines) => (lines.at(-1)?.getBoundingClientRect().y ?? 0) - (lines[0]?.getBoundingClientRect().y ?? 0),
-        ),
+      .poll(
+        () =>
+          codeLines.evaluateAll(
+            (lines) => (lines.at(-1)?.getBoundingClientRect().y ?? 0) - (lines[0]?.getBoundingClientRect().y ?? 0),
+          ),
+        { message: 'code block wraps, read in one pass across highlighting' },
       )
       .toBeGreaterThan(0)
     await expect(page.locator('.article-body pre code span[style*="--shiki-dark"]').first()).toBeVisible()

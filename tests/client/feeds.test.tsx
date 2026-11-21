@@ -58,7 +58,6 @@ function activeOn(active: number): number[] {
 }
 
 describe('Add feed', () => {
-  // Noon on the fixtures' day, so every previewed instant is whole days away in any timezone.
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-08-08T12:00:00.000Z') })
   })
@@ -587,15 +586,13 @@ describe('OPML portability', () => {
     expect(await screen.findByText('Field Notes')).toBeDefined()
   })
 
-  it('explains an upload the server refused', async () => {
+  it('explains an upload the server refused, even one the picker’s filter would have discouraged', async () => {
     stubApi().on('POST /api/subscriptions/import', {
       status: 422,
       body: { error: { code: 'unsupported_opml', message: 'The file is not an OPML subscription list' } },
     })
     window.history.replaceState(null, '', '/feeds')
     render(<App />)
-    // `applyAccept` off: this test hands the reader exactly the file the
-    // picker's filter would discourage, because the server still must refuse it.
     const user = userEvent.setup({ applyAccept: false })
 
     const file = new File(['not xml'], 'notes.txt', { type: 'text/plain' })

@@ -35,14 +35,7 @@ import { sameOrigin } from './http/same-origin.js'
 import { securityHeaders } from './http/security-headers.js'
 import { staticAssets } from './http/static-assets.js'
 
-/**
- * Everything a serving installation has. Declared here, where it is consumed,
- * so the composition root depends on this contract rather than the reverse.
- * The bundle is built whole or not at all, so no route downstream has to ask
- * whether one piece of it arrived.
- */
 export interface Services {
-  /** The process-wide Drizzle handle shared by routes and operational checks. */
   readonly db: DrizzleDatabase
   readonly authentication: Authentication
   readonly settings: InstallationSettingsStore
@@ -57,7 +50,6 @@ export interface Services {
   readonly search: SearchService
   readonly images: ImageService
   readonly imageSignature: ImageUrlSignature
-  /** The in-process background poller; routes only ever nudge it. */
   readonly scheduler: PollScheduler
 }
 
@@ -69,16 +61,9 @@ export interface AppDependencies {
   readonly config: Config
   readonly clock: Clock
   readonly logger: Logger
-  /** A failed startup keeps the process live; readiness reports the reason rather than crash-looping. */
   readonly startup: Startup
 }
 
-/**
- * The whole HTTP surface. Route order is the contract: `/health` and `/api`
- * match before the client fallback so they can never return HTML, and the
- * `/api` guards register before any route they protect. Whether the
- * installation has services is decided once, here, rather than per request.
- */
 export function createApp(deps: AppDependencies): Hono {
   const app = new Hono()
 
@@ -165,11 +150,6 @@ export function createApp(deps: AppDependencies): Hono {
   return app
 }
 
-/**
- * The startup failure first, then the volume — a mounted-but-full disk only
- * reveals itself on a real write. The Setup Secret is checked last because it
- * needs the database to know whether it is still required.
- */
 function readinessFailure(deps: AppDependencies): string | undefined {
   if (deps.startup.kind === 'failed') return deps.startup.reason
   const { services } = deps.startup
@@ -184,11 +164,6 @@ function readinessFailure(deps: AppDependencies): string | undefined {
   return services.authentication.setupBlocker()
 }
 
-/**
- * Nothing the API answers may sit in a cache, shared or private — including
- * its 404s and 500s. A route that may be cached (Reader extraction, proxied
- * images) says so with its own `Cache-Control`, which this leaves alone.
- */
 function noStoreByDefault(): MiddlewareHandler {
   return async (c, next) => {
     await next()
@@ -196,7 +171,6 @@ function noStoreByDefault(): MiddlewareHandler {
   }
 }
 
-/** One record per request; query strings are omitted — they carry search terms and signed image URLs. */
 function requestLogging(logger: Logger): MiddlewareHandler {
   const scoped = logger.child({ component: 'http' })
 

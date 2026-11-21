@@ -52,7 +52,6 @@ function feedRequest(url: string, overrides: Partial<Omit<RetrievalRequest, 'url
   return { url, operation: 'feed', ...overrides }
 }
 
-/** Runs fake time forward, then settles what was already started. */
 async function settledAfter<T>(ms: number, pending: Promise<T>): Promise<T> {
   await vi.advanceTimersByTimeAsync(ms)
   return pending
@@ -308,7 +307,6 @@ describe('redirects', () => {
   it('pins each hop to the answer its own validation approved, asking the resolver once', async () => {
     const asked: string[] = []
     const { retrieval, upstream } = harness({
-      // Answers public to the first query and rebinds to loopback for any later one.
       resolve: async (hostname) => {
         asked.push(hostname)
         return asked.length === 1 ? ['93.184.216.34'] : ['127.0.0.1']

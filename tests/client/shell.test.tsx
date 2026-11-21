@@ -104,7 +104,6 @@ describe('the application shell', () => {
   it('leaves modified clicks to the browser so a tab can be opened', async () => {
     await renderAt('/digest')
     const event = new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true })
-    // `preventDefault` stops jsdom from attempting a real navigation it cannot perform.
     let handledByBrowser = false
     window.addEventListener(
       'click',

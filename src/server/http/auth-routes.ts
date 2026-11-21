@@ -19,10 +19,6 @@ export interface AuthRouteDependencies {
   readonly trustProxyHeaders: boolean
 }
 
-/**
- * Setup, sign-in, sign-out, and the password change. Mounted at `/api/auth`;
- * which of these answer without a Session is `require-session.ts`'s call.
- */
 export function authRoutes(deps: AuthRouteDependencies): Hono {
   const app = new Hono()
 
