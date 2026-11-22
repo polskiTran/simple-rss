@@ -158,9 +158,9 @@ export class ReaderService {
     }
 
     extraction.stage = 'parsing'
-    const answered = hostField(result.url)
+    const answered = hostField(result.finalUrl)
     const parsed = await this.#extractor.extract(
-      { bytes: result.bytes.buffer, charset: result.charset, url: result.url },
+      { bytes: result.bytes.buffer, charset: result.charset, url: result.finalUrl },
       signal,
     )
     if (parsed.kind === 'cancelled') {

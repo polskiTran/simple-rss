@@ -133,7 +133,7 @@ export class Authentication {
   }
 
   authenticate(token: string | undefined): boolean {
-    return token ? this.#deps.credentials.touch(token, this.#deps.clock.now()) : false
+    return token ? this.#deps.credentials.authenticate(token, this.#deps.clock.now()) : false
   }
 
   signOut(token: string | undefined): void {

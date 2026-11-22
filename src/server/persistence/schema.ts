@@ -71,11 +71,15 @@ export const subscriptions = sqliteTable('subscriptions', {
   createdAt: text('created_at').notNull(),
 })
 
-export const effectiveFeedTitle = sql<string>`coalesce(${subscriptions.customTitle}, ${feeds.title})`
+export const effectiveFeedTitle = sql<string>`coalesce(
+  (SELECT custom_title FROM subscriptions WHERE subscriptions.feed_id = feeds.id),
+  feeds.title
+)`
 
-export const effectiveFeedDescription = sql<
-  string | null
->`coalesce(${subscriptions.customDescription}, ${feeds.description})`
+export const effectiveFeedDescription = sql<string | null>`coalesce(
+  (SELECT custom_description FROM subscriptions WHERE subscriptions.feed_id = feeds.id),
+  feeds.description
+)`
 
 export const feedItems = sqliteTable('feed_items', {
   id: integer('id').primaryKey(),

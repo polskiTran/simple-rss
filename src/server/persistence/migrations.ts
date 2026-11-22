@@ -359,6 +359,97 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX feed_items_feed_chronology ON feed_items (feed_id, chronology_at DESC, id DESC);
     `,
   },
+  {
+    version: 20,
+    name: 'subscription-availability-checks',
+    sql: `
+      CREATE TABLE subscriptions_checked (
+        feed_id                  INTEGER PRIMARY KEY REFERENCES feeds(id) ON DELETE CASCADE,
+        polling_interval_minutes INTEGER NOT NULL DEFAULT 120
+          CHECK (polling_interval_minutes IN (30, 60, 120, 360, 720, 1440)),
+        created_at               TEXT NOT NULL,
+        next_poll_at             TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
+        last_polled_at           TEXT,
+        last_success_at          TEXT,
+        consecutive_failures     INTEGER NOT NULL DEFAULT 0 CHECK (consecutive_failures >= 0),
+        last_failure_category    TEXT
+          CHECK (last_failure_category IN
+            ('unreachable', 'timeout', 'too_large', 'unsupported_content', 'http_error', 'invalid_feed')),
+        custom_title             TEXT
+          CHECK (custom_title IS NULL OR length(custom_title) BETWEEN 1 AND 512),
+        custom_description       TEXT
+          CHECK (custom_description IS NULL OR length(custom_description) BETWEEN 1 AND 1024),
+        reading_source           TEXT NOT NULL DEFAULT 'original-webpage'
+          CHECK (reading_source IN ('original-webpage', 'feed-content')),
+        CHECK (consecutive_failures = 0 OR (last_failure_category IS NOT NULL AND last_polled_at IS NOT NULL)),
+        CHECK (last_success_at IS NULL OR last_polled_at IS NOT NULL)
+      );
+
+      INSERT INTO subscriptions_checked (
+        feed_id, polling_interval_minutes, created_at, next_poll_at, last_polled_at, last_success_at,
+        consecutive_failures, last_failure_category, custom_title, custom_description, reading_source
+      )
+      SELECT
+        feed_id, polling_interval_minutes, created_at, next_poll_at, polled_at, last_success_at,
+        CASE WHEN run_is_complete THEN consecutive_failures ELSE 0 END,
+        CASE WHEN run_is_complete THEN last_failure_category END,
+        custom_title, custom_description, reading_source
+      FROM (
+        SELECT *,
+          coalesce(last_polled_at, last_success_at) AS polled_at,
+          consecutive_failures = 0
+            OR (last_failure_category IS NOT NULL AND coalesce(last_polled_at, last_success_at) IS NOT NULL)
+            AS run_is_complete
+        FROM subscriptions
+      );
+
+      DROP TRIGGER feed_item_search_after_insert;
+      DROP TRIGGER feed_item_search_after_update;
+      DROP TRIGGER feed_item_search_after_feed_rename;
+      DROP TABLE subscriptions;
+      ALTER TABLE subscriptions_checked RENAME TO subscriptions;
+      CREATE INDEX subscriptions_next_poll_at ON subscriptions (next_poll_at);
+
+      CREATE TRIGGER feed_item_search_after_insert AFTER INSERT ON feed_items BEGIN
+        INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+        VALUES (new.id, new.title, new.summary, coalesce(
+          (SELECT custom_title FROM subscriptions WHERE feed_id = new.feed_id),
+          (SELECT title FROM feeds WHERE id = new.feed_id)));
+      END;
+
+      CREATE TRIGGER feed_item_search_after_update AFTER UPDATE ON feed_items
+      WHEN old.title IS NOT new.title OR old.summary IS NOT new.summary BEGIN
+        DELETE FROM feed_item_search WHERE rowid = old.id;
+        INSERT INTO feed_item_search (rowid, item_title, summary, feed_title)
+        VALUES (new.id, new.title, new.summary, coalesce(
+          (SELECT custom_title FROM subscriptions WHERE feed_id = new.feed_id),
+          (SELECT title FROM feeds WHERE id = new.feed_id)));
+      END;
+
+      CREATE TRIGGER feed_item_search_after_feed_rename AFTER UPDATE OF title ON feeds
+      WHEN old.title IS NOT new.title AND NOT EXISTS (
+        SELECT 1 FROM subscriptions WHERE feed_id = new.id AND custom_title IS NOT NULL
+      ) BEGIN
+        UPDATE feed_item_search SET feed_title = new.title
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = new.id);
+      END;
+
+      CREATE TRIGGER feed_item_search_after_custom_title_change
+      AFTER UPDATE OF custom_title ON subscriptions
+      WHEN old.custom_title IS NOT new.custom_title BEGIN
+        UPDATE feed_item_search
+        SET feed_title = coalesce(new.custom_title, (SELECT title FROM feeds WHERE id = new.feed_id))
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = new.feed_id);
+      END;
+
+      CREATE TRIGGER feed_item_search_after_unsubscribe AFTER DELETE ON subscriptions
+      WHEN old.custom_title IS NOT NULL BEGIN
+        UPDATE feed_item_search
+        SET feed_title = (SELECT title FROM feeds WHERE id = old.feed_id)
+        WHERE rowid IN (SELECT id FROM feed_items WHERE feed_id = old.feed_id);
+      END;
+    `,
+  },
 ]
 
 const MIGRATION_TABLE = `
@@ -391,17 +482,16 @@ export function applyMigrations(
 
   const already = new Set(recorded)
   const applied: number[] = []
+  const driver = db.$client
+  const record = driver.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
+  const apply = driver.transaction((migration: Migration) => {
+    driver.exec(migration.sql)
+    record.run(migration.version, migration.name, clock.now().toISOString())
+  })
 
   for (const migration of pending) {
     if (already.has(migration.version)) continue
-
-    db.transaction((tx) => {
-      db.$client.exec(migration.sql)
-      tx.run(
-        sql`INSERT INTO schema_migrations (version, name, applied_at)
-            VALUES (${migration.version}, ${migration.name}, ${clock.now().toISOString()})`,
-      )
-    })
+    apply(migration)
     applied.push(migration.version)
   }
 

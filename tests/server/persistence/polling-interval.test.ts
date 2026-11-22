@@ -14,7 +14,8 @@ function pollingIntervalLists(sql: string): number[][] {
 describe('the released polling interval CHECK', () => {
   it('lists the same minutes as POLLING_INTERVAL_MINUTES', async () => {
     const released = migrations.flatMap((migration) => pollingIntervalLists(migration.sql))
-    expect(released).toEqual([[...POLLING_INTERVAL_MINUTES]])
+    expect(released).not.toEqual([])
+    expect(released).toEqual(released.map(() => [...POLLING_INTERVAL_MINUTES]))
 
     const db = openDatabase(join(await makeTempDataDir(), 'simple-rss.db'))
     applyMigrations(db)
