@@ -61,7 +61,7 @@ export class FeedPreview {
 
     const page = decodePage(retrieved.bytes, retrieved.charset)
     const answers = await Promise.all(
-      declaredFeeds(page, retrieved.url)
+      declaredFeeds(page, retrieved.finalUrl)
         .slice(0, MAX_DECLARED_FEEDS)
         .map(async (feedUrl) => {
           const declared = await this.#retrieval.retrieveBytes({ url: feedUrl, operation: 'feed', ...cancellable })
@@ -73,7 +73,7 @@ export class FeedPreview {
     )
     const [failure] = answers.flatMap(({ answer }) => (answer.kind === 'parsed' ? [] : [answer]))
     if (feeds.length === 0 && failure) return failure
-    return { kind: 'previewed', preview: { kind: 'page', host: new URL(retrieved.url).hostname, feeds } }
+    return { kind: 'previewed', preview: { kind: 'page', host: new URL(retrieved.finalUrl).hostname, feeds } }
   }
 
   #summarise(feedUrl: string, answer: Extract<FeedAnswer, { kind: 'parsed' }>, now: Date): PreviewedFeed {
@@ -91,14 +91,14 @@ export class FeedPreview {
     return {
       feedUrl,
       title: parsed.title,
-      domain: feedDomain(parsed, retrieved.url),
+      domain: feedDomain(parsed, retrieved.finalUrl),
       homePageUrl: parsed.homePageUrl,
       cadence: trailingDayKeys(dateKey(now, timezone), CADENCE_STRIP_DAYS).map((day) => perDay.get(day) ?? 0),
       lastItemAt: items[0]?.chronologyAt ?? null,
       items: items
         .slice(0, FEED_PREVIEW_ITEMS)
         .map(({ title, publishedAt }) => ({ title: title ?? 'Untitled', publishedAt })),
-      subscribed: [feedUrl, retrieved.url].some((url) => subscribedFeedId(this.#db, url) !== undefined),
+      subscribed: [feedUrl, retrieved.finalUrl].some((url) => subscribedFeedId(this.#db, url) !== undefined),
     }
   }
 }
