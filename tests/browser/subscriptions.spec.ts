@@ -128,6 +128,23 @@ test.describe('desktop Feed and Digest rendering', () => {
     await expectOpenFeed(page)
   })
 
+  test('centres the Feed’s actions on the first line of its title', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await page.getByRole('link', { name: 'Field Notes' }).click()
+    const title = page.getByRole('heading', { level: 1, name: 'Field Notes' })
+    const edit = page.getByRole('button', { name: 'Edit', exact: true })
+    await expect(edit).toBeVisible()
+
+    const firstLineCentre = await title.evaluate(
+      (heading) => heading.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(heading).lineHeight) / 2,
+    )
+    const editCentre = await edit.evaluate((button) => {
+      const { top, height } = button.getBoundingClientRect()
+      return top + height / 2
+    })
+    expect(editCentre).toBeCloseTo(firstLineCentre, 0)
+  })
+
   test('keeps a busy control’s label in its own colours while it works', async ({ page, installation }) => {
     await subscribe(page, installation)
     await page.getByRole('link', { name: 'Field Notes' }).click()

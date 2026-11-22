@@ -116,10 +116,8 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
             count={group.complete ? group.items.length : undefined}
           >
             <div className="item-list library-list">
-              {group.items.map((item) =>
-                unsaved.has(item.feedItemId) ? (
-                  <UndoLine key={item.feedItemId} item={item} onResaved={() => mark(item.feedItemId, true)} />
-                ) : (
+              {group.items.map((item) => {
+                const box = (
                   <ItemBox
                     key={item.feedItemId}
                     feedItemId={item.feedItemId}
@@ -139,8 +137,18 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
                     onOpen={onOpenItem}
                     onSaved={(saved) => mark(item.feedItemId, saved)}
                   />
-                ),
-              )}
+                )
+                return unsaved.has(item.feedItemId) ? (
+                  <div key={item.feedItemId} className="undo-slot">
+                    <div inert aria-hidden="true">
+                      {box}
+                    </div>
+                    <UndoLine item={item} onResaved={() => mark(item.feedItemId, true)} />
+                  </div>
+                ) : (
+                  box
+                )
+              })}
             </div>
           </Group>
         ))
