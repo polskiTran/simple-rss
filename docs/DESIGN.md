@@ -300,8 +300,8 @@ the list. No field carries a note: the switch names both kinds of address, and
 the Import tab's only line under its file is a refusal.
 
 **Undo line.** Removing something from a list leaves a `row-hover` line in
-its place saying what happened, with an outlined Undo button, so the list does
-not jump.
+its place saying what happened, with an outlined Undo button. The line is at
+least as tall as what it replaces, so the list does not jump.
 
 **Digest.** The date heading is the page's title, so the word Digest is kept for
 screen readers and shown only before the first Subscription. One list, newest

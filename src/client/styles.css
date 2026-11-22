@@ -76,13 +76,15 @@
 @layer base {
   :root {
     --control: 36px;
-    --day-tools-room: calc(var(--control) + 88px);
     --field: 40px;
     --gutter: 40px;
+    --title-size: 48px;
+    --title-leading: 1.08;
 
     @media (max-width: 1024px) {
       --control: 44px;
       --field: 48px;
+      --title-size: 36px;
       --gutter: clamp(20px, 4vw, 32px);
     }
   }
@@ -209,17 +211,14 @@
   }
 
   .page-title {
-    margin: 0 0 0 -2px;
+    --title-bearing: -2px;
+    margin: 0 0 0 var(--title-bearing);
     font-weight: 500;
-    font-size: 48px;
-    line-height: 1.08;
+    font-size: var(--title-size);
+    line-height: var(--title-leading);
     letter-spacing: -0.025em;
     overflow-wrap: anywhere;
     text-wrap: balance;
-
-    @media (max-width: 1024px) {
-      font-size: 36px;
-    }
   }
 
   .page-title:has(.page-title-companion) {
@@ -423,6 +422,7 @@
   .switch {
     display: inline-flex;
     gap: 2px;
+    height: var(--control);
     padding: 3px;
     background: var(--color-control);
   }
@@ -431,7 +431,6 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: calc(var(--control) - 6px);
     padding: 0 12px;
     border: 0;
     border-radius: 0;
@@ -796,7 +795,7 @@
   .day-distance {
     display: block;
     margin-bottom: 8px;
-    margin-left: 2px;
+    margin-left: calc(-1 * var(--title-bearing));
     font-weight: 400;
     font-size: 17px;
     line-height: 1.2;
@@ -809,6 +808,12 @@
     }
   }
 
+  .digest-day:first-child .group-header {
+    @media (max-width: 1024px) {
+      display: block;
+    }
+  }
+
   .digest-day:first-child .day-distance {
     margin-top: calc(-1lh - 8px);
 
@@ -817,7 +822,6 @@
       align-items: center;
       min-height: var(--control);
       margin-top: 0;
-      padding-inline-end: var(--day-tools-room);
     }
   }
 
@@ -851,8 +855,10 @@
   }
 
   .group-aside:has(.button-small) {
+    display: flex;
     align-self: center;
-    margin-block: calc((17px - 30px) / 2);
+    align-items: center;
+    height: 0;
   }
 
   .rows {
@@ -1043,10 +1049,21 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 84px;
     padding: 12px 20px 12px 24px;
     background: var(--color-row-hover);
     color: var(--color-ink-2);
+  }
+
+  .undo-slot {
+    display: grid;
+
+    & > * {
+      grid-area: 1 / 1;
+    }
+
+    & > [inert] {
+      visibility: hidden;
+    }
   }
 
   .more {
@@ -1521,7 +1538,7 @@
 
   .feed-actions {
     flex: none;
-    margin-block-start: calc((40px * 1.08 - var(--control)) / 2);
+    margin-block-start: calc((var(--title-size) * var(--title-leading) - var(--control)) / 2);
 
     @media (max-width: 1024px) {
       margin-block-start: 0;
@@ -1952,28 +1969,19 @@
     gap: 20px;
   }
 
-  .digest-head {
-    position: relative;
-    height: 0;
-    margin-bottom: 0;
-  }
-
   .digest-empty {
     @media (max-width: 1024px) {
       display: flex;
       align-items: center;
       min-height: var(--control);
-      padding-inline-end: var(--day-tools-room);
     }
   }
 
   .day-tools {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-end: 0;
-    z-index: 1;
     display: none;
+    float: inline-end;
     gap: 8px;
+    margin-inline-start: 16px;
 
     @media (max-width: 1024px) {
       display: flex;
@@ -2196,9 +2204,11 @@
   .feed-day-fold-label {
     display: inline-grid;
 
-    &::after {
-      content: 'Show less';
-      height: 0;
+    & > * {
+      grid-area: 1 / 1;
+    }
+
+    & > [aria-hidden='true'] {
       visibility: hidden;
     }
   }

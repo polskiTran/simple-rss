@@ -16,6 +16,7 @@ import { feedPath, readerPath, useKept } from '../routing.js'
 
 const FOLD_OVER = 5
 const FOLDED_ITEMS = 3
+const FOLD_LABELS = ['Show all', 'Show less'] as const
 
 interface DigestDayProps {
   readonly group: DigestGroup
@@ -113,6 +114,7 @@ function FeedDayBox({
   const list = useRef<HTMLUListElement>(null)
   const foldable = feed.items.length > FOLD_OVER
   const folded = foldable && !unfolded
+  const foldLabel = folded ? 'Show all' : 'Show less'
   const folding = useRef(false)
   const toggleFold = async () => {
     const items = list.current
@@ -143,7 +145,13 @@ function FeedDayBox({
         </div>
         {foldable ? (
           <Button className="feed-day-fold" aria-expanded={unfolded} onClick={toggleFold}>
-            <span className="feed-day-fold-label">{folded ? 'Show all' : 'Show less'}</span>
+            <span className="feed-day-fold-label">
+              {FOLD_LABELS.map((label) => (
+                <span key={label} aria-hidden={label === foldLabel ? undefined : true}>
+                  {label}
+                </span>
+              ))}
+            </span>
             <Icon name={folded ? 'chevron-down' : 'chevron-up'} />
           </Button>
         ) : null}
