@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { MAX_FEED_DESCRIPTION_LENGTH, MAX_FEED_TITLE_LENGTH } from '../../../src/shared/api.js'
 import { systemClock } from '../../../src/server/clock.js'
 import { openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations, appliedVersions, migrations } from '../../../src/server/persistence/migrations.js'
@@ -87,6 +88,32 @@ describe('migrations', () => {
         .prepare('INSERT INTO installation_settings (id, timezone, created_at, updated_at) VALUES (?, ?, ?, ?)')
         .run(2, 'UTC', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
     ).toThrow()
+    db.$client.close()
+  })
+
+  it('holds a Feed title and description to the bounds the contract states, and refuses one past them', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(db)
+    const insertFeed = db.$client.prepare(
+      `INSERT INTO feeds (id, entered_url, resolved_url, title, description, domain, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'bounds.example', '2026-01-01', '2026-01-01')`,
+    )
+    const feed = (id: number, title: string, description: string) =>
+      insertFeed.run(id, `https://bounds.example/${id}`, `https://bounds.example/${id}`, title, description)
+    const subscribe = db.$client.prepare(
+      'INSERT INTO subscriptions (feed_id, custom_title, custom_description, created_at) VALUES (?, ?, ?, ?)',
+    )
+    const longestTitle = 't'.repeat(MAX_FEED_TITLE_LENGTH)
+    const longestDescription = 'd'.repeat(MAX_FEED_DESCRIPTION_LENGTH)
+
+    feed(1, longestTitle, longestDescription)
+    subscribe.run(1, longestTitle, longestDescription, '2026-01-01')
+
+    expect(() => feed(2, `${longestTitle}t`, longestDescription)).toThrow(/CHECK constraint/)
+    expect(() => feed(3, longestTitle, `${longestDescription}d`)).toThrow(/CHECK constraint/)
+    feed(4, longestTitle, longestDescription)
+    expect(() => subscribe.run(4, `${longestTitle}t`, null, '2026-01-01')).toThrow(/CHECK constraint/)
+    expect(() => subscribe.run(4, null, `${longestDescription}d`, '2026-01-01')).toThrow(/CHECK constraint/)
     db.$client.close()
   })
 

@@ -1,9 +1,8 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
+import { MAX_FEED_TITLE_LENGTH } from '../../shared/api.js'
 import { arrayOf, asRecord, declaresXmlEntities } from '../ingestion/xml.js'
 
 export const MAX_OPML_FEEDS = 500
-
-const MAX_TITLE_LENGTH = 512
 
 export interface OpmlFeedOutline {
   readonly url: string
@@ -94,7 +93,7 @@ function collectFeeds(outline: unknown, feeds: Map<string, OpmlFeedOutline>): vo
         throw new OpmlError('too_many_feeds', `One import processes at most ${MAX_OPML_FEEDS} Feeds`)
       }
       const title = attributeIgnoringCase(record, 'title') ?? attributeIgnoringCase(record, 'text')
-      feeds.set(url, { url, title: title ? title.slice(0, MAX_TITLE_LENGTH) : null })
+      feeds.set(url, { url, title: title ? title.slice(0, MAX_FEED_TITLE_LENGTH) : null })
     }
     collectFeeds(record.outline, feeds)
   }
