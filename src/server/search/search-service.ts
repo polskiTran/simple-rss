@@ -205,8 +205,7 @@ export function rebuildSearchIndex(db: DrizzleDatabase): number {
             feedTitle: effectiveFeedTitle.as('feed_title'),
           })
           .from(feedItems)
-          .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
-          .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id)),
+          .innerJoin(feeds, eq(feeds.id, feedItems.feedId)),
       )
       .run().changes
   })
