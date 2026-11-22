@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { dateKeySchema, digestParamsOf, type DigestStart } from '../../shared/api.js'
+import { type DateKey, dateKeySchema, digestParamsOf, type DigestStart } from '../../shared/api.js'
 import { fetchDigest } from '../api.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
@@ -22,7 +22,7 @@ export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: Di
   const [through, keepThrough] = useKept('through', dateKeySchema)
   const [state, { retry, set, loadMore, older }] = usePagedResource(
     digestParamsOf(start).toString(),
-    (from, signal) => fetchDigest(from ? { from } : { ...start, through }, signal),
+    (from: DateKey | undefined, signal) => fetchDigest(from ? { from } : { ...start, through }, signal),
     (shown, page) => ({ ...shown, groups: [...shown.groups, ...page.groups], nextFrom: page.nextFrom }),
   )
   const oldestShown = state.kind === 'loaded' ? state.value.groups.at(-1)?.date : undefined

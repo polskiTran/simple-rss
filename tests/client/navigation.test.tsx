@@ -7,6 +7,7 @@ import type { SearchResults } from '../../src/shared/api.js'
 import {
   digest,
   digestGroup,
+  day,
   digestItem,
   feedDetail,
   feedItems,
@@ -20,7 +21,7 @@ import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
 
 const TODAY_HEADING = 'Today Saturday 8\u00a0August (1)'
 
-const DETAIL = feedDetail({ subscribedDate: '2026-08-08', cadence: cadenceWindow({ '2026-08-08': 1 }) })
+const DETAIL = feedDetail({ subscribedDate: day('2026-08-08'), cadence: cadenceWindow({ '2026-08-08': 1 }) })
 
 const LIBRARY = library({
   items: [
@@ -35,7 +36,7 @@ const LIBRARY = library({
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       savedAt: '2026-08-01T08:00:00.000Z',
-      savedDate: '2026-08-01',
+      savedDate: day('2026-08-01'),
     }),
   ],
 })
@@ -384,10 +385,15 @@ describe('the section an open article reads under', () => {
 describe('the scope a search takes from its screen', () => {
   const found = (...titles: string[]) => titles.map((title, index) => searchResult({ feedItemId: 3 + index, title }))
   const withinFeed = {
-    body: { scope: 'feed', today: '2026-08-08', feed: { title: 'Field Notes' }, results: found('First light') },
+    body: { scope: 'feed', today: day('2026-08-08'), feed: { title: 'Field Notes' }, results: found('First light') },
   } satisfies Reply<SearchResults>
   const everywhere = {
-    body: { scope: 'everywhere', today: '2026-08-08', subscriptions: [], results: found('First light', 'Coast light') },
+    body: {
+      scope: 'everywhere',
+      today: day('2026-08-08'),
+      subscriptions: [],
+      results: found('First light', 'Coast light'),
+    },
   } satisfies Reply<SearchResults>
 
   it('from an opened Feed, answers within it and names it; everywhere steps out, and clearing lands back on the Feed', async () => {

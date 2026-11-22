@@ -27,7 +27,7 @@ import { Choice } from '../components/choice.js'
 import { Field } from '../components/field.js'
 import { Icon } from '../components/icon.js'
 import { LoadingNote } from '../components/loading-note.js'
-import { ago, daysBefore, localDay, relativeDay, shortDate } from '../day-names.js'
+import { ago, daysBefore, relativeDay, shortDate } from '../day-names.js'
 import { addFailure, feedAddressOf, NOT_AN_ADDRESS } from './feed-language.js'
 
 type Way = 'address' | 'opml'
@@ -307,13 +307,12 @@ function FoundFeeds({
   onChoose(feed: FeedPreview): void
 }) {
   const id = useId()
-  const today = localDay(new Date())
 
   if (feeds.length === 1) {
     return (
       <div className="add-feed-found feed-preview" data-lone="">
-        <FeedHead feed={chosen} today={today} id={id} />
-        <FeedDetail feed={chosen} today={today} />
+        <FeedHead feed={chosen} id={id} />
+        <FeedDetail feed={chosen} />
       </div>
     )
   }
@@ -344,9 +343,9 @@ function FoundFeeds({
                 aria-labelledby={`${feedId}-name`}
                 aria-describedby={`${feedId}-pulse`}
               >
-                <FeedHead feed={feed} today={today} id={feedId} />
+                <FeedHead feed={feed} id={feedId} />
               </Radio.Root>
-              {open ? <FeedDetail feed={feed} today={today} /> : null}
+              {open ? <FeedDetail feed={feed} /> : null}
             </div>
           )
         })}
@@ -355,16 +354,12 @@ function FoundFeeds({
   )
 }
 
-function lastDay(feed: FeedPreview): string | undefined {
-  return feed.lastItemAt === null ? undefined : localDay(feed.lastItemAt)
+function isSilent({ lastItemDate, today }: FeedPreview): boolean {
+  return lastItemDate === null || daysBefore(lastItemDate, today) > SILENT_AFTER_DAYS
 }
 
-function isSilent(lastItem: string | undefined, today: string): boolean {
-  return lastItem === undefined || daysBefore(lastItem, today) > SILENT_AFTER_DAYS
-}
-
-function FeedHead({ feed, today, id }: { feed: FeedPreview; today: string; id: string }) {
-  const lastItem = lastDay(feed)
+function FeedHead({ feed, id }: { feed: FeedPreview; id: string }) {
+  const { lastItemDate, today } = feed
   return (
     <span className="feed-preview-head">
       <span className="feed-preview-name" id={`${id}-name`}>
@@ -372,8 +367,8 @@ function FeedHead({ feed, today, id }: { feed: FeedPreview; today: string; id: s
       </span>
       <CadenceStrip counts={feed.cadence} title={feed.title} />
       <span className="feed-preview-pulse" id={`${id}-pulse`}>
-        <span className={isSilent(lastItem, today) ? 'feed-preview-mark' : undefined}>
-          {lastItem === undefined ? 'No items' : `Last item ${ago(lastItem, today)}`}
+        <span className={isSilent(feed) ? 'feed-preview-mark' : undefined}>
+          {lastItemDate === null ? 'No items' : `Last item ${ago(lastItemDate, today)}`}
         </span>
         <span>{RHYTHM_LABELS[rhythmOf(feed.cadence)]}</span>
         {feed.subscribed ? <span className="feed-preview-mark">You follow this</span> : null}
@@ -382,26 +377,21 @@ function FeedHead({ feed, today, id }: { feed: FeedPreview; today: string; id: s
   )
 }
 
-function FeedDetail({ feed, today }: { feed: FeedPreview; today: string }) {
+function FeedDetail({ feed: { items, today, feedUrl } }: { feed: FeedPreview }) {
   return (
     <div className="feed-preview-detail">
-      {feed.items.length > 0 ? (
+      {items.length > 0 ? (
         <ol className="feed-preview-items">
-          {feed.items.map((item, index) => {
-            const day = item.publishedAt === null ? undefined : localDay(item.publishedAt)
-            return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: the newest titles in Feed order; two may share a title, and the list never reorders while shown.
-              <li key={index} className="feed-preview-item">
-                <span className="feed-preview-title">{item.title}</span>
-                {day ? (
-                  <span className="feed-preview-day">{relativeDay(day, today) ?? shortDate(day, today)}</span>
-                ) : null}
-              </li>
-            )
-          })}
+          {items.map(({ title, date }, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the newest titles in Feed order; two may share a title, and the list never reorders while shown.
+            <li key={index} className="feed-preview-item">
+              <span className="feed-preview-title">{title}</span>
+              <span className="feed-preview-day">{relativeDay(date, today) ?? shortDate(date, today)}</span>
+            </li>
+          ))}
         </ol>
       ) : null}
-      <p className="feed-preview-url">{feed.feedUrl.replace(/^https:\/\//, '')}</p>
+      <p className="feed-preview-url">{feedUrl.replace(/^https:\/\//, '')}</p>
     </div>
   )
 }

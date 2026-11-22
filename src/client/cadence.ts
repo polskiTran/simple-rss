@@ -1,8 +1,8 @@
-import type { CadenceObservation } from '../shared/api.js'
+import type { CadenceObservation, DateKey } from '../shared/api.js'
 import { counted, fullDate, shortMonth, weekday } from './day-names.js'
 
 interface CadenceCell {
-  readonly date: string
+  readonly date: DateKey
   readonly count: number
   readonly level: 0 | 1 | 2 | 3 | 4
 }
@@ -86,6 +86,6 @@ function statsOf(days: readonly CadenceObservation[]): CadenceStats {
   return { total, busiestWeekday: total === 0 || !busiestDay ? undefined : weekday(busiestDay.date), longestQuiet }
 }
 
-function mondayFirst(date: string): number {
+function mondayFirst(date: DateKey): number {
   return (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7
 }

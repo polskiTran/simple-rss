@@ -4,15 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow } from './cadence-window.js'
 import type { Digest } from '../../src/shared/api.js'
-import { digest, digestGroup, digestItem } from './fixtures.js'
+import { day, digest, digestGroup, digestItem } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const item = (feedItemId: number, title: string, displayTime: string, feedId = 1, feedTitle = 'Field Notes') =>
   digestItem({ feedItemId, title, displayTime, feedId, feedTitle, link: `https://journal.example/${feedItemId}` })
 
 const TODAY = digestGroup({ items: [item(3, 'First light', '07:15'), item(2, 'Second thoughts', '06:40')] })
-const YESTERDAY = digestGroup({ date: '2026-08-07', items: [item(1, 'Evening notes', '09:31')] })
-const JUNE = digestGroup({ date: '2026-06-03', items: [item(4, 'A June letter', '12:00')] })
+const YESTERDAY = digestGroup({ date: day('2026-08-07'), items: [item(1, 'Evening notes', '09:31')] })
+const JUNE = digestGroup({ date: day('2026-06-03'), items: [item(4, 'A June letter', '12:00')] })
 
 const DIGEST = digest({ groups: [TODAY, YESTERDAY, JUNE] })
 
@@ -48,7 +48,7 @@ describe('the chronological Digest', () => {
 
   it('shows more from the day the page names, under the days already shown', async () => {
     const api = stubApi()
-      .on('GET /api/digest', { body: digest({ groups: [TODAY, YESTERDAY], nextFrom: '2026-06-03' }) })
+      .on('GET /api/digest', { body: digest({ groups: [TODAY, YESTERDAY], nextFrom: day('2026-06-03') }) })
       .on('GET /api/digest?from=2026-06-03', { body: digest({ groups: [JUNE] }) })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -188,7 +188,7 @@ describe('the chronological Digest', () => {
   })
 
   it('names a day an item was placed ahead of today as tomorrow', async () => {
-    const ahead = digestGroup({ date: '2026-08-09', items: [item(5, 'Early release', '08:00')] })
+    const ahead = digestGroup({ date: day('2026-08-09'), items: [item(5, 'Early release', '08:00')] })
     stubApi().on('GET /api/digest', { body: digest({ groups: [ahead, TODAY] }) })
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -264,7 +264,7 @@ const CALENDAR = {
 
 const dayDigest = (date: string, titles: readonly string[]) =>
   digest({
-    groups: [digestGroup({ date, items: titles.map((title, index) => item(10 + index, title, '09:00')) })],
+    groups: [digestGroup({ date: day(date), items: titles.map((title, index) => item(10 + index, title, '09:00')) })],
   })
 
 const digestWithCalendar = () =>

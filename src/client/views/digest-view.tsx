@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { useRef } from 'react'
 import { useScreenTitle } from '../arrival.js'
-import type { DigestCalendar, DigestStart } from '../../shared/api.js'
+import { type DateKey, dateKeySchema, type DigestCalendar, type DigestStart } from '../../shared/api.js'
 import { fetchDigestCalendar } from '../api.js'
 import { Icon } from '../components/icon.js'
 import { useResource, valueInView } from '../use-resource.js'
@@ -23,7 +23,7 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
   const firstRun = shown?.subscriptions === 0
   const stream = useRef<HTMLDivElement>(null)
 
-  const readFrom = (from: string | undefined) => {
+  const readFrom = (from: DateKey | undefined) => {
     onStart({ from: from === shown?.today ? undefined : from })
     if ((stream.current?.getBoundingClientRect().top ?? 0) < 0) window.scrollTo({ top: 0 })
   }
@@ -80,8 +80,8 @@ function DayPicker({
   onFrom,
 }: {
   calendar: DigestCalendar
-  from: string | undefined
-  onFrom(day: string): void
+  from: DateKey | undefined
+  onFrom(day: DateKey): void
 }) {
   return (
     <label className="button button-icon day-picker">
@@ -94,7 +94,8 @@ function DayPicker({
         value={from ?? calendar.today}
         onClick={(event) => event.currentTarget.showPicker()}
         onChange={(event) => {
-          if (event.target.value) onFrom(event.target.value)
+          const day = dateKeySchema.safeParse(event.target.value)
+          if (day.success) onFrom(day.data)
         }}
       />
     </label>

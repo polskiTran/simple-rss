@@ -3,6 +3,7 @@ import {
   type ApiErrorCode,
   type FeedAvailability,
   type FeedAvailabilityCategory,
+  utcDayKey,
 } from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { ApiError } from '../api.js'
@@ -66,7 +67,7 @@ export function unavailableNote(availability: Extract<FeedAvailability, { state:
   const reason = AVAILABILITY_COPY[availability.category]
   const { lastSuccessDate, lastCheckedAt } = availability
   const lastSuccess = lastSuccessDate
-    ? `Last reached ${shortDate(lastSuccessDate, lastCheckedAt.slice(0, 10))}.`
+    ? `Last reached ${shortDate(lastSuccessDate, utcDayKey(Date.parse(lastCheckedAt)))}.`
     : 'Not reached since subscribing.'
 
   return `${reason}. ${lastSuccess}`

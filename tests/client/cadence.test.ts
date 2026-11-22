@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cadenceDayLabel, cadenceGrid, cadenceLevel } from '../../src/client/cadence.js'
 import { cadenceWindow } from './cadence-window.js'
+import { day } from './fixtures.js'
 
 describe('the four ink levels', () => {
   it('maps counts to silence, one, a few, busy, and peak — never more levels', () => {
@@ -63,7 +64,7 @@ describe('the statistics', () => {
 
 describe('a represented day', () => {
   it('is described for a screen reader with its count and calendar day', () => {
-    expect(cadenceDayLabel({ date: '2026-06-03', count: 2, level: 2 })).toBe('2 items on 3 June 2026')
-    expect(cadenceDayLabel({ date: '2026-08-08', count: 1, level: 1 })).toBe('1 item on 8 August 2026')
+    expect(cadenceDayLabel({ date: day('2026-06-03'), count: 2, level: 2 })).toBe('2 items on 3 June 2026')
+    expect(cadenceDayLabel({ date: day('2026-08-08'), count: 1, level: 1 })).toBe('1 item on 8 August 2026')
   })
 })

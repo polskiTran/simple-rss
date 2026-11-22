@@ -4,6 +4,7 @@ import {
   MAX_FEED_DESCRIPTION_LENGTH,
   MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
+  type DateKey,
   type DigestStart,
   type FeedDetail,
   type FeedDetailsUpdate,
@@ -65,7 +66,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     { dropOnNewKey: true },
   )
   const items = valueInView(itemsState)
-  const [shownDay, setShownDay] = useState<string>()
+  const [shownDay, setShownDay] = useState<DateKey>()
   const [notice, setNotice] = useState('')
   const [refreshing, startRefresh] = useTransition()
   const [changing, startChange] = useTransition()
@@ -111,7 +112,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
     })
   }
 
-  function showDay(date: string) {
+  function showDay(date: DateKey) {
     const anchor = dayAnchor(feedId, date)
     if (document.getElementById(anchor) || !items?.nextFrom) {
       enterSection(anchor)
@@ -272,7 +273,7 @@ function Items({
 }: {
   feedId: number
   feedTitle: string
-  today: string
+  today: DateKey
   state: Resource<FeedItems>
   page: FeedItems | undefined
   older: OlderState
