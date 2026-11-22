@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { livenessSchema, readinessSchema } from '../../src/shared/api.js'
 import { DATABASE_FILE } from '../../src/server/config.js'
 import { migrations } from '../../src/server/persistence/migrations.js'
-import { startTestService } from '../support/service-harness.js'
+import { startTestService, startUnreadyTestService } from '../support/service-harness.js'
 import { makeTempDataDir } from '../support/temp-dir.js'
 
 describe('health endpoints', () => {
@@ -34,7 +34,7 @@ describe('health endpoints', () => {
     await mkdir(unwritable)
     await chmod(unwritable, 0o500)
 
-    const service = await startTestService({ dataDir: join(unwritable, 'data') })
+    const service = await startUnreadyTestService({ dataDir: join(unwritable, 'data') })
 
     const live = await service.fetch('/health/live')
     const ready = await service.fetch('/health/ready')
@@ -55,7 +55,7 @@ describe('health endpoints', () => {
     squatter.exec('CREATE TABLE installation_settings (squatter TEXT)')
     squatter.close()
 
-    const service = await startTestService({ dataDir })
+    const service = await startUnreadyTestService({ dataDir })
     const ready = await service.fetch('/health/ready')
 
     expect(readinessSchema.parse(await ready.json())).toEqual({ status: 'unready', reason: 'migrations failed' })
@@ -63,19 +63,19 @@ describe('health endpoints', () => {
   })
 
   it('refuses to start on a database a newer release has migrated, as after rolling the image back', async () => {
-    const service = await startTestService()
-    await service.stop()
-    const newer = new Database(join(service.dataDir, DATABASE_FILE))
+    const current = await startTestService()
+    await current.stop()
+    const newer = new Database(join(current.dataDir, DATABASE_FILE))
     newer
       .prepare("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, 'from-the-future', ?)")
       .run(migrations.length + 1, new Date().toISOString())
     newer.close()
 
-    await service.restart()
-    const ready = await service.fetch('/health/ready')
+    const rolledBack = await startUnreadyTestService({ dataDir: current.dataDir })
+    const ready = await rolledBack.fetch('/health/ready')
 
     expect(readinessSchema.parse(await ready.json())).toEqual({ status: 'unready', reason: 'migrations failed' })
-    expect(service.logs.findLast((record) => record.message === 'startup.failed')).toMatchObject({
+    expect(rolledBack.logs.findLast((record) => record.message === 'startup.failed')).toMatchObject({
       error: { message: expect.stringContaining(`schema version ${migrations.length + 1}`) },
     })
   })
@@ -86,7 +86,7 @@ describe('health endpoints', () => {
     await mkdir(unwritable)
     await chmod(unwritable, 0o500)
 
-    const service = await startTestService({ dataDir: join(unwritable, 'data') })
+    const service = await startUnreadyTestService({ dataDir: join(unwritable, 'data') })
 
     const response = await service.fetch('/api/feeds')
 
@@ -101,7 +101,7 @@ describe('health endpoints', () => {
     await mkdir(unwritable)
     await chmod(unwritable, 0o500)
 
-    const service = await startTestService({ dataDir: join(unwritable, 'data') })
+    const service = await startUnreadyTestService({ dataDir: join(unwritable, 'data') })
 
     expect(service.logs.find((record) => record.message === 'startup.failed')).toMatchObject({
       reason: 'database could not be opened',
