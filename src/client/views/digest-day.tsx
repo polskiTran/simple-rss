@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { z } from 'zod'
 import type { DateKey, DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
@@ -114,6 +114,17 @@ function FeedDayBox({
   const list = useRef<HTMLUListElement>(null)
   const foldable = feed.items.length > FOLD_OVER
   const folded = foldable && !unfolded
+  const stuck = foldable && unfolded
+  useEffect(() => {
+    const article = box.current
+    const header = head.current
+    if (!stuck || !article || !header) return
+    const observer = new ResizeObserver(() =>
+      article.style.setProperty('--feed-day-head', `${header.getBoundingClientRect().height}px`),
+    )
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [stuck])
   const foldLabel = folded ? 'Show all' : 'Show less'
   const folding = useRef(false)
   const toggleFold = async () => {
@@ -134,7 +145,7 @@ function FeedDayBox({
   }
   const quiet = feed.quiet ? <QuietSpell quietDays={feed.quiet.quietDays} /> : null
   return (
-    <article ref={box} className="feed-day" data-unfolded={foldable && unfolded ? '' : undefined}>
+    <article ref={box} className="feed-day" data-unfolded={stuck ? '' : undefined}>
       <header ref={head} className="feed-day-head">
         <div className="feed-day-who">
           <RoutedLink className="item-feed" href={feedPath(feed.feedId)} onNavigate={() => onOpenFeed(feed.feedId)}>

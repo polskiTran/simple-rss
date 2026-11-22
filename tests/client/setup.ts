@@ -34,3 +34,8 @@ const played: Pick<Animation, 'finished' | 'cancel'> = {
 // SAFETY: the client only awaits `finished` and calls `cancel`.
 Element.prototype.animate = () => played as Animation
 window.matchMedia = (query) => ({ matches: false, media: query }) as MediaQueryList
+window.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}

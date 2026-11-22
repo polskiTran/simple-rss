@@ -247,7 +247,7 @@ async function sharedTitle(row: Locator) {
   })
 }
 
-function ledgerDay(page: Page) {
+function ledgerDay(page: Page, { quietDays }: { quietDays?: number } = {}) {
   return page.route(
     (url) => url.pathname === '/api/digest',
     async (route) => {
@@ -261,6 +261,7 @@ function ledgerDay(page: Page) {
           feedItemId: item.feedItemId + index,
           title: `Ledger entry ${index + 1}`,
         }))
+        if (quietDays) group.returns = [{ feedId: item.feedId, quietDays }]
       }
       await route.fulfill({ response, json: digest })
     },
@@ -293,6 +294,36 @@ test.describe('a Feed\u2019s day', () => {
 
     await expect(title).toBeInViewport()
     await expect(page.getByRole('heading', { name: 'Ledger entry 4', exact: true })).toHaveCount(0)
+  })
+
+  test('brings a title reached by Shift+Tab out from under the stuck header, Quiet Spell included', async ({
+    page,
+    installation,
+  }) => {
+    await ledgerDay(page, { quietDays: 30 })
+    await openDigest(page, installation)
+    await page.getByRole('button', { name: 'Show all' }).click()
+    const head = page.locator('.feed-day-head')
+    await expect(head.getByText('First in 30 days')).toBeVisible()
+    await page.waitForFunction(() => document.getAnimations().length === 0)
+
+    const title = page.getByRole('link', { name: 'Ledger entry 20', exact: true })
+    await title.evaluate((link) => window.scrollBy(0, link.getBoundingClientRect().top))
+    const stuckBottom = await head.evaluate((header) => header.getBoundingClientRect().bottom)
+    await title.evaluate(
+      (link, bottom) => window.scrollBy(0, link.getBoundingClientRect().top - bottom + 8),
+      stuckBottom,
+    )
+    await page.getByRole('link', { name: 'Ledger entry 21', exact: true }).focus()
+    await page.keyboard.press('Shift+Tab')
+    await page.keyboard.press('Shift+Tab')
+
+    await expect(title).toBeFocused()
+    const [titleTop, headBottom] = await title.evaluate((link) => [
+      link.closest('h3')?.getBoundingClientRect().top ?? 0,
+      link.closest('.feed-day')?.querySelector('.feed-day-head')?.getBoundingClientRect().bottom ?? 0,
+    ])
+    expect(Math.abs(titleTop - headBottom)).toBeLessThan(1)
   })
 
   test('comes back from an article to its box still unfolded', async ({ page, installation }) => {
