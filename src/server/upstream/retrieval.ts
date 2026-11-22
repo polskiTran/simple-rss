@@ -114,6 +114,10 @@ export interface RetrievalFailure {
 
 export type RetrievalResult = RetrievalSuccess | RetrievalFailure
 
+export function neverReachedPublisher(failure: RetrievalFailure): boolean {
+  return failure.code === 'cancelled' || failure.code === 'busy'
+}
+
 export interface RetrievalBytes extends Omit<RetrievalSuccess, 'body'> {
   readonly bytes: Uint8Array<ArrayBuffer>
 }

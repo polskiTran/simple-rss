@@ -9,6 +9,7 @@ import {
   LIBRARY_PAGE_SIZE,
   type Library,
   type LibraryItem,
+  type MarkedText,
   MAX_FEED_TITLE_LENGTH,
   SEARCH_RESULT_LIMIT,
   SEARCH_SUBSCRIPTION_LIMIT,
@@ -415,17 +416,22 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
   }
 }
 
+function markedIn(text: string, line: string): MarkedText {
+  const start = text.toLowerCase().indexOf(line.toLowerCase())
+  return { text, matches: line === '' || start < 0 ? [] : [[start, start + line.length]] }
+}
+
 function searchOf(dataset: Exclude<Dataset, 'demo'>, query: URLSearchParams): SearchResults | undefined {
   const request = searchRequestSchema.safeParse(Object.fromEntries(query))
   if (!request.success) return undefined
-  const { scope } = request.data
+  const { query: line, scope } = request.data
   const feeds = feedsOf(dataset)
   const { today, groups } = digestOf(dataset)
   const hits = groups.flatMap((group) =>
     group.items.map(
       (item): SearchResult => ({
         feedItemId: item.feedItemId,
-        title: item.title,
+        title: markedIn(item.title, line),
         feedId: item.feedId,
         feedTitle: item.feedTitle,
         publishedAt: item.publishedAt,
@@ -433,7 +439,7 @@ function searchOf(dataset: Exclude<Dataset, 'demo'>, query: URLSearchParams): Se
         date: group.date,
         displayTime: item.displayTime,
         saved: item.saved,
-        snippet: item.summary,
+        snippet: item.summary === null ? null : markedIn(item.summary, line),
       }),
     ),
   )

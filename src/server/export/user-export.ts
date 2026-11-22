@@ -73,8 +73,8 @@ export function buildUserExport(options: {
       (feed): UserExportFeed => ({
         enteredUrl: feed.enteredUrl,
         resolvedUrl: feed.resolvedUrl,
-        title: feed.title,
-        description: feed.description,
+        reportedTitle: feed.title,
+        reportedDescription: feed.description,
         domain: feed.domain,
         homePageUrl: feed.homePageUrl,
         createdAt: feed.createdAt,

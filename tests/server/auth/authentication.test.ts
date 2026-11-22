@@ -608,6 +608,23 @@ describe('cross-site request forgery', () => {
     expect((await new Device(service, { origin: 'null' }).signIn()).status).toBe(403)
   })
 
+  it.each([
+    ['http, https', 401],
+    ['https, http', 403],
+  ])('takes the scheme from the nearest proxy when X-Forwarded-Proto is %s', async (forwardedProto, status) => {
+    const service = await startTestService()
+    await claimedDevice(service)
+    const { host } = new URL(service.url)
+
+    const response = await service.fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { origin: `https://${host}`, 'x-forwarded-proto': forwardedProto, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'a-wrong-password' }),
+    })
+
+    expect(response.status).toBe(status)
+  })
+
   it('protects an authenticated mutation the same way', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

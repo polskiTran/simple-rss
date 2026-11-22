@@ -460,7 +460,7 @@ export type Library = z.infer<typeof librarySchema>
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-export const USER_EXPORT_VERSION = 4
+export const USER_EXPORT_VERSION = 5
 
 const userExportItemSchema = z.object({
   dedupeKey: z.string(),
@@ -479,8 +479,8 @@ export type UserExportItem = z.infer<typeof userExportItemSchema>
 const userExportFeedSchema = z.object({
   enteredUrl: z.string(),
   resolvedUrl: z.string(),
-  title: z.string(),
-  description: z.string().nullable(),
+  reportedTitle: z.string(),
+  reportedDescription: z.string().nullable(),
   domain: z.string(),
   homePageUrl: z.string().nullable(),
   createdAt: z.string(),
@@ -546,9 +546,15 @@ export const searchRequestSchema = z
     sort,
   }))
 
+const matchRangeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().positive()])
+export type MatchRange = z.infer<typeof matchRangeSchema>
+
+const markedTextSchema = z.object({ text: z.string(), matches: z.array(matchRangeSchema) })
+export type MarkedText = z.infer<typeof markedTextSchema>
+
 const searchResultSchema = z.object({
   feedItemId: z.number().int().positive(),
-  title: z.string(),
+  title: markedTextSchema,
   feedId: z.number().int().positive(),
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
@@ -556,7 +562,7 @@ const searchResultSchema = z.object({
   date: dateKeySchema,
   displayTime: z.string().nullable(),
   saved: z.boolean(),
-  snippet: z.string().nullable(),
+  snippet: markedTextSchema.nullable(),
 })
 export type SearchResult = z.infer<typeof searchResultSchema>
 

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { readerItemSchema } from '../../src/shared/api.js'
+import { readerItemSchema, type SearchResult } from '../../src/shared/api.js'
 import { runCli, type CliContext } from '../../src/server/cli.js'
 import { loadConfig } from '../../src/server/config.js'
 import { createLogger, type Logger } from '../../src/server/logger.js'
@@ -277,7 +277,7 @@ describe('backup and restore, round-tripped through the running application', ()
     expect(library.items.map((item: { title: string }) => item.title)).toEqual(['Morning chronology'])
 
     const found = await (await device.get('/api/search?q=chronology')).json()
-    expect(found.results.map((result: { title: string }) => result.title)).toEqual(['Morning chronology'])
+    expect(found.results.map((result: SearchResult) => result.title.text)).toEqual(['Morning chronology'])
 
     const settings = await (await device.get('/api/settings')).json()
     expect(settings).toEqual({ timezone: 'Europe/Berlin' })
