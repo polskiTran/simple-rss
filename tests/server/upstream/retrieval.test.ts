@@ -79,7 +79,7 @@ describe('retrieveBytes', () => {
     if (!result.ok) return
     expect(decode(result.bytes)).toBe('<rss></rss>')
     expect(result.status).toBe(200)
-    expect(result.url).toBe('https://example.com/feed.xml')
+    expect(result.finalUrl).toBe('https://example.com/feed.xml')
     expect(result.contentType).toBe('application/rss+xml')
     expect(result.charset).toBe('utf-8')
     expect(result.etag).toBe('"v1"')
@@ -271,7 +271,7 @@ describe('redirects', () => {
 
     const result = await retrieval.retrieveBytes(feedRequest('https://example.com/feed'))
 
-    expect(result).toMatchObject({ ok: true, url: 'https://cdn.example.net/feed.xml' })
+    expect(result).toMatchObject({ ok: true, finalUrl: 'https://cdn.example.net/feed.xml' })
   })
 
   it('resolves a relative location against the hop it came from', async () => {
@@ -284,7 +284,7 @@ describe('redirects', () => {
 
     await expect(retrieval.retrieveBytes(feedRequest('https://example.com/feed'))).resolves.toMatchObject({
       ok: true,
-      url: 'https://example.com/feeds/main.xml',
+      finalUrl: 'https://example.com/feeds/main.xml',
     })
   })
 
