@@ -67,7 +67,7 @@ export class ReaderItems {
       summary: row.summary,
       feedContent: row.feedContentMarkdown
         ? {
-            markdown: applyReaderMarkdownPolicy(row.feedContentMarkdown, { images: this.#signImageUrl }),
+            markdown: applyReaderMarkdownPolicy(row.feedContentMarkdown, { images: { sign: this.#signImageUrl } }),
             truncated: row.feedContentTruncated !== 0,
             readingTimeMinutes: readingTimeMinutes(row.feedContentMarkdown),
           }

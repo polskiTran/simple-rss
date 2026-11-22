@@ -33,7 +33,7 @@ export interface ExtractArticleInput {
   readonly bytes: Uint8Array
   readonly charset?: string | undefined
   readonly url: string
-  readonly signImageUrl?: SignImageUrl
+  readonly signImageUrl: SignImageUrl
 }
 
 export interface ExtractionTimings {
@@ -72,7 +72,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
     const policyStartedAt = performance.now()
     const markdown = applyReaderMarkdownPolicy(result.contentMarkdown ?? '', {
       baseUrl: input.url,
-      ...(input.signImageUrl ? { images: input.signImageUrl } : {}),
+      images: { sign: input.signImageUrl },
     })
     timings.markdownPolicyMs = elapsedMs(policyStartedAt)
     if (!markdown) return { article: undefined, timings }
