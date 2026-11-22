@@ -68,7 +68,7 @@ export class CredentialStore {
     })
   }
 
-  touch(token: string, now: Date): boolean {
+  authenticate(token: string, now: Date): boolean {
     const tokenHash = fingerprint(token)
 
     const [row] = this.#db

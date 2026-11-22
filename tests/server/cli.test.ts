@@ -157,8 +157,8 @@ describe('runCli reset-password', () => {
     await runCli(['reset-password', 'a-recovered-password'], context)
 
     expect(JSON.parse(output[0]!)).toEqual({ passwordReset: true, sessionsRevoked: 2 })
-    expect(inspect((credentials) => credentials.touch(issued[0]!.token, at))).toBe(false)
-    expect(inspect((credentials) => credentials.touch(issued[1]!.token, at))).toBe(false)
+    expect(inspect((credentials) => credentials.authenticate(issued[0]!.token, at))).toBe(false)
+    expect(inspect((credentials) => credentials.authenticate(issued[1]!.token, at))).toBe(false)
   })
 
   it('replaces a password the User has forgotten, without being told it', async () => {
