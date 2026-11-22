@@ -84,18 +84,21 @@ describe('settling a poll', () => {
     expect(waitMinutes(settle({ ...polled, pollingIntervalMinutes: 1440 }, failedWith('timeout'), NOW))).toBe(24 * 60)
   })
 
-  it('moves one Polling Interval on without blaming the Feed when the attempt was busy', () => {
-    const settlement = settle({ ...polled, consecutiveFailures: 2 }, failedWith('busy'), NOW)
+  it.each(['busy', 'cancelled'] as const)(
+    'moves one Polling Interval on without blaming the Feed when the attempt was %s',
+    (code) => {
+      const settlement = settle({ ...polled, consecutiveFailures: 2 }, failedWith(code), NOW)
 
-    expect(settlement.patch).toEqual({ nextPollAt: expect.any(String), lastPolledAt: START })
-    expect(waitMinutes(settlement)).toBeGreaterThanOrEqual(120)
-    expect(waitMinutes(settlement)).toBeLessThan(132)
-    expect(settlement.log).toEqual({
-      level: 'info',
-      message: 'subscriptions.feed_poll_deferred',
-      fields: { feedId: 7, resolvedUrl: 'https://one.example/feed', code: 'busy' },
-    })
-  })
+      expect(settlement.patch).toEqual({ nextPollAt: expect.any(String), lastPolledAt: START })
+      expect(waitMinutes(settlement)).toBeGreaterThanOrEqual(120)
+      expect(waitMinutes(settlement)).toBeLessThan(132)
+      expect(settlement.log).toEqual({
+        level: 'info',
+        message: 'subscriptions.feed_poll_deferred',
+        fields: { feedId: 7, resolvedUrl: 'https://one.example/feed', code },
+      })
+    },
+  )
 
   it.each([
     ['timeout', 'timeout'],

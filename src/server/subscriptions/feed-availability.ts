@@ -8,7 +8,7 @@ import { dateKey } from '../calendar.js'
 import type { FeedDocumentError } from '../ingestion/feed-document.js'
 import type { LogFields } from '../logger.js'
 import type { subscriptions } from '../persistence/schema.js'
-import type { RetrievalFailure } from '../upstream/retrieval.js'
+import { neverReachedPublisher, type RetrievalFailure } from '../upstream/retrieval.js'
 import { loggableUrl } from './loggable-url.js'
 import { nextPollTime, nextRetryTime } from './polling-schedule.js'
 
@@ -56,7 +56,7 @@ export function settle(feed: PolledFeed, outcome: SettledPoll, now: Date): Settl
     }
   }
 
-  if (wasNeverAsked(outcome)) {
+  if (outcome.kind === 'retrieval-failed' && neverReachedPublisher(outcome.failure)) {
     return {
       patch: { nextPollAt: nextPollTime(feed.feedId, feed.pollingIntervalMinutes, now), lastPolledAt },
       log: {
@@ -84,10 +84,6 @@ export function settle(feed: PolledFeed, outcome: SettledPoll, now: Date): Settl
       },
     },
   }
-}
-
-function wasNeverAsked(outcome: FailedPoll): outcome is Extract<FailedPoll, { kind: 'retrieval-failed' }> {
-  return outcome.kind === 'retrieval-failed' && outcome.failure.code === 'busy'
 }
 
 function availabilityCategoryOf(outcome: FailedPoll): FeedAvailabilityCategory {

@@ -6,7 +6,12 @@ import type { LogFields, Logger } from '../logger.js'
 import { elapsedMs } from '../monotonic.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItems } from '../persistence/schema.js'
-import type { Retrieval, RetrievalFailure, RetrievalFailureCode } from '../upstream/retrieval.js'
+import {
+  neverReachedPublisher,
+  type Retrieval,
+  type RetrievalFailure,
+  type RetrievalFailureCode,
+} from '../upstream/retrieval.js'
 import type { ReaderExtractor } from './reader-extractor.js'
 
 type ReaderTraceOutcome = RetrievalFailureCode | 'extracted' | 'unreadable' | 'worker_failed'
@@ -256,7 +261,7 @@ function settled(
 
 function countsAsFailure(outcome: ReaderArticleOutcome): boolean {
   if (outcome.kind === 'unreadable') return true
-  return outcome.kind === 'retrieval-failed' && outcome.failure.code !== 'cancelled' && outcome.failure.code !== 'busy'
+  return outcome.kind === 'retrieval-failed' && !neverReachedPublisher(outcome.failure)
 }
 
 function hostField(url: string): LogFields {
