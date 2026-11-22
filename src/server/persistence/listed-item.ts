@@ -1,3 +1,4 @@
+import { UNTITLED_FEED_ITEM_TITLE } from '../../shared/api.js'
 import { feedItems, libraryItems } from './schema.js'
 
 export const LISTED_ITEM_COLUMNS = {
@@ -21,7 +22,7 @@ export interface ListedItemRow {
 export function listedItemOf(row: ListedItemRow) {
   return {
     feedItemId: row.feedItemId,
-    title: row.title ?? 'Untitled',
+    title: row.title ?? UNTITLED_FEED_ITEM_TITLE,
     publishedAt: row.publishedAt,
     firstSeenAt: row.firstSeenAt,
     saved: row.savedAt !== null,

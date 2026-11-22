@@ -3,6 +3,7 @@ import {
   FEED_PREVIEW_ITEMS,
   type FeedPreview as PreviewedFeed,
   type FeedPreviewResponse,
+  UNTITLED_FEED_ITEM_TITLE,
 } from '../../shared/api.js'
 import { dateKey, dayKeysIn } from '../calendar.js'
 import type { Clock } from '../clock.js'
@@ -82,7 +83,7 @@ export class FeedPreview {
     const items = [...new Map(parsed.items.map((item) => [item.dedupeKey, item])).values()]
       .reverse()
       .map((item) => ({
-        title: item.title ?? 'Untitled',
+        title: item.title ?? UNTITLED_FEED_ITEM_TITLE,
         publishedAt: item.publishedAt,
         chronologyAt: feedItemChronologyAt(item.publishedAt, seenAt),
       }))

@@ -1,13 +1,16 @@
-import type {
-  DigestCalendar,
-  Digest,
-  DigestItem,
-  FeedDetail,
-  FeedItems,
-  Library,
-  LibraryItem,
-  SubscriptionList,
-  SubscriptionSummary,
+import {
+  type DigestCalendar,
+  type Digest,
+  type DigestItem,
+  type FeedDetail,
+  type FeedItems,
+  LIBRARY_PAGE_SIZE,
+  type Library,
+  type LibraryItem,
+  MAX_FEED_TITLE_LENGTH,
+  type SubscriptionList,
+  type SubscriptionSummary,
+  UNTITLED_FEED_ITEM_TITLE,
 } from '../../shared/api.js'
 
 const DATASETS = ['demo', 'worst', 'empty', 'one', 'huge'] as const
@@ -176,7 +179,7 @@ const LONG_TITLE =
 const POST_TITLE =
   'Small thread on what happened to our deploy pipeline last night, because a few of you asked and I think the failure mode is genuinely interesting: at 02:14 the artifact cache filled up, the cleanup job that was supposed to run at 02:00 had been silently disabled in a config migration three weeks ago, and every build after that point started falling back to a cold cache, which pushed build times from four minutes to forty-one, which tripped the deploy timeout, which the on-call runbook told us to fix by retrying, which made it worse. 1/9 #devops #postmortem'.slice(
     0,
-    512,
+    MAX_FEED_TITLE_LENGTH,
   )
 const LONG_SUMMARY =
   `${'In the spring we noticed that the scheduler was dropping roughly one job in ten thousand under load. '.repeat(20)}`.trim()
@@ -203,7 +206,7 @@ const WORST_TODAY: readonly ItemSeed[] = [
   { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
   { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
   { feed: 6, title: POST_TITLE, time: '17:45' },
-  { feed: 8, title: 'Untitled', time: '17:15' },
+  { feed: 8, title: UNTITLED_FEED_ITEM_TITLE, time: '17:15' },
   {
     feed: 9,
     title: '<b>Release</b> &amp; notes — **v2.0** is out',
@@ -355,7 +358,7 @@ function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
         today: TODAY,
         total: 1_000,
         items: feeds
-          .slice(0, 50)
+          .slice(0, LIBRARY_PAGE_SIZE)
           .map((feed) => item({ feed: feed.feedId, title: `${feed.title}: saved`, time: '12:00' }, TODAY)),
         nextCursor: 'more',
       }

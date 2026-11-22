@@ -340,6 +340,8 @@ export const feedDetailSchema = feedSummarySchema.extend({
 })
 export type FeedDetail = z.infer<typeof feedDetailSchema>
 
+export const UNTITLED_FEED_ITEM_TITLE = 'Untitled'
+
 export const feedItemsSchema = z.object({
   items: z.array(feedItemRowSchema),
   nextFrom: z.string().nullable(),
@@ -432,6 +434,8 @@ export type LibraryOrder = (typeof LIBRARY_ORDERS)[number]
 export const libraryRequestSchema = z.object({
   order: z.enum(LIBRARY_ORDERS).default('newest'),
 })
+
+export const LIBRARY_PAGE_SIZE = 50
 
 export const librarySchema = z.object({
   today: z.string(),
