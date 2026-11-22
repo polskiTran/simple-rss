@@ -6,10 +6,19 @@ import {
   type DigestItem,
   type FeedDetail,
   type FeedItems,
+  LIBRARY_PAGE_SIZE,
   type Library,
   type LibraryItem,
+  MAX_FEED_TITLE_LENGTH,
+  SEARCH_RESULT_LIMIT,
+  SEARCH_SUBSCRIPTION_LIMIT,
+  type SearchResult,
+  type SearchResults,
+  type SearchSubscriptionMatch,
+  searchRequestSchema,
   type SubscriptionList,
   type SubscriptionSummary,
+  UNTITLED_FEED_ITEM_TITLE,
   utcDayKey,
 } from '../../shared/api.js'
 
@@ -181,7 +190,7 @@ const LONG_TITLE =
 const POST_TITLE =
   'Small thread on what happened to our deploy pipeline last night, because a few of you asked and I think the failure mode is genuinely interesting: at 02:14 the artifact cache filled up, the cleanup job that was supposed to run at 02:00 had been silently disabled in a config migration three weeks ago, and every build after that point started falling back to a cold cache, which pushed build times from four minutes to forty-one, which tripped the deploy timeout, which the on-call runbook told us to fix by retrying, which made it worse. 1/9 #devops #postmortem'.slice(
     0,
-    512,
+    MAX_FEED_TITLE_LENGTH,
   )
 const LONG_SUMMARY =
   `${'In the spring we noticed that the scheduler was dropping roughly one job in ten thousand under load. '.repeat(20)}`.trim()
@@ -208,7 +217,7 @@ const WORST_TODAY: readonly ItemSeed[] = [
   { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
   { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
   { feed: 6, title: POST_TITLE, time: '17:45' },
-  { feed: 8, title: 'Untitled', time: '17:15' },
+  { feed: 8, title: UNTITLED_FEED_ITEM_TITLE, time: '17:15' },
   {
     feed: 9,
     title: '<b>Release</b> &amp; notes — **v2.0** is out',
@@ -358,7 +367,7 @@ function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
         today: TODAY,
         total: 1_000,
         items: feeds
-          .slice(0, 50)
+          .slice(0, LIBRARY_PAGE_SIZE)
           .map((feed) => item({ feed: feed.feedId, title: `${feed.title}: saved`, time: '12:00' }, TODAY)),
         nextCursor: 'more',
       }
@@ -401,6 +410,62 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
   }
 }
 
+function searchOf(dataset: Exclude<Dataset, 'demo'>, query: URLSearchParams): SearchResults | undefined {
+  const request = searchRequestSchema.safeParse(Object.fromEntries(query))
+  if (!request.success) return undefined
+  const { scope } = request.data
+  const feeds = feedsOf(dataset)
+  const { today, groups } = digestOf(dataset)
+  const hits = groups.flatMap((group) =>
+    group.items.map(
+      (item): SearchResult => ({
+        feedItemId: item.feedItemId,
+        title: item.title,
+        feedId: item.feedId,
+        feedTitle: item.feedTitle,
+        publishedAt: item.publishedAt,
+        firstSeenAt: item.firstSeenAt,
+        date: group.date,
+        displayTime: item.displayTime,
+        saved: item.saved,
+        snippet: item.summary,
+      }),
+    ),
+  )
+  const jumpTo = feeds.map(
+    ({ feedId, title, domain, homePageUrl, cadence }): SearchSubscriptionMatch => ({
+      feedId,
+      title,
+      domain,
+      homePageUrl,
+      cadence,
+    }),
+  )
+  switch (scope.kind) {
+    case 'everywhere':
+      return {
+        scope: 'everywhere',
+        today,
+        subscriptions: jumpTo.slice(0, SEARCH_SUBSCRIPTION_LIMIT),
+        results: hits.slice(0, SEARCH_RESULT_LIMIT),
+      }
+    case 'saved':
+      return { scope: 'saved', today, results: hits.filter((hit) => hit.saved).slice(0, SEARCH_RESULT_LIMIT) }
+    case 'subscriptions':
+      return { scope: 'subscriptions', today, subscriptions: jumpTo }
+    case 'feed': {
+      const feed = feeds.find((candidate) => candidate.feedId === scope.feedId)
+      if (!feed) return undefined
+      return {
+        scope: 'feed',
+        today,
+        feed: { title: feed.title },
+        results: hits.filter((hit) => hit.feedId === scope.feedId).slice(0, SEARCH_RESULT_LIMIT),
+      }
+    }
+  }
+}
+
 function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string, query: URLSearchParams) {
   if (path === '/api/auth/status') return { claimed: true, authenticated: true }
   if (path === '/api/meta') return { name: 'simple-rss', version: '0.0.0-worst-case' }
@@ -425,6 +490,7 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
   }
   if (path === '/api/digest/days') return calendarOf(dataset)
   if (path === '/api/library') return libraryOf(dataset)
+  if (path === '/api/search') return searchOf(dataset, query)
   const library = path.match(/^\/api\/library\/(\d+)$/)
   if (library) {
     const saved = method === 'PUT'

@@ -8,6 +8,8 @@ import {
 
 const URL = 'https://publisher.example/writing/prompt-injection'
 
+const signImageUrl = (url: string) => `/reader/images?src=${encodeURIComponent(url)}&sig=test`
+
 function page(article: string, head = ''): Uint8Array {
   return new TextEncoder().encode(
     `<!doctype html>
@@ -58,7 +60,7 @@ const JSON_LD = `<script type="application/ld+json">{"@context":"https://schema.
 
 describe('extractArticle', () => {
   it('extracts long-form technical content as structured markdown', async () => {
-    const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
+    const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL, signImageUrl })
 
     expect(article).toBeDefined()
     expect(article?.markdown).toContain('Paragraph 7 keeps the argument moving')
@@ -70,13 +72,13 @@ describe('extractArticle', () => {
   })
 
   it('estimates reading time from what the Reader will actually show', async () => {
-    const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
+    const { article } = await extractArticle({ bytes: page(LONG_FORM), url: URL, signImageUrl })
 
     expect(article?.readingTimeMinutes, 'about 900 words at 225 a minute').toBe(4)
   })
 
   it('times each extraction phase it reached, without recording content', async () => {
-    const { timings } = await extractArticle({ bytes: page(LONG_FORM), url: URL })
+    const { timings } = await extractArticle({ bytes: page(LONG_FORM), url: URL, signImageUrl })
 
     expect(timings.domMs).toBeGreaterThanOrEqual(0)
     expect(timings.defuddleMs).toBeGreaterThanOrEqual(0)
@@ -87,7 +89,7 @@ describe('extractArticle', () => {
     const body =
       '<html><head><title>t</title></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
     const latin1 = Uint8Array.from([...body].map((char) => char.charCodeAt(0)))
-    const { article } = await extractArticle({ bytes: latin1, charset: 'windows-1252', url: URL })
+    const { article } = await extractArticle({ bytes: latin1, charset: 'windows-1252', url: URL, signImageUrl })
 
     expect(article?.markdown).toContain('café terrace')
   })
@@ -96,7 +98,7 @@ describe('extractArticle', () => {
     const body =
       '<html><head><meta charset="windows-1252"></head><body><p>café terrace, and a paragraph long enough for the extractor to keep it as real article content.</p></body></html>'
     const bytes = Uint8Array.from([...body].map((char) => char.charCodeAt(0)))
-    const { article } = await extractArticle({ bytes, url: URL })
+    const { article } = await extractArticle({ bytes, url: URL, signImageUrl })
 
     expect(article?.markdown).toContain('café terrace')
   })
@@ -105,11 +107,13 @@ describe('extractArticle', () => {
     const { article } = await extractArticle({
       bytes: page(`${LONG_FORM}${HAZARDS}`, JSON_LD),
       url: URL,
+      signImageUrl,
     })
 
     expect(article?.markdown).toContain('Paragraph 7 keeps the argument moving')
     for (const leak of HAZARD_LEAKS) expect(article?.markdown).not.toContain(leak)
-    expect(article?.markdown).not.toContain('figure.png')
+    expect(article?.markdown).toContain('![a figure](/reader/images?src=')
+    expect(article?.markdown).not.toContain('](https://publisher.example/images/figure.png)')
   })
 
   it('keeps raw-text LaTeX intact on pages that load a math renderer', async () => {
@@ -122,6 +126,7 @@ describe('extractArticle', () => {
         katexScript,
       ),
       url: URL,
+      signImageUrl,
     })
     const markdown = article?.markdown ?? ''
 
@@ -137,6 +142,7 @@ describe('extractArticle', () => {
     const outcome = await extractArticle({
       bytes: new TextEncoder().encode('<!doctype html><html><head></head><body></body></html>'),
       url: URL,
+      signImageUrl,
     })
 
     expect(outcome.article).toBeUndefined()
@@ -180,7 +186,7 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   it('gives a document at the element bound full cleanup', async () => {
     const bytes = pageWithElements(FULL_CLEANUP_MAX_ELEMENTS)
     expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_MAX_ELEMENTS)
-    const { article } = await extractArticle({ bytes, url: URL })
+    const { article } = await extractArticle({ bytes, url: URL, signImageUrl })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
     expect(article?.markdown).not.toContain('Related posts')
@@ -190,7 +196,7 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   it('keeps the article of a document above the element bound, tolerating boilerplate', async () => {
     const bytes = pageWithElements(FULL_CLEANUP_MAX_ELEMENTS + 1)
     expect(parsedElementCount(bytes)).toBe(FULL_CLEANUP_MAX_ELEMENTS + 1)
-    const { article } = await extractArticle({ bytes, url: URL })
+    const { article } = await extractArticle({ bytes, url: URL, signImageUrl })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
     for (const marker of BOILERPLATE_MARKERS) expect(article?.markdown).toContain(marker)
@@ -199,7 +205,7 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   it('gives a document at the byte bound full cleanup', async () => {
     const bytes = pageWithBytes(FULL_CLEANUP_MAX_BYTES)
     expect(bytes.byteLength).toBe(FULL_CLEANUP_MAX_BYTES)
-    const { article } = await extractArticle({ bytes, url: URL })
+    const { article } = await extractArticle({ bytes, url: URL, signImageUrl })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
     expect(article?.markdown).not.toContain('Related posts')
@@ -207,7 +213,11 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
   })
 
   it('keeps the article of a document above the byte bound, tolerating boilerplate', async () => {
-    const { article } = await extractArticle({ bytes: pageWithBytes(FULL_CLEANUP_MAX_BYTES + 1), url: URL })
+    const { article } = await extractArticle({
+      bytes: pageWithBytes(FULL_CLEANUP_MAX_BYTES + 1),
+      url: URL,
+      signImageUrl,
+    })
 
     expect(article?.markdown).toContain('Steady sentence 7 ')
     for (const marker of BOILERPLATE_MARKERS) expect(article?.markdown).toContain(marker)
@@ -223,7 +233,7 @@ describe('extraction cleanup profiles', { timeout: 15_000 }, () => {
     const { article } = await extractArticle({
       bytes,
       url: URL,
-      signImageUrl: (url) => `/reader/images?src=${encodeURIComponent(url)}&sig=test`,
+      signImageUrl,
     })
     const markdown = article?.markdown ?? ''
 

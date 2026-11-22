@@ -6,7 +6,6 @@ This directory is the maintained source for verifying what a reader sees. Read t
 
 - `verify.mjs up` has printed `ready`, and `verify.mjs doctor` exits 0.
 - Screens come from the dev mock's `worst` dataset unless the recipe says otherwise.
-- Search comes from `SEARCH_ANSWER` in `verify.mjs`, because the mock does not answer it.
 - Specs boot their own service. They never need `up`, and they run against `dist/client`.
 - Never drive an instance this run did not start. 5173 and 8080 are the developer's.
 

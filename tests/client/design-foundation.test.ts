@@ -63,27 +63,41 @@ function contrast(one: string, other: string): number {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05)
 }
 
-const PROMISED: readonly (readonly [string, string, number])[] = [
-  ['ink-2', 'ground', 4.5],
-  ['ink-2', 'control', 4.5],
-  ...['control', 'control-hover', 'toggle-off', 'segment'].map((fill) => ['ink-off', fill, 4.5] as const),
-  ['ink-3', 'ink', 4.5],
-  ['ramp-2', 'ground', 3],
-  ...['ramp-1', 'ramp-2'].map((fill) => ['ink', fill, 4.5] as const),
-  ...['ramp-3', 'ramp-4', 'ramp-5'].map((fill) => ['ground', fill, 4.5] as const),
-  ...['ground', 'control', 'danger-fill'].map((fill) => ['danger', fill, 4.5] as const),
-  ['feed-name', 'ground', 4.5],
-  ['away', 'ground', 4.5],
-  ['ink', 'match', 4.5],
+interface ContrastPromise {
+  readonly text: string
+  readonly ground: string
+  readonly leastRatio: number
+}
+
+const CONTRAST_PROMISES: readonly ContrastPromise[] = [
+  { text: 'ink-2', ground: 'ground', leastRatio: 4.5 },
+  { text: 'ink-2', ground: 'control', leastRatio: 4.5 },
+  { text: 'ink-off', ground: 'control', leastRatio: 4.5 },
+  { text: 'ink-off', ground: 'control-hover', leastRatio: 4.5 },
+  { text: 'ink-off', ground: 'toggle-off', leastRatio: 4.5 },
+  { text: 'ink-off', ground: 'segment', leastRatio: 4.5 },
+  { text: 'ink-3', ground: 'ink', leastRatio: 4.5 },
+  { text: 'ramp-2', ground: 'ground', leastRatio: 3 },
+  { text: 'ink', ground: 'ramp-1', leastRatio: 4.5 },
+  { text: 'ink', ground: 'ramp-2', leastRatio: 4.5 },
+  { text: 'ground', ground: 'ramp-3', leastRatio: 4.5 },
+  { text: 'ground', ground: 'ramp-4', leastRatio: 4.5 },
+  { text: 'ground', ground: 'ramp-5', leastRatio: 4.5 },
+  { text: 'danger', ground: 'ground', leastRatio: 4.5 },
+  { text: 'danger', ground: 'control', leastRatio: 4.5 },
+  { text: 'danger', ground: 'danger-fill', leastRatio: 4.5 },
+  { text: 'feed-name', ground: 'ground', leastRatio: 4.5 },
+  { text: 'away', ground: 'ground', leastRatio: 4.5 },
+  { text: 'ink', ground: 'match', leastRatio: 4.5 },
 ]
 
 describe('contrast', () => {
   it.each(['light', 'dark'] as const)('keeps every promised pair in %s', (mode) => {
     const colours = tokens()
     const side = mode === 'light' ? 0 : 1
-    for (const [text, ground, least] of PROMISED) {
+    for (const { text, ground, leastRatio } of CONTRAST_PROMISES) {
       const ratio = contrast(colours.get(text)?.[side] ?? '', colours.get(ground)?.[side] ?? '')
-      expect(ratio, `${text} on ${ground}`).toBeGreaterThanOrEqual(least)
+      expect(ratio, `${text} on ${ground}`).toBeGreaterThanOrEqual(leastRatio)
     }
   })
 })

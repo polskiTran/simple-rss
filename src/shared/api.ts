@@ -361,6 +361,8 @@ export const feedDetailSchema = feedSummarySchema.extend({
 })
 export type FeedDetail = z.infer<typeof feedDetailSchema>
 
+export const UNTITLED_FEED_ITEM_TITLE = 'Untitled'
+
 export const feedItemsSchema = z.object({
   items: z.array(feedItemRowSchema),
   nextFrom: dateKeySchema.nullable(),
@@ -445,6 +447,8 @@ export type LibraryOrder = (typeof LIBRARY_ORDERS)[number]
 export const libraryRequestSchema = z.object({
   order: z.enum(LIBRARY_ORDERS).default('newest'),
 })
+
+export const LIBRARY_PAGE_SIZE = 50
 
 export const librarySchema = z.object({
   today: dateKeySchema,
@@ -563,6 +567,10 @@ export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSche
 
 const searchItemsSchema = z.array(searchResultSchema)
 const searchJumpToSchema = z.array(searchSubscriptionMatchSchema)
+
+export const SEARCH_RESULT_LIMIT = 50
+
+export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
 export const searchResultsSchema = z.discriminatedUnion('scope', [
   z.object({

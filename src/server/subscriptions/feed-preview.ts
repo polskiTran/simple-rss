@@ -3,6 +3,7 @@ import {
   FEED_PREVIEW_ITEMS,
   type FeedPreview as PreviewedFeed,
   type FeedPreviewResponse,
+  UNTITLED_FEED_ITEM_TITLE,
 } from '../../shared/api.js'
 import { dateKey, dayKeysIn } from '../calendar.js'
 import type { Clock } from '../clock.js'
@@ -100,7 +101,7 @@ export class FeedPreview {
       lastItemDate: newest ? dayOf(newest.chronologyAt) : null,
       items: items
         .slice(0, FEED_PREVIEW_ITEMS)
-        .map(({ title, chronologyAt }) => ({ title: title ?? 'Untitled', date: dayOf(chronologyAt) })),
+        .map(({ title, chronologyAt }) => ({ title: title ?? UNTITLED_FEED_ITEM_TITLE, date: dayOf(chronologyAt) })),
       subscribed: [feedUrl, retrieved.finalUrl].some((url) => subscribedFeedId(this.#db, url) !== undefined),
     }
   }
