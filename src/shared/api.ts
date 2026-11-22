@@ -17,6 +17,21 @@ export const serviceMetaSchema = z.object({
 })
 export type ServiceMeta = z.infer<typeof serviceMetaSchema>
 
+export const dateKeySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const time = Date.parse(`${value}T00:00:00Z`)
+    return Number.isFinite(time) && new Date(time).toISOString().startsWith(value)
+  })
+  .brand<'DateKey'>()
+export type DateKey = z.infer<typeof dateKeySchema>
+
+export function utcDayKey(instant: number): DateKey {
+  // SAFETY: the first ten characters of an ISO instant are the calendar day it falls on in UTC.
+  return new Date(instant).toISOString().slice(0, 10) as DateKey
+}
+
 const readerDeadlineStageSchema = z.enum(['publisher', 'parsing'])
 export type ReaderDeadlineStage = z.infer<typeof readerDeadlineStageSchema>
 
@@ -61,14 +76,19 @@ export const apiErrorCodeSchema = z.enum([
 ])
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>
 
+const stagedErrorCodeSchema = z.literal('article_deadline_exceeded')
+
+const unstagedErrorCodeSchema = apiErrorCodeSchema.exclude([stagedErrorCodeSchema.value])
+export type UnstagedErrorCode = z.infer<typeof unstagedErrorCodeSchema>
+
 export const apiErrorSchema = z.object({
-  error: z.object({
-    code: apiErrorCodeSchema,
-    message: z.string(),
-    stage: readerDeadlineStageSchema.optional(),
-  }),
+  error: z.discriminatedUnion('code', [
+    z.object({ code: stagedErrorCodeSchema, message: z.string(), stage: readerDeadlineStageSchema }).strict(),
+    z.object({ code: unstagedErrorCodeSchema, message: z.string() }).strict(),
+  ]),
 })
 export type ApiErrorBody = z.infer<typeof apiErrorSchema>
+export type ApiFailure = ApiErrorBody['error']
 
 export const MIN_PASSWORD_LENGTH = 12
 
@@ -246,14 +266,14 @@ const feedAvailabilitySchema = z.discriminatedUnion('state', [
   z.object({
     state: z.literal('available'),
     lastCheckedAt: z.string(),
-    lastSuccessDate: z.string(),
+    lastSuccessDate: dateKeySchema,
     consecutiveFailures: failureRunSchema,
     category: feedAvailabilityCategorySchema.nullable(),
   }),
   z.object({
     state: z.literal('unavailable'),
     lastCheckedAt: z.string(),
-    lastSuccessDate: z.string().nullable(),
+    lastSuccessDate: dateKeySchema.nullable(),
     consecutiveFailures: failureRunSchema.min(FEED_UNAVAILABLE_AFTER_FAILURES),
     category: feedAvailabilityCategorySchema,
   }),
@@ -280,8 +300,9 @@ export const FEED_PREVIEW_ITEMS = 5
 const feedPreviewSchema = feedSummarySchema.pick({ title: true, domain: true, homePageUrl: true }).extend({
   feedUrl: z.string(),
   cadence: cadenceStripSchema,
-  lastItemAt: z.string().nullable(),
-  items: z.array(z.object({ title: z.string(), publishedAt: z.string().nullable() })).max(FEED_PREVIEW_ITEMS),
+  today: dateKeySchema,
+  lastItemDate: dateKeySchema.nullable(),
+  items: z.array(z.object({ title: z.string(), date: dateKeySchema })).max(FEED_PREVIEW_ITEMS),
   subscribed: z.boolean(),
 })
 export type FeedPreview = z.infer<typeof feedPreviewSchema>
@@ -310,7 +331,7 @@ export type RefreshFeedResponse = z.infer<typeof refreshFeedResponseSchema>
 export const CADENCE_GRID_WEEKS = 26
 
 const cadenceObservationSchema = z.object({
-  date: z.string(),
+  date: dateKeySchema,
   count: z.number().int().nonnegative(),
 })
 export type CadenceObservation = z.infer<typeof cadenceObservationSchema>
@@ -321,7 +342,7 @@ const feedItemRowSchema = z.object({
   link: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  date: z.string(),
+  date: dateKeySchema,
   displayTime: z.string().nullable(),
   saved: z.boolean(),
 })
@@ -335,14 +356,14 @@ export const feedDetailSchema = feedSummarySchema.extend({
   availability: feedAvailabilitySchema,
   schedule: pollingScheduleSchema,
   readingSource: readingSourceSchema,
-  subscribedDate: z.string(),
+  subscribedDate: dateKeySchema,
   cadence: z.array(cadenceObservationSchema),
 })
 export type FeedDetail = z.infer<typeof feedDetailSchema>
 
 export const feedItemsSchema = z.object({
   items: z.array(feedItemRowSchema),
-  nextFrom: z.string().nullable(),
+  nextFrom: dateKeySchema.nullable(),
 })
 export type FeedItems = z.infer<typeof feedItemsSchema>
 
@@ -370,30 +391,22 @@ export type DigestReturn = z.infer<typeof digestReturnSchema>
 export const QUIET_SPELL_DAYS = 7
 
 const digestGroupSchema = z.object({
-  date: z.string(),
+  date: dateKeySchema,
   items: z.array(digestItemSchema),
   returns: z.array(digestReturnSchema),
 })
 export type DigestGroup = z.infer<typeof digestGroupSchema>
 
 export const digestSchema = z.object({
-  today: z.string(),
+  today: dateKeySchema,
   groups: z.array(digestGroupSchema),
-  nextFrom: z.string().nullable(),
+  nextFrom: dateKeySchema.nullable(),
 })
 export type Digest = z.infer<typeof digestSchema>
 
-export const dateKeySchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((value) => {
-    const time = Date.parse(`${value}T00:00:00Z`)
-    return Number.isFinite(time) && new Date(time).toISOString().startsWith(value)
-  })
-
 export interface DigestStart {
-  readonly from?: string | undefined
-  readonly through?: string | undefined
+  readonly from?: DateKey | undefined
+  readonly through?: DateKey | undefined
 }
 
 export function digestParamsOf({ from, through }: DigestStart): URLSearchParams {
@@ -403,10 +416,10 @@ export function digestParamsOf({ from, through }: DigestStart): URLSearchParams 
 export const digestRequestSchema = z.object({
   from: dateKeySchema.optional(),
   through: dateKeySchema.optional(),
-}) satisfies z.ZodType<DigestStart>
+}) satisfies z.ZodType<DigestStart, z.ZodTypeDef, unknown>
 
 export const digestCalendarSchema = z.object({
-  today: z.string(),
+  today: dateKeySchema,
   days: z.array(cadenceObservationSchema),
   subscriptions: z.number().int().nonnegative(),
 })
@@ -422,7 +435,7 @@ const libraryItemSchema = z.object({
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   savedAt: z.string(),
-  savedDate: z.string(),
+  savedDate: dateKeySchema,
 })
 export type LibraryItem = z.infer<typeof libraryItemSchema>
 
@@ -434,7 +447,7 @@ export const libraryRequestSchema = z.object({
 })
 
 export const librarySchema = z.object({
-  today: z.string(),
+  today: dateKeySchema,
   total: z.number().int().nonnegative(),
   items: z.array(libraryItemSchema),
   nextCursor: z.string().nullable(),
@@ -536,7 +549,7 @@ const searchResultSchema = z.object({
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  date: z.string(),
+  date: dateKeySchema,
   displayTime: z.string().nullable(),
   saved: z.boolean(),
   snippet: z.string().nullable(),
@@ -554,15 +567,15 @@ const searchJumpToSchema = z.array(searchSubscriptionMatchSchema)
 export const searchResultsSchema = z.discriminatedUnion('scope', [
   z.object({
     scope: z.literal('everywhere'),
-    today: z.string(),
+    today: dateKeySchema,
     subscriptions: searchJumpToSchema,
     results: searchItemsSchema,
   }),
-  z.object({ scope: z.literal('saved'), today: z.string(), results: searchItemsSchema }),
-  z.object({ scope: z.literal('subscriptions'), today: z.string(), subscriptions: searchJumpToSchema }),
+  z.object({ scope: z.literal('saved'), today: dateKeySchema, results: searchItemsSchema }),
+  z.object({ scope: z.literal('subscriptions'), today: dateKeySchema, subscriptions: searchJumpToSchema }),
   z.object({
     scope: z.literal('feed'),
-    today: z.string(),
+    today: dateKeySchema,
     feed: z.object({ title: z.string() }),
     results: searchItemsSchema,
   }),
@@ -598,8 +611,8 @@ export const readerItemSchema = z.object({
   discussionUrl: z.string().nullable(),
   publishedAt: z.string().nullable(),
   firstSeenAt: z.string(),
-  date: z.string(),
-  today: z.string(),
+  date: dateKeySchema,
+  today: dateKeySchema,
   summary: z.string().nullable(),
   saved: z.boolean(),
   readingSource: readingSourceSchema,

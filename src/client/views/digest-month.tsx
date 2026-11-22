@@ -1,6 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { useState } from 'react'
-import type { DigestCalendar } from '../../shared/api.js'
+import { type DateKey, type DigestCalendar, utcDayKey } from '../../shared/api.js'
 import { cadenceDayLabel, relativeLevels } from '../cadence.js'
 import { CadenceLegend } from '../components/cadence-grid.js'
 import { Group } from '../components/group.js'
@@ -9,8 +9,8 @@ import { monthOfYear } from '../day-names.js'
 
 interface DigestMonthProps {
   readonly calendar: DigestCalendar
-  readonly selected: string
-  onPick(date: string): void
+  readonly selected: DateKey
+  onPick(date: DateKey): void
   readonly onToday?: (() => void) | undefined
 }
 
@@ -26,7 +26,7 @@ export function DigestMonth({ calendar, selected, onPick, onToday }: DigestMonth
   const levelOf = relativeLevels(calendar.days.map(({ count }) => count))
   const earliest = (calendar.days[0]?.date ?? calendar.today).slice(0, 7)
   const latest = calendar.today.slice(0, 7)
-  const monthTitle = monthOfYear(`${month}-01`)
+  const monthTitle = monthOfYear(month)
 
   return (
     <Group
@@ -112,10 +112,10 @@ function shiftMonth(month: string, by: number): string {
   return new Date(Date.UTC(year ?? 0, (index ?? 1) - 1 + by, 1)).toISOString().slice(0, 7)
 }
 
-function weeksOf(month: string): string[] {
+function weeksOf(month: string): DateKey[] {
   const first = Date.parse(`${month}-01T00:00:00Z`)
   const start = first - ((new Date(first).getUTCDay() + 6) % 7) * DAY_MS
   const end = Date.parse(`${shiftMonth(month, 1)}-01T00:00:00Z`)
   const days = Math.ceil((end - start) / DAY_MS / 7) * 7
-  return Array.from({ length: days }, (_, index) => new Date(start + index * DAY_MS).toISOString().slice(0, 10))
+  return Array.from({ length: days }, (_, index) => utcDayKey(start + index * DAY_MS))
 }

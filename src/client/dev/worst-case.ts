@@ -1,13 +1,16 @@
-import type {
-  DigestCalendar,
-  Digest,
-  DigestItem,
-  FeedDetail,
-  FeedItems,
-  Library,
-  LibraryItem,
-  SubscriptionList,
-  SubscriptionSummary,
+import {
+  type DateKey,
+  dateKeySchema,
+  type DigestCalendar,
+  type Digest,
+  type DigestItem,
+  type FeedDetail,
+  type FeedItems,
+  type Library,
+  type LibraryItem,
+  type SubscriptionList,
+  type SubscriptionSummary,
+  utcDayKey,
 } from '../../shared/api.js'
 
 const DATASETS = ['demo', 'worst', 'empty', 'one', 'huge'] as const
@@ -21,9 +24,11 @@ const LABELS = {
 } as const satisfies Record<Dataset, string>
 const STORAGE_KEY = 'break-ui:data'
 
-const TODAY = '2026-10-22'
-const YESTERDAY = '2026-10-21'
-const LAST_YEAR = '2025-12-31'
+const day = (key: string) => dateKeySchema.parse(key)
+
+const TODAY = day('2026-10-22')
+const YESTERDAY = day('2026-10-21')
+const LAST_YEAR = day('2025-12-31')
 
 function isDataset(value: string | null): value is Dataset {
   return DATASETS.some((dataset) => dataset === value)
@@ -273,7 +278,7 @@ function digestOf(dataset: Exclude<Dataset, 'demo'>): Digest {
             returns: [],
           },
         ],
-        nextFrom: '2025-12-30',
+        nextFrom: day('2025-12-30'),
       }
     case 'empty':
       return { today: TODAY, groups: [], nextFrom: null }
@@ -305,9 +310,7 @@ function digestOf(dataset: Exclude<Dataset, 'demo'>): Digest {
 function calendarOf(dataset: Exclude<Dataset, 'demo'>): DigestCalendar {
   const listed = new Map(digestOf(dataset).groups.map((group) => [group.date, group.items.length]))
   const days = Array.from({ length: 26 * 7 }, (_, index) => {
-    const date = new Date(Date.parse(`${TODAY}T12:00:00Z`) - (26 * 7 - 1 - index) * 86_400_000)
-      .toISOString()
-      .slice(0, 10)
+    const date = utcDayKey(Date.parse(`${TODAY}T12:00:00Z`) - (26 * 7 - 1 - index) * 86_400_000)
     const filler = dataset === 'worst' ? (index % 5 === 0 ? 1_284 : index % 3) : 0
     return { date, count: listed.get(date) ?? filler }
   })
@@ -316,7 +319,7 @@ function calendarOf(dataset: Exclude<Dataset, 'demo'>): DigestCalendar {
 
 function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
   const feeds = feedsOf(dataset)
-  const item = (seed: ItemSeed, savedDate: string, subscribed = true): LibraryItem => ({
+  const item = (seed: ItemSeed, savedDate: DateKey, subscribed = true): LibraryItem => ({
     feedItemId: nextItemId++,
     title: seed.title,
     feedId: seed.feed,
@@ -337,7 +340,7 @@ function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
           item({ feed: 1, title: LONG_TITLE, time: '23:59' }, TODAY),
           item({ feed: 2, title: WORST_TODAY[1]?.title ?? '', time: '10:00' }, YESTERDAY),
           item({ feed: 99, title: 'Saved from a Feed that is gone', time: '09:00' }, LAST_YEAR, false),
-          item({ feed: 3, title: 'J', time: '08:00', link: null }, '1970-01-01'),
+          item({ feed: 3, title: 'J', time: '08:00', link: null }, day('1970-01-01')),
         ],
         nextCursor: 'more',
       }
@@ -372,7 +375,7 @@ function feedDetailOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedDe
     reportedDescription: feed.description,
     customDescription: null,
     schedule: { pollingIntervalMinutes: 1440, nextPollAt: `${TODAY}T23:00:00Z` },
-    subscribedDate: feed.subscribedAt.slice(0, 10),
+    subscribedDate: day(feed.subscribedAt.slice(0, 10)),
     cadence: calendarOf(dataset).days,
   }
 }
@@ -405,13 +408,14 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
   if (path === '/api/feeds') return { subscriptions: feedsOf(dataset) } satisfies SubscriptionList
   if (path === '/api/digest') {
     const digest = digestOf(dataset)
-    const from = query.get('from')
-    if (!from) return digest
+    const parsedFrom = dateKeySchema.safeParse(query.get('from'))
+    if (!parsedFrom.success) return digest
+    const from = parsedFrom.data
     if (from !== digest.nextFrom) return { ...digest, groups: digest.groups.filter((group) => group.date <= from) }
     const feeds = feedsOf(dataset)
     return {
       today: digest.today,
-      groups: [from, '2025-12-29'].map((date) => ({
+      groups: [from, day('2025-12-29')].map((date) => ({
         date,
         items: [1, 3].map((feed) => digestItem({ feed, title: `An older item, ${date}`, time: '08:00' }, date, feeds)),
         returns: [],

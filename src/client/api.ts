@@ -22,7 +22,7 @@ import {
   searchResultsSchema,
   subscriptionListSchema,
   serviceMetaSchema,
-  type ApiErrorCode,
+  type ApiFailure,
   type AuthStatus,
   type ClaimRequest,
   type CreateSubscriptionRequest,
@@ -47,7 +47,6 @@ import {
   type ReadingSource,
   type ReadingSourcePreference,
   type ReaderArticle,
-  type ReaderDeadlineStage,
   type ReaderItem,
   type RefreshFeedResponse,
   type SearchResults,
@@ -63,21 +62,23 @@ import {
 import type { z } from 'zod'
 import type { JsonValue } from '../shared/json.js'
 
-type FailureCode = ApiErrorCode | 'unknown'
+type Failure = ApiFailure | { readonly code: 'unknown' }
 
 export class ApiError extends Error {
   readonly status: number
-  readonly code: FailureCode
+  readonly failure: Failure
   readonly retryAfterSeconds: number | undefined
-  readonly stage: ReaderDeadlineStage | undefined
 
-  constructor(status: number, code: FailureCode, retryAfterSeconds?: number, stage?: ReaderDeadlineStage) {
+  constructor(status: number, failure: Failure, retryAfterSeconds?: number) {
     super(`Request failed with ${status}`)
     this.name = 'ApiError'
     this.status = status
-    this.code = code
+    this.failure = failure
     this.retryAfterSeconds = retryAfterSeconds
-    this.stage = stage
+  }
+
+  get code(): Failure['code'] {
+    return this.failure.code
   }
 }
 
@@ -124,7 +125,7 @@ async function request(path: string, options: ApiRequestOptions = {}): Promise<R
 
   if (failure.code === 'unauthenticated' && path !== STATUS_PATH) sessionEnded?.()
 
-  throw new ApiError(response.status, failure.code, retryAfterOf(response), failure.stage)
+  throw new ApiError(response.status, failure, retryAfterOf(response))
 }
 
 async function getJson<T>(
@@ -231,8 +232,8 @@ export function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<F
   return getJson(`/api/feeds/${feedId}`, feedDetailSchema, { signal })
 }
 
-export function fetchFeedItems(feedId: number, query: string, signal?: AbortSignal): Promise<FeedItems> {
-  return getJson(withQuery(`/api/feeds/${feedId}/items`, new URLSearchParams(query)), feedItemsSchema, { signal })
+export function fetchFeedItems(feedId: number, start: DigestStart, signal?: AbortSignal): Promise<FeedItems> {
+  return getJson(withQuery(`/api/feeds/${feedId}/items`, digestParamsOf(start)), feedItemsSchema, { signal })
 }
 
 export function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {
@@ -324,10 +325,9 @@ export function fetchServiceMeta(signal?: AbortSignal): Promise<ServiceMeta> {
   return getJson('/api/meta', serviceMetaSchema, { signal })
 }
 
-async function failureOf(response: Response): Promise<{ code: FailureCode; stage?: ReaderDeadlineStage }> {
+async function failureOf(response: Response): Promise<Failure> {
   try {
-    const { error } = apiErrorSchema.parse(await response.json())
-    return { code: error.code, ...(error.stage === undefined ? {} : { stage: error.stage }) }
+    return apiErrorSchema.parse(await response.json()).error
   } catch {
     return { code: 'unknown' }
   }

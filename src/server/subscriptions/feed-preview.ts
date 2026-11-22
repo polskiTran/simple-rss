@@ -88,16 +88,19 @@ export class FeedPreview {
       perDay.set(day, (perDay.get(day) ?? 0) + 1)
     }
 
+    const today = dateKey(now, timezone)
+    const newest = items[0]
     return {
       feedUrl,
       title: parsed.title,
       domain: feedDomain(parsed, retrieved.finalUrl),
       homePageUrl: parsed.homePageUrl,
-      cadence: trailingDayKeys(dateKey(now, timezone), CADENCE_STRIP_DAYS).map((day) => perDay.get(day) ?? 0),
-      lastItemAt: items[0]?.chronologyAt ?? null,
+      cadence: trailingDayKeys(today, CADENCE_STRIP_DAYS).map((day) => perDay.get(day) ?? 0),
+      today,
+      lastItemDate: newest ? dayOf(newest.chronologyAt) : null,
       items: items
         .slice(0, FEED_PREVIEW_ITEMS)
-        .map(({ title, publishedAt }) => ({ title: title ?? 'Untitled', publishedAt })),
+        .map(({ title, chronologyAt }) => ({ title: title ?? 'Untitled', date: dayOf(chronologyAt) })),
       subscribed: [feedUrl, retrieved.finalUrl].some((url) => subscribedFeedId(this.#db, url) !== undefined),
     }
   }

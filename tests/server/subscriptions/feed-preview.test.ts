@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { feedItemsSchema, feedPreviewResponseSchema, type FeedPreviewResponse } from '../../../src/shared/api.js'
+import {
+  dateKeySchema,
+  feedItemsSchema,
+  feedPreviewResponseSchema,
+  type FeedPreviewResponse,
+} from '../../../src/shared/api.js'
 import { FeedPreview, type FeedPreviewOutcome } from '../../../src/server/subscriptions/feed-preview.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
@@ -66,15 +71,42 @@ describe('Feed preview', () => {
         domain: 'journal.example',
         homePageUrl: 'https://journal.example/',
         cadence: [...Array.from({ length: 22 }, () => 0), 1, 0, 0, 0, 0, 1, 1, 4],
-        lastItemAt: '2026-08-08T21:00:00.000Z',
+        today: '2026-08-08',
+        lastItemDate: '2026-08-08',
         items: [
-          { title: 'Tonight', publishedAt: '2026-08-08T21:00:00.000Z' },
-          { title: 'Far future', publishedAt: '2026-09-01T00:00:00.000Z' },
-          { title: 'Undated', publishedAt: null },
-          { title: 'This morning', publishedAt: '2026-08-08T07:00:00.000Z' },
-          { title: 'Yesterday', publishedAt: '2026-08-07T12:00:00.000Z' },
+          { title: 'Tonight', date: '2026-08-08' },
+          { title: 'Far future', date: '2026-08-08' },
+          { title: 'Undated', date: '2026-08-08' },
+          { title: 'This morning', date: '2026-08-08' },
+          { title: 'Yesterday', date: '2026-08-07' },
         ],
         subscribed: false,
+      },
+    })
+  })
+
+  it('names its days in the installation timezone, not by the UTC date', async () => {
+    const service = await startTestService()
+    service.settings.setTimezone('Pacific/Auckland', service.clock.now())
+    service.upstream.stub(FEED_URL, {
+      headers: RSS_HEADERS,
+      body: rss(
+        'Field Notes',
+        item('Just after midnight in Auckland', '2026-08-07T12:30:00Z'),
+        item('Just before midnight in Auckland', '2026-08-07T11:30:00Z'),
+      ),
+    })
+    const user = await claimedDevice(service)
+
+    expect(await preview(user, FEED_URL)).toMatchObject({
+      kind: 'feed',
+      feed: {
+        today: '2026-08-08',
+        lastItemDate: '2026-08-08',
+        items: [
+          { title: 'Just after midnight in Auckland', date: '2026-08-08' },
+          { title: 'Just before midnight in Auckland', date: '2026-08-07' },
+        ],
       },
     })
   })
@@ -327,7 +359,8 @@ function detectedFeed(feedUrl: string, title: string): FeedPreviewOutcome {
         domain: 'journal.example',
         homePageUrl: 'https://journal.example/',
         cadence: QUIET_CADENCE,
-        lastItemAt: null,
+        today: dateKeySchema.parse('2026-08-08'),
+        lastItemDate: null,
         items: [],
         subscribed: false,
       },

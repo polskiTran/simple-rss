@@ -206,7 +206,10 @@ function keptChanged() {
   for (const listener of keptListeners) listener()
 }
 
-export function useKept<T extends string | number | boolean>(name: string, schema: z.ZodType<T>) {
+export function useKept<T extends string | number | boolean>(
+  name: string,
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+) {
   const value = useSyncExternalStore(subscribeKept, () => schema.safeParse(historyState().kept?.[name]).data)
   const keep = useCallback(
     (next: T | undefined) => {
