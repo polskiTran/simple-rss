@@ -460,7 +460,7 @@ export type Library = z.infer<typeof librarySchema>
 
 export const USER_EXPORT_FORMAT = 'simple-rss-export'
 
-export const USER_EXPORT_VERSION = 4
+export const USER_EXPORT_VERSION = 5
 
 const userExportItemSchema = z.object({
   dedupeKey: z.string(),
@@ -479,8 +479,8 @@ export type UserExportItem = z.infer<typeof userExportItemSchema>
 const userExportFeedSchema = z.object({
   enteredUrl: z.string(),
   resolvedUrl: z.string(),
-  title: z.string(),
-  description: z.string().nullable(),
+  reportedTitle: z.string(),
+  reportedDescription: z.string().nullable(),
   domain: z.string(),
   homePageUrl: z.string().nullable(),
   createdAt: z.string(),

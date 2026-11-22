@@ -75,7 +75,7 @@ describe('the JSON export', () => {
     expect(document.exportedAt).toBe(service.clock.now().toISOString())
 
     expect(document.feeds).toHaveLength(2)
-    const exportedRss = document.feeds.find((feed: { title: string }) => feed.title === 'Field Notes')
+    const exportedRss = document.feeds.find((feed: { reportedTitle: string }) => feed.reportedTitle === 'Field Notes')
     if (!exportedRss) throw new Error('the RSS Feed was absent from the export')
     expect(exportedRss).toMatchObject({
       enteredUrl: RSS_URL,
@@ -98,7 +98,7 @@ describe('the JSON export', () => {
       },
     ])
 
-    const exportedAtom = document.feeds.find((feed: { title: string }) => feed.title === 'Atom Letters')
+    const exportedAtom = document.feeds.find((feed: { reportedTitle: string }) => feed.reportedTitle === 'Atom Letters')
     if (!exportedAtom) throw new Error('the Atom Feed was absent from the export')
     expect(exportedAtom.subscription).toEqual({
       pollingIntervalMinutes: 120,
@@ -112,7 +112,7 @@ describe('the JSON export', () => {
     expect(firstAtomItem.savedAt).toBeNull()
   })
 
-  it('carries the Feed Description and both overrides faithfully, under the bumped version', async () => {
+  it('names what the Feed reported apart from the Custom Title and Custom Description the User set', async () => {
     const service = await startTestService()
     service.upstream.stub(RSS_URL, {
       headers: { 'content-type': 'application/rss+xml' },
@@ -130,12 +130,14 @@ describe('the JSON export', () => {
 
     const document = await (await user.get('/api/export')).json()
 
-    expect(document.exportVersion).toBe(4)
+    expect(document.exportVersion).toBe(5)
     expect(document.feeds[0]).toMatchObject({
-      title: 'Field Notes',
-      description: 'From the field',
+      reportedTitle: 'Field Notes',
+      reportedDescription: 'From the field',
       subscription: { customTitle: 'Tech tabloid', customDescription: 'read weekly' },
     })
+    expect(document.feeds[0]).not.toHaveProperty('title')
+    expect(document.feeds[0]).not.toHaveProperty('description')
   })
 
   it('keeps an unsubscribed Feed that Library saves still attribute', async () => {
@@ -153,7 +155,7 @@ describe('the JSON export', () => {
     const document = await (await user.get('/api/export')).json()
 
     expect(document.feeds).toHaveLength(1)
-    expect(document.feeds[0]).toMatchObject({ title: 'Field Notes', subscription: null })
+    expect(document.feeds[0]).toMatchObject({ reportedTitle: 'Field Notes', subscription: null })
     expect(document.feeds[0].items.some((item: { savedAt: string | null }) => item.savedAt !== null)).toBe(true)
   })
 
@@ -177,14 +179,14 @@ describe('the JSON export', () => {
     ])
     expect(Object.keys(document.feeds[0]).sort()).toEqual([
       'createdAt',
-      'description',
       'domain',
       'enteredUrl',
       'homePageUrl',
       'items',
+      'reportedDescription',
+      'reportedTitle',
       'resolvedUrl',
       'subscription',
-      'title',
     ])
 
     const storedHash = service.database.$client.prepare('SELECT password_hash FROM user_auth').get() as {
