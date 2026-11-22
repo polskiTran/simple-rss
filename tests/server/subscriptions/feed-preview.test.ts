@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { feedPreviewResponseSchema, type FeedPreviewResponse } from '../../../src/shared/api.js'
+import { feedItemsSchema, feedPreviewResponseSchema, type FeedPreviewResponse } from '../../../src/shared/api.js'
 import { FeedPreview, type FeedPreviewOutcome } from '../../../src/server/subscriptions/feed-preview.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
@@ -77,6 +77,33 @@ describe('Feed preview', () => {
         subscribed: false,
       },
     })
+  })
+
+  it('lists Feed Items in the order the Feed lists them once subscribed, duplicates and ties included', async () => {
+    const service = await startTestService()
+    const sameTime = '2026-08-08T07:00:00Z'
+    const entry = (guid: string, title: string, pubDate: string) =>
+      `<item><guid>${guid}</guid><title>${title}</title><pubDate>${new Date(pubDate).toUTCString()}</pubDate></item>`
+    service.upstream.stub(FEED_URL, {
+      headers: RSS_HEADERS,
+      body: rss(
+        'Field Notes',
+        entry('first', 'First', sameTime),
+        entry('second', 'Second', sameTime),
+        entry('newest', 'Newest', '2026-08-08T09:00:00Z'),
+        entry('first', 'First, corrected', sameTime),
+        entry('third', 'Third', sameTime),
+      ),
+    })
+    const user = await claimedDevice(service)
+
+    const previewed = await preview(user, FEED_URL)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const stored = feedItemsSchema.parse(await (await user.get('/api/feeds/1/items')).json())
+
+    const previewedTitles = previewed.kind === 'feed' ? previewed.feed.items.map((listed) => listed.title) : []
+    expect(previewedTitles).toEqual(['Newest', 'Third', 'Second', 'First, corrected'])
+    expect(stored.items.map((listed) => listed.title)).toEqual(previewedTitles)
   })
 
   it('previews a Feed served as a web page as the Feed it is', async () => {

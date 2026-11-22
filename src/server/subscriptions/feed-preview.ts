@@ -8,9 +8,8 @@ import { dateKey, dayKeysIn } from '../calendar.js'
 import type { Clock } from '../clock.js'
 import { trailingDayKeys } from '../digest/cadence-window.js'
 import { declaredFeeds } from '../ingestion/declared-feeds.js'
-import { feedDomain } from '../ingestion/feed-window.js'
+import { feedDomain, feedWindowNewestFirst } from '../ingestion/feed-window.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
-import { feedItemChronologyAt } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { decodePage } from '../upstream/page-text.js'
 import { RETRIEVAL_PROFILES, type Retrieval, type RetrievalBytes } from '../upstream/retrieval.js'
@@ -79,15 +78,7 @@ export class FeedPreview {
 
   #summarise(feedUrl: string, answer: Extract<FeedAnswer, { kind: 'parsed' }>, now: Date): PreviewedFeed {
     const { retrieved, parsed } = answer
-    const seenAt = now.toISOString()
-    const items = [...new Map(parsed.items.map((item) => [item.dedupeKey, item])).values()]
-      .reverse()
-      .map((item) => ({
-        title: item.title ?? 'Untitled',
-        publishedAt: item.publishedAt,
-        chronologyAt: feedItemChronologyAt(item.publishedAt, seenAt),
-      }))
-      .sort((left, right) => right.chronologyAt.localeCompare(left.chronologyAt))
+    const items = feedWindowNewestFirst(parsed, now.toISOString())
 
     const timezone = this.#settings.effectiveTimezone()
     const dayOf = dayKeysIn(timezone)
@@ -104,7 +95,9 @@ export class FeedPreview {
       homePageUrl: parsed.homePageUrl,
       cadence: trailingDayKeys(dateKey(now, timezone), CADENCE_STRIP_DAYS).map((day) => perDay.get(day) ?? 0),
       lastItemAt: items[0]?.chronologyAt ?? null,
-      items: items.slice(0, FEED_PREVIEW_ITEMS).map(({ title, publishedAt }) => ({ title, publishedAt })),
+      items: items
+        .slice(0, FEED_PREVIEW_ITEMS)
+        .map(({ title, publishedAt }) => ({ title: title ?? 'Untitled', publishedAt })),
       subscribed: [feedUrl, retrieved.url].some((url) => subscribedFeedId(this.#db, url) !== undefined),
     }
   }
