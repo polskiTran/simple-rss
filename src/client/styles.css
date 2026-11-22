@@ -76,7 +76,6 @@
 @layer base {
   :root {
     --control: 36px;
-    --day-tools-room: calc(var(--control) + 88px);
     --field: 40px;
     --gutter: 40px;
 
@@ -809,6 +808,12 @@
     }
   }
 
+  .digest-day:first-child .group-header {
+    @media (max-width: 1024px) {
+      display: block;
+    }
+  }
+
   .digest-day:first-child .day-distance {
     margin-top: calc(-1lh - 8px);
 
@@ -817,7 +822,6 @@
       align-items: center;
       min-height: var(--control);
       margin-top: 0;
-      padding-inline-end: var(--day-tools-room);
     }
   }
 
@@ -1952,28 +1956,19 @@
     gap: 20px;
   }
 
-  .digest-head {
-    position: relative;
-    height: 0;
-    margin-bottom: 0;
-  }
-
   .digest-empty {
     @media (max-width: 1024px) {
       display: flex;
       align-items: center;
       min-height: var(--control);
-      padding-inline-end: var(--day-tools-room);
     }
   }
 
   .day-tools {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-end: 0;
-    z-index: 1;
     display: none;
+    float: inline-end;
     gap: 8px;
+    margin-inline-start: 16px;
 
     @media (max-width: 1024px) {
       display: flex;

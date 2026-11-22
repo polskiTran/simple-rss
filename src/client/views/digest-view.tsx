@@ -30,18 +30,8 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
 
   return (
     <div className="view">
-      <header className={firstRun ? 'page-head' : 'page-head digest-head'}>
+      <header className={firstRun ? 'page-head' : undefined}>
         <h1 className={firstRun ? 'page-title' : 'visually-hidden'}>Digest</h1>
-        {shown && !firstRun ? (
-          <div className="day-tools">
-            {start.from ? (
-              <Button className="button" onClick={() => readFrom(undefined)}>
-                Today
-              </Button>
-            ) : null}
-            <DayPicker calendar={shown} from={start.from} onFrom={readFrom} />
-          </div>
-        ) : null}
       </header>
 
       {firstRun ? (
@@ -52,6 +42,16 @@ export function DigestView({ start, onStart, onOpenItem, onOpenFeed }: DigestVie
       ) : (
         <div className="with-aside">
           <div ref={stream}>
+            {shown ? (
+              <div className="day-tools">
+                {start.from ? (
+                  <Button className="button" onClick={() => readFrom(undefined)}>
+                    Today
+                  </Button>
+                ) : null}
+                <DayPicker calendar={shown} from={start.from} onFrom={readFrom} />
+              </div>
+            ) : null}
             <DigestList
               start={start}
               onRetry={retryCalendar}
