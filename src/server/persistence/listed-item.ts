@@ -1,4 +1,5 @@
-import { feedItems, libraryItems } from './schema.js'
+import { sql } from 'drizzle-orm'
+import { feedItems } from './schema.js'
 
 export const LISTED_ITEM_COLUMNS = {
   feedItemId: feedItems.id,
@@ -6,7 +7,7 @@ export const LISTED_ITEM_COLUMNS = {
   publishedAt: feedItems.publishedAt,
   firstSeenAt: feedItems.firstSeenAt,
   chronologyAt: feedItems.chronologyAt,
-  savedAt: libraryItems.savedAt,
+  savedAt: sql<string | null>`(SELECT saved_at FROM library_items WHERE library_items.feed_item_id = feed_items.id)`,
 }
 
 export interface ListedItemRow {

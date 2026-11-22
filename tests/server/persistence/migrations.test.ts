@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { MAX_FEED_DESCRIPTION_LENGTH, MAX_FEED_TITLE_LENGTH } from '../../../src/shared/api.js'
 import { systemClock } from '../../../src/server/clock.js'
 import { openDatabase } from '../../../src/server/persistence/database.js'
 import { applyMigrations, appliedVersions, migrations } from '../../../src/server/persistence/migrations.js'
@@ -87,6 +88,32 @@ describe('migrations', () => {
         .prepare('INSERT INTO installation_settings (id, timezone, created_at, updated_at) VALUES (?, ?, ?, ?)')
         .run(2, 'UTC', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
     ).toThrow()
+    db.$client.close()
+  })
+
+  it('holds a Feed title and description to the bounds the contract states, and refuses one past them', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(db)
+    const insertFeed = db.$client.prepare(
+      `INSERT INTO feeds (id, entered_url, resolved_url, title, description, domain, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'bounds.example', '2026-01-01', '2026-01-01')`,
+    )
+    const feed = (id: number, title: string, description: string) =>
+      insertFeed.run(id, `https://bounds.example/${id}`, `https://bounds.example/${id}`, title, description)
+    const subscribe = db.$client.prepare(
+      'INSERT INTO subscriptions (feed_id, custom_title, custom_description, created_at) VALUES (?, ?, ?, ?)',
+    )
+    const longestTitle = 't'.repeat(MAX_FEED_TITLE_LENGTH)
+    const longestDescription = 'd'.repeat(MAX_FEED_DESCRIPTION_LENGTH)
+
+    feed(1, longestTitle, longestDescription)
+    subscribe.run(1, longestTitle, longestDescription, '2026-01-01')
+
+    expect(() => feed(2, `${longestTitle}t`, longestDescription)).toThrow(/CHECK constraint/)
+    expect(() => feed(3, longestTitle, `${longestDescription}d`)).toThrow(/CHECK constraint/)
+    feed(4, longestTitle, longestDescription)
+    expect(() => subscribe.run(4, `${longestTitle}t`, null, '2026-01-01')).toThrow(/CHECK constraint/)
+    expect(() => subscribe.run(4, null, `${longestDescription}d`, '2026-01-01')).toThrow(/CHECK constraint/)
     db.$client.close()
   })
 
@@ -216,6 +243,101 @@ describe('migrations', () => {
     expect(db.$client.prepare('SELECT dedupe_key, chronology_at FROM feed_items ORDER BY id').all()).toEqual([
       { dedupe_key: 'release-date', chronology_at: '2026-10-27T12:00:00.000Z' },
       { dedupe_key: 'timed', chronology_at: '2026-10-27T17:08:00.000Z' },
+    ])
+    db.$client.close()
+  })
+
+  it('refuses Feed Availability that no poll could have recorded', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(db)
+    db.$client
+      .prepare(`INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
+        VALUES (1, 'https://journal.example/feed', 'https://journal.example/feed', 'Field Notes', 'journal.example', '2026-01-01', '2026-01-01')`)
+      .run()
+    const subscribe = db.$client.prepare(
+      `INSERT INTO subscriptions (feed_id, created_at, last_polled_at, last_success_at, consecutive_failures, last_failure_category)
+       VALUES (1, '2026-01-01', ?, ?, ?, ?)`,
+    )
+
+    expect(() => subscribe.run('2026-08-08', null, 3, null)).toThrow(/CHECK constraint/)
+    expect(() => subscribe.run(null, null, 3, 'timeout')).toThrow(/CHECK constraint/)
+    expect(() => subscribe.run(null, '2026-08-08', 0, null)).toThrow(/CHECK constraint/)
+    subscribe.run('2026-08-08', null, 3, 'timeout')
+    expect(() =>
+      db.$client.prepare('UPDATE subscriptions SET last_failure_category = NULL WHERE feed_id = 1').run(),
+    ).toThrow(/CHECK constraint/)
+    db.$client.close()
+  })
+
+  it('repairs Feed Availability that older releases could store, keeping every Subscription', async () => {
+    const db = await openFreshDatabase()
+    applyMigrations(
+      db,
+      systemClock,
+      migrations.filter((migration) => migration.version < 20),
+    )
+    const feed = db.$client.prepare(
+      `INSERT INTO feeds (id, entered_url, resolved_url, title, domain, created_at, updated_at)
+       VALUES (?, ?, ?, 'Field Notes', 'journal.example', '2026-01-01', '2026-01-01')`,
+    )
+    const subscribe = db.$client.prepare(
+      `INSERT INTO subscriptions (feed_id, created_at, custom_title, last_polled_at, last_success_at, consecutive_failures, last_failure_category)
+       VALUES (?, '2026-01-01', ?, ?, ?, ?, ?)`,
+    )
+    const rows: Array<[number, string | null, string | null, string | null, number, string | null]> = [
+      [1, 'Kept', '2026-08-08', '2026-08-07', 2, 'timeout'],
+      [2, null, '2026-08-08', null, 3, null],
+      [3, null, null, null, 3, 'http_error'],
+      [4, null, null, '2026-08-07', 0, null],
+      [5, null, null, '2026-08-07', 4, 'timeout'],
+    ]
+    for (const [feedId, ...row] of rows) {
+      feed.run(feedId, `https://journal.example/${feedId}`, `https://journal.example/${feedId}`)
+      subscribe.run(feedId, ...row)
+    }
+
+    expect(applyMigrations(db)).toEqual([20])
+
+    expect(
+      db.$client
+        .prepare(`SELECT feed_id AS feedId, custom_title AS customTitle, last_polled_at AS lastPolledAt,
+          last_success_at AS lastSuccessAt, consecutive_failures AS consecutiveFailures,
+          last_failure_category AS category FROM subscriptions ORDER BY feed_id`)
+        .all(),
+    ).toEqual([
+      {
+        feedId: 1,
+        customTitle: 'Kept',
+        lastPolledAt: '2026-08-08',
+        lastSuccessAt: '2026-08-07',
+        consecutiveFailures: 2,
+        category: 'timeout',
+      },
+      {
+        feedId: 2,
+        customTitle: null,
+        lastPolledAt: '2026-08-08',
+        lastSuccessAt: null,
+        consecutiveFailures: 0,
+        category: null,
+      },
+      { feedId: 3, customTitle: null, lastPolledAt: null, lastSuccessAt: null, consecutiveFailures: 0, category: null },
+      {
+        feedId: 4,
+        customTitle: null,
+        lastPolledAt: '2026-08-07',
+        lastSuccessAt: '2026-08-07',
+        consecutiveFailures: 0,
+        category: null,
+      },
+      {
+        feedId: 5,
+        customTitle: null,
+        lastPolledAt: '2026-08-07',
+        lastSuccessAt: '2026-08-07',
+        consecutiveFailures: 4,
+        category: 'timeout',
+      },
     ])
     db.$client.close()
   })
