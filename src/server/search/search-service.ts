@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, or, type SQL, sql } from 'drizzle-orm'
 import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, dayKeysIn } from '../calendar.js'
@@ -8,17 +8,18 @@ import type { InstallationSettingsStore } from '../persistence/installation-sett
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { stripCadenceByFeed } from '../digest/cadence-window.js'
-import { feedItemSearch } from './search-schema.js'
+import { feedItemSearch, SEARCHED_COLUMNS, type SearchedColumn } from './search-schema.js'
 
 export const SEARCH_RESULT_LIMIT = 50
 export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
-const ITEM_TITLE_WEIGHT = 4
-const SUMMARY_WEIGHT = 1
-const FEED_TITLE_WEIGHT = 2
+type ColumnWeights = Readonly<Record<SearchedColumn, number>>
+
+const MATCH_WEIGHTS = { item_title: 4, summary: 1, feed_title: 2 } satisfies ColumnWeights
+const SUMMARY_ALONE = { item_title: 0, summary: 1, feed_title: 0 } satisfies ColumnWeights
 const RECENCY_DECAY_DAYS = 30
 
-const SNIPPET_COLUMN = 1
+const SNIPPET_COLUMN = SEARCHED_COLUMNS.indexOf('summary')
 const SNIPPET_TOKENS = 20
 
 export class SearchService {
@@ -91,7 +92,7 @@ export class SearchService {
     const match = matchExpressionOf(words)
 
     const chronology = feedItems.chronologyAt
-    const relevance = sql`bm25(${feedItemSearch}, ${ITEM_TITLE_WEIGHT}, ${SUMMARY_WEIGHT}, ${FEED_TITLE_WEIGHT})
+    const relevance = sql`${bm25(MATCH_WEIGHTS)}
       / (1.0 + max(julianday(${now.toISOString()}) - julianday(${chronology}), 0) / ${RECENCY_DECAY_DAYS})`
 
     const rows = this.#db
@@ -102,7 +103,7 @@ export class SearchService {
         summarySnippet: sql<
           string | null
         >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', '…', ${SNIPPET_TOKENS})`,
-        summaryMatchQuality: sql<number>`bm25(${feedItemSearch}, 0, 1, 0)`,
+        summaryMatchQuality: bm25(SUMMARY_ALONE),
       })
       .from(feedItemSearch)
       .innerJoin(feedItems, eq(feedItems.id, feedItemSearch.rowid))
@@ -172,6 +173,11 @@ function folded(value: string): string {
     .normalize('NFKD')
     .replace(/\p{M}+/gu, '')
     .toLowerCase()
+}
+
+function bm25(weights: ColumnWeights): SQL<number> {
+  const ordered = SEARCHED_COLUMNS.map((column) => sql`${weights[column]}`)
+  return sql<number>`bm25(${feedItemSearch}, ${sql.join(ordered, sql`, `)})`
 }
 
 function wordsOf(query: string): string[] {
