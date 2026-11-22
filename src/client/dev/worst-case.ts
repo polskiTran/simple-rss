@@ -217,6 +217,11 @@ const WORST_TODAY: readonly ItemSeed[] = [
   { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
   { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
   { feed: 6, title: POST_TITLE, time: '17:45' },
+  ...['17:40', '17:35', '17:30', '17:25'].map((time, index) => ({
+    feed: 6,
+    title: `Shipping notes, week ${41 - index}`,
+    time,
+  })),
   { feed: 8, title: UNTITLED_FEED_ITEM_TITLE, time: '17:15' },
   {
     feed: 9,

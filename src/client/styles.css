@@ -2227,8 +2227,8 @@
     background: linear-gradient(to top, transparent, var(--color-ground) 8px);
   }
 
-  html:has(.feed-day[data-unfolded]) {
-    scroll-padding-block-start: 56px;
+  .feed-day[data-unfolded] .feed-day-item :is(a, button) {
+    scroll-margin-block-start: var(--feed-day-head, 0px);
   }
 
   .feed-day-items {
