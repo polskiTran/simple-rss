@@ -391,17 +391,16 @@ export function applyMigrations(
 
   const already = new Set(recorded)
   const applied: number[] = []
+  const driver = db.$client
+  const record = driver.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
+  const apply = driver.transaction((migration: Migration) => {
+    driver.exec(migration.sql)
+    record.run(migration.version, migration.name, clock.now().toISOString())
+  })
 
   for (const migration of pending) {
     if (already.has(migration.version)) continue
-
-    db.transaction((tx) => {
-      db.$client.exec(migration.sql)
-      tx.run(
-        sql`INSERT INTO schema_migrations (version, name, applied_at)
-            VALUES (${migration.version}, ${migration.name}, ${clock.now().toISOString()})`,
-      )
-    })
+    apply(migration)
     applied.push(migration.version)
   }
 
