@@ -2,17 +2,21 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
+import type { MatchRange } from '../../src/shared/api.js'
 import { day, digest, searchResult } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const TODAY_HEADING = 'Today Saturday 8\u00a0August (1)'
 
 const result = (feedItemId: number, title: string, date: string, saved = false) =>
-  searchResult({ feedItemId, title, date: day(date), saved })
+  searchResult({ feedItemId, title: { text: title, matches: [] }, date: day(date), saved })
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
+
+const marksIn = (container: HTMLElement) =>
+  [...container.querySelectorAll('mark.match')].map((mark) => mark.textContent)
 
 describe('the search line in the chrome', () => {
   it('swaps the screen for results that say title, Feed, date, and saved state', async () => {
@@ -190,23 +194,65 @@ describe('the search line in the chrome', () => {
     expect(screen.queryByRole('button', { name: 'Newest' })).toBeNull()
   })
 
-  it('marks the words that matched, in the title and the snippet alike', async () => {
+  it('marks exactly the ranges the server matched, in the title and the snippet alike', async () => {
     stubApi().on('GET /api/search?q=Tide', {
       body: {
         scope: 'everywhere',
         today: '2026-08-08',
         subscriptions: [],
-        results: [{ ...result(9, 'Tide chronology', '2026-08-08'), snippet: 'Low tide came early.' }],
+        results: [
+          searchResult({
+            feedItemId: 9,
+            title: { text: 'Tide chronology', matches: [[0, 4]] },
+            snippet: {
+              text: 'Low tide came early, then tides turned.',
+              matches: [
+                [4, 8],
+                [26, 31],
+              ],
+            },
+          }),
+        ],
       },
     })
     window.history.replaceState(null, '', '/search?q=Tide')
     const { container } = render(<App />)
 
     await screen.findByRole('region', { name: 'search results' })
-    const marks = [...container.querySelectorAll('mark.match')].map((mark) => mark.textContent)
-    expect(marks).toEqual(['Tide', 'tide'])
+    expect(marksIn(container)).toEqual(['Tide', 'tide', 'tides'])
+    expect(container.querySelector('.item-snippet')?.textContent).toBe('Low tide came early, then tides turned.')
     expect(screen.getByRole('link', { name: 'Tide chronology' })).toBeDefined()
   })
+
+  it.each([
+    { line: 'c++ --', query: 'c%2B%2B+--', matches: [[9, 10]], marks: ['C'] },
+    {
+      line: 'c',
+      query: 'c',
+      matches: [
+        [9, 10],
+        [20, 29],
+      ],
+      marks: ['C', 'compilers'],
+    },
+  ] satisfies { line: string; query: string; matches: MatchRange[]; marks: string[] }[])(
+    'marks what the server matched for “$line”, not the words as typed',
+    async ({ query, matches, marks }) => {
+      stubApi().on(`GET /api/search?q=${query}`, {
+        body: {
+          scope: 'everywhere',
+          today: '2026-08-08',
+          subscriptions: [],
+          results: [searchResult({ title: { text: 'Notes on C++ -- and compilers', matches } })],
+        },
+      })
+      window.history.replaceState(null, '', `/search?q=${query}`)
+      const { container } = render(<App />)
+
+      await screen.findByRole('region', { name: 'search results' })
+      expect(marksIn(container)).toEqual(marks)
+    },
+  )
 
   it('narrows the results to the ticked Feeds, and clears back to all of them', async () => {
     stubApi().on('GET /api/search?q=light', {

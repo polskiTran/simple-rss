@@ -383,7 +383,8 @@ describe('the section an open article reads under', () => {
 })
 
 describe('the scope a search takes from its screen', () => {
-  const found = (...titles: string[]) => titles.map((title, index) => searchResult({ feedItemId: 3 + index, title }))
+  const found = (...titles: string[]) =>
+    titles.map((title, index) => searchResult({ feedItemId: 3 + index, title: { text: title, matches: [] } }))
   const withinFeed = {
     body: { scope: 'feed', today: day('2026-08-08'), feed: { title: 'Field Notes' }, results: found('First light') },
   } satisfies Reply<SearchResults>

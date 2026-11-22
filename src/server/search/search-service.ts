@@ -1,7 +1,10 @@
 import { and, desc, eq, isNotNull, or, type SQL, sql } from 'drizzle-orm'
 import {
+  type MarkedText,
+  type MatchRange,
   SEARCH_RESULT_LIMIT,
   SEARCH_SUBSCRIPTION_LIMIT,
+  UNTITLED_FEED_ITEM_TITLE,
   type SearchResult,
   type SearchResults,
   type SearchScope,
@@ -24,8 +27,13 @@ const MATCH_WEIGHTS = { item_title: 4, summary: 1, feed_title: 2 } satisfies Col
 const SUMMARY_ALONE = { item_title: 0, summary: 1, feed_title: 0 } satisfies ColumnWeights
 const RECENCY_DECAY_DAYS = 30
 
+const TITLE_COLUMN = SEARCHED_COLUMNS.indexOf('item_title')
 const SNIPPET_COLUMN = SEARCHED_COLUMNS.indexOf('summary')
 const SNIPPET_TOKENS = 20
+const SNIPPET_ELLIPSIS = '…'
+
+const MATCH_OPENS = '\uE000'
+const MATCH_CLOSES = '\uE001'
 
 export class SearchService {
   readonly #db: DrizzleDatabase
@@ -105,9 +113,13 @@ export class SearchService {
         ...LISTED_ITEM_COLUMNS,
         feedId: feeds.id,
         feedTitle: effectiveFeedTitle,
+        markedTitle: sql<string | null>`highlight(${feedItemSearch}, ${TITLE_COLUMN}, ${MATCH_OPENS}, ${MATCH_CLOSES})`,
         summarySnippet: sql<
           string | null
-        >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', '…', ${SNIPPET_TOKENS})`,
+        >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, '', '', ${SNIPPET_ELLIPSIS}, ${SNIPPET_TOKENS})`,
+        markedSummarySnippet: sql<
+          string | null
+        >`snippet(${feedItemSearch}, ${SNIPPET_COLUMN}, ${MATCH_OPENS}, ${MATCH_CLOSES}, ${SNIPPET_ELLIPSIS}, ${SNIPPET_TOKENS})`,
         summaryMatchQuality: bm25(SUMMARY_ALONE),
       })
       .from(feedItemSearch)
@@ -130,11 +142,15 @@ export class SearchService {
     const dayOf = dayKeysIn(timezone)
     return rows.map((row) => ({
       ...listedItemOf(row),
+      title: markedTextOf(row.markedTitle, row.title ?? UNTITLED_FEED_ITEM_TITLE),
       feedId: row.feedId,
       feedTitle: row.feedTitle,
       date: dayOf(row.chronologyAt),
       displayTime: displayTimeOf(row, timezone),
-      snippet: row.summaryMatchQuality < 0 ? row.summarySnippet : null,
+      snippet:
+        row.summaryMatchQuality < 0 && row.summarySnippet !== null
+          ? markedTextOf(row.markedSummarySnippet, row.summarySnippet)
+          : null,
     }))
   }
 
@@ -183,6 +199,18 @@ function folded(value: string): string {
 function bm25(weights: ColumnWeights): SQL<number> {
   const ordered = SEARCHED_COLUMNS.map((column) => sql`${weights[column]}`)
   return sql<number>`bm25(${feedItemSearch}, ${sql.join(ordered, sql`, `)})`
+}
+
+function markedTextOf(marked: string | null, text: string): MarkedText {
+  const matches: MatchRange[] = []
+  let unmarked = ''
+  let start = 0
+  for (const character of marked ?? '') {
+    if (character === MATCH_OPENS) start = unmarked.length
+    else if (character === MATCH_CLOSES) matches.push([start, unmarked.length])
+    else unmarked += character
+  }
+  return { text, matches: unmarked === text ? matches : [] }
 }
 
 function wordsOf(query: string): string[] {

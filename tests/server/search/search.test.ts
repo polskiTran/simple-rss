@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  type MatchRange,
   SEARCH_RESULT_LIMIT,
   SEARCH_SUBSCRIPTION_LIMIT,
   searchParamsOf,
@@ -45,6 +46,8 @@ async function subscribed(user: Device, service: TestService, xml: string, url: 
   expect(response.status).toBe(201)
 }
 
+const slices = (text: string, matches: readonly MatchRange[]) => matches.map(([start, end]) => text.slice(start, end))
+
 type Answer<K extends SearchScope['kind']> = Extract<SearchResults, { scope: K }>
 
 function search(user: Device, query: string): Promise<Answer<'everywhere'>>
@@ -71,7 +74,7 @@ async function foundTitles(
   scope: SearchScope = { kind: 'everywhere' },
 ): Promise<string[]> {
   const answer = await search(user, query, scope)
-  return 'results' in answer ? answer.results.map((result) => result.title) : []
+  return 'results' in answer ? answer.results.map((result) => result.title.text) : []
 }
 
 describe('searching retained reading metadata', () => {
@@ -98,7 +101,7 @@ describe('searching retained reading metadata', () => {
     const [result] = (await search(user, 'chronology')).results
     expect(result).toEqual({
       feedItemId: 1,
-      title: 'Morning chronology',
+      title: { text: 'Morning chronology', matches: [[8, 18]] },
       feedId: 1,
       feedTitle: 'Field Notes',
       publishedAt: '2026-08-08T07:15:00.000Z',
@@ -129,18 +132,70 @@ describe('searching retained reading metadata', () => {
     )
 
     const [summaryMatch] = (await search(user, 'estuary')).results
-    expect(summaryMatch?.snippet).toBe('Notes on tidal patterns along the estuary')
+    expect(summaryMatch?.snippet?.text).toBe('Notes on tidal patterns along the estuary')
 
     const [deepMatch] = (await search(user, 'heron')).results
-    expect(deepMatch?.snippet).toContain('the heron lifted')
-    expect(deepMatch?.snippet).not.toContain('filler0')
+    expect(deepMatch?.snippet?.text).toContain('the heron lifted')
+    expect(deepMatch?.snippet?.text).not.toContain('filler0')
 
     const [titleMatch] = (await search(user, 'chronology')).results
     expect(titleMatch?.snippet).toBeNull()
 
     const noSummaryResults = (await search(user, 'field notes')).results
-    const chronologyByFeed = noSummaryResults.find((result) => result.title === 'Morning chronology')
+    const chronologyByFeed = noSummaryResults.find((result) => result.title.text === 'Morning chronology')
     expect(chronologyByFeed?.snippet).toBeNull()
+  })
+
+  it('says where the title and the snippet matched, as the index tokenized the line', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(
+      user,
+      service,
+      rss(
+        'Field Notes',
+        item('a', 'Notes on C++ -- and compilers', { pubDate: '2026-08-08T07:00:00.000Z' }),
+        item('b', 'Chronology', { pubDate: '2026-08-08T06:00:00.000Z' }),
+        item('c', '𝄞 Résumé, revised', {
+          pubDate: '2026-08-08T05:00:00.000Z',
+          summary: 'The résumé went out, as résumés rarely do',
+        }),
+      ),
+    )
+    const titleMarks = async (query: string) =>
+      (await search(user, query)).results.map(({ title }) => slices(title.text, title.matches))
+
+    expect(await titleMarks('c++ --')).toEqual([['C', 'compilers'], ['Chronology']])
+    expect(await titleMarks('c')).toEqual([['C', 'compilers'], ['Chronology']])
+
+    const [resume] = (await search(user, 'resume')).results
+    expect(resume?.title).toEqual({ text: '𝄞 Résumé, revised', matches: [[3, 9]] })
+    expect(resume?.snippet).toEqual({
+      text: 'The résumé went out, as résumés rarely do',
+      matches: [
+        [4, 10],
+        [24, 31],
+      ],
+    })
+  })
+
+  it('marks nothing rather than the wrong place when a Feed’s text carries the marker characters', async () => {
+    const service = await startTestService()
+    const user = await claimedDevice(service)
+    await subscribed(
+      user,
+      service,
+      rss(
+        'Field Notes',
+        item('a', 'Private \uE000glyphs\uE001 in a title', {
+          summary: 'Private \uE001glyphs\uE000 hide in plain sight',
+        }),
+      ),
+    )
+
+    const [result] = (await search(user, 'private')).results
+    expect(result?.title).toEqual({ text: 'Private \uE000glyphs\uE001 in a title', matches: [] })
+    expect(result?.snippet).toEqual({ text: 'Private \uE001glyphs\uE000 hide in plain sight', matches: [] })
   })
 
   it('matches calmly through typing, diacritics, and would-be operators', async () => {
@@ -328,7 +383,7 @@ describe('searching retained reading metadata', () => {
     await service.wakeScheduler()
 
     const [result] = (await search(user, 'saved essay')).results
-    expect([result?.title, result?.feedTitle, result?.saved]).toEqual(['Saved essay', 'Field Notes', true])
+    expect([result?.title.text, result?.feedTitle, result?.saved]).toEqual(['Saved essay', 'Field Notes', true])
     expect(await foundTitles(user, 'passing')).toEqual([])
   })
 
@@ -388,8 +443,8 @@ describe('searching retained reading metadata', () => {
 
     const { results } = await search(user, 'numbered')
     expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
-    expect(results[0]?.title).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
-    expect(results.at(-1)?.title).toBe('Numbered entry 5')
+    expect(results[0]?.title.text).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
+    expect(results.at(-1)?.title.text).toBe('Numbered entry 5')
   })
 
   it('keeps a strong old title match inside the bound when newer weak matches would crowd it out', async () => {
@@ -409,7 +464,7 @@ describe('searching retained reading metadata', () => {
 
     const { results } = await search(user, 'estuary')
     expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
-    expect(results[0]?.title).toBe('Estuary crossings')
+    expect(results[0]?.title.text).toBe('Estuary crossings')
   })
 
   it("sorted newest, answers the newest fifty matches in the Digest's chronology, however strong an older one", async () => {
@@ -429,7 +484,7 @@ describe('searching retained reading metadata', () => {
 
     const response = await user.get(`/api/search?${searchParamsOf('estuary', { kind: 'everywhere' }, 'newest')}`)
     const answer = searchResultsSchema.parse(await response.json())
-    expect('results' in answer ? answer.results.map((result) => result.title) : []).toEqual(
+    expect('results' in answer ? answer.results.map((result) => result.title.text) : []).toEqual(
       Array.from({ length: SEARCH_RESULT_LIMIT }, (_, index) => `Numbered entry ${SEARCH_RESULT_LIMIT + 4 - index}`),
     )
   })
@@ -451,9 +506,9 @@ describe('searching retained reading metadata', () => {
 
     const { results } = await search(user, 'numbered')
     expect(results).toHaveLength(SEARCH_RESULT_LIMIT)
-    expect(results.map((entry) => entry.title)).not.toContain('Numbered entry future')
-    expect(results[0]?.title).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
-    expect(results.at(-1)?.title).toBe('Numbered entry 5')
+    expect(results.map((entry) => entry.title.text)).not.toContain('Numbered entry future')
+    expect(results[0]?.title.text).toBe(`Numbered entry ${SEARCH_RESULT_LIMIT + 4}`)
+    expect(results.at(-1)?.title.text).toBe('Numbered entry 5')
   })
 
   it('jumps to Subscriptions by effective title and domain, in the same response as the items', async () => {
@@ -468,7 +523,7 @@ describe('searching retained reading metadata', () => {
     ])
     expect(byTitle.subscriptions[0]?.cadence).toHaveLength(30)
     expect(byTitle.subscriptions[0]?.cadence.reduce((sum, count) => sum + count, 0)).toBe(1)
-    expect(byTitle.results.map((result) => result.title)).toEqual(['Morning chronology'])
+    expect(byTitle.results.map((result) => result.title.text)).toEqual(['Morning chronology'])
 
     const byDomain = await search(user, 'shore.example')
     expect(byDomain.subscriptions.map((entry) => entry.title)).toEqual(['The Quiet Coast'])
@@ -512,7 +567,7 @@ describe('searching retained reading metadata', () => {
 
     const answer = await search(user, 'field')
     expect(answer.subscriptions).toEqual([])
-    expect(answer.results.map((result) => result.title)).toEqual(['Saved essay'])
+    expect(answer.results.map((result) => result.title.text)).toEqual(['Saved essay'])
   })
 
   it('caps the jump-to group everywhere, and leaves it whole where it is the answer: the Feeds screen', async () => {
@@ -550,9 +605,9 @@ describe('searching retained reading metadata', () => {
 
     const scoped = await search(user, 'slow', { kind: 'feed', feedId: 2 })
     expect(scoped.feed.title).toBe('Shore Letters')
-    expect(scoped.results.map((result) => result.title)).toEqual(['Slow water'])
+    expect(scoped.results.map((result) => result.title.text)).toEqual(['Slow water'])
     const byFeedTitle = await search(user, 'shore', { kind: 'feed', feedId: 2 })
-    expect(byFeedTitle.results.map((result) => result.title)).toEqual(['Slow water'])
+    expect(byFeedTitle.results.map((result) => result.title.text)).toEqual(['Slow water'])
     expect(byFeedTitle).not.toHaveProperty('subscriptions')
   })
 
@@ -578,7 +633,7 @@ describe('searching retained reading metadata', () => {
     expect(await foundTitles(user, 'estuary')).toEqual(['Estuary tides', 'Estuary crossings', 'Morning links'])
     expect(await search(user, 'estuary', { kind: 'saved' })).toMatchObject({
       scope: 'saved',
-      results: [{ title: 'Estuary crossings' }, { title: 'Morning links' }],
+      results: [{ title: { text: 'Estuary crossings' } }, { title: { text: 'Morning links' } }],
     })
   })
 
