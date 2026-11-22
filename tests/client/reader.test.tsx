@@ -30,7 +30,7 @@ afterEach(() => {
 })
 
 describe('Reader View', () => {
-  it('shows Feed Content through loading and failure, then replaces it with the original on retry', async () => {
+  it('falls back to Feed Content when the original fails, then replaces it with the original on retry', async () => {
     const pending = Promise.withResolvers<void>()
     let healed = false
     const api = reading()
@@ -52,14 +52,14 @@ describe('Reader View', () => {
       })
     render(<App />)
     const user = userEvent.setup()
+    expect(await screen.findByText('Reading the original webpage')).toBeDefined()
+    expect(screen.queryByRole('heading', { name: 'Feed methods' })).toBeNull()
+    pending.resolve()
+    await screen.findByRole('button', { name: 'Retry' })
     expect(await screen.findByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(screen.getByText('Feed content for now')).toBeDefined()
     expect(screen.getByText('2 min read')).toBeDefined()
     expect(screen.getByText('Shortened by simple.')).toBeDefined()
-    expect(screen.getByText('Reading the original webpage')).toBeDefined()
-    pending.resolve()
-    await screen.findByRole('button', { name: 'Retry' })
-    expect(screen.getByRole('heading', { name: 'Feed methods' })).toBeDefined()
     expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(1)
     healed = true
     await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -76,25 +76,34 @@ describe('Reader View', () => {
     expect(screen.getByRole('button', { name: 'Feed content' }).getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('brings the Original webpage in as a new article over Feed Content, never rewriting it in place', async () => {
+  it('keeps the summary above the arriving Original webpage, folded only when the User asks', async () => {
     const pending = Promise.withResolvers<void>()
     reading()
       .on('GET /api/items/3', {
-        body: { ...ITEM, feedContent: { markdown: '## Feed methods', truncated: true, readingTimeMinutes: 2 } },
+        body: { ...ITEM, feedContent: { markdown: '## Feed methods', truncated: false, readingTimeMinutes: 1 } },
       })
       .on('GET /api/items/3/reader', async () => {
         await pending.promise
         return { body: ARTICLE }
       })
     render(<App />)
+    const user = userEvent.setup()
 
-    const standIn = (await screen.findByRole('heading', { name: 'Feed methods' })).closest('.article-body')
+    const summary = await screen.findByText('A clear morning over the valley.')
+    const toggle = screen.getByRole('button', { name: 'Summary' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Reading the original webpage')).toBeDefined()
+    expect(screen.queryByRole('heading', { name: 'Feed methods' })).toBeNull()
+
     pending.resolve()
-    const arrived = (await screen.findByRole('heading', { name: 'Dawn' })).closest('.article-body')
+    await screen.findByRole('heading', { level: 3, name: 'Dawn' })
+    expect(summary.isConnected).toBe(true)
+    expect(screen.queryByText('Reading the original webpage')).toBeNull()
 
-    expect(arrived).not.toBeNull()
-    expect(arrived).not.toBe(standIn)
-    expect(standIn?.isConnected).toBe(false)
+    await user.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    await waitFor(() => expect(screen.queryByText('A clear morning over the valley.')).toBeNull())
+    expect(screen.getByRole('heading', { level: 3, name: 'Dawn' })).toBeDefined()
   })
 
   it('uses the Subscription preference without requesting the original and ignores a held old source', async () => {

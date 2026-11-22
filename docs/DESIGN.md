@@ -365,12 +365,17 @@ day with whole counts.
 Save on the right — over a 680px column: the title, a meta line of the Feed (a
 link), the day and the minutes to read, the Reading Source switch
 (spanning the column on a phone), then the article.
+While the reading is the Original webpage, the item's summary sits above the
+article in a thin-edged box headed Summary, open on arrival. The Original
+webpage loads under it and nothing replaces it, so the summary is never taken
+from the User mid-sentence; pressing the header folds the box to that line and
+opens it again. Feed Content stands in only once the Original webpage fails.
 The Discussion appears only when the Feed declares one. It is a grey button in
 that toolbar, labelled Discussion beside a chat bubble, and on a phone the same
 square as Open original and Save, the bubble alone, named Discussion. It opens
 in a new tab because it leaves for another site.
 The meta line names the reading only when it is not the one chosen: "Feed
-content for now" while the Original webpage loads or fails, or the one reading
+content for now" once the Original webpage fails, or the one reading
 an item has when the chosen one is missing. Article links are ink and
 underlined; they all leave, so none carries ↗. Next in the digest closes the
 article as an item box.
@@ -451,7 +456,7 @@ each preference.
 ## 7. Motion
 
 Screens and lists are instant, but for the Digest's three changes of length
-below. What the User presses or opens — a control, a
+and the Reader's Summary box below. What the User presses or opens — a control, a
 switch, a screen with its title and toolbar, a hover, a jump within a page —
 changes in the same frame, and nothing moves: a pressed control steps its fill,
 never its size. The lists read many times a day — item boxes, Feed rows and
@@ -463,10 +468,13 @@ A saved title's highlight sweeps in as it is saved, the one thing a list moves:
 it answers the press, and with reduced motion it appears at once.
 What answers an action — what an address answers in Add feed, the undo line an
 unsave leaves, the notice or error an action answers with — fades in over 150ms
-as it mounts, opacity only. So does an article, and the Original webpage arriving
-over Feed Content is a new article that fades in, never text rewritten in
-place. A wait shorter than 400ms shows nothing; after that the waiting line
-fades in.
+as it mounts, opacity only. An article arrives block by block instead: its
+first six blocks fade in over 280ms and rise 8px over 320ms, 0, 40, 75, 105,
+130 and 150ms apart, the next six together at 165ms, and the rest are already
+there. Opacity takes a plain `ease`, since the strong ease-out shows a large
+block almost whole in its first frame. The Original webpage arriving over Feed
+Content is a new article that arrives this way, never text rewritten in place.
+A wait shorter than 400ms shows nothing; after that the waiting line fades in.
 Stepping to another day keeps the one on show until the next answers, so the
 screen changes once rather than emptying first. The new list then fades in over
 240ms, moving 12px: up from below when the User went back in time, down from
@@ -481,6 +489,10 @@ only as far as the screen's bottom edge. Folded from far down, the page returns
 to the box's start in the frame of the press, and the header stays where it was
 stuck.
 
+The Reader's Summary box folds the same way: it opens over 240ms and closes over
+180ms, its text fading with the height so the article below slides rather than
+jumps. Its chevron turns in the frame of the press.
+
 A change of Appearance crossfades the screen over 200ms, the one press that is
 not answered in the same frame.
 
@@ -493,8 +505,8 @@ at once.
 A dialog is the one thing with an exit (see Dialog). Under
 `prefers-reduced-motion` there is less motion, not none: fades stay, nothing
 moves — the sheet fades in place instead of rising, the search field fades
-instead of opening, a Feed's day changes height at once, another day only
-fades in, and the waiting tile and the mark hold still.
+instead of opening, a Feed's day and the Summary box change height at once, another day and an
+article's blocks only fade in, and the waiting tile and the mark hold still.
 
 ## 8. Not yet designed
 
