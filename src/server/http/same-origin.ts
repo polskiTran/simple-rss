@@ -23,7 +23,13 @@ export function sameOrigin(options: SameOriginOptions): MiddlewareHandler {
 }
 
 function expectedProtocol(c: Parameters<MiddlewareHandler>[0], options: SameOriginOptions): string {
-  const forwarded = options.trustProxyHeaders ? c.req.header('x-forwarded-proto')?.split(',')[0]?.trim() : undefined
+  const forwarded = options.trustProxyHeaders
+    ? c.req
+        .header('x-forwarded-proto')
+        ?.split(',')
+        .map((entry) => entry.trim())
+        .findLast((entry) => entry.length > 0)
+    : undefined
 
   return forwarded ? `${forwarded.toLowerCase()}:` : new URL(c.req.url).protocol
 }
