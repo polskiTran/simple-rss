@@ -1,7 +1,5 @@
 import { fitsPasswordBytes } from '../../shared/api.js'
-import { hash, verify, type Algorithm } from '@node-rs/argon2'
-
-const ARGON2ID: Algorithm = 2
+import { hash, verify } from '@node-rs/argon2'
 
 export interface PasswordHasher {
   hash(password: string): Promise<string>
@@ -15,12 +13,10 @@ export const ARGON2ID_PARAMETERS = {
 } as const
 
 export function argon2idHasher(): PasswordHasher {
-  const options = { ...ARGON2ID_PARAMETERS, algorithm: ARGON2ID }
-
   return {
     async hash(password) {
       assertHashable(password)
-      return hash(password, options)
+      return hash(password, ARGON2ID_PARAMETERS)
     },
 
     async verify(storedHash, password) {

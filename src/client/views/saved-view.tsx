@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { useState, useTransition } from 'react'
 import { useScreenTitle } from '../arrival.js'
-import type { LibraryItem, LibraryOrder } from '../../shared/api.js'
+import type { DateKey, LibraryItem, LibraryOrder } from '../../shared/api.js'
 import { fetchLibrary, saveToLibrary } from '../api.js'
 import { Choice } from '../components/choice.js'
 import { Group } from '../components/group.js'
@@ -97,7 +97,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
         }))
       : [...Map.groupBy(library.items, (item) => item.savedDate.slice(0, 7))].map(([month, items], index, all) => ({
           id: `saved-${month}`,
-          title: monthName(`${month}-01`, library.today),
+          title: monthName(month, library.today),
           items,
           complete: complete || index < all.length - 1,
         }))
@@ -158,7 +158,7 @@ export function SavedView({ onOpenItem, onOpenFeed }: SavedViewProps) {
   )
 }
 
-function savedLabel(savedDate: string, today: string): string {
+function savedLabel(savedDate: DateKey, today: DateKey): string {
   return `Saved ${relativeDay(savedDate, today)?.toLowerCase() ?? dayOfYear(savedDate, today)}`
 }
 

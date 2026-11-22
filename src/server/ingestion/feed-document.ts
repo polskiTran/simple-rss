@@ -1,3 +1,4 @@
+import { MAX_FEED_DESCRIPTION_LENGTH, MAX_FEED_TITLE_LENGTH } from '../../shared/api.js'
 import { hasOwn } from '../../shared/record.js'
 import { createHash } from 'node:crypto'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
@@ -10,8 +11,7 @@ import {
 } from './feed-content.js'
 import { arrayOf, asRecord, declaresXmlEntities } from './xml.js'
 
-const MAX_TITLE_LENGTH = 512
-const MAX_DESCRIPTION_LENGTH = 1_024
+const MAX_ITEM_TITLE_LENGTH = 512
 const MAX_SUMMARY_LENGTH = 20_000
 
 export type FeedItemIdentityKind = 'guid' | 'link' | 'content'
@@ -107,7 +107,7 @@ function parseRss(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
 
   const record = asRecord(channel)
   const title = requiredFeedTitle(recordField(record, ['title']), baseUrl)
-  const description = boundedPlainText(recordField(record, ['description']), MAX_DESCRIPTION_LENGTH)
+  const description = boundedPlainText(recordField(record, ['description']), MAX_FEED_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(recordField(record, ['link']), baseUrl, feedUrls)
   const items = arrayOf(recordField(record, ['item'])).map((item) =>
     normalizeItem(asRecord(item), declaredBase(record, declaredBase(asRecord(root), { xmlBase: baseUrl })), false),
@@ -118,7 +118,7 @@ function parseRss(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
 function parseAtom(root: unknown, baseUrl: string, feedUrls: readonly string[]): ParsedFeedDocument {
   const record = asRecord(root)
   const title = requiredFeedTitle(recordField(record, ['title', 'atom:title']), baseUrl)
-  const description = boundedPlainText(recordField(record, ['subtitle', 'atom:subtitle']), MAX_DESCRIPTION_LENGTH)
+  const description = boundedPlainText(recordField(record, ['subtitle', 'atom:subtitle']), MAX_FEED_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(atomLink(record, 'alternate'), baseUrl, feedUrls)
   const entries = recordField(record, ['entry', 'atom:entry'])
   const items = arrayOf(entries).map((entry) =>
@@ -135,7 +135,7 @@ function parseRdf(root: unknown, baseUrl: string, feedUrls: readonly string[]): 
   }
 
   const title = requiredFeedTitle(recordField(channel, ['title']), baseUrl)
-  const description = boundedPlainText(recordField(channel, ['description']), MAX_DESCRIPTION_LENGTH)
+  const description = boundedPlainText(recordField(channel, ['description']), MAX_FEED_DESCRIPTION_LENGTH)
   const homePageUrl = homePageUrlOf(recordField(channel, ['link']), baseUrl, feedUrls)
   const items = arrayOf(recordField(record, ['item'])).map((item) =>
     normalizeItem(asRecord(item), declaredBase(record, { xmlBase: baseUrl }), false),
@@ -158,7 +158,7 @@ function pageKey(value: string): string {
 }
 
 function normalizeItem(record: Record<string, unknown>, inherited: DocumentBase, atom: boolean): NormalizedFeedItem {
-  const title = boundedPlainText(recordField(record, ['title', 'atom:title']), MAX_TITLE_LENGTH)
+  const title = boundedPlainText(recordField(record, ['title', 'atom:title']), MAX_ITEM_TITLE_LENGTH)
   const itemBase = declaredBase(record, inherited)
   const linkElement = atom ? atomLinkElement(record, 'alternate') : recordField(record, ['link'])
   const declaredLink = normalizeHttpUrl(
@@ -276,7 +276,7 @@ function atomLinkElement(record: Record<string, unknown>, relationship: string):
 }
 
 function requiredFeedTitle(value: unknown, baseUrl: string): string {
-  return boundedPlainText(value, MAX_TITLE_LENGTH) ?? new URL(baseUrl).hostname
+  return boundedPlainText(value, MAX_FEED_TITLE_LENGTH) ?? new URL(baseUrl).hostname
 }
 
 function normalizeHttpUrl(value: unknown, baseUrl: string): string | null {

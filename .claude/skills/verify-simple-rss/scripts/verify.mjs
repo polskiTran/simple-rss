@@ -43,44 +43,6 @@ const SAME_LINE = {
   phone: ['feeds', 'saved', 'settings', 'search'],
 }
 
-const cadence = (step) => Array.from({ length: 30 }, (_, day) => (day % step === 0 ? (day % 3) + 1 : 0))
-const feed = (feedId, title, domain, step) => ({
-  feedId,
-  title,
-  domain,
-  homePageUrl: `https://${domain}/`,
-  cadence: cadence(step),
-})
-const hit = (feedItemId, title, feedId, feedTitle, saved) => ({
-  feedItemId,
-  title,
-  feedId,
-  feedTitle,
-  publishedAt: '2026-10-21T13:36:00Z',
-  firstSeenAt: '2026-10-21T13:36:00Z',
-  date: '2026-10-21',
-  displayTime: '13:36',
-  saved,
-  snippet: null,
-})
-
-const SEARCH_ANSWER = {
-  scope: 'everywhere',
-  today: '2026-10-22',
-  subscriptions: [
-    feed(1, 'ChinAI Newsletter', 'chinai.substack.com', 7),
-    feed(2, 'EconTalk Podcast Archive - Econlib', 'www.econlib.org', 5),
-    feed(3, 'Stanford Encyclopedia of Philosophy', 'plato.stanford.edu', 2),
-    feed(4, 'Statistical Modeling, Causal Inference, and Social Science', 'statmodeling.stat.columbia.edu', 3),
-    feed(5, 'Rindfleischetikettierungsüberwachungsaufgabenübertragungsgesetz', 'de.example', 11),
-  ],
-  results: [
-    hit(1, 'Hackers hijack Egypt highway billboard and Malaysian screens to show porn', 6, 'Hacker News', false),
-    hit(2, 'An Italian farmer found some unknown seeds in his attic and planted them', 6, 'Hacker News', true),
-    hit(3, 'Chatbots Are Learning to Think, and This Changes Everything', 7, 'WIRED>ALL', false),
-  ],
-}
-
 function options(args) {
   const parsed = { params: [] }
   for (let index = 0; index < args.length; index += 2) {
@@ -287,7 +249,6 @@ async function sweep(args) {
     page.on('pageerror', (error) => errors.push(error.message))
     await page.route('**/api/**', (route) => {
       const url = new URL(route.request().url())
-      if (url.pathname === '/api/search') return route.fulfill({ json: SEARCH_ANSWER })
       unanswered.push(`${route.request().method()} ${url.pathname}`)
       return route.abort()
     })

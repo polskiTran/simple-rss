@@ -1,13 +1,25 @@
-import type {
-  DigestCalendar,
-  Digest,
-  DigestItem,
-  FeedDetail,
-  FeedItems,
-  Library,
-  LibraryItem,
-  SubscriptionList,
-  SubscriptionSummary,
+import {
+  type DateKey,
+  dateKeySchema,
+  type DigestCalendar,
+  type Digest,
+  type DigestItem,
+  type FeedDetail,
+  type FeedItems,
+  LIBRARY_PAGE_SIZE,
+  type Library,
+  type LibraryItem,
+  MAX_FEED_TITLE_LENGTH,
+  SEARCH_RESULT_LIMIT,
+  SEARCH_SUBSCRIPTION_LIMIT,
+  type SearchResult,
+  type SearchResults,
+  type SearchSubscriptionMatch,
+  searchRequestSchema,
+  type SubscriptionList,
+  type SubscriptionSummary,
+  UNTITLED_FEED_ITEM_TITLE,
+  utcDayKey,
 } from '../../shared/api.js'
 
 const DATASETS = ['demo', 'worst', 'empty', 'one', 'huge'] as const
@@ -21,9 +33,11 @@ const LABELS = {
 } as const satisfies Record<Dataset, string>
 const STORAGE_KEY = 'break-ui:data'
 
-const TODAY = '2026-10-22'
-const YESTERDAY = '2026-10-21'
-const LAST_YEAR = '2025-12-31'
+const day = (key: string) => dateKeySchema.parse(key)
+
+const TODAY = day('2026-10-22')
+const YESTERDAY = day('2026-10-21')
+const LAST_YEAR = day('2025-12-31')
 
 function isDataset(value: string | null): value is Dataset {
   return DATASETS.some((dataset) => dataset === value)
@@ -176,7 +190,7 @@ const LONG_TITLE =
 const POST_TITLE =
   'Small thread on what happened to our deploy pipeline last night, because a few of you asked and I think the failure mode is genuinely interesting: at 02:14 the artifact cache filled up, the cleanup job that was supposed to run at 02:00 had been silently disabled in a config migration three weeks ago, and every build after that point started falling back to a cold cache, which pushed build times from four minutes to forty-one, which tripped the deploy timeout, which the on-call runbook told us to fix by retrying, which made it worse. 1/9 #devops #postmortem'.slice(
     0,
-    512,
+    MAX_FEED_TITLE_LENGTH,
   )
 const LONG_SUMMARY =
   `${'In the spring we noticed that the scheduler was dropping roughly one job in ten thousand under load. '.repeat(20)}`.trim()
@@ -203,7 +217,7 @@ const WORST_TODAY: readonly ItemSeed[] = [
   { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
   { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
   { feed: 6, title: POST_TITLE, time: '17:45' },
-  { feed: 8, title: 'Untitled', time: '17:15' },
+  { feed: 8, title: UNTITLED_FEED_ITEM_TITLE, time: '17:15' },
   {
     feed: 9,
     title: '<b>Release</b> &amp; notes — **v2.0** is out',
@@ -273,7 +287,7 @@ function digestOf(dataset: Exclude<Dataset, 'demo'>): Digest {
             returns: [],
           },
         ],
-        nextFrom: '2025-12-30',
+        nextFrom: day('2025-12-30'),
       }
     case 'empty':
       return { today: TODAY, groups: [], nextFrom: null }
@@ -305,9 +319,7 @@ function digestOf(dataset: Exclude<Dataset, 'demo'>): Digest {
 function calendarOf(dataset: Exclude<Dataset, 'demo'>): DigestCalendar {
   const listed = new Map(digestOf(dataset).groups.map((group) => [group.date, group.items.length]))
   const days = Array.from({ length: 26 * 7 }, (_, index) => {
-    const date = new Date(Date.parse(`${TODAY}T12:00:00Z`) - (26 * 7 - 1 - index) * 86_400_000)
-      .toISOString()
-      .slice(0, 10)
+    const date = utcDayKey(Date.parse(`${TODAY}T12:00:00Z`) - (26 * 7 - 1 - index) * 86_400_000)
     const filler = dataset === 'worst' ? (index % 5 === 0 ? 1_284 : index % 3) : 0
     return { date, count: listed.get(date) ?? filler }
   })
@@ -316,7 +328,7 @@ function calendarOf(dataset: Exclude<Dataset, 'demo'>): DigestCalendar {
 
 function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
   const feeds = feedsOf(dataset)
-  const item = (seed: ItemSeed, savedDate: string, subscribed = true): LibraryItem => ({
+  const item = (seed: ItemSeed, savedDate: DateKey, subscribed = true): LibraryItem => ({
     feedItemId: nextItemId++,
     title: seed.title,
     feedId: seed.feed,
@@ -337,7 +349,7 @@ function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
           item({ feed: 1, title: LONG_TITLE, time: '23:59' }, TODAY),
           item({ feed: 2, title: WORST_TODAY[1]?.title ?? '', time: '10:00' }, YESTERDAY),
           item({ feed: 99, title: 'Saved from a Feed that is gone', time: '09:00' }, LAST_YEAR, false),
-          item({ feed: 3, title: 'J', time: '08:00', link: null }, '1970-01-01'),
+          item({ feed: 3, title: 'J', time: '08:00', link: null }, day('1970-01-01')),
         ],
         nextCursor: 'more',
       }
@@ -355,7 +367,7 @@ function libraryOf(dataset: Exclude<Dataset, 'demo'>): Library {
         today: TODAY,
         total: 1_000,
         items: feeds
-          .slice(0, 50)
+          .slice(0, LIBRARY_PAGE_SIZE)
           .map((feed) => item({ feed: feed.feedId, title: `${feed.title}: saved`, time: '12:00' }, TODAY)),
         nextCursor: 'more',
       }
@@ -372,7 +384,7 @@ function feedDetailOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedDe
     reportedDescription: feed.description,
     customDescription: null,
     schedule: { pollingIntervalMinutes: 1440, nextPollAt: `${TODAY}T23:00:00Z` },
-    subscribedDate: feed.subscribedAt.slice(0, 10),
+    subscribedDate: day(feed.subscribedAt.slice(0, 10)),
     cadence: calendarOf(dataset).days,
   }
 }
@@ -398,6 +410,62 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
   }
 }
 
+function searchOf(dataset: Exclude<Dataset, 'demo'>, query: URLSearchParams): SearchResults | undefined {
+  const request = searchRequestSchema.safeParse(Object.fromEntries(query))
+  if (!request.success) return undefined
+  const { scope } = request.data
+  const feeds = feedsOf(dataset)
+  const { today, groups } = digestOf(dataset)
+  const hits = groups.flatMap((group) =>
+    group.items.map(
+      (item): SearchResult => ({
+        feedItemId: item.feedItemId,
+        title: item.title,
+        feedId: item.feedId,
+        feedTitle: item.feedTitle,
+        publishedAt: item.publishedAt,
+        firstSeenAt: item.firstSeenAt,
+        date: group.date,
+        displayTime: item.displayTime,
+        saved: item.saved,
+        snippet: item.summary,
+      }),
+    ),
+  )
+  const jumpTo = feeds.map(
+    ({ feedId, title, domain, homePageUrl, cadence }): SearchSubscriptionMatch => ({
+      feedId,
+      title,
+      domain,
+      homePageUrl,
+      cadence,
+    }),
+  )
+  switch (scope.kind) {
+    case 'everywhere':
+      return {
+        scope: 'everywhere',
+        today,
+        subscriptions: jumpTo.slice(0, SEARCH_SUBSCRIPTION_LIMIT),
+        results: hits.slice(0, SEARCH_RESULT_LIMIT),
+      }
+    case 'saved':
+      return { scope: 'saved', today, results: hits.filter((hit) => hit.saved).slice(0, SEARCH_RESULT_LIMIT) }
+    case 'subscriptions':
+      return { scope: 'subscriptions', today, subscriptions: jumpTo }
+    case 'feed': {
+      const feed = feeds.find((candidate) => candidate.feedId === scope.feedId)
+      if (!feed) return undefined
+      return {
+        scope: 'feed',
+        today,
+        feed: { title: feed.title },
+        results: hits.filter((hit) => hit.feedId === scope.feedId).slice(0, SEARCH_RESULT_LIMIT),
+      }
+    }
+  }
+}
+
 function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string, query: URLSearchParams) {
   if (path === '/api/auth/status') return { claimed: true, authenticated: true }
   if (path === '/api/meta') return { name: 'simple-rss', version: '0.0.0-worst-case' }
@@ -405,13 +473,14 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
   if (path === '/api/feeds') return { subscriptions: feedsOf(dataset) } satisfies SubscriptionList
   if (path === '/api/digest') {
     const digest = digestOf(dataset)
-    const from = query.get('from')
-    if (!from) return digest
+    const parsedFrom = dateKeySchema.safeParse(query.get('from'))
+    if (!parsedFrom.success) return digest
+    const from = parsedFrom.data
     if (from !== digest.nextFrom) return { ...digest, groups: digest.groups.filter((group) => group.date <= from) }
     const feeds = feedsOf(dataset)
     return {
       today: digest.today,
-      groups: [from, '2025-12-29'].map((date) => ({
+      groups: [from, day('2025-12-29')].map((date) => ({
         date,
         items: [1, 3].map((feed) => digestItem({ feed, title: `An older item, ${date}`, time: '08:00' }, date, feeds)),
         returns: [],
@@ -421,6 +490,7 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
   }
   if (path === '/api/digest/days') return calendarOf(dataset)
   if (path === '/api/library') return libraryOf(dataset)
+  if (path === '/api/search') return searchOf(dataset, query)
   const library = path.match(/^\/api\/library\/(\d+)$/)
   if (library) {
     const saved = method === 'PUT'

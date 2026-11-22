@@ -1,26 +1,27 @@
 import { vi } from 'vitest'
+import type { z } from 'zod'
 import type {
   ApiErrorBody,
   AuthStatus,
-  CreateSubscriptionResponse,
-  Digest,
-  DigestCalendar,
-  FeedDetail,
+  createSubscriptionResponseSchema,
+  digestCalendarSchema,
+  digestSchema,
+  feedDetailSchema,
   FeedDetailsUpdate,
-  FeedItems,
-  FeedPreviewResponse,
+  feedItemsSchema,
+  feedPreviewResponseSchema,
   InstallationPreferences,
-  Library,
+  librarySchema,
   LibraryMembership,
   OpmlImportReport,
   PollingSchedule,
   ReaderArticle,
-  ReaderItem,
+  readerItemSchema,
   ReadingSourcePreference,
   RefreshFeedResponse,
-  SearchResults,
+  searchResultsSchema,
   ServiceMeta,
-  SubscriptionList,
+  subscriptionListSchema,
 } from '../../src/shared/api.js'
 import { digest, library } from './fixtures.js'
 
@@ -33,27 +34,27 @@ interface Answers {
   'GET /api/meta': ServiceMeta
   'GET /api/settings': InstallationPreferences
   'PUT /api/settings/timezone': InstallationPreferences
-  'GET /api/feeds': SubscriptionList
-  'POST /api/subscriptions/preview': FeedPreviewResponse
-  'POST /api/subscriptions': CreateSubscriptionResponse
+  'GET /api/feeds': z.input<typeof subscriptionListSchema>
+  'POST /api/subscriptions/preview': z.input<typeof feedPreviewResponseSchema>
+  'POST /api/subscriptions': z.input<typeof createSubscriptionResponseSchema>
   'POST /api/subscriptions/import': OpmlImportReport
-  [route: `GET /api/feeds/${number}`]: FeedDetail
-  [route: `GET /api/feeds/${number}/items`]: FeedItems
-  [route: `GET /api/feeds/${number}/items?${string}`]: FeedItems
+  [route: `GET /api/feeds/${number}`]: z.input<typeof feedDetailSchema>
+  [route: `GET /api/feeds/${number}/items`]: z.input<typeof feedItemsSchema>
+  [route: `GET /api/feeds/${number}/items?${string}`]: z.input<typeof feedItemsSchema>
   [route: `DELETE /api/feeds/${number}`]: undefined
   [route: `POST /api/feeds/${number}/refresh`]: RefreshFeedResponse
   [route: `PUT /api/feeds/${number}/details`]: FeedDetailsUpdate
   [route: `PUT /api/feeds/${number}/interval`]: PollingSchedule
   [route: `PUT /api/feeds/${number}/reading-source`]: ReadingSourcePreference
-  'GET /api/digest': Digest
-  [route: `GET /api/digest?${string}`]: Digest
-  'GET /api/digest/days': DigestCalendar
-  'GET /api/library': Library
-  [route: `GET /api/library?${string}`]: Library
+  'GET /api/digest': z.input<typeof digestSchema>
+  [route: `GET /api/digest?${string}`]: z.input<typeof digestSchema>
+  'GET /api/digest/days': z.input<typeof digestCalendarSchema>
+  'GET /api/library': z.input<typeof librarySchema>
+  [route: `GET /api/library?${string}`]: z.input<typeof librarySchema>
   [route: `PUT /api/library/${number}`]: LibraryMembership
   [route: `DELETE /api/library/${number}`]: LibraryMembership
-  [route: `GET /api/search?${string}`]: SearchResults
-  [route: `GET /api/items/${number}`]: ReaderItem
+  [route: `GET /api/search?${string}`]: z.input<typeof searchResultsSchema>
+  [route: `GET /api/items/${number}`]: z.input<typeof readerItemSchema>
   [route: `GET /api/items/${number}/reader`]: ReaderArticle
 }
 

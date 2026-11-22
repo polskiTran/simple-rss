@@ -1,13 +1,18 @@
 import { and, asc, count, desc, eq, gt, lt, or } from 'drizzle-orm'
-import type { Library, LibraryItem, LibraryMembership, LibraryOrder } from '../../shared/api.js'
+import {
+  LIBRARY_PAGE_SIZE,
+  type Library,
+  type LibraryItem,
+  type LibraryMembership,
+  type LibraryOrder,
+  UNTITLED_FEED_ITEM_TITLE,
+} from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { encodeLibraryCursor, type LibraryCursor } from './library-cursor.js'
-
-const LIBRARY_PAGE_SIZE = 50
 
 export class LibraryService {
   readonly #db: DrizzleDatabase
@@ -80,7 +85,7 @@ export class LibraryService {
 
     const items: LibraryItem[] = rows.map((row) => ({
       feedItemId: row.feedItemId,
-      title: row.title ?? 'Untitled',
+      title: row.title ?? UNTITLED_FEED_ITEM_TITLE,
       feedId: row.feedId,
       feedTitle: row.feedTitle,
       subscribed: row.subscribedFeedId !== null,

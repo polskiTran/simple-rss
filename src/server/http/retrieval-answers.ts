@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
-import type { ApiErrorCode } from '../../shared/api.js'
+import type { UnstagedErrorCode } from '../../shared/api.js'
 import { RETRIEVAL_PROFILES, type RetrievalFailureCode, type RetrievalProfile } from '../upstream/retrieval.js'
 import { apiError } from './requests.js'
 
 export interface FailureAnswer {
   readonly status: 400 | 413 | 415 | 502 | 504
-  readonly code: ApiErrorCode
+  readonly code: UnstagedErrorCode
   readonly message: string
 }
 
@@ -15,9 +15,9 @@ interface RetrievalSubject {
   readonly unsafeDestination: FailureAnswer
   readonly unsupportedContent: FailureAnswer
   readonly unreachable: FailureAnswer
-  readonly tooLargeCode: ApiErrorCode
-  readonly timeoutCode: ApiErrorCode
-  readonly bodyTimeoutCode: ApiErrorCode
+  readonly tooLargeCode: UnstagedErrorCode
+  readonly timeoutCode: UnstagedErrorCode
+  readonly bodyTimeoutCode: UnstagedErrorCode
 }
 
 function retrievalAnswers(subject: RetrievalSubject) {

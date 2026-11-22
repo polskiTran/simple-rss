@@ -1,6 +1,5 @@
 import { join } from 'node:path'
 import { afterEach } from 'vitest'
-import type { Services } from '../../src/server/app.js'
 import { DATABASE_FILE, type Config } from '../../src/server/config.js'
 import { createLogger, type LogRecord } from '../../src/server/logger.js'
 import type { DrizzleDatabase } from '../../src/server/persistence/database.js'
@@ -45,9 +44,11 @@ export interface TestService {
   stop(): Promise<void>
 }
 
+export type UnreadyTestService = Omit<TestService, 'settings' | 'database' | 'wakeScheduler' | 'restart'>
+
 const running: BootedService[] = []
 
-export async function startTestService(options: HarnessOptions = {}): Promise<TestService> {
+async function prepare(options: HarnessOptions) {
   const dataDir = options.dataDir ?? (await makeTempDataDir())
   const clock = options.clock ?? new ManualClock()
   const upstream = options.upstream ?? new UpstreamFixtures()
@@ -77,40 +78,70 @@ export async function startTestService(options: HarnessOptions = {}): Promise<Te
     return started
   }
 
-  let service = await boot()
+  return { dataDir, clock, upstream, logs, sleeps, boot }
+}
 
-  const services = (): Services => {
-    if (!service.services) throw new Error('the service started unready; read /health/ready for the reason')
-    return service.services
+export async function startTestService(options: HarnessOptions = {}): Promise<TestService> {
+  const { dataDir, clock, upstream, logs, sleeps, boot } = await prepare(options)
+
+  const bootReady = async () => {
+    const service = await boot()
+    if (service.services) return { service, services: service.services }
+    await stop(service)
+    throw new Error('the service started unready; a failed-startup test uses startUnreadyTestService')
   }
+
+  let ready = await bootReady()
 
   return {
     get url() {
-      return service.url
+      return ready.service.url
     },
     get config() {
-      return service.config
+      return ready.service.config
     },
     dataDir,
     clock,
     upstream,
     get retrieval() {
-      return service.retrieval
+      return ready.service.retrieval
     },
     get settings() {
-      return services().settings
+      return ready.services.settings
     },
     get database() {
-      return services().db
+      return ready.services.db
     },
     logs,
     sleeps,
-    fetch: (path, init) => fetch(new URL(path, service.url), init),
-    wakeScheduler: () => services().scheduler.tick(),
+    fetch: (path, init) => fetch(new URL(path, ready.service.url), init),
+    wakeScheduler: () => ready.services.scheduler.tick(),
     async restart() {
-      await stop(service)
-      service = await boot()
+      await stop(ready.service)
+      ready = await bootReady()
     },
+    stop: () => stop(ready.service),
+  }
+}
+
+export async function startUnreadyTestService(options: HarnessOptions = {}): Promise<UnreadyTestService> {
+  const { dataDir, clock, upstream, logs, sleeps, boot } = await prepare(options)
+  const service = await boot()
+  if (service.services) {
+    await stop(service)
+    throw new Error('the service started ready; startUnreadyTestService is for a startup that fails')
+  }
+
+  return {
+    url: service.url,
+    config: service.config,
+    dataDir,
+    clock,
+    upstream,
+    retrieval: service.retrieval,
+    logs,
+    sleeps,
+    fetch: (path, init) => fetch(new URL(path, service.url), init),
     stop: () => stop(service),
   }
 }

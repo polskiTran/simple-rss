@@ -354,8 +354,7 @@ test.describe('Reader View at the server deadline', () => {
     const answered = await deadline
     expect(answered.status()).toBe(504)
     const failure = apiErrorSchema.parse(await answered.json()).error
-    expect(failure.code).toBe('article_deadline_exceeded')
-    expect(failure.stage).toBe('publisher')
+    expect(failure).toMatchObject({ code: 'article_deadline_exceeded', stage: 'publisher' })
     expect(answered.headers()['cache-control']).toBe('no-store')
 
     await expect(page.getByText('The ridge holds its light.')).toBeVisible()

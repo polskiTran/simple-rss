@@ -43,7 +43,7 @@ const CODE_LANGUAGE = /^[\w+#.-]+$/u
 
 export interface ReaderMarkdownPolicyOptions {
   readonly baseUrl?: string
-  readonly images?: 'preserve' | ((url: string) => string)
+  readonly images: 'preserve' | { readonly sign: (url: string) => string }
 }
 
 export function applyReaderMarkdownPolicy(markdown: string, options: ReaderMarkdownPolicyOptions): string {
@@ -185,14 +185,13 @@ function policyLink(node: Link, context: ReaderMarkdownPolicyOptions): PhrasingC
 }
 
 function policyImage(node: Image, context: ReaderMarkdownPolicyOptions): PhrasingContent[] {
-  if (!context.images) return []
   const alt = node.alt?.trim() ?? ''
   const url = absoluteHttpUrl(node.url, context.baseUrl)
   if (!url || url.username || url.password) return []
 
   const image: Image = {
     type: 'image',
-    url: context.images === 'preserve' ? url.href : context.images(url.href),
+    url: context.images === 'preserve' ? url.href : context.images.sign(url.href),
     alt,
     ...(node.title ? { title: node.title } : {}),
   }

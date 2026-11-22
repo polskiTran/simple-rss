@@ -1,3 +1,5 @@
+import { type DateKey, utcDayKey } from '../shared/api.js'
+
 const DAY_MS = 24 * 60 * 60 * 1_000
 
 const formats = new Map<string, Intl.DateTimeFormat>()
@@ -12,27 +14,28 @@ function formatIn(timezone: string, locale: string, options: Intl.DateTimeFormat
   return format
 }
 
-export function dateKey(date: Date, timezone: string): string {
+export function dateKey(date: Date, timezone: string): DateKey {
   const parts = formatIn(timezone, 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  return `${values.year}-${values.month}-${values.day}`
+  // SAFETY: Intl's numeric year and 2-digit month and day of a real instant spell a calendar day that exists.
+  return `${values.year}-${values.month}-${values.day}` as DateKey
 }
 
 export function timeLabel(date: Date, timezone: string): string {
   return formatIn(timezone, 'en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
 }
 
-function dayBefore(dayKey: string): string {
-  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - DAY_MS).toISOString().slice(0, 10)
+function dayBefore(dayKey: DateKey): DateKey {
+  return utcDayKey(Date.parse(`${dayKey}T00:00:00.000Z`) - DAY_MS)
 }
 
-export function dayAfter(dayKey: string): string {
-  return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10)
+export function dayAfter(dayKey: DateKey): DateKey {
+  return utcDayKey(Date.parse(`${dayKey}T00:00:00.000Z`) + DAY_MS)
 }
 
-export function dayKeysIn(timezone: string): (instant: string) => string {
-  const starts = new Map<string, string>()
-  const startOf = (day: string) => {
+export function dayKeysIn(timezone: string): (instant: string) => DateKey {
+  const starts = new Map<DateKey, string>()
+  const startOf = (day: DateKey) => {
     let start = starts.get(day)
     if (start === undefined) {
       start = dayStartUtc(day, timezone).toISOString()
@@ -41,7 +44,7 @@ export function dayKeysIn(timezone: string): (instant: string) => string {
     return start
   }
   return (instant) => {
-    const day = instant.slice(0, 10)
+    const day = utcDayKey(Date.parse(instant))
     if (instant < startOf(day)) return dayBefore(day)
     const next = dayAfter(day)
     return instant < startOf(next) ? day : next

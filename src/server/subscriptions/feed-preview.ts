@@ -3,15 +3,16 @@ import {
   FEED_PREVIEW_ITEMS,
   type FeedPreview as PreviewedFeed,
   type FeedPreviewResponse,
+  UNTITLED_FEED_ITEM_TITLE,
 } from '../../shared/api.js'
 import { dateKey, dayKeysIn } from '../calendar.js'
 import type { Clock } from '../clock.js'
 import { trailingDayKeys } from '../digest/cadence-window.js'
 import { declaredFeeds } from '../ingestion/declared-feeds.js'
-import { feedDomain } from '../ingestion/feed-window.js'
+import { feedDomain, feedWindowNewestFirst } from '../ingestion/feed-window.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
-import { feedItemChronologyAt } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { decodePage } from '../upstream/page-text.js'
 import { RETRIEVAL_PROFILES, type Retrieval, type RetrievalBytes } from '../upstream/retrieval.js'
 import type { FailedPoll } from './feed-availability.js'
 import { readFeed, type FeedAnswer } from './feed-poll.js'
@@ -59,9 +60,9 @@ export class FeedPreview {
       return { kind: 'previewed', preview: { kind: 'feed', feed: this.#summarise(requestedUrl, answer, now) } }
     }
 
-    const page = new TextDecoder().decode(retrieved.bytes)
+    const page = decodePage(retrieved.bytes, retrieved.charset)
     const answers = await Promise.all(
-      declaredFeeds(page, retrieved.url)
+      declaredFeeds(page, retrieved.finalUrl)
         .slice(0, MAX_DECLARED_FEEDS)
         .map(async (feedUrl) => {
           const declared = await this.#retrieval.retrieveBytes({ url: feedUrl, operation: 'feed', ...cancellable })
@@ -73,20 +74,12 @@ export class FeedPreview {
     )
     const [failure] = answers.flatMap(({ answer }) => (answer.kind === 'parsed' ? [] : [answer]))
     if (feeds.length === 0 && failure) return failure
-    return { kind: 'previewed', preview: { kind: 'page', host: new URL(retrieved.url).hostname, feeds } }
+    return { kind: 'previewed', preview: { kind: 'page', host: new URL(retrieved.finalUrl).hostname, feeds } }
   }
 
   #summarise(feedUrl: string, answer: Extract<FeedAnswer, { kind: 'parsed' }>, now: Date): PreviewedFeed {
     const { retrieved, parsed } = answer
-    const seenAt = now.toISOString()
-    const items = [...new Map(parsed.items.map((item) => [item.dedupeKey, item])).values()]
-      .reverse()
-      .map((item) => ({
-        title: item.title ?? 'Untitled',
-        publishedAt: item.publishedAt,
-        chronologyAt: feedItemChronologyAt(item.publishedAt, seenAt),
-      }))
-      .sort((left, right) => right.chronologyAt.localeCompare(left.chronologyAt))
+    const items = feedWindowNewestFirst(parsed, now.toISOString())
 
     const timezone = this.#settings.effectiveTimezone()
     const dayOf = dayKeysIn(timezone)
@@ -96,15 +89,20 @@ export class FeedPreview {
       perDay.set(day, (perDay.get(day) ?? 0) + 1)
     }
 
+    const today = dateKey(now, timezone)
+    const newest = items[0]
     return {
       feedUrl,
       title: parsed.title,
-      domain: feedDomain(parsed, retrieved.url),
+      domain: feedDomain(parsed, retrieved.finalUrl),
       homePageUrl: parsed.homePageUrl,
-      cadence: trailingDayKeys(dateKey(now, timezone), CADENCE_STRIP_DAYS).map((day) => perDay.get(day) ?? 0),
-      lastItemAt: items[0]?.chronologyAt ?? null,
-      items: items.slice(0, FEED_PREVIEW_ITEMS).map(({ title, publishedAt }) => ({ title, publishedAt })),
-      subscribed: [feedUrl, retrieved.url].some((url) => subscribedFeedId(this.#db, url) !== undefined),
+      cadence: trailingDayKeys(today, CADENCE_STRIP_DAYS).map((day) => perDay.get(day) ?? 0),
+      today,
+      lastItemDate: newest ? dayOf(newest.chronologyAt) : null,
+      items: items
+        .slice(0, FEED_PREVIEW_ITEMS)
+        .map(({ title, chronologyAt }) => ({ title: title ?? UNTITLED_FEED_ITEM_TITLE, date: dayOf(chronologyAt) })),
+      subscribed: [feedUrl, retrieved.finalUrl].some((url) => subscribedFeedId(this.#db, url) !== undefined),
     }
   }
 }

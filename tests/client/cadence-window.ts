@@ -1,4 +1,4 @@
-import type { CadenceObservation } from '../../src/shared/api.js'
+import { type CadenceObservation, utcDayKey } from '../../src/shared/api.js'
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 
@@ -9,7 +9,7 @@ export function cadenceWindow(
 ): CadenceObservation[] {
   const opening = Date.parse(`${start}T00:00:00.000Z`)
   return Array.from({ length: days }, (_, index) => {
-    const date = new Date(opening + index * DAY_MS).toISOString().slice(0, 10)
+    const date = utcDayKey(opening + index * DAY_MS)
     return { date, count: counts[date] ?? 0 }
   })
 }

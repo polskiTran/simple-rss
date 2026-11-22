@@ -4,9 +4,9 @@ export const WINDOW_MS = 15 * 60 * 1000
 
 export const PER_CLIENT_FAILURES = 5
 
-export const GLOBAL_FAILURES = 20
+export const GLOBAL_FAILURES_FOR_MAX_DELAY = 20
 
-export const GLOBAL_LIMIT = 100
+export const GLOBAL_FAILURES_BEFORE_REFUSAL = 100
 
 const BASE_DELAY_MS = 250
 
@@ -43,7 +43,7 @@ export class LoginRateLimiter {
     const own = this.#reservations.filter((reservation) => reservation.client === client)
     const decisive = Math.max(
       own.at(-PER_CLIENT_FAILURES)?.at ?? Number.NEGATIVE_INFINITY,
-      this.#reservations.at(-GLOBAL_LIMIT)?.at ?? Number.NEGATIVE_INFINITY,
+      this.#reservations.at(-GLOBAL_FAILURES_BEFORE_REFUSAL)?.at ?? Number.NEGATIVE_INFINITY,
     )
 
     if (decisive !== Number.NEGATIVE_INFINITY) {
@@ -82,7 +82,7 @@ export class LoginRateLimiter {
   }
 
   #cost(clientAttempts: number): number {
-    const pressure = this.#reservations.length >= GLOBAL_FAILURES ? MAX_DELAY_MS : 0
+    const pressure = this.#reservations.length >= GLOBAL_FAILURES_FOR_MAX_DELAY ? MAX_DELAY_MS : 0
     return Math.max(delayFor(clientAttempts), pressure)
   }
 }
