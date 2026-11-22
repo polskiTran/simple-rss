@@ -4,7 +4,7 @@ import {
   MAX_FEED_DESCRIPTION_LENGTH,
   MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
-  digestParamsOf,
+  type DigestStart,
   type FeedDetail,
   type FeedDetailsUpdate,
   type FeedItems,
@@ -60,7 +60,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
   useScreenTitle(detail?.title)
   const [itemsState, pages] = usePagedResource(
     String(feedId),
-    (cursor, signal) => fetchFeedItems(feedId, cursor ?? '', signal),
+    (start: DigestStart | undefined, signal) => fetchFeedItems(feedId, start ?? {}, signal),
     (shown, page) => ({ ...shown, items: [...shown.items, ...page.items], nextFrom: page.nextFrom }),
     { dropOnNewKey: true },
   )
@@ -118,7 +118,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
       return
     }
     setShownDay(date)
-    pages.loadMore(digestParamsOf({ from: items.nextFrom, through: date }).toString())
+    pages.loadMore({ from: items.nextFrom, through: date })
   }
 
   useEffect(() => {
@@ -276,7 +276,7 @@ function Items({
   state: Resource<FeedItems>
   page: FeedItems | undefined
   older: OlderState
-  onLoadOlder: (cursor: string) => void
+  onLoadOlder: (start: DigestStart) => void
   onRetry: () => void
   onSaved: (feedItemId: number, saved: boolean) => void
   onOpenItem: (feedItemId: number, feedTitle: string) => void
@@ -311,12 +311,7 @@ function Items({
           </div>
         </Group>
       ))}
-      <OlderItems
-        nextCursor={page.nextFrom}
-        older={older}
-        noun="items"
-        onLoadOlder={(from) => onLoadOlder(digestParamsOf({ from }).toString())}
-      />
+      <OlderItems nextCursor={page.nextFrom} older={older} noun="items" onLoadOlder={(from) => onLoadOlder({ from })} />
     </div>
   )
 }

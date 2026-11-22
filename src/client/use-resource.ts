@@ -18,8 +18,8 @@ interface ResourceOptions {
 
 export type OlderState = 'idle' | 'loading' | 'failed'
 
-interface PagedControls<T> extends ResourceControls<T> {
-  loadMore(cursor: string): void
+interface PagedControls<T, Cursor> extends ResourceControls<T> {
+  loadMore(cursor: Cursor): void
   readonly older: OlderState
 }
 
@@ -32,12 +32,12 @@ export function useResource<T>(
   return [held.resource, { retry, set: (update) => patch(undefined, update) }]
 }
 
-export function usePagedResource<T>(
+export function usePagedResource<T, Cursor = string>(
   key: string,
-  load: (cursor: string | undefined, signal: AbortSignal) => Promise<T>,
+  load: (cursor: Cursor | undefined, signal: AbortSignal) => Promise<T>,
   append: (shown: T, page: T) => T,
   options?: ResourceOptions,
-): readonly [Resource<T>, PagedControls<T>] {
+): readonly [Resource<T>, PagedControls<T, Cursor>] {
   const { held, retry, patch } = useHeld(key, (signal) => load(undefined, signal), options?.dropOnNewKey ?? false)
   const [older, setOlder] = useState<{ readonly load: number; readonly state: OlderState }>({
     load: 0,
@@ -46,7 +46,7 @@ export function usePagedResource<T>(
   const more = useRef<AbortController>(undefined)
   useEffect(() => () => more.current?.abort(), [])
 
-  const loadMore = (cursor: string) => {
+  const loadMore = (cursor: Cursor) => {
     const from = held.load
     more.current?.abort()
     const request = new AbortController()

@@ -231,8 +231,8 @@ export function fetchFeedDetail(feedId: number, signal?: AbortSignal): Promise<F
   return getJson(`/api/feeds/${feedId}`, feedDetailSchema, { signal })
 }
 
-export function fetchFeedItems(feedId: number, query: string, signal?: AbortSignal): Promise<FeedItems> {
-  return getJson(withQuery(`/api/feeds/${feedId}/items`, new URLSearchParams(query)), feedItemsSchema, { signal })
+export function fetchFeedItems(feedId: number, start: DigestStart, signal?: AbortSignal): Promise<FeedItems> {
+  return getJson(withQuery(`/api/feeds/${feedId}/items`, digestParamsOf(start)), feedItemsSchema, { signal })
 }
 
 export function updateFeedDetails(feedId: number, details: UpdateFeedDetailsRequest): Promise<FeedDetailsUpdate> {

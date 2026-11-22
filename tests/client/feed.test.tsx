@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import type { fetchFeedItems } from '../../src/client/api.js'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow as cadence } from './cadence-window.js'
 import { feedDetail, feedItemRow, feedItems, subscription, unavailable } from './fixtures.js'
@@ -166,6 +167,10 @@ describe('opening one Feed', () => {
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull()
     expect(api.requestsTo('GET /api/feeds/1/items?from=2026-06-03')).toHaveLength(1)
+  })
+
+  it('pages a Feed by DigestStart, never by a hand-built query string', () => {
+    expectTypeOf<string>().not.toMatchTypeOf<Parameters<typeof fetchFeedItems>[1]>()
   })
 
   it('fetches a day picked on the grid that is not shown yet, then moves to it', async () => {
