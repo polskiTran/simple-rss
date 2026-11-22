@@ -43,7 +43,7 @@ type Answer = FeedAnswer | { readonly kind: 'not-modified'; readonly retrieved: 
 export function readFeed(retrieved: RetrievalBytesResult, priorUrls: readonly string[]): FeedAnswer {
   if (!retrieved.ok) return { kind: 'retrieval-failed', failure: retrieved }
   try {
-    return { kind: 'parsed', retrieved, parsed: parseFeedDocument(retrieved.bytes, retrieved.url, priorUrls) }
+    return { kind: 'parsed', retrieved, parsed: parseFeedDocument(retrieved.bytes, retrieved.finalUrl, priorUrls) }
   } catch (error) {
     if (error instanceof FeedDocumentError) return { kind: 'invalid-feed', code: error.code }
     throw error
@@ -97,7 +97,7 @@ export class FeedPoll {
 
     const now = this.#clock.now()
     return this.#db.transaction((tx): SubscribeOutcome => {
-      const owner = subscribedFeedId(tx, requestedUrl) ?? subscribedFeedId(tx, answer.retrieved.url)
+      const owner = subscribedFeedId(tx, requestedUrl) ?? subscribedFeedId(tx, answer.retrieved.finalUrl)
       if (owner !== undefined) return { kind: 'duplicate', feedId: owner }
 
       const feedId = recordSubscription(tx, this.#logger, { enteredUrl, requestedUrl, now: now.toISOString() })
@@ -160,14 +160,14 @@ export class FeedPoll {
     const { retrieved, parsed } = answer
     const window = {
       parsed,
-      resolvedUrl: retrieved.url,
+      resolvedUrl: retrieved.finalUrl,
       validators: { etag: retrieved.etag, lastModified: retrieved.lastModified },
       now: now.toISOString(),
     }
 
-    const existingFeedId = aliasOwner(tx, retrieved.url)
+    const existingFeedId = aliasOwner(tx, retrieved.finalUrl)
     if (existingFeedId !== undefined && existingFeedId !== feed.feedId) {
-      const survivor = this.#mergeInto(tx, feed, existingFeedId, retrieved.url, now)
+      const survivor = this.#mergeInto(tx, feed, existingFeedId, retrieved.finalUrl, now)
       persistFeedWindow(tx, { feedId: survivor.feedId, ...window })
       this.#settle(tx, survivor, { kind: 'updated' }, now)
       return { kind: 'merged', intoFeedId: existingFeedId }
@@ -179,7 +179,7 @@ export class FeedPoll {
     this.#logger.info('subscriptions.feed_window_ingested', {
       feedId: feed.feedId,
       enteredUrl: loggableUrl(feed.enteredUrl),
-      resolvedUrl: loggableUrl(retrieved.url),
+      resolvedUrl: loggableUrl(retrieved.finalUrl),
       observedItems,
     })
     return { kind: 'updated', observedItems }

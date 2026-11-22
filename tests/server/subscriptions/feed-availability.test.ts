@@ -457,7 +457,7 @@ function feedBytes(url: string): RetrievalBytesResult {
   return {
     ok: true,
     status: 200,
-    url,
+    finalUrl: url,
     contentType: 'application/rss+xml',
     charset: undefined,
     etag: null,
