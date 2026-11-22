@@ -121,18 +121,15 @@ function OpenReader({
 }) {
   const [viewSource, setViewSource] = useState<ReadingSource>(item.readingSource)
   const source = resolvedReadingSource(viewSource, item)
-  const [waiting, setWaiting] = useState<{ readonly load: AbortSignal; readonly stage: ReaderDeadlineStage }>()
-  const [sourceState, { retry: retrySource }] = useResource(
+  const [sourceState, { retry: retrySource }] = useResource<SourceResult, ReaderDeadlineStage>(
     `${item.feedItemId} ${source}`,
-    async (signal): Promise<SourceResult> => {
+    async (signal, report) => {
       if (source === 'feed-content' && item.feedContent) {
         return { source: 'feed-content', content: item.feedContent }
       }
       if (!item.link) throw new Error('the Feed Item has no original link')
       try {
-        const content = await fetchArticleThroughDeadlines(item.feedItemId, signal, (stage) =>
-          setWaiting({ load: signal, stage }),
-        )
+        const content = await fetchArticleThroughDeadlines(item.feedItemId, signal, report)
         return { source: 'original-webpage', content }
       } finally {
         if (!signal.aborted) performance.mark(READER_MARKS.articleResponse)
@@ -145,7 +142,8 @@ function OpenReader({
   const displayed: SourceResult | undefined =
     selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
   const next = item.nextInDigest
-  const waitingNote = waiting && !waiting.load.aborted ? STAGE_NOTES[waiting.stage] : 'Reading the original webpage'
+  const stage = sourceState.kind === 'loading' ? sourceState.progress : undefined
+  const waitingNote = stage ? STAGE_NOTES[stage] : 'Reading the original webpage'
   const waitingContent = item.summary ? (
     <div className="reader-waiting">
       <p className="reader-summary">{item.summary}</p>
@@ -301,8 +299,9 @@ function waitSecondsOf(cause: unknown): number | undefined {
 }
 
 function deadlineStage(cause: unknown): ReaderDeadlineStage | undefined {
-  if (!(cause instanceof ApiError) || cause.code !== 'article_deadline_exceeded') return undefined
-  return cause.stage ?? 'publisher'
+  return cause instanceof ApiError && cause.failure.code === 'article_deadline_exceeded'
+    ? cause.failure.stage
+    : undefined
 }
 
 async function fetchArticleThroughDeadlines(

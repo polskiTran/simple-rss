@@ -3,7 +3,7 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CreateSubscriptionResponse, FeedPreviewResponse, SubscriptionList } from '../../src/shared/api.js'
 import { App } from '../../src/client/app.js'
-import { feedPreview, subscription, UNCHECKED, unavailable } from './fixtures.js'
+import { day, feedPreview, subscription, UNCHECKED, unavailable } from './fixtures.js'
 import { stubApi, type Reply } from './stub-api.js'
 
 const FEED = subscription()
@@ -24,7 +24,7 @@ const PREVIEWED = feedPreview()
 const COMMENTS = feedPreview({
   feedUrl: 'https://journal.example/comments/feed',
   title: 'Comments on Field Notes',
-  items: [{ title: 'On First light', publishedAt: '2026-08-07T12:00:00.000Z' }],
+  items: [{ title: 'On First light', date: day('2026-08-07') }],
 })
 
 afterEach(() => {
@@ -96,8 +96,8 @@ describe('Add feed', () => {
         kind: 'feed',
         feed: feedPreview({
           cadence: activeOn(5),
-          lastItemAt: '2026-08-05T12:00:00.000Z',
-          items: [{ title: 'First light', publishedAt: '2026-08-05T12:00:00.000Z' }],
+          lastItemDate: day('2026-08-05'),
+          items: [{ title: 'First light', date: day('2026-08-05') }],
         }),
       },
     })
@@ -116,11 +116,11 @@ describe('Add feed', () => {
   })
 
   it('says how long a silent Feed has gone without an item', async () => {
-    const twoYearsAgo = '2024-08-01T12:00:00.000Z'
+    const twoYearsAgo = day('2024-08-01')
     stubApi().on('POST /api/subscriptions/preview', {
       body: {
         kind: 'feed',
-        feed: feedPreview({ lastItemAt: twoYearsAgo, items: [{ title: 'Last word', publishedAt: twoYearsAgo }] }),
+        feed: feedPreview({ lastItemDate: twoYearsAgo, items: [{ title: 'Last word', date: twoYearsAgo }] }),
       },
     })
     window.history.replaceState(null, '', '/feeds')
@@ -520,7 +520,7 @@ describe('Feed Availability', () => {
 
   it('names the year of a last success before the latest check’s year', async () => {
     const lastYear = subscription({
-      availability: unavailable({ lastSuccessDate: '2025-12-31' }),
+      availability: unavailable({ lastSuccessDate: day('2025-12-31') }),
     })
     stubApi().on('GET /api/feeds', { body: { subscriptions: [lastYear] } })
     window.history.replaceState(null, '', '/feeds')

@@ -1,16 +1,16 @@
 import { Button } from '@base-ui/react/button'
 import type { OlderState } from '../use-resource.js'
 
-export function OlderItems({
+export function OlderItems<Cursor extends string>({
   nextCursor,
   older,
   noun,
   onLoadOlder,
 }: {
-  nextCursor: string | null
+  nextCursor: Cursor | null
   older: OlderState
   noun: 'items' | 'saves'
-  onLoadOlder: (cursor: string) => void
+  onLoadOlder: (cursor: Cursor) => void
 }) {
   if (nextCursor === null) return null
   return (

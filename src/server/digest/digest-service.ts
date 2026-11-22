@@ -13,7 +13,7 @@ import type { DrizzleDatabase } from '../persistence/database.js'
 import { displayTimeOf } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf, type ListedItemRow } from '../persistence/listed-item.js'
-import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { effectiveFeedTitle, feedItems, feeds, subscriptions } from '../persistence/schema.js'
 import { dailyCounts, gridDayKeys } from './cadence-window.js'
 import { dateKey, dayKeysIn, daysBetween, dayStartUtc } from '../calendar.js'
 import { wholeDayPage } from './whole-day-page.js'
@@ -97,7 +97,6 @@ export class DigestService {
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
       .innerJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(and(...conditions))
       .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
   }

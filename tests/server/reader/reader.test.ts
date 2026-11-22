@@ -134,6 +134,19 @@ describe('the Reader item', () => {
     expect(saved.saved).toBe(true)
   })
 
+  it('opens a saved Feed Item after its Feed is unsubscribed, under the title the Feed reports', async () => {
+    const service = await startTestService()
+    const { user, feedItemId } = await readingSetup(service)
+    expect((await user.put(`/api/library/${feedItemId}`)).status).toBe(200)
+    const details = { customTitle: 'Morning paper', customDescription: null }
+    expect((await user.put('/api/feeds/1/details', details)).status).toBe(200)
+
+    expect((await user.delete('/api/feeds/1')).status).toBe(204)
+
+    const reader = readerItemSchema.parse(await (await user.get(`/api/items/${feedItemId}`)).json())
+    expect(reader).toMatchObject({ title: 'First light', feedTitle: 'Field Notes', saved: true })
+  })
+
   it('answers 404 for Feed Items that do not exist', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

@@ -4,7 +4,7 @@ import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { z } from 'zod'
-import type { DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
+import type { DateKey, DigestGroup, DigestItem, DigestReturn } from '../../shared/api.js'
 import { Icon } from '../components/icon.js'
 import { Group } from '../components/group.js'
 import { FeedName } from '../components/item-box.js'
@@ -19,7 +19,7 @@ const FOLDED_ITEMS = 3
 
 interface DigestDayProps {
   readonly group: DigestGroup
-  readonly today: string
+  readonly today: DateKey
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
   onSaved(feedItemId: number, saved: boolean): void

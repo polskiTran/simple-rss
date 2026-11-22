@@ -60,8 +60,7 @@ async function expectDeadline(response: Response, stage: 'publisher' | 'parsing'
   expect(response.status).toBe(504)
   expect(response.headers.get('cache-control')).toBe('no-store')
   const { error } = apiErrorSchema.parse(await response.json())
-  expect(error.code).toBe('article_deadline_exceeded')
-  expect(error.stage).toBe(stage)
+  expect(error).toMatchObject({ code: 'article_deadline_exceeded', stage })
 }
 
 const extracted = (service: TestService) =>

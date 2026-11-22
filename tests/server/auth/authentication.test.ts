@@ -2,7 +2,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Authentication } from '../../../src/server/auth/authentication.js'
 import type { PasswordHasher } from '../../../src/server/auth/password.js'
-import { GLOBAL_LIMIT, LoginRateLimiter, PER_CLIENT_FAILURES } from '../../../src/server/auth/rate-limit.js'
+import {
+  GLOBAL_FAILURES_BEFORE_REFUSAL,
+  LoginRateLimiter,
+  PER_CLIENT_FAILURES,
+} from '../../../src/server/auth/rate-limit.js'
 import { ABSOLUTE_TIMEOUT_MS, CredentialStore, IDLE_TIMEOUT_MS } from '../../../src/server/auth/credentials.js'
 import { SESSION_COOKIE } from '../../../src/server/http/session-cookie.js'
 import { createLogger } from '../../../src/server/logger.js'
@@ -529,7 +533,7 @@ describe('resisting password guessing', () => {
   it('refuses every address once guessing spread across many has used the installation-wide budget', async () => {
     const service = await startTestService()
     await claimedDevice(service)
-    for (let host = 1; host <= GLOBAL_LIMIT / PER_CLIENT_FAILURES; host += 1) {
+    for (let host = 1; host <= GLOBAL_FAILURES_BEFORE_REFUSAL / PER_CLIENT_FAILURES; host += 1) {
       const guesser = new Device(service, { address: `203.0.113.${host}` })
       await Promise.all(Array.from({ length: PER_CLIENT_FAILURES }, () => guesser.signIn('a-wrong-password')))
     }

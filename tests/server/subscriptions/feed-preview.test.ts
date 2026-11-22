@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { feedPreviewResponseSchema, type FeedPreviewResponse } from '../../../src/shared/api.js'
+import {
+  dateKeySchema,
+  feedItemsSchema,
+  feedPreviewResponseSchema,
+  type FeedPreviewResponse,
+} from '../../../src/shared/api.js'
 import { FeedPreview, type FeedPreviewOutcome } from '../../../src/server/subscriptions/feed-preview.js'
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
@@ -66,17 +71,71 @@ describe('Feed preview', () => {
         domain: 'journal.example',
         homePageUrl: 'https://journal.example/',
         cadence: [...Array.from({ length: 22 }, () => 0), 1, 0, 0, 0, 0, 1, 1, 4],
-        lastItemAt: '2026-08-08T21:00:00.000Z',
+        today: '2026-08-08',
+        lastItemDate: '2026-08-08',
         items: [
-          { title: 'Tonight', publishedAt: '2026-08-08T21:00:00.000Z' },
-          { title: 'Far future', publishedAt: '2026-09-01T00:00:00.000Z' },
-          { title: 'Undated', publishedAt: null },
-          { title: 'This morning', publishedAt: '2026-08-08T07:00:00.000Z' },
-          { title: 'Yesterday', publishedAt: '2026-08-07T12:00:00.000Z' },
+          { title: 'Tonight', date: '2026-08-08' },
+          { title: 'Far future', date: '2026-08-08' },
+          { title: 'Undated', date: '2026-08-08' },
+          { title: 'This morning', date: '2026-08-08' },
+          { title: 'Yesterday', date: '2026-08-07' },
         ],
         subscribed: false,
       },
     })
+  })
+
+  it('names its days in the installation timezone, not by the UTC date', async () => {
+    const service = await startTestService()
+    service.settings.setTimezone('Pacific/Auckland', service.clock.now())
+    service.upstream.stub(FEED_URL, {
+      headers: RSS_HEADERS,
+      body: rss(
+        'Field Notes',
+        item('Just after midnight in Auckland', '2026-08-07T12:30:00Z'),
+        item('Just before midnight in Auckland', '2026-08-07T11:30:00Z'),
+      ),
+    })
+    const user = await claimedDevice(service)
+
+    expect(await preview(user, FEED_URL)).toMatchObject({
+      kind: 'feed',
+      feed: {
+        today: '2026-08-08',
+        lastItemDate: '2026-08-08',
+        items: [
+          { title: 'Just after midnight in Auckland', date: '2026-08-08' },
+          { title: 'Just before midnight in Auckland', date: '2026-08-07' },
+        ],
+      },
+    })
+  })
+
+  it('lists Feed Items in the order the Feed lists them once subscribed, duplicates and ties included', async () => {
+    const service = await startTestService()
+    const sameTime = '2026-08-08T07:00:00Z'
+    const entry = (guid: string, title: string, pubDate: string) =>
+      `<item><guid>${guid}</guid><title>${title}</title><pubDate>${new Date(pubDate).toUTCString()}</pubDate></item>`
+    service.upstream.stub(FEED_URL, {
+      headers: RSS_HEADERS,
+      body: rss(
+        'Field Notes',
+        entry('first', 'First', sameTime),
+        entry('second', 'Second', sameTime),
+        entry('newest', 'Newest', '2026-08-08T09:00:00Z'),
+        entry('first', 'First, corrected', sameTime),
+        entry('third', 'Third', sameTime),
+      ),
+    })
+    const user = await claimedDevice(service)
+
+    const previewed = await preview(user, FEED_URL)
+    expect((await user.post('/api/subscriptions', { url: FEED_URL })).status).toBe(201)
+    const stored = feedItemsSchema.parse(await (await user.get('/api/feeds/1/items')).json())
+
+    const previewedTitles = previewed.kind === 'feed' ? previewed.feed.items.map((listed) => listed.title) : []
+    expect(previewedTitles).toEqual(['Newest', 'Third', 'Second', 'First, corrected'])
+    expect(stored.items.map((listed) => listed.title)).toEqual(previewedTitles)
   })
 
   it('previews a Feed served as a web page as the Feed it is', async () => {
@@ -160,6 +219,18 @@ describe('Feed preview', () => {
 
     expect(declaredFeedTitles(await preview(user, PAGE_URL))).toEqual(['Field Notes'])
     expect(service.upstream.requestsTo('https://journal.example/deeper')).toHaveLength(0)
+  })
+
+  it('finds the Declared Feeds of a page written in UTF-16, read by its byte order mark', async () => {
+    const service = await startTestService()
+    const markup = page(declares('application/rss+xml', '/feed'))
+    const utf16le = new Uint8Array([0xff, 0xfe, ...new Uint8Array(Buffer.from(markup, 'utf16le'))])
+    service.upstream
+      .stub(PAGE_URL, { headers: { 'content-type': 'text/html' }, body: utf16le })
+      .stub(FEED_URL, { headers: RSS_HEADERS, body: rss('Field Notes') })
+    const user = await claimedDevice(service)
+
+    expect(declaredFeedTitles(await preview(user, PAGE_URL))).toEqual(['Field Notes'])
   })
 
   it('answers a page that declares no Feed with an empty list', async () => {
@@ -288,7 +359,8 @@ function detectedFeed(feedUrl: string, title: string): FeedPreviewOutcome {
         domain: 'journal.example',
         homePageUrl: 'https://journal.example/',
         cadence: QUIET_CADENCE,
-        lastItemAt: null,
+        today: dateKeySchema.parse('2026-08-08'),
+        lastItemDate: null,
         items: [],
         subscribed: false,
       },

@@ -9,7 +9,7 @@ import { readingTimeMinutes } from '../markdown/reading-time.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
-import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
+import { effectiveFeedTitle, feedItems, feeds, subscriptions } from '../persistence/schema.js'
 
 export class ReaderItems {
   readonly #db: DrizzleDatabase
@@ -48,7 +48,6 @@ export class ReaderItems {
       .from(feedItems)
       .innerJoin(feeds, eq(feeds.id, feedItems.feedId))
       .leftJoin(subscriptions, eq(subscriptions.feedId, feeds.id))
-      .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
       .where(eq(feedItems.id, feedItemId))
       .limit(1)
       .all()[0]

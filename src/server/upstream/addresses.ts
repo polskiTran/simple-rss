@@ -14,11 +14,11 @@ export function classifyAddress(address: string): AddressClass {
   const family = isIP(address)
   if (family === 4) {
     const bytes = parseIpv4(address)
-    return bytes ? classifyIpv4(bytes) : 'invalid'
+    return bytes ? classifyIn(IPV4, bytes) : 'invalid'
   }
   if (family === 6) {
     const bytes = parseIpv6(address)
-    return bytes ? classifyIpv6(bytes) : 'invalid'
+    return bytes ? classifyIn(IPV6, bytes) : 'invalid'
   }
   return 'invalid'
 }
@@ -26,85 +26,127 @@ export function classifyAddress(address: string): AddressClass {
 export function isBenchmarkIpv4Literal(address: string): boolean {
   if (isIP(address) !== 4) return false
   const bytes = parseIpv4(address)
-  if (!bytes) return false
-  return isBenchmarkIpv4(bytes[0] ?? 0, bytes[1] ?? 0)
-}
-
-function isBenchmarkIpv4(first: number, second: number): boolean {
-  return first === 198 && (second === 18 || second === 19)
+  return bytes !== undefined && contains(BENCHMARKING_IPV4_PREFIX, bytes)
 }
 
 export function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 }
 
-function classifyIpv4(bytes: Uint8Array): AddressClass {
-  const [a = 0, b = 0, c = 0, d = 0] = bytes
+type Classified = Exclude<AddressClass, 'invalid'>
 
-  if (a === 0) return b === 0 && c === 0 && d === 0 ? 'unspecified' : 'reserved'
-  if (a === 127) return 'loopback'
-  if (a === 10) return 'private'
-  if (a === 172 && b >= 16 && b <= 31) return 'private'
-  if (a === 192 && b === 168) return 'private'
-  if (a === 169 && b === 254) return 'link-local'
-  if (a === 100 && b >= 64 && b <= 127) return 'reserved'
-  if (a === 192 && b === 0 && c === 0) return d === 9 || d === 10 ? 'public' : 'reserved'
-  if (a === 192 && b === 0 && c === 2) return 'reserved'
-  if (a === 192 && b === 88 && c === 99) return 'reserved'
-  if (a === 198 && b === 51 && c === 100) return 'reserved'
-  if (a === 203 && b === 0 && c === 113) return 'reserved'
-  if (isBenchmarkIpv4(a, b)) return 'reserved'
-  if (a >= 224 && a <= 239) return 'multicast'
-  if (a >= 240) return 'reserved'
-
-  return 'public'
+interface ClassifiedRange {
+  readonly cidr: string
+  readonly name: string
+  readonly class: Classified
 }
 
-function classifyIpv6(bytes: Uint8Array): AddressClass {
-  if (allZero(bytes, 0, 16)) return 'unspecified'
-  if (allZero(bytes, 0, 15) && bytes[15] === 1) return 'loopback'
-  if (bytes[0] === 0xff) return 'multicast'
-  if (bytes[0] === 0xfe && ((bytes[1] ?? 0) & 0xc0) === 0x80) return 'link-local'
-  if (((bytes[0] ?? 0) & 0xfe) === 0xfc) return 'private'
-
-  if (allZero(bytes, 0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) {
-    return classifyIpv4(bytes.subarray(12, 16))
-  }
-  if (bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b && allZero(bytes, 4, 12)) {
-    return classifyIpv4(bytes.subarray(12, 16))
-  }
-  if (
-    bytes[0] === 0x00 &&
-    bytes[1] === 0x64 &&
-    bytes[2] === 0xff &&
-    bytes[3] === 0x9b &&
-    bytes[4] === 0x00 &&
-    bytes[5] === 0x01
-  ) {
-    return 'reserved'
-  }
-  if (bytes[0] === 0x20 && bytes[1] === 0x02) {
-    return classifyIpv4(bytes.subarray(2, 6))
-  }
-  if (bytes[0] === 0x20 && bytes[1] === 0x01) {
-    if (bytes[2] === 0x00 && bytes[3] === 0x00) return 'reserved'
-    if (bytes[2] === 0x00 && bytes[3] === 0x02 && allZero(bytes, 4, 6)) return 'reserved'
-    if (bytes[2] === 0x00 && ((bytes[3] ?? 0) & 0xf0) === 0x10) return 'reserved'
-    if (bytes[2] === 0x0d && bytes[3] === 0xb8) return 'reserved'
-  }
-  if (bytes[0] === 0x3f && ((bytes[1] ?? 0) & 0xf0) === 0xf0) return 'reserved'
-
-  if (bytes[0] === 0x01 && bytes[1] === 0x00 && allZero(bytes, 2, 8)) return 'reserved'
-  if (allZero(bytes, 0, 12)) return 'reserved'
-
-  return ((bytes[0] ?? 0) & 0xe0) === 0x20 ? 'public' : 'reserved'
+interface EmbeddingRange {
+  readonly cidr: string
+  readonly name: string
+  readonly embedsIpv4At: number
 }
 
-function allZero(bytes: Uint8Array, from: number, to: number): boolean {
-  for (let index = from; index < to; index += 1) {
-    if (bytes[index] !== 0) return false
+interface Prefix {
+  readonly bytes: Uint8Array
+  readonly length: number
+}
+
+interface AddressTable<Range> {
+  readonly unlisted: Classified
+  readonly ranges: readonly (Range & { readonly prefix: Prefix })[]
+}
+
+const BENCHMARKING_IPV4 = '198.18.0.0/15'
+
+const BENCHMARKING_IPV4_PREFIX = prefixOf(BENCHMARKING_IPV4, parseIpv4)
+
+const IPV4 = table<ClassifiedRange>(parseIpv4, 'public', [
+  { cidr: '0.0.0.0/8', name: 'This network', class: 'reserved' },
+  { cidr: '0.0.0.0/32', name: 'This host on this network', class: 'unspecified' },
+  { cidr: '10.0.0.0/8', name: 'Private-Use', class: 'private' },
+  { cidr: '100.64.0.0/10', name: 'Shared Address Space', class: 'reserved' },
+  { cidr: '127.0.0.0/8', name: 'Loopback', class: 'loopback' },
+  { cidr: '169.254.0.0/16', name: 'Link Local', class: 'link-local' },
+  { cidr: '172.16.0.0/12', name: 'Private-Use', class: 'private' },
+  { cidr: '192.0.0.0/24', name: 'IETF Protocol Assignments', class: 'reserved' },
+  { cidr: '192.0.0.9/32', name: 'Port Control Protocol Anycast', class: 'public' },
+  { cidr: '192.0.0.10/32', name: 'Traversal Using Relays around NAT Anycast', class: 'public' },
+  { cidr: '192.0.2.0/24', name: 'Documentation (TEST-NET-1)', class: 'reserved' },
+  { cidr: '192.88.99.0/24', name: 'Deprecated (6to4 Relay Anycast)', class: 'reserved' },
+  { cidr: '192.168.0.0/16', name: 'Private-Use', class: 'private' },
+  { cidr: BENCHMARKING_IPV4, name: 'Benchmarking', class: 'reserved' },
+  { cidr: '198.51.100.0/24', name: 'Documentation (TEST-NET-2)', class: 'reserved' },
+  { cidr: '203.0.113.0/24', name: 'Documentation (TEST-NET-3)', class: 'reserved' },
+  { cidr: '224.0.0.0/4', name: 'Multicast', class: 'multicast' },
+  { cidr: '240.0.0.0/4', name: 'Reserved, including Limited Broadcast', class: 'reserved' },
+])
+
+const IPV6 = table<ClassifiedRange | EmbeddingRange>(parseIpv6, 'reserved', [
+  { cidr: '::/128', name: 'Unspecified Address', class: 'unspecified' },
+  { cidr: '::1/128', name: 'Loopback Address', class: 'loopback' },
+  { cidr: '::/96', name: 'Deprecated IPv4-Compatible Address', class: 'reserved' },
+  { cidr: '::ffff:0:0/96', name: 'IPv4-mapped Address', embedsIpv4At: 12 },
+  { cidr: '64:ff9b::/96', name: 'IPv4-IPv6 Translation', embedsIpv4At: 12 },
+  { cidr: '64:ff9b:1::/48', name: 'IPv4-IPv6 Translation, local use', class: 'reserved' },
+  { cidr: '100::/64', name: 'Discard-Only Address Block', class: 'reserved' },
+  { cidr: '2000::/3', name: 'Global Unicast', class: 'public' },
+  { cidr: '2001::/32', name: 'TEREDO', class: 'reserved' },
+  { cidr: '2001:2::/48', name: 'Benchmarking', class: 'reserved' },
+  { cidr: '2001:10::/28', name: 'Deprecated (previously ORCHID)', class: 'reserved' },
+  { cidr: '2001:db8::/32', name: 'Documentation', class: 'reserved' },
+  { cidr: '2002::/16', name: '6to4', embedsIpv4At: 2 },
+  { cidr: '3ff0::/12', name: 'Unassigned, including Documentation 3fff::/20', class: 'reserved' },
+  { cidr: 'fc00::/7', name: 'Unique-Local', class: 'private' },
+  { cidr: 'fe80::/10', name: 'Link-Local Unicast', class: 'link-local' },
+  { cidr: 'ff00::/8', name: 'Multicast', class: 'multicast' },
+])
+
+function classifyIn<Range extends ClassifiedRange | EmbeddingRange>(
+  addresses: AddressTable<Range>,
+  bytes: Uint8Array,
+): Classified {
+  let narrowest: AddressTable<Range>['ranges'][number] | undefined
+  for (const range of addresses.ranges) {
+    if (contains(range.prefix, bytes) && range.prefix.length > (narrowest?.prefix.length ?? -1)) narrowest = range
   }
-  return true
+  if (narrowest === undefined) return addresses.unlisted
+  if ('class' in narrowest) return narrowest.class
+  return classifyIn(IPV4, bytes.subarray(narrowest.embedsIpv4At, narrowest.embedsIpv4At + 4))
+}
+
+function table<Range extends ClassifiedRange | EmbeddingRange>(
+  parse: (address: string) => Uint8Array | undefined,
+  unlisted: Classified,
+  ranges: readonly Range[],
+): AddressTable<Range> {
+  return { unlisted, ranges: ranges.map((range) => ({ ...range, prefix: prefixOf(range.cidr, parse) })) }
+}
+
+function prefixOf(cidr: string, parse: (address: string) => Uint8Array | undefined): Prefix {
+  const [address = '', bits = ''] = cidr.split('/')
+  const bytes = parse(address)
+  const length = Number(bits)
+  if (bytes === undefined || !Number.isInteger(length) || length < 0 || length > bytes.length * 8) {
+    throw new Error(`${cidr} is not a CIDR prefix`)
+  }
+  const hostBits = (index: number) => 0xff >> Math.min(8, Math.max(0, length - index * 8))
+  if (bytes.some((byte, index) => (byte & hostBits(index)) !== 0)) {
+    throw new Error(`${cidr} sets bits past its prefix length`)
+  }
+  return { bytes, length }
+}
+
+function contains(prefix: Prefix, bytes: Uint8Array): boolean {
+  if (bytes.length !== prefix.bytes.length) return false
+  const whole = prefix.length >> 3
+  for (let index = 0; index < whole; index += 1) {
+    if (bytes[index] !== prefix.bytes[index]) return false
+  }
+  const partial = prefix.length & 7
+  if (partial === 0) return true
+  const mask = (0xff << (8 - partial)) & 0xff
+  return ((bytes[whole] ?? 0) & mask) === ((prefix.bytes[whole] ?? 0) & mask)
 }
 
 function parseIpv4(address: string): Uint8Array | undefined {

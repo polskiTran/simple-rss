@@ -17,14 +17,7 @@ import type { DrizzleDatabase } from '../persistence/database.js'
 import { displayTimeOf } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
 import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js'
-import {
-  effectiveFeedDescription,
-  effectiveFeedTitle,
-  feedItems,
-  feeds,
-  libraryItems,
-  subscriptions,
-} from '../persistence/schema.js'
+import { effectiveFeedDescription, effectiveFeedTitle, feedItems, feeds, subscriptions } from '../persistence/schema.js'
 import { cadenceByFeed, gridDayKeys, stripCadenceByFeed } from '../digest/cadence-window.js'
 import { wholeDayPage } from '../digest/whole-day-page.js'
 import { availabilityOf, type RecordedAvailability } from './feed-availability.js'
@@ -285,7 +278,6 @@ export class SubscriptionService {
         const query = this.#db
           .select({ ...LISTED_ITEM_COLUMNS, link: feedItems.link })
           .from(feedItems)
-          .leftJoin(libraryItems, eq(libraryItems.feedItemId, feedItems.id))
           .where(and(eq(feedItems.feedId, feedId), ...conditions))
           .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
         return limit === undefined ? query.all() : query.limit(limit).all()

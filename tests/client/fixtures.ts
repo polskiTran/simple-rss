@@ -1,21 +1,25 @@
-import type {
-  Digest,
-  DigestGroup,
-  DigestItem,
-  FeedAvailability,
-  FeedDetail,
-  FeedItemRow,
-  FeedItems,
-  FeedPreview,
-  Library,
-  LibraryItem,
-  ReaderArticle,
-  ReaderItem,
-  SearchResult,
-  SubscriptionSummary,
+import {
+  type DateKey,
+  dateKeySchema,
+  type Digest,
+  type DigestGroup,
+  type DigestItem,
+  type FeedAvailability,
+  type FeedDetail,
+  type FeedItemRow,
+  type FeedItems,
+  type FeedPreview,
+  type Library,
+  type LibraryItem,
+  type ReaderArticle,
+  type ReaderItem,
+  type SearchResult,
+  type SubscriptionSummary,
 } from '../../src/shared/api.js'
 
-const TODAY = '2026-08-08'
+export const day = (key: string): DateKey => dateKeySchema.parse(key)
+
+const TODAY = day('2026-08-08')
 
 type AvailabilityIn<State extends FeedAvailability['state']> = Extract<FeedAvailability, { state: State }>
 
@@ -31,7 +35,7 @@ export const availability = (overrides: Partial<AvailabilityIn<'available'>> = {
 export const unavailable = (overrides: Partial<AvailabilityIn<'unavailable'>> = {}): FeedAvailability => ({
   state: 'unavailable',
   lastCheckedAt: '2026-08-08T09:00:00.000Z',
-  lastSuccessDate: '2026-08-05',
+  lastSuccessDate: day('2026-08-05'),
   consecutiveFailures: 3,
   category: 'http_error',
   ...overrides,
@@ -70,8 +74,9 @@ export const feedPreview = (overrides: Partial<FeedPreview> = {}): FeedPreview =
   domain: FEED.domain,
   homePageUrl: FEED.homePageUrl,
   cadence: Array.from({ length: 30 }, (_, day) => (day === 29 ? 1 : 0)),
-  lastItemAt: `${TODAY}T12:00:00.000Z`,
-  items: [{ title: 'First light', publishedAt: `${TODAY}T12:00:00.000Z` }],
+  today: TODAY,
+  lastItemDate: TODAY,
+  items: [{ title: 'First light', date: TODAY }],
   subscribed: false,
   ...overrides,
 })
@@ -96,7 +101,7 @@ export const feedDetail = (overrides: Partial<FeedDetail> = {}): FeedDetail => (
   customDescription: null,
   availability: availability(),
   schedule: { pollingIntervalMinutes: 120, nextPollAt: '2026-08-08T11:00:00.000Z' },
-  subscribedDate: '2026-08-01',
+  subscribedDate: day('2026-08-01'),
   cadence: [],
   ...overrides,
 })
@@ -188,7 +193,7 @@ export const library = (overrides: Partial<Library> = {}): Library => {
       publishedAt: '2026-06-03T12:00:00.000Z',
       firstSeenAt: '2026-06-03T13:00:00.000Z',
       savedAt: '2026-07-28T08:00:00.000Z',
-      savedDate: '2026-07-28',
+      savedDate: day('2026-07-28'),
     }),
   ]
   return { today: TODAY, total: items.length, nextCursor: null, ...overrides, items }

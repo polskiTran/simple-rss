@@ -96,7 +96,7 @@ export interface RetrievalRequest {
 export interface RetrievalSuccess {
   readonly ok: true
   readonly status: number
-  readonly url: string
+  readonly finalUrl: string
   readonly contentType: string
   readonly charset: string | undefined
   readonly etag: string | null
@@ -357,7 +357,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
       return {
         ok: true,
         status: 304,
-        url: url.href,
+        finalUrl: url.href,
         contentType: '',
         charset: undefined,
         etag: response.headers.get('etag'),
@@ -392,7 +392,7 @@ async function run(request: RetrievalRequest, context: RunContext): Promise<Retr
     return {
       ok: true,
       status: response.status,
-      url: url.href,
+      finalUrl: url.href,
       contentType,
       charset: charsetOf(response.headers.get('content-type')),
       etag: response.headers.get('etag'),

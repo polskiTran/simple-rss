@@ -1,7 +1,19 @@
 import { eq } from 'drizzle-orm'
 import type { DatabaseTransaction } from '../persistence/database.js'
+import { feedItemChronologyAt } from '../persistence/feed-item-chronology.js'
 import { feedItems, feeds, feedUrlAliases } from '../persistence/schema.js'
-import type { ParsedFeedDocument } from './feed-document.js'
+import type { NormalizedFeedItem, ParsedFeedDocument } from './feed-document.js'
+
+function feedWindowItems(parsed: ParsedFeedDocument): NormalizedFeedItem[] {
+  return [...new Map(parsed.items.map((item) => [item.dedupeKey, item])).values()]
+}
+
+export function feedWindowNewestFirst(parsed: ParsedFeedDocument, firstSeenAt: string) {
+  return feedWindowItems(parsed)
+    .reverse()
+    .map((item) => ({ ...item, chronologyAt: feedItemChronologyAt(item.publishedAt, firstSeenAt) }))
+    .sort((left, right) => right.chronologyAt.localeCompare(left.chronologyAt))
+}
 
 export function persistFeedWindow(
   tx: DatabaseTransaction,
@@ -37,7 +49,7 @@ export function persistFeedWindow(
     })
     .where(eq(feeds.id, feedId))
     .run()
-  for (const item of parsed.items) {
+  for (const item of feedWindowItems(parsed)) {
     tx.insert(feedItems)
       .values({
         feedId,

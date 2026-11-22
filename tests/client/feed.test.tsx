@@ -1,13 +1,14 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import type { fetchFeedItems } from '../../src/client/api.js'
 import { App } from '../../src/client/app.js'
 import { cadenceWindow as cadence } from './cadence-window.js'
-import { feedDetail, feedItemRow, feedItems, subscription, unavailable } from './fixtures.js'
+import { day, feedDetail, feedItemRow, feedItems, subscription, unavailable } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const DETAIL = feedDetail({
-  subscribedDate: '2026-05-20',
+  subscribedDate: day('2026-05-20'),
   cadence: cadence({ '2026-06-03': 2, '2026-08-08': 1 }),
 })
 
@@ -17,14 +18,14 @@ const JUNE_LETTER = feedItemRow({
   link: null,
   publishedAt: '2026-06-03T12:00:00.000Z',
   firstSeenAt: '2026-06-03T13:00:00.000Z',
-  date: '2026-06-03',
+  date: day('2026-06-03'),
   displayTime: '12:00',
   saved: true,
 })
 
 const ITEMS = feedItems({ items: [feedItemRow({ feedItemId: 12 }), JUNE_LETTER] })
 
-const TODAY_ONLY = feedItems({ items: [feedItemRow({ feedItemId: 12 })], nextFrom: '2026-06-03' })
+const TODAY_ONLY = feedItems({ items: [feedItemRow({ feedItemId: 12 })], nextFrom: day('2026-06-03') })
 
 function feedApi(items = ITEMS) {
   return stubApi().on('GET /api/feeds/1', { body: DETAIL }).on('GET /api/feeds/1/items', { body: items })
@@ -166,6 +167,10 @@ describe('opening one Feed', () => {
     expect(screen.getByRole('heading', { name: 'First light' })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull()
     expect(api.requestsTo('GET /api/feeds/1/items?from=2026-06-03')).toHaveLength(1)
+  })
+
+  it('pages a Feed by DigestStart, never by a hand-built query string', () => {
+    expectTypeOf<string>().not.toMatchTypeOf<Parameters<typeof fetchFeedItems>[1]>()
   })
 
   it('fetches a day picked on the grid that is not shown yet, then moves to it', async () => {

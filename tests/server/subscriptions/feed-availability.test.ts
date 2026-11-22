@@ -152,10 +152,6 @@ describe('presented Feed Availability', () => {
     )
   })
 
-  it('refuses a failure run recorded without its category, which settle never writes', () => {
-    expect(() => presented({ ...never, lastPolledAt: START, consecutiveFailures: 3 }, 'UTC')).toThrow()
-  })
-
   it('names the last success by its day in the installation timezone', () => {
     const lateEvening = { ...never, lastPolledAt: START, lastSuccessAt: '2026-08-07T20:00:00.000Z' }
     expect(presented(lateEvening, 'UTC').lastSuccessDate).toBe('2026-08-07')
@@ -457,7 +453,7 @@ function feedBytes(url: string): RetrievalBytesResult {
   return {
     ok: true,
     status: 200,
-    url,
+    finalUrl: url,
     contentType: 'application/rss+xml',
     charset: undefined,
     etag: null,

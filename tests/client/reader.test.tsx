@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
@@ -345,6 +345,38 @@ describe('Reader View', () => {
       await act(() => vi.advanceTimersByTimeAsync(2_000))
       await act(() => vi.advanceTimersByTimeAsync(2_000))
       expect(screen.getByText('Reading the original webpage took too long.')).toBeDefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops a deadline stage with its load, so a retry starts from plain reading', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      stubApi()
+        .on('GET /api/items/3', { body: { ...ITEM, summary: null } })
+        .on('GET /api/items/3/reader', () => {
+          calls += 1
+          return calls <= 3
+            ? {
+                status: 504,
+                body: { error: { code: 'article_deadline_exceeded', message: 'preparing', stage: 'parsing' } },
+              }
+            : new Promise<never>(() => {})
+        })
+      window.history.replaceState(null, '', '/reader/3')
+      render(<App />)
+
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      await act(() => vi.advanceTimersByTimeAsync(2_000))
+      expect(screen.getByText('Reading the original webpage took too long.')).toBeDefined()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(screen.getByText('Reading the original webpage')).toBeDefined()
+      expect(screen.queryByText('Still reading the original webpage')).toBeNull()
     } finally {
       vi.useRealTimers()
     }

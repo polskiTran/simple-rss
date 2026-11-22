@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  GLOBAL_FAILURES,
+  GLOBAL_FAILURES_FOR_MAX_DELAY,
   LoginRateLimiter,
   PER_CLIENT_FAILURES,
   WINDOW_MS,
@@ -73,8 +73,8 @@ describe('LoginRateLimiter', () => {
 
   it('lets the global ceiling drain too', () => {
     let recorded = 0
-    for (let host = 1; recorded < GLOBAL_FAILURES; host += 1) {
-      const batch = Math.min(PER_CLIENT_FAILURES - 1, GLOBAL_FAILURES - recorded)
+    for (let host = 1; recorded < GLOBAL_FAILURES_FOR_MAX_DELAY; host += 1) {
+      const batch = Math.min(PER_CLIENT_FAILURES - 1, GLOBAL_FAILURES_FOR_MAX_DELAY - recorded)
       fail(`203.0.113.${host}`, batch)
       recorded += batch
     }

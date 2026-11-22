@@ -2,13 +2,13 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/client/app.js'
-import { digest, searchResult } from './fixtures.js'
+import { day, digest, searchResult } from './fixtures.js'
 import { stubApi } from './stub-api.js'
 
 const TODAY_HEADING = 'Today Saturday 8\u00a0August (1)'
 
 const result = (feedItemId: number, title: string, date: string, saved = false) =>
-  searchResult({ feedItemId, title, date, saved })
+  searchResult({ feedItemId, title, date: day(date), saved })
 
 afterEach(() => {
   vi.unstubAllGlobals()
