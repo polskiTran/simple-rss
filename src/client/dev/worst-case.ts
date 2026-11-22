@@ -8,6 +8,12 @@ import {
   type Library,
   type LibraryItem,
   MAX_FEED_TITLE_LENGTH,
+  SEARCH_RESULT_LIMIT,
+  SEARCH_SUBSCRIPTION_LIMIT,
+  type SearchResult,
+  type SearchResults,
+  type SearchSubscriptionMatch,
+  searchRequestSchema,
   type SubscriptionList,
   type SubscriptionSummary,
   UNTITLED_FEED_ITEM_TITLE,
@@ -401,6 +407,62 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
   }
 }
 
+function searchOf(dataset: Exclude<Dataset, 'demo'>, query: URLSearchParams): SearchResults | undefined {
+  const request = searchRequestSchema.safeParse(Object.fromEntries(query))
+  if (!request.success) return undefined
+  const { scope } = request.data
+  const feeds = feedsOf(dataset)
+  const { today, groups } = digestOf(dataset)
+  const hits = groups.flatMap((group) =>
+    group.items.map(
+      (item): SearchResult => ({
+        feedItemId: item.feedItemId,
+        title: item.title,
+        feedId: item.feedId,
+        feedTitle: item.feedTitle,
+        publishedAt: item.publishedAt,
+        firstSeenAt: item.firstSeenAt,
+        date: group.date,
+        displayTime: item.displayTime,
+        saved: item.saved,
+        snippet: item.summary,
+      }),
+    ),
+  )
+  const jumpTo = feeds.map(
+    ({ feedId, title, domain, homePageUrl, cadence }): SearchSubscriptionMatch => ({
+      feedId,
+      title,
+      domain,
+      homePageUrl,
+      cadence,
+    }),
+  )
+  switch (scope.kind) {
+    case 'everywhere':
+      return {
+        scope: 'everywhere',
+        today,
+        subscriptions: jumpTo.slice(0, SEARCH_SUBSCRIPTION_LIMIT),
+        results: hits.slice(0, SEARCH_RESULT_LIMIT),
+      }
+    case 'saved':
+      return { scope: 'saved', today, results: hits.filter((hit) => hit.saved).slice(0, SEARCH_RESULT_LIMIT) }
+    case 'subscriptions':
+      return { scope: 'subscriptions', today, subscriptions: jumpTo }
+    case 'feed': {
+      const feed = feeds.find((candidate) => candidate.feedId === scope.feedId)
+      if (!feed) return undefined
+      return {
+        scope: 'feed',
+        today,
+        feed: { title: feed.title },
+        results: hits.filter((hit) => hit.feedId === scope.feedId).slice(0, SEARCH_RESULT_LIMIT),
+      }
+    }
+  }
+}
+
 function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string, query: URLSearchParams) {
   if (path === '/api/auth/status') return { claimed: true, authenticated: true }
   if (path === '/api/meta') return { name: 'simple-rss', version: '0.0.0-worst-case' }
@@ -424,6 +486,7 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
   }
   if (path === '/api/digest/days') return calendarOf(dataset)
   if (path === '/api/library') return libraryOf(dataset)
+  if (path === '/api/search') return searchOf(dataset, query)
   const library = path.match(/^\/api\/library\/(\d+)$/)
   if (library) {
     const saved = method === 'PUT'

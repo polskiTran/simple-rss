@@ -1,5 +1,13 @@
 import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import type { SearchResult, SearchResults, SearchScope, SearchSort, SearchSubscriptionMatch } from '../../shared/api.js'
+import {
+  SEARCH_RESULT_LIMIT,
+  SEARCH_SUBSCRIPTION_LIMIT,
+  type SearchResult,
+  type SearchResults,
+  type SearchScope,
+  type SearchSort,
+  type SearchSubscriptionMatch,
+} from '../../shared/api.js'
 import type { Clock } from '../clock.js'
 import { dateKey, dayKeysIn } from '../calendar.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
@@ -9,9 +17,6 @@ import { LISTED_ITEM_COLUMNS, listedItemOf } from '../persistence/listed-item.js
 import { effectiveFeedTitle, feedItems, feeds, libraryItems, subscriptions } from '../persistence/schema.js'
 import { stripCadenceByFeed } from '../digest/cadence-window.js'
 import { feedItemSearch } from './search-schema.js'
-
-export const SEARCH_RESULT_LIMIT = 50
-export const SEARCH_SUBSCRIPTION_LIMIT = 5
 
 const ITEM_TITLE_WEIGHT = 4
 const SUMMARY_WEIGHT = 1

@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { digestSchema, LIBRARY_PAGE_SIZE, librarySchema, MAX_FEED_TITLE_LENGTH } from '../../src/shared/api.js'
+import {
+  digestSchema,
+  LIBRARY_PAGE_SIZE,
+  librarySchema,
+  MAX_FEED_TITLE_LENGTH,
+  SEARCH_SUBSCRIPTION_LIMIT,
+  searchResultsSchema,
+} from '../../src/shared/api.js'
 import { install } from '../../src/client/dev/worst-case.js'
 
 const realFetch = window.fetch
@@ -29,5 +36,20 @@ describe('the dev worst-case mock', () => {
     const longest = Math.max(...digest.groups.flatMap((group) => group.items.map((item) => item.title.length)))
 
     expect(longest).toBe(MAX_FEED_TITLE_LENGTH)
+  })
+
+  it.each(['q=hi', 'q=hi&in=saved', 'q=hi&in=subscriptions', 'q=hi&feed=1'])(
+    'answers a Search for %s in the Search response shape',
+    async (query) => {
+      const answered = searchResultsSchema.parse(await mocked('worst', `/api/search?${query}`))
+
+      expect('results' in answered ? answered.results : answered.subscriptions).not.toHaveLength(0)
+    },
+  )
+
+  it('fills the Jump-to Group from its own Feeds, up to the shared limit', async () => {
+    const answered = searchResultsSchema.parse(await mocked('huge', '/api/search?q=hi'))
+
+    expect(answered.scope === 'everywhere' && answered.subscriptions).toHaveLength(SEARCH_SUBSCRIPTION_LIMIT)
   })
 })

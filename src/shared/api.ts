@@ -555,6 +555,10 @@ export type SearchSubscriptionMatch = z.infer<typeof searchSubscriptionMatchSche
 const searchItemsSchema = z.array(searchResultSchema)
 const searchJumpToSchema = z.array(searchSubscriptionMatchSchema)
 
+export const SEARCH_RESULT_LIMIT = 50
+
+export const SEARCH_SUBSCRIPTION_LIMIT = 5
+
 export const searchResultsSchema = z.discriminatedUnion('scope', [
   z.object({
     scope: z.literal('everywhere'),

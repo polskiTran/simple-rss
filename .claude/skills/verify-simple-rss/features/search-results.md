@@ -20,7 +20,7 @@ A search leads with matching Feeds as rows, then items with the words marked, an
 
 Preconditions:
 
-- The baseline holds. `verify` answers search from `SEARCH_ANSWER`.
+- The baseline holds.
 
 - **Render.** Run `verify sweep --tag search --screens search`. No findings at any target.
 - **Width.** Run `spec tests/browser/search.spec.ts -g "gives a matching Feed"`. It passes at 1280px and 320px.
@@ -30,7 +30,7 @@ Preconditions:
 
 ## Gotchas
 
-- `SEARCH_ANSWER` is fixed, so the query word does not change the screen. Only a spec proves a real match.
+- The dev mock answers every query with the whole dataset, so the query word does not change the screen. Only a spec proves a real match.
 - Narrow by feed needs results from two Feeds. Without it the list spans the page and rows go to two columns.
 - Search results update after a pause. Wait for a result, not a fixed sleep.
 - The same Feed row appears on the Feeds list, so sweep both after changing it.
