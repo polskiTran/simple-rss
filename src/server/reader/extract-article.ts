@@ -4,6 +4,7 @@ import { elapsedMs } from '../monotonic.js'
 import type { SignImageUrl } from '../images/image-url-signature.js'
 import { applyReaderMarkdownPolicy } from '../markdown/markdown-policy.js'
 import { readingTimeMinutes } from '../markdown/reading-time.js'
+import { decodePage } from '../upstream/page-text.js'
 
 const UNSUPPORTED_ACTIVE_CONTENT = /<(?:iframe|video|audio|object|embed)\b/i
 
@@ -51,7 +52,7 @@ export async function extractArticle(input: ExtractArticleInput): Promise<Extrac
   const timings: { -readonly [Phase in keyof ExtractionTimings]: ExtractionTimings[Phase] } = {}
   try {
     const domStartedAt = performance.now()
-    const document = articleDocument(decode(input.bytes, input.charset), input.url)
+    const document = articleDocument(decodePage(input.bytes, input.charset), input.url)
     for (const element of document.querySelectorAll(IRRELEVANT_DOM_SELECTOR)) element.remove()
     const fastProfile =
       input.bytes.byteLength > FULL_CLEANUP_MAX_BYTES ||
@@ -100,28 +101,4 @@ function articleDocument(html: string, url: string): ArticleDocument {
   }
   Object.defineProperty(document, 'URL', { configurable: true, value: url })
   return document
-}
-
-function decode(bytes: Uint8Array, transportCharset: string | undefined): string {
-  const label = bomCharset(bytes) ?? transportCharset ?? metaCharset(bytes) ?? 'utf-8'
-  try {
-    return new TextDecoder(label).decode(bytes)
-  } catch {
-    return new TextDecoder('utf-8').decode(bytes)
-  }
-}
-
-function bomCharset(bytes: Uint8Array): string | undefined {
-  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8'
-  if (bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le'
-  if (bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be'
-  return undefined
-}
-
-function metaCharset(bytes: Uint8Array): string | undefined {
-  const head = new TextDecoder('latin1').decode(bytes.subarray(0, 1024))
-  return (
-    /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i.exec(head)?.[1] ??
-    /<meta[^>]+content\s*=\s*["'][^"']*charset=([\w-]+)/i.exec(head)?.[1]
-  )
 }

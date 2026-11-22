@@ -162,6 +162,18 @@ describe('Feed preview', () => {
     expect(service.upstream.requestsTo('https://journal.example/deeper')).toHaveLength(0)
   })
 
+  it('finds the Declared Feeds of a page written in UTF-16, read by its byte order mark', async () => {
+    const service = await startTestService()
+    const markup = page(declares('application/rss+xml', '/feed'))
+    const utf16le = new Uint8Array([0xff, 0xfe, ...new Uint8Array(Buffer.from(markup, 'utf16le'))])
+    service.upstream
+      .stub(PAGE_URL, { headers: { 'content-type': 'text/html' }, body: utf16le })
+      .stub(FEED_URL, { headers: RSS_HEADERS, body: rss('Field Notes') })
+    const user = await claimedDevice(service)
+
+    expect(declaredFeedTitles(await preview(user, PAGE_URL))).toEqual(['Field Notes'])
+  })
+
   it('answers a page that declares no Feed with an empty list', async () => {
     const service = await startTestService()
     service.upstream.stub(PAGE_URL, { headers: HTML_HEADERS, body: page('') })

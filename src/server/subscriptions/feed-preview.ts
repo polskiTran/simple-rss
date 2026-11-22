@@ -12,6 +12,7 @@ import { feedDomain } from '../ingestion/feed-window.js'
 import type { DrizzleDatabase } from '../persistence/database.js'
 import { feedItemChronologyAt } from '../persistence/feed-item-chronology.js'
 import type { InstallationSettingsStore } from '../persistence/installation-settings.js'
+import { decodePage } from '../upstream/page-text.js'
 import { RETRIEVAL_PROFILES, type Retrieval, type RetrievalBytes } from '../upstream/retrieval.js'
 import type { FailedPoll } from './feed-availability.js'
 import { readFeed, type FeedAnswer } from './feed-poll.js'
@@ -59,7 +60,7 @@ export class FeedPreview {
       return { kind: 'previewed', preview: { kind: 'feed', feed: this.#summarise(requestedUrl, answer, now) } }
     }
 
-    const page = new TextDecoder().decode(retrieved.bytes)
+    const page = decodePage(retrieved.bytes, retrieved.charset)
     const answers = await Promise.all(
       declaredFeeds(page, retrieved.url)
         .slice(0, MAX_DECLARED_FEEDS)
