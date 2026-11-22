@@ -201,7 +201,7 @@ export const library = (overrides: Partial<Library> = {}): Library => {
 
 export const searchResult = (overrides: Partial<SearchResult> = {}): SearchResult => ({
   feedItemId: 3,
-  title: 'First light',
+  title: { text: 'First light', matches: [] },
   feedId: FEED.feedId,
   feedTitle: FEED.title,
   publishedAt: '2026-08-08T07:15:00.000Z',

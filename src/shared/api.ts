@@ -546,9 +546,15 @@ export const searchRequestSchema = z
     sort,
   }))
 
+const matchRangeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().positive()])
+export type MatchRange = z.infer<typeof matchRangeSchema>
+
+const markedTextSchema = z.object({ text: z.string(), matches: z.array(matchRangeSchema) })
+export type MarkedText = z.infer<typeof markedTextSchema>
+
 const searchResultSchema = z.object({
   feedItemId: z.number().int().positive(),
-  title: z.string(),
+  title: markedTextSchema,
   feedId: z.number().int().positive(),
   feedTitle: z.string(),
   publishedAt: z.string().nullable(),
@@ -556,7 +562,7 @@ const searchResultSchema = z.object({
   date: dateKeySchema,
   displayTime: z.string().nullable(),
   saved: z.boolean(),
-  snippet: z.string().nullable(),
+  snippet: markedTextSchema.nullable(),
 })
 export type SearchResult = z.infer<typeof searchResultSchema>
 

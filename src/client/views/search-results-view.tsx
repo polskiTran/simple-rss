@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import {
+  type MarkedText,
   searchParamsOf,
   type SearchResult,
   type SearchScope,
@@ -79,7 +80,6 @@ export function SearchResultsView({
       />
     )
 
-  const words = wordsOf(line)
   const results = answer && 'results' in answer ? answer.results : []
   const subscriptions = answer && 'subscriptions' in answer ? answer.subscriptions : []
   const feeds = feedsOf(results)
@@ -132,9 +132,9 @@ export function SearchResultsView({
                   <ItemBox
                     key={result.feedItemId}
                     feedItemId={result.feedItemId}
-                    title={result.title}
-                    titleContent={marked(result.title, words)}
-                    snippet={result.snippet === null ? undefined : marked(result.snippet, words)}
+                    title={result.title.text}
+                    titleContent={marked(result.title)}
+                    snippet={result.snippet === null ? undefined : marked(result.snippet)}
                     saved={result.saved}
                     feed={
                       answer.scope === 'feed'
@@ -195,25 +195,18 @@ function MatchingFeeds({
   )
 }
 
-function wordsOf(line: string): string[] {
-  return line
-    .split(/\s+/)
-    .map((word) => word.replace(/^["“”']+|["“”']+$/g, ''))
-    .filter((word) => word.length > 1)
-}
-
-function marked(text: string, words: readonly string[]): ReactNode {
-  if (words.length === 0) return text
-  const pattern = new RegExp(`(${words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
-  const parts = text.split(pattern)
-  return parts.map((part, index) =>
-    index % 2 === 1 ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed string, in order — the position is the identity.
-      <mark key={index} className="match">
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  )
+function marked({ text, matches }: MarkedText): ReactNode {
+  const parts: ReactNode[] = []
+  let shown = 0
+  for (const [start, end] of matches) {
+    parts.push(
+      text.slice(shown, start),
+      <mark key={start} className="match">
+        {text.slice(start, end)}
+      </mark>,
+    )
+    shown = end
+  }
+  parts.push(text.slice(shown))
+  return parts
 }

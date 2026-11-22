@@ -394,7 +394,7 @@ Feeds) shows a switch of that scope and Everywhere, moving both ways; Best
 match and Newest sit at the other end wherever items answer. Matching
 Subscriptions lead as Feed rows, a lone one spanning the list, so beside Narrow
 by feed they stack in one column with their strips aligned; items follow
-with the query's words marked in `match`. Beside them, Narrow by feed lists the
+with what the index matched marked in `match`. Beside them, Narrow by feed lists the
 Feeds the results came from, with counts, and narrows the list to those ticked —
 a checkbox list on desktop, a row of chips on a phone.
 

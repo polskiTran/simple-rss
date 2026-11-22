@@ -171,7 +171,7 @@ test.describe('the global search line', () => {
     await expect(page.getByRole('searchbox', { name: 'Search this feed' })).toHaveValue('')
   })
 
-  test('shows the matched summary with its words marked, and no snippet when the title matched', async ({
+  test('shows the matched summary with the words the index matched marked, and no snippet when the title matched', async ({
     page,
     installation,
   }) => {
@@ -179,7 +179,7 @@ test.describe('the global search line', () => {
     const field = page.getByRole('searchbox', { name: 'Search your reading' })
     const results = page.getByRole('region', { name: 'search results' })
 
-    await field.fill('clear morning')
+    await field.fill('clear morn')
     await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
     const snippet = results.locator('.item-snippet')
     await expect(snippet).toHaveText('A clear morning.')
@@ -219,7 +219,7 @@ test.describe('the global search line', () => {
     })
     const result = (feedItemId: number, feedId: number, feedTitle: string) => ({
       feedItemId,
-      title: `Item ${feedItemId}`,
+      title: { text: `Item ${feedItemId}`, matches: [] },
       feedId,
       feedTitle,
       publishedAt: null,
