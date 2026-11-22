@@ -695,7 +695,6 @@ describe('what authentication reveals', () => {
 })
 
 describe('credential rotation races', () => {
-  // Built by hand: the race needs a hasher that holds verification open, which no request can arrange.
   let database: DrizzleDatabase | undefined
 
   afterEach(() => database?.$client.close())

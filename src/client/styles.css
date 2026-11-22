@@ -6,8 +6,6 @@
 
 @source '../../node_modules/streamdown/dist/*.js';
 
-/* Streamdown's classes ask for `dark:`; it follows the same appearance the
-   tokens do. */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
     &:where(:not([data-appearance='light'], [data-appearance='light'] *)) {
@@ -20,8 +18,6 @@
   }
 }
 
-/* One declaration per token: `light-dark()` resolves against the document's
-   `color-scheme`, which the appearance choice sets below. */
 @theme {
   --font-read: 'Literata Variable', Georgia, serif;
   --font-ui: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
@@ -68,7 +64,6 @@
   --color-feed-name: var(--color-ramp-4);
   --color-match: light-dark(oklch(92% 0.1 97), oklch(38% 0.075 275));
 
-  /* The Markdown renderer's tokens, under the names its classes ask for. */
   --color-background: var(--color-ground);
   --color-foreground: var(--color-ink);
   --color-border: var(--color-rule);
@@ -79,13 +74,8 @@
 }
 
 @layer base {
-  /* Sizes, docs/DESIGN.md §4: a control is 36px on desktop and 44px on a phone;
-     a field is 40px and 48px, as are a phone sheet's buttons. The gutter is the
-     page's side margin, which a row that scrolls sideways bleeds into: 40px on
-     desktop, and on a phone 20px, widening to 32px as the screen does. */
   :root {
     --control: 36px;
-    /* What a phone's day tools take at the end of their row: Today, the calendar button, the gaps. */
     --day-tools-room: calc(var(--control) + 88px);
     --field: 40px;
     --gutter: 40px;
@@ -122,7 +112,6 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     -webkit-tap-highlight-color: transparent;
-    /* Turned sideways, iOS would enlarge the text; the type scale stands. */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -132,7 +121,6 @@
     text-decoration: none;
   }
 
-  /* A quick second tap on a control is another press, never a zoom. */
   :is(a, button, input, select, label, summary) {
     touch-action: manipulation;
   }
@@ -142,9 +130,6 @@
     outline-offset: 2px;
   }
 
-  /* Headings and sections take focus only by script, to announce an Arrival or
-     carry the keyboard into a jump; they are not controls, so they draw no ring.
-     WebKit would otherwise show one, since a mouse click leaves nothing focused. */
   :is(h1, section)[tabindex='-1']:focus-visible {
     outline: none;
   }
@@ -156,8 +141,6 @@
 }
 
 @layer components {
-  /* The phone layout spans the screen, so on a tablet its top bar and lists
-     reach the same edges the gutter sets. */
   .app {
     max-width: 1360px;
     min-height: 100dvh;
@@ -189,13 +172,6 @@
     }
   }
 
-  /* A screen and its lists are instant. Only an answer to an action — what an
-     address answered in Add feed, the words of the undo line an unsave leaves,
-     whose box takes the item's place at once, the notice, error or failure line
-     an action answers with — fades in once, as it mounts. A notice is cleared
-     before each action, so every answer leaves `display: none` and fades
-     afresh. The failure line's note is left out, so the line fades once. Nothing
-     here nests inside another, so no fade compounds. */
   :is(
     .add-feed-found,
     .undo-line > *,
@@ -220,7 +196,6 @@
     }
   }
 
-  /* One column held to the page: a scrolling row inside must not widen it. */
   .page-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -233,8 +208,6 @@
     }
   }
 
-  /* Every screen's title, and each Digest day's. The -2px pulls the big
-     glyphs' side bearing back to the column edge. */
   .page-title {
     margin: 0 0 0 -2px;
     font-weight: 500;
@@ -270,11 +243,9 @@
     gap: 12px;
   }
 
-  /* Holds its end of the toolbar even when nothing stands at the start. */
   .toolbar-end {
     margin-inline-start: auto;
 
-    /* Wrapped under the scope switch, the sort starts its own row. */
     @media (max-width: 1024px) {
       margin-inline-start: 0;
     }
@@ -394,7 +365,6 @@
     }
   }
 
-  /* Pressed: one step past hover, and nothing moves. */
   .button:active {
     background: var(--color-toggle-off);
   }
@@ -431,8 +401,6 @@
     padding: 0;
   }
 
-  /* A busy control is disabled only so it ignores presses; it keeps its own
-     colours, since its label says what it is doing and must stay readable. */
   .button:is(:disabled, [aria-disabled='true']):not([aria-busy='true']) {
     background: var(--color-control);
     color: var(--color-ink-3);
@@ -451,8 +419,6 @@
   .icon {
     flex: none;
   }
-
-  /* Switch: its 3px padding brings a segment to a control’s height. */
 
   .switch {
     display: inline-flex;
@@ -475,8 +441,6 @@
     white-space: nowrap;
     cursor: pointer;
 
-    /* On a phone segments share their switch's width, padded closely enough
-       that three fit the narrowest column. */
     @media (max-width: 1024px) {
       flex: 1;
       padding-inline: 4px;
@@ -499,8 +463,6 @@
     outline-offset: 0;
   }
 
-  /* A held switch keeps its chosen segment readable and dims the rest, as a
-     disabled button does. */
   .switch-segment[data-disabled] {
     cursor: not-allowed;
 
@@ -562,8 +524,6 @@
     opacity: 1;
   }
 
-  /* The ring is a shadow, which forced colours drop; the transparent outline
-     is what they paint in its place. */
   .field-input:focus {
     background: var(--color-ground);
     box-shadow: inset 0 0 0 1px var(--color-ink);
@@ -571,7 +531,6 @@
     outline-offset: -2px;
   }
 
-  /* A held field keeps the value it sent readable, dimmed from what can be edited. */
   .field-input:read-only {
     color: var(--color-ink-2);
     cursor: not-allowed;
@@ -637,7 +596,6 @@
     cursor: pointer;
     field-sizing: content;
 
-    /* Under 16px, iOS zooms the page into a focused select. */
     @media (max-width: 1024px) {
       font-size: 16px;
     }
@@ -663,7 +621,6 @@
     pointer-events: none;
   }
 
-  /* Above the chrome, which a dialog covers like everything else. */
   .dialog-backdrop,
   .dialog-viewport {
     z-index: 10;
@@ -676,11 +633,6 @@
     transition: opacity var(--duration-enter) var(--ease-out);
   }
 
-  /* The page keeps a scrollbar gutter the fixed scrim cannot reach, and the
-     gutter paints only the root's background colour. While a dialog is open
-     that colour is the scrim laid over the ground, mixed solid: `scrim` is ink
-     at .24 in light and black at .5 in dark. It fades with the scrim, both
-     ways, so no dark strip runs ahead of it or outlasts it. */
   html:has(.dialog-backdrop) {
     background: light-dark(
       color-mix(in srgb, var(--color-ink) 24%, var(--color-ground)),
@@ -703,9 +655,6 @@
     padding: 140px 24px 24px;
     overflow-y: auto;
 
-    /* A sheet sits on the bottom edge by its auto top margin rather than
-       flex-end, so one taller than the screen overflows downward and its top
-       can still be scrolled to. */
     @media (max-width: 1024px) {
       padding: 0;
     }
@@ -721,9 +670,6 @@
     outline: none;
     transition: opacity var(--duration-enter) var(--ease-out);
 
-    /* On a phone, a sheet that rises from the bottom edge under the fading scrim,
-       and sinks back into it. The sheet stays opaque; only the scrim fades. It
-       keeps the dialog's width, so on a wide phone layout it rises centred. */
     @media (max-width: 1024px) {
       margin-top: auto;
       padding: 20px;
@@ -842,13 +788,11 @@
     }
   }
 
-  /* The sections of a whole screen, a step under its title. */
   .app:is([data-screen='feeds'], [data-screen='saved']) .group-heading {
     font-size: 20px;
     line-height: 1.2;
   }
 
-  /* The 2px cancels the title's. */
   .day-distance {
     display: block;
     margin-bottom: 8px;
@@ -865,10 +809,6 @@
     }
   }
 
-  /* The first day's distance rises into the page's top padding, so the date
-     holds the line every other screen's title sits on. A phone's padding has
-     no room for it: there the distance is a row as tall as a control, its end
-     holding the day tools, so Today coming and going moves nothing. */
   .digest-day:first-child .day-distance {
     margin-top: calc(-1lh - 8px);
 
@@ -885,8 +825,6 @@
     white-space: nowrap;
   }
 
-  /* Where the title steps down to 36px, the date shortens to `Thu 22 Oct` so it
-     and its count fit a phone's line. The full date stays the heading's name. */
   .day-date {
     @media (max-width: 1024px) {
       position: absolute;
@@ -912,9 +850,6 @@
     border-bottom: 1px solid var(--color-rule);
   }
 
-  /* Small controls beside a heading — the month's turns, a filter's Clear —
-     centre on its 17px line and overhang it, so the heading sits where every
-     other one does. Both panels are desktop-only. */
   .group-aside:has(.button-small) {
     align-self: center;
     margin-block: calc((17px - 30px) / 2);
@@ -977,7 +912,6 @@
     }
   }
 
-  /* A Feed's own list names no Feed, so the meta column holds only the time. */
   .app[data-screen='feed'] .item {
     --item-meta: 56px;
   }
@@ -988,7 +922,6 @@
     }
   }
 
-  /* The box is the Reader link's hit area, so pressing it steps its fill. */
   .item:has(.item-title a:active) {
     background: var(--color-row-hover);
   }
@@ -1015,10 +948,6 @@
     }
   }
 
-  /* The Feed name sits over the box's Reader link; its hit area reaches past
-     its line so a near miss opens the Feed rather than the article. A long
-     name holds two lines, breaking inside a word when it has to; the Feed's
-     page names it in full. */
   .item-feed {
     position: relative;
     z-index: 1;
@@ -1060,8 +989,6 @@
     }
   }
 
-  /* A title or snippet holds a readable measure — about 66 characters of
-     Literata a line — however wide its box runs. */
   :is(.item-title, .item-snippet) {
     max-inline-size: 32em;
     overflow-wrap: anywhere;
@@ -1085,8 +1012,6 @@
     outline: none;
   }
 
-  /* The title's link opens the Reader from anywhere in the box; the Feed
-     name and Save sit above it and keep their own jobs. */
   .item-title a::after {
     content: '';
     position: absolute;
@@ -1118,7 +1043,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    /* A one-line item box's height, so taking its place moves nothing. */
     min-height: 84px;
     padding: 12px 20px 12px 24px;
     background: var(--color-row-hover);
@@ -1148,7 +1072,6 @@
     width: 5px;
     height: 5px;
 
-    /* A phone draws the last 14 days. */
     @media (max-width: 1024px) {
       &:nth-child(-n + 16) {
         display: none;
@@ -1214,8 +1137,6 @@
     }
   }
 
-  /* The mark assembles along its diagonal where a User first meets it, on Sign in
-     and Setup. The form below never waits for it. */
   .app:has(.gate) .chrome .wordmark-cell {
     animation: mark-assemble 250ms var(--ease-out) calc(var(--glint-step) * 30ms) backwards;
   }
@@ -1233,7 +1154,6 @@
     margin: 0;
     font-size: 14px;
     color: var(--color-ink-2);
-    /* A wait shorter than 400ms shows nothing; a longer one fades the line in. */
     animation: note-arrive var(--duration-enter) var(--ease-out) 400ms both;
   }
 
@@ -1287,7 +1207,6 @@
     }
   }
 
-  /* One line, so it spans the page rather than the scrolling jumps’ content. */
   .toolbar:has(.rhythm-jumps) {
     @media (max-width: 1024px) {
       flex-direction: column-reverse;
@@ -1296,7 +1215,6 @@
     }
   }
 
-  /* Two columns only where each row can hold a name beside a whole strip. */
   .feed-rows {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
@@ -1319,8 +1237,6 @@
     padding: 16px 24px;
     border: 1px solid var(--color-edge);
 
-    /* A phone gives the name its own line and the strip the rest of the
-       host's, or a line of its own under a host too long to share. */
     @media (max-width: 1024px) {
       display: flex;
       flex-wrap: wrap;
@@ -1373,7 +1289,6 @@
     }
   }
 
-  /* Inline, so a host that wraps keeps its mark at the end of its last line. */
   .feed-host .icon {
     display: inline-block;
     width: 14px;
@@ -1507,7 +1422,6 @@
     color: var(--color-ink-3);
   }
 
-  /* What would change the decision: a silent Feed, or one already followed. */
   .feed-preview-mark {
     font-weight: 500;
     color: var(--color-ink);
@@ -1571,7 +1485,6 @@
     margin-bottom: 40px;
   }
 
-  /* On a phone the chrome’s back square stands in for the view’s. */
   .view-back {
     @media (max-width: 1024px) {
       display: none;
@@ -1606,8 +1519,6 @@
     color: var(--color-reader-body);
   }
 
-  /* Beside the identity the actions keep one line, centred on the title's
-     40/1.08 first line; on a phone they wrap, each line filled. */
   .feed-actions {
     flex: none;
     margin-block-start: calc((40px * 1.08 - var(--control)) / 2);
@@ -1630,8 +1541,6 @@
     color: var(--color-danger);
   }
 
-  /* Cadence and Settings keep their own widths and Info takes the rest; where
-     the three do not fit on one line, Settings wraps under Cadence. */
   .feed-panels {
     display: flex;
     flex-wrap: wrap;
@@ -1667,9 +1576,6 @@
     margin: 0;
   }
 
-  /* On a phone the 26 columns fit the panel: 11px cells, or, where the panel
-     is narrower, cells that fill it edge to edge. The panel's column sizes to
-     the grid on desktop, so only a phone measures the figure. */
   .cadence-figure {
     --cell: 13px;
     --gap: 4px;
@@ -1762,7 +1668,6 @@
     }
   }
 
-  /* The Reader's Save is a grey button, not an item box's square. */
   .save-toggle-labelled[data-pressed] .icon {
     color: var(--color-saved);
   }
@@ -1915,8 +1820,6 @@
     font-weight: 600;
   }
 
-  /* Markers hang outside the column's left edge, so wrapped lines align with
-     the words rather than the bullet. */
   .article-body :is(ul, ol) {
     margin: 0 0 1.4em;
     padding-inline-start: 1.3em;
@@ -1953,7 +1856,6 @@
     margin-bottom: 0;
   }
 
-  /* A table is data to operate on, not prose: set in the interface face. */
   .article-table {
     margin: 0 0 1.4em;
     overflow-x: auto;
@@ -1988,14 +1890,10 @@
     border-top: 1px solid var(--color-rule);
   }
 
-  /* KaTeX's own 1.21em step eased back, so an equation reads at the size of
-     the prose it sits in. */
   .article-body .katex {
     font-size: 1.05em;
   }
 
-  /* The 2px keeps the scroller from clipping the pixels KaTeX hangs outside
-     its own box. */
   .article-body .katex-display {
     margin: 0 0 1.4em;
     padding-block: 2px;
@@ -2003,16 +1901,12 @@
     overflow-y: hidden;
   }
 
-  /* A numbered equation hangs its number at the box's right edge — on top of
-     any formula wider than the column. Widening the box to the formula and
-     reserving the number's room on both sides moves it clear, centred. */
   .article-body .katex-display > .katex > .katex-html:has(> .tag) {
     min-width: 100%;
     width: max-content;
     padding-inline: 3.5em;
   }
 
-  /* The inset line keeps a white image's edge from dissolving into the page. */
   .article-body .article-image {
     outline: 1px solid light-dark(oklch(0% 0 0 / 0.1), oklch(100% 0 0 / 0.1));
     outline-offset: -1px;
@@ -2058,16 +1952,12 @@
     gap: 20px;
   }
 
-  /* The first date is the page's title, so the head holds only the phone's day
-     picker, which sits beside that date. */
   .digest-head {
     position: relative;
     height: 0;
     margin-bottom: 0;
   }
 
-  /* With no day to head the list, a phone's note takes the distance row's
-     place, keeping clear of the day tools: Today and the calendar button. */
   .digest-empty {
     @media (max-width: 1024px) {
       display: flex;
@@ -2077,8 +1967,6 @@
     }
   }
 
-  /* The phone's day tools, at the end of the first day's distance row. On a
-     wide screen Today stands in the month's header instead. */
   .day-tools {
     position: absolute;
     inset-block-start: 0;
@@ -2092,9 +1980,6 @@
     }
   }
 
-  /* iOS Safari gives a date field a minimum width from its date text, so the
-     invisible field would run past the screen edge and let the page drag
-     sideways. The button clips it to its own box. */
   .day-picker {
     position: relative;
     display: none;
@@ -2128,10 +2013,6 @@
       0 0 0 2px var(--color-ink);
   }
 
-  /* A day's Feeds as chips in one row that scrolls sideways, the one shown
-     alone ringed in ink. Its trailing 32px fade, so what is past the edge reads
-     as there; the row ends 32px past its last chip so that chip can scroll clear
-     of the fade, and bleeds by a focus ring so its scrolling clips none. */
   .day-feeds {
     display: flex;
     align-items: center;
@@ -2193,8 +2074,6 @@
     box-shadow: inset 0 0 0 1px var(--color-ink);
   }
 
-  /* A long Feed name ends in an ellipsis so its count, and the chips after it,
-     stay in view; the chip's title holds the whole name. */
   .chip-name {
     min-width: 0;
     max-inline-size: 24ch;
@@ -2208,9 +2087,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A Feed's day in the Digest. Folded or unfolded its geometry is the same, so
-     a press moves nothing. Folded from far down, the page returns to the box's
-     start under the header, which stays where it was stuck. */
   .feed-day {
     --feed-day-inline: 24px;
     position: relative;
@@ -2245,9 +2121,6 @@
     }
   }
 
-  /* The name gives way first, ending in an ellipsis, so the count and the
-     control hold their places however long it runs. The Feed's page names it
-     in full. */
   .feed-day-who {
     display: flex;
     align-items: baseline;
@@ -2269,8 +2142,6 @@
     }
   }
 
-  /* A tag on the header's line. Its block padding is undone by its margin, so a
-     box with one is no taller than a box without. */
   .quiet-spell {
     margin-block: -2px;
     padding: 2px 6px;
@@ -2280,15 +2151,12 @@
     white-space: nowrap;
   }
 
-  /* Beside the control, it takes the next line rather than the name's room. */
   .feed-day-head > .quiet-spell {
     grid-column: 1 / -1;
     justify-self: start;
     margin-block-start: 4px;
   }
 
-  /* Text on the header's line. Its hit area reaches past that line, to a
-     control's height on a phone, and stops short of the title below. */
   .feed-day-fold {
     position: relative;
     z-index: 1;
@@ -2325,7 +2193,6 @@
     }
   }
 
-  /* Sized by the longer word, so the change of word moves neither edge. */
   .feed-day-fold-label {
     display: inline-grid;
 
@@ -2343,8 +2210,6 @@
     }
   }
 
-  /* Unfolded, the header sticks. Its fade stays inside its bottom padding, so at
-     rest it covers no title and it shows only as titles pass under it. */
   .feed-day[data-unfolded] .feed-day-head {
     position: sticky;
     top: 0;
@@ -2352,7 +2217,6 @@
     background: linear-gradient(to top, transparent, var(--color-ground) 8px);
   }
 
-  /* A title reached by keyboard clears the stuck header. */
   html:has(.feed-day[data-unfolded]) {
     scroll-padding-block-start: 56px;
   }
@@ -2402,13 +2266,6 @@
     }
   }
 
-  /* A saved title's highlight, reading the toggle's own state so it answers on
-     the press. One sweep across the lines, first to last, reversing from wherever
-     it has reached. Like a text selection, each line is filled to the text's
-     edges and to the line's full height, and a line the clamp hides leaves no
-     sliver under the last it shows. The half pixel past the line closes the seam
-     that snapping each band to device pixels leaves between lines. On Saved every
-     title is saved, so it would say nothing. */
   .item-text {
     --saved-band: calc(1lh + 0.5px);
     background-image: linear-gradient(var(--color-saved-tint), var(--color-saved-tint));
@@ -2422,8 +2279,6 @@
     background-size: 100% var(--saved-band);
   }
 
-  /* A lone title opens the Reader from anywhere in its box, past its own row;
-     the box clips the reach, and the Feed name and Save sit above it. */
   .feed-day:has(.feed-day-item:only-child) {
     overflow: clip;
   }
@@ -2447,10 +2302,6 @@
     outline-offset: 2px;
   }
 
-  /* Saving floats over the end of a title's first line on hover or keyboard
-     focus, fading what is under it, so it costs a title no width at rest. Where
-     nothing hovers, a list holds it in the open at the end of the meta line, and
-     the Digest saves from the Reader alone. */
   .save-word {
     position: absolute;
     z-index: 1;
@@ -2469,8 +2320,6 @@
     }
   }
 
-  /* Keyboard focus only: a click leaves focus on the word, which would hold it
-     in view after the pointer has gone. */
   :is(.feed-day-item, .item):has(:focus-visible) > .save-word {
     opacity: 1;
   }
@@ -2512,7 +2361,6 @@
     }
   }
 
-  /* The month has no room beside the list on a phone; the date picker stands in for it. */
   .digest-calendar {
     @media (max-width: 1024px) {
       display: none;
@@ -2528,7 +2376,6 @@
     width: 30px;
   }
 
-  /* Today is its own action, so it stands apart from the month turns. */
   .calendar-turns .day-today {
     margin-inline-end: 4px;
   }
@@ -2605,9 +2452,6 @@
     }
   }
 
-  /* The column stays in view beside a long list, scrolling itself if taller.
-     It bleeds out by the rows' hover fill and focus ring, which its scrolling
-     would otherwise clip. */
   .with-aside > :is(.digest-calendar, .feed-filter) {
     position: sticky;
     top: 24px;
@@ -2672,7 +2516,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Checked is a filled inner square: hard-edged, and no image to fetch. */
   .checkbox {
     appearance: none;
     flex: none;
@@ -2698,7 +2541,6 @@
     min-height: var(--control);
     cursor: pointer;
 
-    /* On a phone, a chip. It holds its hidden tick box, which would otherwise escape the scrolling row. */
     @media (max-width: 1024px) {
       position: relative;
       gap: 8px;
@@ -2822,9 +2664,6 @@
         display: none;
       }
 
-      /* Where Saved and Settings are hidden their tracks go too, or their empty
-         gaps would hold the search square short of the column's edge; the
-         Reader gives their place to its toolbar. */
       .app[data-screen='search'] & {
         grid-template-columns: auto auto minmax(0, 1fr) auto;
       }
@@ -2839,8 +2678,6 @@
     grid-column: 1;
     grid-row: 1;
 
-    /* The row fits from 375px; narrower, the mark gives way, since the Digest
-       segment beside it goes home too. */
     @media (max-width: 1024px) {
       height: var(--control);
       padding-right: 10px;
@@ -2880,15 +2717,11 @@
     gap: 12px;
     margin-top: 32px;
 
-    /* On a phone the toolbar joins the top bar after the search square, where
-       Saved and Settings stand elsewhere, so the bar is focused in the order it
-       is drawn; the chrome’s own back square stands in for the one it carries. */
     @media (max-width: 1024px) {
       grid-column: 5;
       grid-row: 1;
       margin: 0;
 
-      /* Its squares keep the bar's own spacing. */
       & .toolbar-group {
         gap: 6px;
       }
@@ -2899,8 +2732,6 @@
     display: none;
   }
 
-  /* The switch, the search and the buttons take the header's own tracks, in
-     the order they are focused. */
   .sections {
     display: contents;
   }
@@ -2918,17 +2749,12 @@
         padding: 0 8px;
       }
 
-      /* Where the mark gives way, the switch takes its track, gap and all, so
-         it starts at the column's edge. */
       @media (max-width: 374px) {
         grid-column: 1 / span 2;
       }
     }
   }
 
-  /* On a phone an opened Feed leads with its way back instead of the switch; the
-     Reader and a search give the whole bar to their own controls and the search
-     square. */
   .app[data-screen='feed'] .sections-switch,
   .app:is([data-screen='reader'], [data-screen='search']) :is(.sections-switch, .section-button),
   .chrome:has(.search[data-open]) :is(.sections-switch, .section-button) {
@@ -2954,8 +2780,6 @@
     }
   }
 
-  /* Signed in on a phone, the mark stands alone and each section button is an
-     icon square; their words stay as the links' accessible names. */
   .app:not([data-screen='gate']) .chrome .wordmark-name,
   .section-button-label {
     @media (max-width: 1024px) {
@@ -2973,8 +2797,6 @@
     box-shadow: inset 0 0 0 1px var(--color-ink);
   }
 
-  /* Forced colours drop the fills and rings that mark what is chosen, so the
-     system's own selection colours mark it instead. */
   @media (forced-colors: active) {
     :is(
         .switch-segment:is([data-pressed], [aria-current='page']),
@@ -3029,8 +2851,6 @@
     min-width: 0;
     margin: 0;
 
-    /* On a phone the search square opens the field across the whole bar.
-       Closed, it keeps its square's width however tight the bar gets. */
     @media (max-width: 1024px) {
       min-width: var(--control);
 
@@ -3058,10 +2878,6 @@
     }
   }
 
-  /* On a touch phone the field opens out of the search square. The clip stops 4px
-     outside the field so its focus ring stays whole. A typed search is already
-     open when the bar mounts, so it does not play. Keyboards skip this: `/`
-     answers in the same frame. */
   @media (max-width: 1024px) and (hover: none) {
     .search[data-open]:not([data-filled]) .search-field {
       clip-path: inset(-4px);
@@ -3139,15 +2955,12 @@
   }
 }
 
-/* The change of Appearance, the one crossfade across the whole screen. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 200ms;
   animation-timing-function: var(--ease-out);
 }
 
-/* Less motion, not none: fades stay, nothing moves. The phone sheet fades in
-   place instead of rising, and the waiting tile and the mark hold still. */
 @media (prefers-reduced-motion: reduce) {
   .item-text {
     transition: none;
@@ -3185,9 +2998,6 @@
   }
 }
 
-/* Streamdown's code, squared to the system. Unlayered, so it outranks the
-   utility classes the renderer puts on these elements; the language header
-   goes, since a reader has nothing to operate there. */
 .article-body [data-streamdown='code-block'] {
   gap: 0;
   margin: 0 0 1.4em;

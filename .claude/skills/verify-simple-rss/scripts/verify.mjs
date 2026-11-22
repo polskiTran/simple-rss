@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Drives simple-rss in a real browser for UI verification. See ../SKILL.md.
 import { spawn, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -19,10 +18,6 @@ const MIN_FREE_MB = 1024
 
 const playwright = createRequire(join(ROOT, 'package.json'))('@playwright/test')
 
-/**
- * Widths the session's bugs lived at: both sides of the 1024px break, portrait tablets, a phone, the narrowest phone, 200% zoom.
- * A phone target is a mobile browser: touch, and overlay scrollbars, so `scrollbar-gutter` reserves nothing.
- */
 const TARGETS = {
   d1440: { width: 1440, height: 900, scheme: 'light' },
   d1180: { width: 1180, height: 900, scheme: 'light' },
@@ -43,7 +38,6 @@ const SCREENS = {
   search: { path: '/search?q=hi', ready: '.search-feeds' },
 }
 
-/** Screens whose title must share one line; the Feed sits under a Back button, a phone's Digest under its distance. */
 const SAME_LINE = {
   wide: ['digest', 'feeds', 'saved', 'settings', 'search'],
   phone: ['feeds', 'saved', 'settings', 'search'],
@@ -70,7 +64,6 @@ const hit = (feedItemId, title, feedId, feedTitle, saved) => ({
   snippet: null,
 })
 
-/** The dev mock has no search: real names, one long and one unbroken, from Feeds that answer. */
 const SEARCH_ANSWER = {
   scope: 'everywhere',
   today: '2026-10-22',
@@ -131,8 +124,6 @@ async function up() {
     await new Promise((done) => setTimeout(done, 100))
   }
 
-  // Ready means a browser can render a screen, not that the port answers. Vite
-  // reloads the page once while it optimises dependencies on a cold cache.
   const browser = await playwright.chromium.launch()
   try {
     const page = await browser.newPage()
@@ -192,7 +183,6 @@ async function doctor() {
   if (checks.some(({ ok }) => !ok)) process.exit(1)
 }
 
-/** Runs in the page. Raw numbers: a rounded measure once hid a title 0.4px off its line. */
 function probe() {
   const edge = document.documentElement.clientWidth
   const clipped = (element) => {
@@ -212,7 +202,6 @@ function probe() {
   for (const block of document.querySelectorAll(read)) {
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      // An address has no words to protect, so it may break anywhere.
       for (const token of node.textContent.matchAll(/\S+/g)) {
         if (/[/.:@?=]/.test(token[0])) continue
         for (const word of token[0].matchAll(/[\p{Script=Latin}\d’']+/gu)) {
@@ -330,7 +319,6 @@ async function sweep(args) {
   if (findings.length > 0) process.exitCode = 1
 }
 
-/** One image per tag and screen, side by side. Two identical captures mean the change was not live. */
 async function sheet(args) {
   const { tags, target = 'd1180', screens = 'digest,feeds,saved' } = options(args)
   const rows = tags.split(',')

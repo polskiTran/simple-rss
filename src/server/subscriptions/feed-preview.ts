@@ -26,11 +26,6 @@ export type FeedPreviewOutcome =
   | { readonly kind: 'invalid-url' }
   | FailedPoll
 
-/**
- * What an address the User entered answers, summarised before anything is
- * recorded (ADR 0012). The preview reads the database only to say whether a
- * Feed is already subscribed, and never writes to it.
- */
 export class FeedPreview {
   readonly #db: DrizzleDatabase
   readonly #retrieval: Retrieval
@@ -49,13 +44,6 @@ export class FeedPreview {
     this.#settings = options.settings
   }
 
-  /**
-   * A Feed answers as itself, whatever content type serves it. A web page is
-   * read for its Declared Feeds: the first five are each retrieved once, as
-   * Feeds — a declared address answering with another page is left out, never
-   * followed — and those that answer are summarised in page order. When the
-   * page declared Feeds and none answered, the first one's failure is the answer.
-   */
   async preview(enteredUrl: string, signal?: AbortSignal): Promise<FeedPreviewOutcome> {
     const requestedUrl = canonicalFeedUrl(enteredUrl)
     if (!requestedUrl) return { kind: 'invalid-url' }
@@ -71,7 +59,6 @@ export class FeedPreview {
       return { kind: 'previewed', preview: { kind: 'feed', feed: this.#summarise(requestedUrl, answer, now) } }
     }
 
-    // `<link>` markup is ASCII in any charset a page plausibly declares, so UTF-8 reads it.
     const page = new TextDecoder().decode(retrieved.bytes)
     const answers = await Promise.all(
       declaredFeeds(page, retrieved.url)
@@ -89,15 +76,9 @@ export class FeedPreview {
     return { kind: 'previewed', preview: { kind: 'page', host: new URL(retrieved.url).hostname, feeds } }
   }
 
-  /**
-   * Names the Feed as ingestion would. Cadence counts Feed Items by
-   * installation-timezone day over the strip's thirty days.
-   */
   #summarise(feedUrl: string, answer: Extract<FeedAnswer, { kind: 'parsed' }>, now: Date): PreviewedFeed {
     const { retrieved, parsed } = answer
     const seenAt = now.toISOString()
-    // One Feed Item per identity, as storing the window would keep: the last
-    // occurrence wins. Ties fall as stored ones do, the later in the document first.
     const items = [...new Map(parsed.items.map((item) => [item.dedupeKey, item])).values()]
       .reverse()
       .map((item) => ({

@@ -9,8 +9,6 @@ import { ManualClock } from '../../support/manual-clock.js'
 
 const MINUTE = 60 * 1000
 
-// The canonical rate-limit behaviour is pinned over HTTP in `authentication.test.ts`.
-// These cover the edges a request cannot arrange: time inside the window, and cancellation.
 describe('LoginRateLimiter', () => {
   let clock: ManualClock
   let limiter: LoginRateLimiter

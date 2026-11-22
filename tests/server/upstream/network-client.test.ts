@@ -44,7 +44,6 @@ async function origin(handler: Handler): Promise<Origin> {
   }
 }
 
-/** Every test origin listens here; the adapter is handed it as the approved address. */
 const TEST_SERVER: HttpConnection = { addresses: ['127.0.0.1'] }
 
 function send(request: Request): Promise<Response> {
@@ -121,8 +120,6 @@ describe('createNetworkHttpClient', () => {
     const port = new URL(running.url).port
     const network = createNetworkHttpClient()
     const retrieval = createRetrieval({
-      // Validation approves the public answer; the test then re-pins the
-      // socket to its own loopback origin, which no validation would approve.
       httpClient: (request, connection) => network(request, { ...connection, ...TEST_SERVER }),
       logger: createLogger({ level: 'error', sink: () => {} }),
       resolve: async () => ['93.184.216.34'],
@@ -298,8 +295,6 @@ describe('createNetworkHttpClient', () => {
 
     try {
       const observed: HttpTimings[] = []
-      // Node warns at the eleventh listener for one event on one emitter;
-      // a leak of one listener per request crosses that on the twelfth request.
       for (let sent = 0; sent < 12; sent += 1) {
         const response = await client(new Request(url), {
           ...TEST_SERVER,
@@ -310,7 +305,7 @@ describe('createNetworkHttpClient', () => {
       await new Promise<void>((resolve) => setImmediate(resolve))
 
       expect(observed.filter((timings) => timings.connectionReused)).toHaveLength(11)
-      expect(warnings).toEqual([])
+      expect(warnings, 'twelve requests, past Node’s warning at the eleventh listener').toEqual([])
     } finally {
       process.off('warning', onWarning)
     }
@@ -354,7 +349,6 @@ describe('createNetworkHttpClient', () => {
     })
     const port = new URL(running.url).port
 
-    // `.invalid` never resolves: reaching the origin proves no DNS query ran.
     const response = await send(new Request(`http://publisher.invalid:${port}/feed.xml`))
 
     await expect(response.text()).resolves.toBe('<rss></rss>')

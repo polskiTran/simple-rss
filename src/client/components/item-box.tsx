@@ -3,11 +3,6 @@ import { feedPath, readerPath } from '../routing.js'
 import { RoutedLink } from './routed-link.js'
 import { SaveToggle } from './save-toggle.js'
 
-/**
- * Where a Feed Item came from, as the box names it; absent on the Feed's own
- * page. Without `onOpen` the name is plain text — a save whose Subscription is
- * gone has no Feed to open.
- */
 interface ItemFeed {
   readonly feedId: number
   readonly title: string
@@ -19,16 +14,13 @@ interface ItemBoxProps {
   readonly title: string
   readonly saved: boolean
   readonly feed?: ItemFeed | undefined
-  /** The time or date the meta column shows, and the instant it stands for; no label shows nothing. */
   readonly when: { readonly label: string | null; readonly dateTime: string }
-  /** Search results mark their matches; everything else shows the plain title. */
   readonly titleContent?: ReactNode
   readonly snippet?: ReactNode
   onOpen(feedItemId: number): void
   onSaved(saved: boolean): void
 }
 
-/** The one shape a Feed Item takes in every list: the whole box opens the Reader. */
 export function ItemBox({
   feedItemId,
   title,
@@ -72,7 +64,6 @@ export function ItemBox({
   )
 }
 
-/** A Feed's name in a meta column, clamped to two lines; hovering shows the rest. */
 export function FeedName({ title }: { title: string }) {
   return (
     <span className="item-feed-name" title={title}>

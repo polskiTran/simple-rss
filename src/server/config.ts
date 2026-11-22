@@ -33,30 +33,13 @@ const publicOrigin = z
   .transform((value) => new URL(value).origin)
 
 const envSchema = z.object({
-  /** Injected by the host platform; the container must not hard-code a port. */
   PORT: port.default(8080),
-  /**
-   * The mounted volume; everything durable lives below it. The container image
-   * sets this explicitly — the default only serves local development.
-   */
   DATA_DIR: z.string().trim().min(1).default('./.data'),
-  /** Built client assets. Absent means `defaultClientDir()`. */
   CLIENT_DIR: z.string().trim().min(1).optional(),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
-  /** How long in-flight requests may finish after SIGTERM. */
   SHUTDOWN_GRACE_MS: z.coerce.number().int().min(0).max(120_000).default(10_000),
-  /**
-   * The Setup Secret, inert once the installation is claimed. Optional here so
-   * an absent or unusable secret keeps readiness closed with a readable reason
-   * instead of crash-looping the container.
-   */
   SETUP_SECRET: z.string().trim().min(1).optional(),
-  /** Required so outbound retrieval can always refuse a URL pointing back at this API. */
   PUBLIC_ORIGIN: publicOrigin,
-  /**
-   * Whether `X-Forwarded-For` may be believed: true behind the documented
-   * platform proxy, false when exposed directly and the header is attacker-controlled.
-   */
   TRUST_PROXY_HEADERS: z
     .enum(['true', 'false'])
     .default('true')
@@ -65,7 +48,6 @@ const envSchema = z.object({
   NODE_ENV: z.string().optional(),
 })
 
-/** The environment, read into the shape the service runs on, with every path absolute. */
 const configSchema = envSchema.transform((env) => {
   const dataDir = resolve(env.DATA_DIR)
   return {
@@ -102,19 +84,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return parsed.data
 }
 
-/**
- * Compiled output lives at `dist/server/`, the client bundle one directory up.
- * Resolving from the module keeps this independent of the working directory.
- */
 function defaultClientDir(): string {
   const serverDir = fileURLToPath(new URL('.', import.meta.url))
   return resolve(serverDir, '..', 'client')
 }
 
-/**
- * Zod's `.default()` only covers absent keys, but an unset platform variable
- * often arrives as an empty string; dropping empties lets the defaults win.
- */
 function pickDefined(env: NodeJS.ProcessEnv): Record<string, string> {
   const entries = Object.entries(env).filter(
     (entry): entry is [string, string] => entry[1] !== undefined && entry[1] !== '',

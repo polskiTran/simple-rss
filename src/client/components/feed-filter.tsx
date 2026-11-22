@@ -8,10 +8,6 @@ interface FeedFilterProps {
   onChange(shown: ReadonlySet<number>): void
 }
 
-/**
- * Ticked Feeds narrow a list to themselves; none ticked shows all of it. Beside
- * the list on a wide screen, a row of chips above it on a phone.
- */
 export function FeedFilter({ id, title, feeds, shown, onChange }: FeedFilterProps) {
   const toggle = (feedId: number) => {
     const next = new Set(shown)

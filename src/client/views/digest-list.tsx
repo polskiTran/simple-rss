@@ -12,23 +12,12 @@ import { DigestDay } from './digest-day.js'
 
 interface DigestListProps {
   readonly start: DigestStart
-  /** Said when the Digest has nothing from its start. */
   readonly empty: string
-  /** What else to load again when the list's Retry is pressed. */
   onRetry(): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
 }
 
-/**
- * The Digest from one day, or from today, a day to a group; Show more goes on
- * from the day the page names. The oldest day shown is kept on the history
- * entry, so coming back asks for every day read through in one page, and the
- * scroll lands where it was left. A new start keeps the old list in view until
- * its own first page answers, then the new list moves in from the direction of
- * time it went; the days Show more adds fade in. Arriving on the screen plays
- * nothing.
- */
 export function DigestList({ start, empty, onRetry, onOpenItem, onOpenFeed }: DigestListProps) {
   const [through, keepThrough] = useKept('through', dateKeySchema)
   const [state, { retry, set, loadMore, older }] = usePagedResource(

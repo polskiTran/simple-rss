@@ -8,13 +8,6 @@ interface NativeSelectProps<Value extends string> {
   onChange(value: NoInfer<Value>): void
 }
 
-/**
- * A grey button that opens the platform's own picker — on a phone, the native
- * wheel beats any listbox (ADR 0008). Busy while its caller saves, it keeps
- * keyboard focus, as Button's `focusableWhenDisabled` does: it reads as disabled
- * and ignores changes rather than taking the native `disabled`, which drops focus
- * to the body.
- */
 export function NativeSelect<const Value extends string>({
   label,
   value,

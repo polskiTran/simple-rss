@@ -16,27 +16,14 @@ const SINGLETON_ID = 1
 type Transaction = Parameters<Parameters<DrizzleDatabase['transaction']>[0]>[0]
 
 export interface IssuedSession {
-  /** Sent to the device once, in the cookie, and never stored. */
   readonly token: string
-  /** The absolute deadline, for the cookie's own lifetime. */
   readonly expiresAt: Date
 }
 
 export type VerifierChangeOutcome =
-  /** `revoked` counts the sessions signed out, and is legitimately `0`. */
   | { readonly kind: 'changed'; readonly revoked: number }
-  /** The current password no longer matches the stored verifier: nothing was written. */
   | { readonly kind: 'stale-verifier' }
 
-/**
- * The User's password verifier (`user_auth`) and their Sessions (`sessions`).
- *
- * One invariant spans both tables: a Session exists only under the current
- * verifier. Every operation here keeps it inside one transaction — a Session is
- * issued only while the verifier the caller checked is still stored, and
- * replacing the verifier revokes every Session — so a sign-in racing a password
- * change or reset can never leave a Session behind under the old password.
- */
 export class CredentialStore {
   readonly #db: DrizzleDatabase
 
@@ -44,7 +31,6 @@ export class CredentialStore {
     this.#db = db
   }
 
-  /** The encoded Argon2id verifier, or `undefined` while the installation is unclaimed. */
   passwordHash(): string | undefined {
     const [row] = this.#db
       .select({ passwordHash: userAuth.passwordHash })
@@ -70,7 +56,6 @@ export class CredentialStore {
     })
   }
 
-  /** Issues a Session for a verified password; `undefined` if that verifier was replaced meanwhile. */
   issueSession(passwordHash: string, now: Date): IssuedSession | undefined {
     return this.#db.transaction((tx) => {
       const [current] = tx
@@ -83,7 +68,6 @@ export class CredentialStore {
     })
   }
 
-  /** Whether the token names a live Session, sliding its idle deadline if so. */
   touch(token: string, now: Date): boolean {
     const tokenHash = fingerprint(token)
 
@@ -108,7 +92,6 @@ export class CredentialStore {
     return true
   }
 
-  /** Ends one device's Session. Unknown tokens are already revoked. */
   revoke(token: string): void {
     this.#db
       .delete(sessions)
@@ -123,7 +106,6 @@ export class CredentialStore {
       .run().changes
   }
 
-  /** Replaces the verifier the caller checked and revokes every Session; refuses if it was replaced meanwhile. */
   changePassword(expectedHash: string, passwordHash: string, now: Date): VerifierChangeOutcome {
     return this.#db.transaction((tx): VerifierChangeOutcome => {
       const changed = tx
@@ -137,7 +119,6 @@ export class CredentialStore {
     })
   }
 
-  /** Installs an emergency verifier, claiming if need be, and revokes every Session. Returns how many it ended. */
   resetPassword(passwordHash: string, now: Date): number {
     const at = now.toISOString()
 

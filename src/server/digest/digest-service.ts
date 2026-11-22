@@ -69,10 +69,6 @@ export class DigestService {
     return { today, days: days.map((date) => ({ date, count: countOn(date) })), subscriptions: subscribed }
   }
 
-  /**
-   * The Feed Item after this one in Digest order — answered here so the Reader and
-   * the Digest can never disagree. `undefined` when the item is last, or not in the Digest.
-   */
   after(feedItemId: number): DigestItem | undefined {
     const current = this.#db
       .select({ chronologyAt: feedItems.chronologyAt })
@@ -106,11 +102,6 @@ export class DigestService {
       .orderBy(desc(feedItems.chronologyAt), desc(feedItems.id))
   }
 
-  /**
-   * The day's Feeds back from a quiet spell: each Feed's previous item before
-   * the day is one lookup along its own chronology, so a spell that began before
-   * the page is still seen whole. Only a returning Feed has its Cadence counted.
-   */
   #returns(
     { date, items }: Pick<DigestGroup, 'date' | 'items'>,
     timezone: string,

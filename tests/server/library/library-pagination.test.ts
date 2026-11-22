@@ -21,7 +21,6 @@ const minuteItems = (count: number) =>
     item(`note-${index}`, `note-${index}`, `2026-08-08T01:${String(index).padStart(2, '0')}:00.000Z`),
   )
 
-/** Subscribes to 55 items and saves them newest item first — against Digest order — `gapMs` apart. */
 async function savedNotes(gapMs: number) {
   const service = await startTestService()
   service.upstream.stub(FEED_URL, {

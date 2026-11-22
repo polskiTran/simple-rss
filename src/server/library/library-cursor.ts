@@ -1,7 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { z } from 'zod'
 
-/** Where the next Library page resumes: the last item's save, as stored ISO, and its id to break ties. */
 export interface LibraryCursor {
   readonly savedAt: string
   readonly feedItemId: number

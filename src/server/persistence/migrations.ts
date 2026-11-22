@@ -3,13 +3,11 @@ import { systemClock, type Clock } from '../clock.js'
 import type { DrizzleDatabase } from './database.js'
 
 export interface Migration {
-  /** 1-based, contiguous, and never reused or reordered once released. */
   readonly version: number
   readonly name: string
   readonly sql: string
 }
 
-/** Append-only: correct a released migration with a new one. */
 export const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -371,19 +369,12 @@ const MIGRATION_TABLE = `
   );
 `
 
-/** Versions already recorded in this database, ascending. */
 export function appliedVersions(db: DrizzleDatabase): number[] {
   db.run(sql.raw(MIGRATION_TABLE))
   const rows = db.all<{ version: number }>(sql`SELECT version FROM schema_migrations ORDER BY version`)
   return rows.map((row) => row.version)
 }
 
-/**
- * Each migration runs in its own transaction, so a failure leaves the database at the
- * last complete version. A database a newer release has migrated is refused before
- * anything runs: this release cannot know what that schema means, as after an image
- * rollback.
- */
 export function applyMigrations(
   db: DrizzleDatabase,
   clock: Clock = systemClock,
@@ -405,7 +396,6 @@ export function applyMigrations(
     if (already.has(migration.version)) continue
 
     db.transaction((tx) => {
-      // Drizzle deliberately exposes its driver for multi-statement migrations.
       db.$client.exec(migration.sql)
       tx.run(
         sql`INSERT INTO schema_migrations (version, name, applied_at)

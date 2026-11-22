@@ -14,11 +14,9 @@ import { useResource } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
 import { retryFailure, unavailableNote } from './feed-language.js'
 
-/** How often, and how many times, the list is read again while an imported Subscription waits for its first check. */
 const POLL_INTERVAL_MS = 2_000
 const POLL_ROUNDS = 30
 
-/** Rows a Rhythm group shows before Show N more. */
 const GROUP_PREVIEW = 6
 
 type Order = 'rhythm' | 'name' | 'recent'
@@ -57,7 +55,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     if (!signal.aborted) setPollRound(pollRound + 1)
   })
 
-  // Polls while an imported Subscription awaits its first check, and stops on leaving the screen.
   useEffect(() => {
     if (state.kind !== 'loaded' || pollRound >= POLL_ROUNDS) return
     if (!state.value.some((subscription) => subscription.availability.state === 'unchecked')) return
@@ -69,7 +66,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     }
   }, [state, pollRound])
 
-  // A Subscription added by hand was checked before it was recorded: its row simply arrives.
   function subscribed(created: SubscriptionSummary) {
     setNotice('')
     setReport(undefined)
@@ -87,7 +83,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
     void refreshList()
   }
 
-  /** Called outside the row's transition, so the notice clears at once and a repeated answer is announced again. */
   async function retry(feedId: number) {
     setNotice('')
     try {
@@ -174,7 +169,6 @@ export function FeedsView({ onOpenFeed }: FeedsViewProps) {
   )
 }
 
-/** The flat orders: by effective title, or newest Subscription first. */
 function ordered(subscriptions: readonly SubscriptionSummary[], order: 'name' | 'recent') {
   return subscriptions.toSorted((left, right) =>
     order === 'recent'
@@ -183,7 +177,6 @@ function ordered(subscriptions: readonly SubscriptionSummary[], order: 'name' | 
   )
 }
 
-/** The Rhythms that have Subscriptions, in Rhythm order. */
 function rhythmGroups(subscriptions: readonly SubscriptionSummary[]) {
   const byRhythm = Object.groupBy(subscriptions, (subscription) => rhythmOf(subscription.cadence))
   return RHYTHMS.flatMap((rhythm) => {
@@ -213,8 +206,6 @@ function RhythmGroup({
 
   const fold = () => {
     setExpanded(false)
-    // Folding from the foot of a long group would leave the reader in the next
-    // one; bring the group back when its heading has scrolled away.
     const heading = document.getElementById(rhythmAnchor(rhythm))
     if (heading && heading.getBoundingClientRect().top < 0) heading.scrollIntoView({ block: 'start' })
   }

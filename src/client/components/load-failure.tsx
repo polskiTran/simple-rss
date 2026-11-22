@@ -1,13 +1,11 @@
 import { Button } from '@base-ui/react/button'
 
 interface LoadFailureProps {
-  /** What failed to load, as a sentence opens: `The digest`, `Your saves` — the verbs agree with either. */
   readonly subject: string
   readonly kind: 'unreachable' | 'unavailable'
   onRetry(): void
 }
 
-/** A read that failed, told apart by cause: a silent network, or a server that answered wrong. */
 export function LoadFailure({ subject, kind, onRetry }: LoadFailureProps) {
   return (
     <div className="load-failure">

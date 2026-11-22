@@ -19,7 +19,8 @@ pnpm only, Node ≥ 22.
 | `pnpm dev:server` / `pnpm dev:client` | Either half alone |
 | `pnpm build` | Build client then server (`build:client`, `build:server`) |
 | `pnpm start` | Run the built server from `dist/` |
-| `pnpm lint` | `biome check --error-on-warnings .` (formatting and the import boundaries, `biome.jsonc`), then oxlint with the anti-slop rules (`oxlint.config.mjs`); a warning fails it |
+| `pnpm lint` | `biome check --error-on-warnings .` (formatting and the import boundaries, `biome.jsonc`), then oxlint with the anti-slop rules (`oxlint.config.mjs`), then the comment ratchet (`comments:check`); a warning fails it |
+| `pnpm comments:list [path...]` / `pnpm comments:lock` | List the comments the ratchet counts / lower `tools/comments/baseline.json` after deleting some |
 | `pnpm format` | `biome format --write .` |
 | `pnpm typecheck` | `tsc --noEmit` over `tsconfig.json` (the app and tests), `tsconfig.server.json` (the server build) and the vendored anti-slop plugin's own `tsconfig.json` |
 | `pnpm test` / `pnpm test:watch` | Vitest — both projects: `tests/server/` in node, `tests/client/` in jsdom |
@@ -83,9 +84,16 @@ Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CON
 Use the `verify-simple-rss` skill, not a browser on the host or `pnpm dev`. It serves the client against the dev mock on `127.0.0.1:5199` with Playwright's own Chromium, so it needs no sign-in, no database and no published port. Never drive 5173 or 8080: those are the developer's `pnpm dev`, with their real Feeds and session. On a fresh machine, run `pnpm exec playwright install --with-deps chromium` once first.
 </important>
 
-<important if="you are writing comments, docstrings, or docs/ prose">
+<important if="you are about to write a code comment, or `comments:check` fails">
 
-Comments describe current behavior. When behavior changes, update its comments in the same commit; if you cannot make a comment true, delete it.
+Code comments are banned. Say it in a name, a type, or a test; put a non-obvious decision in `docs/adr/`; file an issue for code that needs a comment to excuse it. Exempt: `// SAFETY:` before an `as`, `biome-ignore <reason>`, `@ts-expect-error`, and the suppression reasons in `biome.jsonc` and `oxlint.config.mjs`.
+
+`tools/comments/baseline.json` holds the comments that predate the ban, as comment lines per file. `pnpm lint` fails when a file goes over its count, and when it goes under until `pnpm comments:lock` records the lower number. Never raise a count. To burn the baseline down, use the `delete-comment` skill.
+</important>
+
+<important if="you are writing docs/ prose">
+
+Docs describe current behavior. When behavior changes, update them in the same commit.
 </important>
 
 <important if="you are filing, reading, labeling, or closing an issue">

@@ -22,20 +22,11 @@ export function notFound(c: Context): Response {
   return apiError(c, 404, 'not_found', 'Not found')
 }
 
-/**
- * Reads a Feed or Feed Item identifier from the path, answering `404` itself:
- * an identifier this installation could never have issued and one it does not
- * hold are one answer.
- */
 export function readId(c: Context, name: string): Validated<number> {
   const parsed = idParameterSchema.safeParse(c.req.param(name))
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, response: notFound(c) }
 }
 
-/**
- * Validates a JSON body, answering `400` itself. Failure messages name fields
- * and constraints, never values — one route through here carries the password.
- */
 export async function readJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<Validated<z.infer<S>>> {
   let raw: unknown
   try {
@@ -52,7 +43,6 @@ export async function readJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S
   return { ok: true, value: parsed.data }
 }
 
-/** Absent means the top of the list. An undecodable cursor is answered 400 here. */
 export function readLibraryCursor(c: Context): Validated<LibraryCursor | undefined> {
   const raw = c.req.query('cursor')
   if (raw === undefined) return { ok: true, value: undefined }

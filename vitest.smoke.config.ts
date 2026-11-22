@@ -1,6 +1,5 @@
 import { defineConfig } from 'vitest/config'
 
-// Excluded from `pnpm test`: needs a Docker daemon and a full image build.
 export default defineConfig({
   test: {
     name: 'smoke',

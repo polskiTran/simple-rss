@@ -7,11 +7,12 @@
 # agent traces
 agent-traces/
 
-# agents, keeping the one skill the project maintains
+# agents, keeping the skills the project maintains
 .claude/*
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/verify-simple-rss/
+!.claude/skills/delete-comment/
 .agents/
 .humanlayer/
 

@@ -24,7 +24,6 @@ async function openDigest(page: Page, installation: Installation): Promise<void>
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
 }
 
-/** A section's link in the chrome; exact, since a back button names the same section. */
 function section(page: Page, name: 'Digest' | 'Feeds' | 'Saved' | 'Settings') {
   return page.getByRole('link', { name, exact: true })
 }

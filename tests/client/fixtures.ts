@@ -15,12 +15,6 @@ import type {
   SubscriptionSummary,
 } from '../../src/shared/api.js'
 
-/**
- * Well-formed API answers for client tests, all about one Feed — Field Notes,
- * feed 1 — and its item First light, item 3, on Saturday 8 August 2026. Each
- * builder takes overrides for whole fields; a test states only what it is about.
- */
-
 const TODAY = '2026-08-08'
 
 type AvailabilityIn<State extends FeedAvailability['state']> = Extract<FeedAvailability, { state: State }>
@@ -94,7 +88,6 @@ export const feedItemRow = (overrides: Partial<FeedItemRow> = {}): FeedItemRow =
   ...overrides,
 })
 
-/** An opened Feed: by default no Cadence. Its items arrive apart, as `feedItems`. */
 export const feedDetail = (overrides: Partial<FeedDetail> = {}): FeedDetail => ({
   ...FEED,
   reportedTitle: FEED.title,

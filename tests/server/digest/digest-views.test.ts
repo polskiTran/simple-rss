@@ -3,8 +3,6 @@ import { CADENCE_GRID_WEEKS, digestCalendarSchema, digestSchema } from '../../..
 import { claimedDevice, type Device } from '../../support/device.js'
 import { startTestService, type TestService } from '../../support/service-harness.js'
 
-// The harness clock reads 2026-08-08T09:00Z.
-
 const item = (guid: string, pubDate: string) => `
   <item>
     <guid>${guid}</guid>
@@ -28,7 +26,6 @@ async function subscribe(service: TestService, user: Device, title: string, item
   expect((await user.post('/api/subscriptions', { url })).status).toBe(201)
 }
 
-/** Field Notes publishes daily, Weekly Letters on five days, Old Almanac not for months. */
 async function threeRhythms() {
   const service = await startTestService()
   const user = await claimedDevice(service)

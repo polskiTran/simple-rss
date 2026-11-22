@@ -10,11 +10,6 @@ interface LoginViewProps {
   onSignedIn(status: AuthStatus): void
 }
 
-/**
- * Sign in is never disabled before it is pressed: pressed empty, or answered
- * with a wrong password, it says why on the field and puts focus back there.
- * Anything else — a lost connection, too many attempts — is the form's note.
- */
 export function LoginView({ onSignedIn }: LoginViewProps) {
   useScreenTitle('Sign in')
   const [password, setPassword] = useState('')

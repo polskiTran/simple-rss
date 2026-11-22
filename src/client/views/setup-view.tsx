@@ -13,12 +13,6 @@ interface SetupViewProps {
 
 type SetupField = 'secret' | 'password' | 'confirmation'
 
-/**
- * Claim installation is never disabled before it is pressed: a reason that
- * belongs to one field — an empty or wrong secret, a short or mismatched
- * password — goes on that field, which takes focus. A deployment whose setup
- * secret is missing or too short is the operator's to fix, in the form's note.
- */
 export function SetupView({ onClaimed, onAlreadyClaimed }: SetupViewProps) {
   useScreenTitle('Set up')
   const [setupSecret, setSetupSecret] = useState('')

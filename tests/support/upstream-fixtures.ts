@@ -7,10 +7,6 @@ export interface FixtureResponse {
   readonly status?: number
   readonly headers?: Record<string, string>
   readonly body?: string | Uint8Array | ReadableStream<Uint8Array>
-  /**
-   * Held before the response arrives, so a test can drive a timeout or a
-   * cancellation without waiting on a real network.
-   */
   readonly delayMs?: number
 }
 
@@ -18,21 +14,14 @@ export interface RecordedRequest {
   readonly method: string
   readonly url: string
   readonly headers: Record<string, string>
-  /** What the socket would have been pinned to for this request. */
   readonly addresses: readonly string[]
 }
 
-/**
- * Stands in for the outside world: every upstream retrieval — Feeds, Reader
- * pages, proxied images — goes through the injected `HttpClient`. An unstubbed
- * URL throws rather than escaping to the network.
- */
 export class UpstreamFixtures {
   readonly #responses = new Map<string, FixtureResponse | (() => FixtureResponse)>()
   readonly #requests: RecordedRequest[] = []
   readonly #aborted: string[] = []
 
-  /** Stubs one exact URL. Later calls to the same URL replace the earlier one. */
   stub(url: string, response: FixtureResponse): this {
     this.#responses.set(url, response)
     return this
@@ -51,18 +40,10 @@ export class UpstreamFixtures {
     return this.#requests.filter((request) => request.url === url)
   }
 
-  /**
-   * URLs whose request the caller abandoned — how a test sees a retrieval that
-   * gave up tear its connection down.
-   */
   get aborted(): readonly string[] {
     return this.#aborted
   }
 
-  /**
-   * DNS for the stubbed world: stubbed hosts resolve to one public address,
-   * anything else to nothing — a forgotten stub fails as an unresolvable host.
-   */
   get resolve(): ResolveAddresses {
     return async (hostname) => {
       const known = [...this.#responses.keys()].some((url) => safeHostname(url) === hostname)
@@ -95,8 +76,6 @@ export class UpstreamFixtures {
       if (signal?.aborted) throw abortReason(signal)
       if (delayMs !== undefined) await this.#hold(delayMs, signal)
 
-      // `304` and friends carry no body at all, and `Response` refuses to
-      // pretend otherwise.
       const carriesBody = status !== 204 && status !== 205 && status !== 304
       onTimings?.({ connectionReused: true, ttfbMs: performance.now() - askedAt })
       return new Response(carriesBody ? (body as BodyInit) : null, { status, headers })
@@ -134,14 +113,9 @@ export function chunkedBody(chunks: readonly Uint8Array[]): ReadableStream<Uint8
 
 export interface PacedBodyOptions {
   readonly gapMs: number
-  /** `false` models a publisher that sent part of the body, then went quiet without closing. */
   readonly ends?: boolean
 }
 
-/**
- * A body that arrives steadily but slowly, so a test can tell the wait for an
- * answer apart from the wait for that answer to finish.
- */
 export function pacedBody(chunks: readonly Uint8Array[], options: PacedBodyOptions): ReadableStream<Uint8Array> {
   let index = 0
   return new ReadableStream<Uint8Array>({

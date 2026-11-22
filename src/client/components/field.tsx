@@ -5,25 +5,18 @@ import { Icon } from './icon.js'
 interface FieldProps {
   readonly label: string
   readonly value: string
-  /** `url` keeps a text input — a bare host is a fine answer — with the URL keyboard. */
   readonly type?: 'text' | 'password' | 'url'
   readonly autoComplete?: string
   readonly autoFocus?: boolean
   readonly placeholder?: string | undefined
   readonly maxLength?: number
   readonly multiline?: boolean
-  /** Shows the value and keeps focus, but takes no edits: a form holding what it sent. */
   readonly readOnly?: boolean
   readonly error?: string | undefined
-  /** The input, for a form that moves focus to the field in error. */
   readonly ref?: Ref<HTMLInputElement>
   onChange(value: string): void
 }
 
-/**
- * A labelled control for one value. Base UI ties the label, and the error
- * under it, to the control. A password field carries its own reveal.
- */
 export function Field({
   label,
   value,

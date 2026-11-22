@@ -5,11 +5,6 @@ import { afterEach } from 'vitest'
 
 const created: string[] = []
 
-/**
- * A real directory on disk for the duration of one test. Tests exercise the
- * production SQLite path rather than an in-memory database, so WAL files,
- * permissions, and durability behave the way they do in a container.
- */
 export async function makeTempDataDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'simple-rss-'))
   created.push(dir)

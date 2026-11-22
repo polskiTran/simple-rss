@@ -5,10 +5,6 @@ type RoutedLinkProps = Omit<ComponentProps<'a'>, 'href' | 'onClick'> & {
   onNavigate(): void
 }
 
-/**
- * A link the shell routes itself: a plain left click calls `onNavigate`.
- * Anything else — modified, middle, or already handled — stays with the browser.
- */
 export function RoutedLink({ href, onNavigate, ...anchor }: RoutedLinkProps) {
   return (
     <a

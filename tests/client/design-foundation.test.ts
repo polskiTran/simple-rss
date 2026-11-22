@@ -2,12 +2,9 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-// The design system's global invariants (docs/DESIGN.md §1), read off the
-// stylesheet's declarations. Exact values and layout live in the browser tests.
 let css: string
 
 beforeAll(async () => {
-  // Resolved from the project root: under jsdom, `import.meta.url` is an http: URL.
   css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
 })
 
@@ -31,7 +28,6 @@ describe('colour', () => {
   })
 })
 
-/** Each colour token's light and dark values, `var()` aliases followed. */
 function tokens(): Map<string, readonly [string, string]> {
   const raw = new Map(
     [...css.matchAll(/--color-([\w-]+)\s*:\s*([^;]+);/g)].map(([, name = '', value = '']) => [name, value] as const),
@@ -47,7 +43,6 @@ function tokens(): Map<string, readonly [string, string]> {
   return new Map([...raw.keys()].map((name) => [name, resolve(name)]))
 }
 
-/** WCAG relative luminance of an opaque `oklch(L% C h)`, through linear sRGB. */
 function luminance(colour: string): number {
   const [lightness = 0, chroma = 0, hue = 0] = (colour.match(/[\d.]+/g) ?? []).map(Number)
   const L = lightness / 100
@@ -68,7 +63,6 @@ function contrast(one: string, other: string): number {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05)
 }
 
-// The pairs docs/DESIGN.md §2 promises, as [text, ground, least ratio].
 const PROMISED: readonly (readonly [string, string, number])[] = [
   ['ink-2', 'ground', 4.5],
   ['ink-2', 'control', 4.5],
@@ -105,7 +99,6 @@ describe('shape', () => {
   })
 })
 
-/** Every rule's prelude, with the preludes of the blocks it is nested in. */
 function rules(): { prelude: string; within: string[] }[] {
   const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const found: { prelude: string; within: string[] }[] = []
@@ -124,8 +117,7 @@ function rules(): { prelude: string; within: string[] }[] {
 }
 
 describe('pointer', () => {
-  // A tap reports a hover that never ends, so an ungated hover style sticks after it.
-  it('styles hover only where a pointer can hover', () => {
+  it('gates every hover style on a pointer that can hover, so a tap leaves none stuck', () => {
     const hovers = rules().filter(({ prelude }) => prelude.includes(':hover'))
     expect(hovers.length).toBeGreaterThan(0)
     for (const { prelude, within } of hovers) {

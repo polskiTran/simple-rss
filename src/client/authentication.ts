@@ -2,12 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AuthStatus } from '../shared/api.js'
 import { failureKind, fetchAuthStatus, onSessionEnded } from './api.js'
 
-/**
- * `locked` asks for the password, `unclaimed` for the deployment's setup
- * secret; the server says which — nothing is inferred here. Unanswered, the
- * gate tells a silent network (`unreachable`) from a server that answered
- * wrong (`unavailable`), and counts the attempts so far.
- */
 type Access =
   | { readonly kind: 'checking' }
   | { readonly kind: 'unclaimed' }
@@ -18,11 +12,9 @@ type Access =
 export interface Gate {
   readonly access: Access
   adopt(status: AuthStatus): void
-  /** Asks the server again; settles once the gate shows its answer. */
   recheck(): Promise<void>
 }
 
-/** The longest an unanswered gate waits before asking again on its own. */
 const MOST_PATIENT_MS = 60_000
 
 export function useAccess(): Gate {
@@ -47,8 +39,6 @@ export function useAccess(): Gate {
 
   useEffect(() => onSessionEnded(() => setAccess({ kind: 'locked' })), [])
 
-  // Unanswered, it asks again when the connection or the tab comes back, and
-  // otherwise after a wait that doubles from 2s up to a minute.
   useEffect(() => {
     if (!('attempts' in access)) return
     const again = () => void recheck()

@@ -9,12 +9,7 @@ export interface FailureAnswer {
   readonly message: string
 }
 
-/**
- * What was being retrieved. Three answers are prose it owns; the other three
- * only name a code, since their message is a limit the profile already sets.
- */
 interface RetrievalSubject {
-  /** Sentence subject of the size and timing messages: `'The Feed'`, `'The original page'`. */
   readonly noun: string
   readonly profile: RetrievalProfile
   readonly unsafeDestination: FailureAnswer
@@ -25,10 +20,6 @@ interface RetrievalSubject {
   readonly bodyTimeoutCode: ApiErrorCode
 }
 
-/**
- * Fifteen transport outcomes collapse into the six a User can act on. Adding a
- * `RetrievalFailureCode` fails to compile here and nowhere else.
- */
 function retrievalAnswers(subject: RetrievalSubject) {
   const { noun, profile, unsafeDestination, unsupportedContent, unreachable } = subject
   return {

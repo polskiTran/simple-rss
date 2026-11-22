@@ -10,21 +10,8 @@ interface GlobalSearchProps {
   onQueryChange(query: string): void
 }
 
-/**
- * How long typing rests before the draft becomes the query. Commits are what
- * write history and fetch results, so the pause also keeps the line under
- * Safari's history-write throttle, which throws past ~100 writes in 30s.
- */
 const SETTLE_MS = 250
 
-/**
- * The header's search field. A phone shows it only once its search square is
- * pressed or a search is under way; `data-open` says so, and the close square
- * clears the words and leaves. Keyed by the screen its search belongs to, so
- * moving to another screen shuts it, words or none. Words taken away from
- * outside it, as by going back from the results, shut it too, even when that
- * lands on the screen the search began from; clearing them here keeps it open.
- */
 export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps) {
   const input = useRef<HTMLInputElement>(null)
   const [opened, setOpened] = useState(false)
