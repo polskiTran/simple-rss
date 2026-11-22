@@ -76,14 +76,19 @@ export const apiErrorCodeSchema = z.enum([
 ])
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>
 
+const stagedErrorCodeSchema = z.literal('article_deadline_exceeded')
+
+const unstagedErrorCodeSchema = apiErrorCodeSchema.exclude([stagedErrorCodeSchema.value])
+export type UnstagedErrorCode = z.infer<typeof unstagedErrorCodeSchema>
+
 export const apiErrorSchema = z.object({
-  error: z.object({
-    code: apiErrorCodeSchema,
-    message: z.string(),
-    stage: readerDeadlineStageSchema.optional(),
-  }),
+  error: z.discriminatedUnion('code', [
+    z.object({ code: stagedErrorCodeSchema, message: z.string(), stage: readerDeadlineStageSchema }).strict(),
+    z.object({ code: unstagedErrorCodeSchema, message: z.string() }).strict(),
+  ]),
 })
 export type ApiErrorBody = z.infer<typeof apiErrorSchema>
+export type ApiFailure = ApiErrorBody['error']
 
 export const MIN_PASSWORD_LENGTH = 12
 

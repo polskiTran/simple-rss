@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { z } from 'zod'
-import { idParameterSchema, type ApiErrorBody, type ApiErrorCode } from '../../shared/api.js'
+import { idParameterSchema, type ApiErrorBody, type UnstagedErrorCode } from '../../shared/api.js'
 import { decodeLibraryCursor, type LibraryCursor } from '../library/library-cursor.js'
 
 export type Validated<T> =
@@ -11,7 +11,7 @@ export type Validated<T> =
 export function apiError(
   c: Context,
   status: ContentfulStatusCode,
-  code: ApiErrorCode,
+  code: UnstagedErrorCode,
   message: string,
   headers?: Record<string, string>,
 ): Response {

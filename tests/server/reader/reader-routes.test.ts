@@ -27,8 +27,7 @@ describe('Reader failure answers', () => {
 
     expect(response.status).toBe(504)
     const { error } = apiErrorSchema.parse(await response.json())
-    expect(error.code).toBe('article_deadline_exceeded')
-    expect(error.stage).toBe('publisher')
+    expect(error).toMatchObject({ code: 'article_deadline_exceeded', stage: 'publisher' })
   })
 
   it('names the wait on the rate-limited answer', async () => {

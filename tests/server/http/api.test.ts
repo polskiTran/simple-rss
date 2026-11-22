@@ -5,6 +5,15 @@ import { claimedDevice } from '../../support/device.js'
 import { startTestService } from '../../support/service-harness.js'
 
 describe('API boundary', () => {
+  it('carries a Reader deadline stage on article_deadline_exceeded alone', () => {
+    const deadline = { code: 'article_deadline_exceeded', message: 'preparing', stage: 'parsing' }
+    expect(apiErrorSchema.safeParse({ error: deadline }).success).toBe(true)
+    expect(apiErrorSchema.safeParse({ error: { ...deadline, stage: undefined } }).success).toBe(false)
+    expect(
+      apiErrorSchema.safeParse({ error: { code: 'not_found', message: 'Not found', stage: 'parsing' } }).success,
+    ).toBe(false)
+  })
+
   it('reports which build is running', async () => {
     const service = await startTestService()
     const user = await claimedDevice(service)

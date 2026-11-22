@@ -1,8 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { failureKind } from './api.js'
 
-export type Resource<T> =
-  | { readonly kind: 'loading'; readonly previous: T | undefined }
+export type Resource<T, Progress = never> =
+  | { readonly kind: 'loading'; readonly previous: T | undefined; readonly progress?: Progress | undefined }
   | { readonly kind: 'loaded'; readonly value: T }
   | { readonly kind: 'unavailable'; readonly error: unknown }
   | { readonly kind: 'unreachable'; readonly error: unknown }
@@ -23,11 +23,11 @@ interface PagedControls<T, Cursor> extends ResourceControls<T> {
   readonly older: OlderState
 }
 
-export function useResource<T>(
+export function useResource<T, Progress = never>(
   key: string,
-  load: (signal: AbortSignal) => Promise<T>,
+  load: (signal: AbortSignal, report: (progress: Progress) => void) => Promise<T>,
   options?: ResourceOptions,
-): readonly [Resource<T>, ResourceControls<T>] {
+): readonly [Resource<T, Progress>, ResourceControls<T>] {
   const { held, retry, patch } = useHeld(key, load, options?.dropOnNewKey ?? false)
   return [held.resource, { retry, set: (update) => patch(undefined, update) }]
 }
@@ -74,20 +74,24 @@ export function usePagedResource<T, Cursor = string>(
   ]
 }
 
-export function valueInView<T>(resource: Resource<T>): T | undefined {
+export function valueInView<T>(resource: Resource<T, unknown>): T | undefined {
   if (resource.kind === 'loaded') return resource.value
   if (resource.kind === 'loading') return resource.previous
   return undefined
 }
 
-interface Held<T> {
+interface Held<T, Progress> {
   readonly key: string
-  readonly resource: Resource<T>
+  readonly resource: Resource<T, Progress>
   readonly load: number
 }
 
-function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, dropOnNewKey: boolean) {
-  const [held, setHeld] = useState<Held<T>>({
+function useHeld<T, Progress = never>(
+  key: string,
+  load: (signal: AbortSignal, report: (progress: Progress) => void) => Promise<T>,
+  dropOnNewKey: boolean,
+) {
+  const [held, setHeld] = useState<Held<T, Progress>>({
     key,
     resource: { kind: 'loading', previous: undefined },
     load: 0,
@@ -108,7 +112,13 @@ function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, drop
         previous: dropOnNewKey && current.key !== key ? undefined : valueInView(current.resource),
       },
     }))
-    void run(request.signal)
+    const report = (progress: Progress) => {
+      if (request.signal.aborted) return
+      setHeld((current) =>
+        current.resource.kind === 'loading' ? { ...current, resource: { ...current.resource, progress } } : current,
+      )
+    }
+    void run(request.signal, report)
       .then((value) => {
         if (!request.signal.aborted) setHeld({ key, resource: { kind: 'loaded', value }, load: id })
       })
@@ -118,7 +128,7 @@ function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, drop
     return () => request.abort()
   }, [key, attempt, dropOnNewKey])
 
-  const resource: Resource<T> =
+  const resource: Resource<T, Progress> =
     dropOnNewKey && held.key !== key ? { kind: 'loading', previous: undefined } : held.resource
 
   const patch = (from: number | undefined, update: (current: T) => T) =>
@@ -127,7 +137,7 @@ function useHeld<T>(key: string, load: (signal: AbortSignal) => Promise<T>, drop
       const { resource } = current
       if (resource.kind === 'loaded') return { ...current, resource: { kind: 'loaded', value: update(resource.value) } }
       if (resource.kind === 'loading' && resource.previous !== undefined) {
-        return { ...current, resource: { kind: 'loading', previous: update(resource.previous) } }
+        return { ...current, resource: { ...resource, previous: update(resource.previous) } }
       }
       return current
     })
