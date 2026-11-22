@@ -41,36 +41,34 @@ const rendererChunk = /article-renderer|article-markdown/
 test.describe('Reader View', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('reads structured Feed Content while the original is pending, then replaces it honestly', async ({
+  test('falls back to structured Feed Content when the original fails, then replaces it honestly', async ({
     page,
     installation,
   }) => {
     await subscribe(page, installation)
     await section(page, 'Digest').click()
-    const held = Promise.withResolvers<void>()
+    let failing = true
     await page.route('**/api/items/*/reader', async (route) => {
-      await held.promise
-      await route.continue()
+      if (!failing) return route.continue()
+      await route.fulfill({ status: 502, json: { error: { code: 'article_unreachable', message: 'not today' } } })
     })
-    try {
-      await page.getByRole('link', { name: 'First light' }).click()
-      await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
-      await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
-      await expect(page.locator('.reader-meta')).toContainText('1 min read')
-      await expect(page.getByText('Reading the original webpage')).toBeVisible()
-      const link = page.getByRole('link', { name: 'the feed notebook' })
-      await expect(link).toHaveAttribute('href', 'https://publisher.example/feed-notes')
-      await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-      await expect(page.locator('.article-body em')).toHaveText('carefully')
-      await expect(page.locator('.article-body li')).toHaveText('Keep a steady hand')
-      const illustration = page.getByRole('img', { name: 'The valley in the Feed' })
-      await expect(illustration).toHaveAttribute('src', /^\/api\/reader\/image\?url=.+&exp=\d+&sig=[\w-]+$/)
-      await expect(illustration).toHaveAttribute('loading', 'lazy')
-      await expect(illustration).toHaveJSProperty('naturalWidth', 1)
-      await expect(page.getByText('The first light from the Feed.')).toBeVisible()
-    } finally {
-      held.resolve()
-    }
+    await page.getByRole('link', { name: 'First light' }).click()
+    await expect(page.getByRole('heading', { name: 'From the field' })).toBeVisible()
+    await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
+    await expect(page.locator('.reader-meta')).toContainText('1 min read')
+    const link = page.getByRole('link', { name: 'the feed notebook' })
+    await expect(link).toHaveAttribute('href', 'https://publisher.example/feed-notes')
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    await expect(page.locator('.article-body em')).toHaveText('carefully')
+    await expect(page.locator('.article-body li')).toHaveText('Keep a steady hand')
+    const illustration = page.getByRole('img', { name: 'The valley in the Feed' })
+    await expect(illustration).toHaveAttribute('src', /^\/api\/reader\/image\?url=.+&exp=\d+&sig=[\w-]+$/)
+    await expect(illustration).toHaveAttribute('loading', 'lazy')
+    await expect(illustration).toHaveJSProperty('naturalWidth', 1)
+    await expect(page.getByText('The first light from the Feed.')).toBeVisible()
+
+    failing = false
+    await page.getByRole('button', { name: 'Retry' }).click()
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'From the field' })).toHaveCount(0)
     await expect(page.locator('.reader-meta')).not.toContainText('for now')
@@ -106,7 +104,8 @@ test.describe('Reader View', () => {
     await page.getByRole('button', { name: 'Original webpage' }).click()
     await expect.poll(() => articleRequests.length).toBe(1)
     await expect(page.getByText('Reading the original webpage')).toBeVisible()
-    await expect(page.locator('.reader-meta')).toContainText('Feed content for now')
+    await expect(page.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('heading', { name: 'From the field' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Feed content' }).click()
     held.resolve()
 
@@ -239,7 +238,7 @@ test.describe('Reader View', () => {
     }
 
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
-    await expect(page.getByText('A clear morning.')).toHaveCount(0)
+    await expect(page.getByText('A clear morning.')).toBeVisible()
   })
 
   test('saves from the Reader and the Library agrees', async ({ page, installation }) => {
@@ -338,7 +337,7 @@ test.describe('Reader View', () => {
 test.describe('Reader View at the server deadline', () => {
   test.use({ viewport: { width: 1280, height: 800 }, readerBudgetMs: READER_DEADLINE_BUDGET_MS })
 
-  test('keeps the summary through the deadline and refetches into the article by itself', async ({
+  test('keeps the summary through the deadline and refetches the article in under it', async ({
     page,
     installation,
   }) => {
@@ -365,7 +364,8 @@ test.describe('Reader View at the server deadline', () => {
     expect((await refetched).status()).toBe(200)
 
     await expect(page.getByRole('heading', { name: 'Field methods' })).toBeVisible()
-    await expect(page.getByText('The ridge holds its light.')).toHaveCount(0)
+    await expect(page.getByText('The ridge holds its light.')).toBeVisible()
+    await expect(page.getByText(/Reading the original webpage|Waiting on the publisher/)).toHaveCount(0)
   })
 })
 
@@ -417,7 +417,7 @@ test.describe('Reader View at phone width', () => {
     await page.getByRole('link', { name: 'Moonrise' }).click()
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
     await expect(page.locator('.reader-meta')).toContainText('Feed content')
-    await expect(page.getByText('A separate preview, not the drawing.')).toHaveCount(0)
+    await expect(page.locator('.reader-summary')).toHaveText('A separate preview, not the drawing.')
     const image = page.getByRole('img', { name: 'The moon rises over a sleeping valley' })
     await expect(image).toBeVisible()
     await expect(image).toHaveAttribute('src', /^\/api\/reader\/image\?url=.+&exp=\d+&sig=[\w-]+$/)

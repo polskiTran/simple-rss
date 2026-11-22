@@ -1,4 +1,5 @@
 import { Button } from '@base-ui/react/button'
+import { Collapsible } from '@base-ui/react/collapsible'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import type { FeedContent, ReaderArticle, ReaderDeadlineStage, ReaderItem, ReadingSource } from '../../shared/api.js'
 import { useScreenTitle } from '../arrival.js'
@@ -139,19 +140,13 @@ function OpenReader({
 
   const loaded = sourceState.kind === 'loaded' ? sourceState.value : undefined
   const selectedLoaded = loaded?.source === source ? loaded : undefined
+  const originalFailed = sourceState.kind === 'unavailable' || sourceState.kind === 'unreachable'
+  const feedContent = source === 'feed-content' || originalFailed ? item.feedContent : null
   const displayed: SourceResult | undefined =
-    selectedLoaded ?? (item.feedContent ? { source: 'feed-content', content: item.feedContent } : undefined)
+    selectedLoaded ?? (feedContent ? { source: 'feed-content', content: feedContent } : undefined)
   const next = item.nextInDigest
   const stage = sourceState.kind === 'loading' ? sourceState.progress : undefined
   const waitingNote = stage ? STAGE_NOTES[stage] : 'Reading the original webpage'
-  const waitingContent = item.summary ? (
-    <div className="reader-waiting">
-      <p className="reader-summary">{item.summary}</p>
-      <LoadingNote>{waitingNote}</LoadingNote>
-    </div>
-  ) : (
-    <LoadingNote className="reader-extracting">{waitingNote}</LoadingNote>
-  )
   const canSwitchSource = item.link !== null && item.feedContent !== null
 
   return (
@@ -193,23 +188,20 @@ function OpenReader({
           ) : null}
         </header>
 
+        {item.summary && source === 'original-webpage' ? <SummaryBox summary={item.summary} /> : null}
         {displayed?.source === 'feed-content' && displayed.content.truncated ? (
           <p className="note reader-truncated" role="status">
             Shortened by simple.
           </p>
         ) : null}
         {displayed ? (
-          <Suspense fallback={<p className="reader-summary">{item.summary}</p>}>
+          <Suspense fallback={null}>
             <ArticleMarkdown key={displayed.source} markdown={displayed.content.markdown} />
             {selectedLoaded ? <MarkdownCommitted /> : null}
           </Suspense>
         ) : null}
         {sourceState.kind === 'loading' && source === 'original-webpage' ? (
-          displayed ? (
-            <LoadingNote className="reader-extracting">{waitingNote}</LoadingNote>
-          ) : (
-            waitingContent
-          )
+          <LoadingNote className="reader-extracting">{waitingNote}</LoadingNote>
         ) : null}
         {sourceState.kind === 'unavailable' || sourceState.kind === 'unreachable' ? (
           <Fallback
@@ -242,6 +234,20 @@ function OpenReader({
         ) : null}
       </div>
     </article>
+  )
+}
+
+function SummaryBox({ summary }: { summary: string }) {
+  return (
+    <Collapsible.Root className="reader-summary-box" defaultOpen>
+      <Collapsible.Trigger className="reader-summary-toggle">
+        Summary
+        <Icon name="chevron-down" />
+      </Collapsible.Trigger>
+      <Collapsible.Panel className="reader-summary-panel">
+        <p className="reader-summary">{summary}</p>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   )
 }
 
@@ -347,21 +353,11 @@ interface FallbackProps {
 }
 
 function Fallback({ item, waitSeconds, stage, onRetry }: FallbackProps) {
-  if (!item.link && !item.feedContent) {
-    return item.summary ? (
-      <div className="reader-fallback" role="status">
-        <p className="reader-summary">{item.summary}</p>
-      </div>
-    ) : null
-  }
+  if (!item.link && !item.feedContent) return null
 
   return (
     <div className="reader-fallback" role="status">
-      {!item.feedContent && item.summary ? (
-        <p className="reader-summary">{item.summary}</p>
-      ) : (
-        <p className="note">{stage ? STAGE_FALLBACKS[stage] : 'The original webpage couldn’t be read.'}</p>
-      )}
+      <p className="note">{stage ? STAGE_FALLBACKS[stage] : 'The original webpage couldn’t be read.'}</p>
       {item.link || onRetry ? (
         <p className="reader-fallback-actions">
           {onRetry ? (
