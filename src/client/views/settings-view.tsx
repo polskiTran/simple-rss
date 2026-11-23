@@ -6,6 +6,7 @@ import { signOut } from '../api.js'
 import { Group } from '../components/group.js'
 import { Icon } from '../components/icon.js'
 import { AppearanceChoice } from './settings/appearance-choice.js'
+import { InterfaceChoice } from './settings/interface-choice.js'
 import { PasswordChange } from './settings/password-change.js'
 import { TimezoneChoice } from './settings/timezone-choice.js'
 import { VersionNote } from './settings/version-note.js'
@@ -44,6 +45,9 @@ export function SettingsView({ onAccessChanged }: SettingsViewProps) {
         </Setting>
         <Setting label="Appearance" note="On this device only.">
           <AppearanceChoice />
+        </Setting>
+        <Setting label="Interface" note="On this device only.">
+          <InterfaceChoice />
         </Setting>
       </Group>
 

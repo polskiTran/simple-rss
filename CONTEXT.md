@@ -81,7 +81,7 @@ A Feed's publishing record, drawn from retained Feed Items as per-day counts in 
 _Avoid_: Activity graph, contribution graph, frequency chart
 
 **Rhythm**:
-How often a Feed publishes, read from the last 30 days of its Cadence by counting the days with at least one Feed Item: Daily from 15 days, Weekly from 4, Monthly from 1, and Inactive with none. It describes the Feed's publishing, not its retrieval — an Inactive Feed may be perfectly available.
+How often a Feed publishes, read from the last 30 days of its Cadence. A Feed with 90 or more Feed Items in those days is a Firehose, whatever its days; otherwise Rhythm counts the days with at least one Feed Item: Daily from 15 days, Weekly from 4, Monthly from 1, and Inactive with none. It describes the Feed's publishing, not its retrieval — an Inactive Feed may be perfectly available.
 _Avoid_: Frequency, tier, activity level
 
 **Quiet Spell**:

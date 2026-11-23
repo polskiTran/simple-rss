@@ -9,7 +9,10 @@ import { LoadingNote } from './components/loading-note.js'
 import { ReportSaveFailure, SaveFailureLine } from './components/save-failure.js'
 import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
+import { ExperimentalShell } from './experimental/shell.js'
+import { INTERFACE } from './interface.js'
 import { locationAt, originOf, scopeOf, searchHomeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
+import { useStoredChoice } from './stored-choice.js'
 import { DigestView } from './views/digest-view.js'
 import { FeedView } from './views/feed-view.js'
 import { FeedsView } from './views/feeds-view.js'
@@ -22,8 +25,17 @@ import { SetupView } from './views/setup-view.js'
 
 export function App() {
   const navigation = useNavigation()
-  const { location } = navigation
   const gate = useAccess()
+  const chosen = useStoredChoice(INTERFACE)
+  const v2 = <V2Shell navigation={navigation} gate={gate} />
+  if (chosen === 'experimental' && gate.access.kind === 'open') {
+    return <ExperimentalShell navigation={navigation} fallback={v2} />
+  }
+  return v2
+}
+
+function V2Shell({ navigation, gate }: { readonly navigation: Navigation; readonly gate: Gate }) {
+  const { location } = navigation
   const open = gate.access.kind === 'open'
   const back = open && (location.screen === 'feed' || location.screen === 'reader') ? location.origin : undefined
   const page = useRef<HTMLElement>(null)

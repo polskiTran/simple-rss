@@ -142,3 +142,22 @@ describe('the Settings appearance', () => {
     expect(localStorage.getItem('appearance')).toBeNull()
   })
 })
+
+describe('the Settings interface', () => {
+  it('swaps in the experimental shell on this device, and v2 takes it back', async () => {
+    const api = stubApi()
+    openSettings()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Experimental' }))
+
+    expect(await screen.findByRole('button', { name: 'Open the menu' })).toBeDefined()
+    expect(localStorage.getItem('interface')).toBe('experimental')
+
+    await user.click(screen.getByRole('button', { name: 'v2' }))
+
+    expect(screen.queryByRole('button', { name: 'Open the menu' })).toBeNull()
+    expect(localStorage.getItem('interface')).toBeNull()
+    expect(api.requests.filter(({ method }) => method !== 'GET')).toEqual([])
+  })
+})

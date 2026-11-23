@@ -9,10 +9,11 @@ interface SaveToggleProps {
   readonly title: string
   readonly saved: boolean
   readonly labelled?: boolean
+  readonly className?: string
   onSaved(saved: boolean): void
 }
 
-export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
+export function SaveToggle({ feedItemId, title, saved, labelled = false, className, onSaved }: SaveToggleProps) {
   const [pending, startToggle] = useTransition()
   const [shown, show] = useOptimistic(saved)
   const report = use(ReportSaveFailure)
@@ -34,7 +35,7 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
   const word = shown ? 'Saved' : 'Save'
   return (
     <Toggle
-      className={labelled ? 'button save-toggle-labelled' : 'save-word'}
+      className={className ?? (labelled ? 'button save-toggle-labelled' : 'save-word')}
       pressed={shown}
       aria-label={`${word} ${title}`}
       onPressedChange={toggle}

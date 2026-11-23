@@ -469,7 +469,7 @@ function overrideOf(draft: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-function ago(iso: string): string {
+export function ago(iso: string): string {
   const seconds = (Date.parse(iso) - Date.now()) / 1000
   const format = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' })
   const [unit, size] = AGO_UNITS.find(([, span]) => Math.abs(seconds) >= span) ?? ['second', 1]
@@ -484,7 +484,7 @@ const AGO_UNITS = [
   ['second', 1],
 ] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]
 
-const INTERVALS = {
+export const INTERVALS = {
   30: '30 minutes',
   60: '1 hour',
   120: '2 hours',

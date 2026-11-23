@@ -9,6 +9,10 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
 The project is young and this document moves with it: it records what the
 stylesheet does today, and a change that improves the product changes it.
 
+Settings also offers an experimental interface, per device, for the Digest, a
+Feed and the Reader View. It keeps its own system, described in
+`docs/design/experimental/README.md` (ADR 0032); everything here is v2.
+
 ## 1. Principles
 
 1. **Colour comes from the content.** The interface is greyscale. Colour
@@ -436,10 +440,10 @@ the shipped words are:
 | Search saved posts | Search your saves |
 | By source | By feed |
 
-Rhythm is shown as **Daily**, **Weekly**, **Monthly** and **Inactive** (no
-items in 30 days). Say what happened: "The feed can't be reached. Last reached
-7 Sep." Errors give a reason: "That password isn't right. Passwords are
-case-sensitive."
+Rhythm is shown as **Firehose** (90 or more items in 30 days), **Daily**,
+**Weekly**, **Monthly** and **Inactive** (no items in 30 days). Say what
+happened: "The feed can't be reached. Last reached 7 Sep." Errors give a
+reason: "That password isn't right. Passwords are case-sensitive."
 
 No taglines, helper notes or secondary labels. A heading, a value or a button
 names itself; a sentence that explains a control, repeats a value shown

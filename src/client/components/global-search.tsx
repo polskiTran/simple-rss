@@ -116,7 +116,7 @@ export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps)
   )
 }
 
-function editable(target: EventTarget | null): boolean {
+export function editable(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||

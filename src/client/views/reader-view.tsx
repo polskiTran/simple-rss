@@ -39,7 +39,7 @@ function MarkdownCommitted() {
 const DEADLINE_REFETCH_DELAY_MS = 2_000
 const DEADLINE_REFETCH_ATTEMPTS = 2
 
-const STAGE_NOTES = {
+export const STAGE_NOTES = {
   publisher: 'Waiting on the publisher',
   parsing: 'Still reading the original webpage',
 } as const satisfies Record<ReaderDeadlineStage, string>
@@ -100,7 +100,10 @@ type SourceResult =
   | { readonly source: 'feed-content'; readonly content: FeedContent }
   | { readonly source: 'original-webpage'; readonly content: ReaderArticle }
 
-function resolvedReadingSource(chosen: ReadingSource, item: Pick<ReaderItem, 'feedContent' | 'link'>): ReadingSource {
+export function resolvedReadingSource(
+  chosen: ReadingSource,
+  item: Pick<ReaderItem, 'feedContent' | 'link'>,
+): ReadingSource {
   if (chosen === 'feed-content') return item.feedContent ? 'feed-content' : 'original-webpage'
   return item.link || !item.feedContent ? 'original-webpage' : 'feed-content'
 }
@@ -310,7 +313,7 @@ function deadlineStage(cause: unknown): ReaderDeadlineStage | undefined {
     : undefined
 }
 
-async function fetchArticleThroughDeadlines(
+export async function fetchArticleThroughDeadlines(
   feedItemId: number,
   signal: AbortSignal,
   onWaiting: (stage: ReaderDeadlineStage) => void,
