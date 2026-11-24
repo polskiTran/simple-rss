@@ -20,7 +20,7 @@ describe('the Settings timezone', () => {
     stubApi().on('GET /api/settings', { body: { timezone: 'Pacific/Auckland' } })
     openSettings()
 
-    expect(await screen.findByLabelText('Installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
+    expect(await screen.findByLabelText('Timezone')).toHaveProperty('value', 'Pacific/Auckland')
   })
 
   it('offers Retry when it does not load, and shows it once it does', async () => {
@@ -36,7 +36,7 @@ describe('the Settings timezone', () => {
     expect(await screen.findByText('The timezone didn’t load.')).toBeDefined()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
 
-    expect(await screen.findByLabelText('Installation timezone')).toHaveProperty('value', 'Pacific/Auckland')
+    expect(await screen.findByLabelText('Timezone')).toHaveProperty('value', 'Pacific/Auckland')
   })
 
   it('lets the User change it, sending the choice to the installation', async () => {
@@ -46,7 +46,7 @@ describe('the Settings timezone', () => {
     openSettings()
     const user = userEvent.setup()
 
-    const select = await screen.findByLabelText('Installation timezone')
+    const select = await screen.findByLabelText('Timezone')
     await user.selectOptions(select, 'Pacific/Auckland')
 
     await waitFor(() => expect(select).toHaveProperty('value', 'Pacific/Auckland'))
@@ -62,16 +62,16 @@ describe('the Settings timezone', () => {
     openSettings()
     const user = userEvent.setup()
 
-    const select = await screen.findByLabelText('Installation timezone')
+    const select = await screen.findByLabelText('Timezone')
     await user.selectOptions(select, 'Pacific/Auckland')
 
-    await waitFor(() => expect(select.getAttribute('aria-disabled')).toBe('true'))
+    await waitFor(() => expect(select.getAttribute('aria-busy')).toBe('true'))
     expect(select).toHaveProperty('disabled', false)
     await user.selectOptions(select, 'Europe/Paris')
     expect(select).toHaveProperty('value', 'Pacific/Auckland')
 
     reply.resolve()
-    await waitFor(() => expect(select.getAttribute('aria-disabled')).toBe('false'))
+    await waitFor(() => expect(select.getAttribute('aria-busy')).toBe('false'))
     expect(api.requestsTo('PUT /api/settings/timezone')).toHaveLength(1)
   })
 
@@ -83,7 +83,7 @@ describe('the Settings timezone', () => {
     openSettings()
     const user = userEvent.setup()
 
-    const select = await screen.findByLabelText('Installation timezone')
+    const select = await screen.findByLabelText('Timezone')
     await user.selectOptions(select, 'Pacific/Auckland')
 
     expect(await screen.findByText('That timezone isn’t recognized.')).toBeDefined()
@@ -96,11 +96,11 @@ describe('the Settings export actions', () => {
     stubApi()
     openSettings()
 
-    const opml = await screen.findByRole('link', { name: /Subscriptions \(OPML\)/ })
+    const opml = await screen.findByRole('link', { name: 'OPML' })
     expect(opml.getAttribute('href')).toBe('/api/subscriptions/export')
     expect(opml.getAttribute('download')).toBe('subscriptions.opml')
 
-    const json = screen.getByRole('link', { name: /Everything \(JSON\)/ })
+    const json = screen.getByRole('link', { name: 'Everything' })
     expect(json.getAttribute('href')).toBe('/api/export')
     expect(json.getAttribute('download')).toBe('simple-rss-export.json')
   })

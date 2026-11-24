@@ -6,9 +6,7 @@ import { cadenceWindow } from './cadence-window.js'
 import type { SearchResults } from '../../src/shared/api.js'
 import {
   digest,
-  digestGroup,
   day,
-  digestItem,
   feedDetail,
   feedItems,
   library,
@@ -18,8 +16,6 @@ import {
   searchResult,
 } from './fixtures.js'
 import { stubApi, type Reply, type StubbedApi } from './stub-api.js'
-
-const TODAY_HEADING = 'Today Saturday 8\u00a0August (1)'
 
 const DETAIL = feedDetail({ subscribedDate: day('2026-08-08'), cadence: cadenceWindow({ '2026-08-08': 1 }) })
 
@@ -55,7 +51,7 @@ function reading(path: string): StubbedApi {
 }
 
 function wayBack() {
-  const way = document.querySelector('.chrome-back')
+  const way = document.querySelector('.x-back')
   if (!(way instanceof HTMLElement)) throw new Error('the screen offers no way back')
   return way
 }
@@ -69,6 +65,11 @@ function pressedScope() {
 
 function activeTab() {
   return screen.getByRole('link', { current: 'page' }).textContent
+}
+
+async function search(words: string, prompt: string | RegExp = 'Search your reading') {
+  const user = userEvent.setup()
+  await user.type(screen.getByRole('searchbox', { name: prompt }), `${words}{Enter}`)
 }
 
 const openedFeed = () => screen.findByText('journal.example')
@@ -93,7 +94,7 @@ describe('a Feed Item’s attribution', () => {
     expect(wayBack().textContent).toBe('Digest')
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
   })
 
@@ -110,9 +111,9 @@ describe('a Feed Item’s attribution', () => {
     expect(wayBack().textContent).toBe('Digest')
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeDefined()
     expect(window.location.pathname + window.location.search).toBe('/digest?from=2026-08-07')
-    expect(screen.queryAllByRole('button', { name: 'Today' })).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Friday 7 August' })).toBeDefined()
   })
 
   it('opens its Feed from a search result, and that Feed returns to the results', async () => {
@@ -127,15 +128,16 @@ describe('a Feed Item’s attribution', () => {
     render(<App />)
     const user = userEvent.setup()
 
-    await user.type(await screen.findByRole('searchbox', { name: /Search your reading/i }), 'light')
-    const results = await screen.findByRole('region', { name: 'search results' })
-    await user.click(within(results).getByRole('link', { name: 'Field Notes' }))
+    await screen.findByRole('searchbox', { name: /Search your reading/i })
+    await search('light')
+    const results = await screen.findByRole('region', { name: 'Search results' })
+    await user.click(within(results).getAllByRole('link', { name: 'Field Notes' })[0] as HTMLElement)
 
     await openedFeed()
     expect(wayBack().textContent).toBe('Search')
 
     await user.click(wayBack())
-    expect(await screen.findByRole('region', { name: 'search results' })).toBeDefined()
+    expect(await screen.findByRole('region', { name: 'Search results' })).toBeDefined()
     expect(screen.getByRole<HTMLInputElement>('searchbox', { name: /Search your reading/i }).value).toBe('light')
   })
 
@@ -149,14 +151,14 @@ describe('a Feed Item’s attribution', () => {
     await user.click(attribution)
 
     await openedFeed()
-    expect(wayBack().textContent).toBe('Saved')
+    expect(wayBack().textContent).toBe('Library')
   })
 
   it('leaves a save that outlived its Subscription with nowhere to go', async () => {
     reading('/saved')
     render(<App />)
 
-    expect(await screen.findByText('Saved 1 August · No longer subscribed')).toBeDefined()
+    expect((await screen.findByText('The Slow Press')).getAttribute('title')).toBe('No longer subscribed')
     expect(screen.queryByRole('link', { name: /Slow Press/ })).toBeNull()
   })
 
@@ -204,7 +206,7 @@ describe('the way back out of an opened screen', () => {
     await user.click(await screen.findByRole('link', { name: 'First light' }))
 
     await openedArticle()
-    expect(wayBack().textContent).toBe('Saved')
+    expect(wayBack().textContent).toBe('Library')
 
     await user.click(wayBack())
     expect(window.location.pathname).toBe('/saved')
@@ -256,32 +258,9 @@ describe('the way back out of an opened screen', () => {
 
     await user.click(wayBack())
 
-    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeDefined()
     expect(window.location.pathname).toBe('/digest')
     expect(window.history.length).toBe(entries)
-  })
-
-  it('comes back to the Digest still showing the one Feed of the day it was narrowed to', async () => {
-    const twoFeeds = digest({
-      groups: [
-        digestGroup({
-          items: [digestItem(), digestItem({ feedItemId: 5, title: 'A letter', feedId: 2, feedTitle: 'Letters' })],
-        }),
-      ],
-    })
-    reading('/digest')
-      .on('GET /api/digest', { body: twoFeeds })
-      .on('GET /api/digest?through=2026-08-08', { body: twoFeeds })
-    render(<App />)
-    const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Field Notes 1' }))
-    await user.click(screen.getByRole('link', { name: 'First light' }))
-    await openedArticle()
-
-    await user.click(wayBack())
-
-    expect((await screen.findByRole('button', { name: 'Field Notes 1' })).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.queryByRole('link', { name: 'A letter' })).toBeNull()
   })
 
   it('walks to the origin of an article opened by address, which the browser’s Back then leaves', async () => {
@@ -291,7 +270,7 @@ describe('the way back out of an opened screen', () => {
     await openedArticle()
 
     await user.click(wayBack())
-    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeDefined()
 
     window.history.back()
     expect(await openedArticle()).toBeDefined()
@@ -303,14 +282,14 @@ describe('the way back out of an opened screen', () => {
     const user = userEvent.setup()
     await user.click(await screen.findByRole('link', { name: 'First light' }))
     await openedArticle()
-    await user.click(screen.getByRole('link', { name: 'simple' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Places' })).getByRole('link', { name: 'Digest' }))
     expect(window.location.pathname).toBe('/digest')
 
     window.history.back()
 
     await openedArticle()
-    expect(wayBack().textContent).toBe('Saved')
-    expect(activeTab()).toBe('Saved')
+    expect(wayBack().textContent).toBe('Library')
+    expect(activeTab()).toBe('Library')
   })
 
   it('ignores a way back a history entry has no business holding', async () => {
@@ -330,10 +309,9 @@ describe('the way back out of an opened screen', () => {
     await openedFeed()
 
     await user.click(screen.getByRole('button', { name: 'Unsubscribe' }))
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Unsubscribe' }))
+    await user.click(screen.getByRole('button', { name: 'Unsubscribe from Field Notes' }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: /^Feeds/ })).toBeDefined()
-    expect(window.location.pathname).toBe('/feeds')
+    await waitFor(() => expect(window.location.pathname).toBe('/feeds'))
   })
 })
 
@@ -346,7 +324,7 @@ describe('the section an open article reads under', () => {
     await user.click(await screen.findByRole('link', { name: 'First light' }))
 
     await openedArticle()
-    expect(activeTab()).toBe('Saved')
+    expect(activeTab()).toBe('Library')
   })
 
   it('is feeds, for an item opened from one Feed', async () => {
@@ -375,9 +353,9 @@ describe('the section an open article reads under', () => {
     await user.click(await screen.findByRole('link', { name: 'First light' }))
     await openedArticle()
 
-    await user.click(screen.getByRole('link', { name: 'Digest' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Places' })).getByRole('link', { name: 'Digest' }))
 
-    expect(await screen.findByRole('heading', { name: TODAY_HEADING })).toBeDefined()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeDefined()
     expect(activeTab()).toBe('Digest')
   })
 })
@@ -397,7 +375,7 @@ describe('the scope a search takes from its screen', () => {
     },
   } satisfies Reply<SearchResults>
 
-  it('from an opened Feed, answers within it and names it; everywhere steps out, and clearing lands back on the Feed', async () => {
+  it('from an opened Feed, answers within it and names it; Everywhere steps out and back', async () => {
     const api = reading('/feeds/1')
       .on('GET /api/search?q=light&feed=1', withinFeed)
       .on('GET /api/search?q=light', everywhere)
@@ -405,13 +383,12 @@ describe('the scope a search takes from its screen', () => {
     const user = userEvent.setup()
     await openedFeed()
 
-    await user.type(screen.getByRole('searchbox', { name: 'Search this feed' }), 'light')
-    const results = await screen.findByRole('region', { name: 'search results' })
+    await search('light', 'Search this feed')
+    const results = await screen.findByRole('region', { name: 'Search results' })
     expect(window.location.pathname + window.location.search).toBe('/search?q=light&feed=1')
     expect(within(results).getByRole('link', { name: 'First light' })).toBeDefined()
-    expect(within(results).queryByRole('link', { name: 'Field Notes' })).toBeNull()
-    expect(screen.getByRole('heading', { level: 1, name: '“light” 1 result in Field Notes' })).toBeDefined()
-    expect(pressedScope()).toBe('This feed')
+    expect(within(results).queryByRole('button', { name: 'Search only here' })).toBeNull()
+    expect(pressedScope()).toBe('Field Notes')
     expect(activeTab()).toBe('Feeds')
 
     await user.click(screen.getByRole('button', { name: 'Everywhere' }))
@@ -420,26 +397,19 @@ describe('the scope a search takes from its screen', () => {
     expect(api.requestsTo('GET /api/search?q=light')).toHaveLength(1)
     expect(pressedScope()).toBe('Everywhere')
     expect(activeTab()).toBe('Digest')
-    await user.click(screen.getByRole('button', { name: 'This feed' }))
+
+    await user.click(screen.getByRole('button', { name: 'This Feed' }))
     expect(window.location.pathname + window.location.search).toBe('/search?q=light&feed=1')
-    expect(pressedScope()).toBe('This feed')
-    await user.click(screen.getByRole('button', { name: 'Everywhere' }))
-
-    const field = screen.getByRole<HTMLInputElement>('searchbox', { name: 'Search your reading' })
-    expect(field.value).toBe('light')
-
-    await user.clear(field)
-    await openedFeed()
-    expect(window.location.pathname).toBe('/feeds/1')
+    expect(await screen.findByRole('button', { name: 'Field Notes', pressed: true })).toBeDefined()
   })
 
   it('keeps its scope in the address, so a reloaded or shared search answers the same', async () => {
     reading('/search?q=light&feed=1').on('GET /api/search?q=light&feed=1', withinFeed)
     render(<App />)
 
-    const results = await screen.findByRole('region', { name: 'search results' })
+    const results = await screen.findByRole('region', { name: 'Search results' })
     expect(within(results).getByRole('link', { name: 'First light' })).toBeDefined()
-    expect(pressedScope()).toBe('This feed')
+    expect(pressedScope()).toBe('Field Notes')
     expect(screen.getByRole<HTMLInputElement>('searchbox', { name: 'Search this feed' }).value).toBe('light')
     expect(activeTab()).toBe('Feeds')
   })
@@ -449,13 +419,13 @@ describe('the scope a search takes from its screen', () => {
       body: { scope: 'saved', today: '2026-08-08', results: [] },
     })
     render(<App />)
-    const user = userEvent.setup()
+    const _user = userEvent.setup()
     await screen.findByRole('link', { name: 'First light' })
 
-    await user.type(screen.getByRole('searchbox', { name: 'Search your saves' }), 'light')
+    await search('light', 'Search your saves')
 
-    expect((await screen.findByText('Nothing in your saves matches “light”.')).getAttribute('role')).toBe('status')
-    expect(pressedScope()).toBe('Saved')
+    expect((await screen.findByText('Nothing in your saves matches.')).getAttribute('role')).toBe('status')
+    expect(pressedScope()).toBe('Library')
   })
 
   it('from the Feeds screen, answers with Subscriptions alone', async () => {
@@ -475,25 +445,25 @@ describe('the scope a search takes from its screen', () => {
       },
     })
     render(<App />)
-    const user = userEvent.setup()
-    await screen.findByRole('heading', { level: 1, name: /^Feeds/ })
+    const _user = userEvent.setup()
+    await screen.findByText('No Feeds yet.')
 
-    await user.type(screen.getByRole('searchbox', { name: 'Search your feeds' }), 'field')
+    await search('field', 'Search your feeds')
 
-    const jumpTo = await screen.findByRole('navigation', { name: 'matching subscriptions' })
-    expect(within(jumpTo).getByRole('link', { name: 'Field Notes' })).toBeDefined()
+    const matched = await screen.findByRole('region', { name: 'Feeds' })
+    expect(within(matched).getByRole('link', { name: 'Field Notes' })).toBeDefined()
     expect(pressedScope()).toBe('Feeds')
   })
 
   it('from the Reader, answers everywhere', async () => {
     reading('/reader/3').on('GET /api/search?q=light', everywhere)
     render(<App />)
-    const user = userEvent.setup()
+    const _user = userEvent.setup()
     await openedArticle()
 
-    await user.type(screen.getByRole('searchbox', { name: 'Search your reading' }), 'light')
+    await search('light')
 
-    await screen.findByRole('region', { name: 'search results' })
+    await screen.findByRole('region', { name: 'Search results' })
     expect(screen.queryByRole('group', { name: 'Search in' })).toBeNull()
   })
 })

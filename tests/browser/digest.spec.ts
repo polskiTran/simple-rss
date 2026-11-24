@@ -1,37 +1,30 @@
-import type { Locator, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import {
   addFeed,
+  claim,
   expect,
   expectNoBoxPastTheSideEdge,
   expectNoHorizontalOverflow,
-  LEDGER_LONG_TITLE,
-  UNBROKEN_TITLE,
-  USER_PASSWORD,
-  SETUP_SECRET,
+  goTo,
   test,
+  UNBROKEN_TITLE,
   type Installation,
 } from './installation.js'
 
-const TODAY_ONE = /^Today .+ \(1\)$/
-
 async function claimAndSubscribe(page: Page, installation: Installation, feedUrl: string, title: string) {
-  await page.goto(installation.url)
-  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'Claim installation' }).click()
-  await page.getByRole('link', { name: 'Feeds', exact: true }).click()
+  await claim(page, installation.url)
   await addFeed(page, feedUrl)
-  await expect(page.getByRole('heading', { name: title })).toBeVisible()
-}
-
-async function subscribe(page: Page, installation: Installation): Promise<void> {
-  await claimAndSubscribe(page, installation, installation.feedUrl, 'Field Notes')
+  await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
 }
 
 async function openDigest(page: Page, installation: Installation): Promise<void> {
-  await subscribe(page, installation)
-  await page.getByRole('link', { name: 'Digest', exact: true }).click()
+  await claimAndSubscribe(page, installation, installation.feedUrl, 'Field Notes')
+  await goTo(page, 'Digest')
+}
+
+async function openLongDigest(page: Page, installation: Installation): Promise<void> {
+  await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
+  await goTo(page, 'Digest')
 }
 
 function daysAgo(count: number): string {
@@ -42,44 +35,26 @@ function groundColour(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 }
 
-test.describe('the Digest presentation', () => {
+const today = (page: Page) => page.getByRole('heading', { level: 2, name: 'Today' })
+const title = (page: Page, name: string) => page.getByRole('main').getByRole('link', { name, exact: true })
+const scrolled = (page: Page) => page.evaluate(() => window.scrollY)
+
+test.describe('the Digest', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('counts today in its heading from the server', async ({ page, installation }) => {
+  test('heads today’s Feed Items by the day the server names', async ({ page, installation }) => {
     await openDigest(page, installation)
 
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
-  })
-
-  test('sets the date on the line and in the style of every other screen’s title', async ({ page, installation }) => {
-    const titleLine = () =>
-      page.evaluate(() => {
-        const title = document.querySelector('.page-title:not(.visually-hidden)')
-        const words =
-          title?.querySelector('.day-date') ??
-          [...(title?.childNodes ?? [])].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
-        const range = document.createRange()
-        if (words) range.selectNodeContents(words)
-        const { fontSize, fontWeight } = getComputedStyle(title as Element)
-        return { top: range.getBoundingClientRect().top, fontSize, fontWeight }
-      })
-
-    await openDigest(page, installation)
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
-    const date = await titleLine()
-
-    await page.getByRole('link', { name: 'Feeds', exact: true }).click()
-    await expect(page.getByRole('heading', { level: 1, name: /^Feeds/ })).toBeVisible()
-    expect(await titleLine()).toEqual(date)
+    await expect(today(page)).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Today' }).getByRole('link', { name: 'First light' })).toBeVisible()
   })
 
   test('lets the User pin dark on a light device, surviving a reload', async ({ page, installation }) => {
     await page.emulateMedia({ colorScheme: 'light' })
-    await subscribe(page, installation)
+    await openDigest(page, installation)
     const light = await groundColour(page)
 
-    await page.getByRole('link', { name: 'Settings', exact: true }).click()
+    await goTo(page, 'Settings')
     await page.getByRole('button', { name: 'Dark' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark')
     await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark')
@@ -90,7 +65,6 @@ test.describe('the Digest presentation', () => {
     await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark')
     expect(await groundColour(page)).toBe(dark)
 
-    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByRole('button', { name: 'System' }).click()
     await expect(page.locator('html')).not.toHaveAttribute('data-appearance', /.*/)
     expect(await groundColour(page)).toBe(light)
@@ -103,335 +77,230 @@ test.describe('the Digest presentation', () => {
 
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(() => groundColour(page)).not.toBe(light)
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await expect(today(page)).toBeVisible()
   })
 
   test('changing the installation timezone recasts the same stored instant', async ({ page, installation }) => {
     await openDigest(page, installation)
-    await page.locator('main').getByRole('link', { name: 'Field Notes' }).click()
+    await page.getByRole('main').getByRole('link', { name: 'Field Notes' }).click()
     await expect(page.locator('main').getByText('07:15')).toBeVisible()
     const feed = page.url()
 
-    await page.getByRole('link', { name: 'Settings', exact: true }).click()
-    await page.getByRole('combobox', { name: 'Installation timezone' }).selectOption('Pacific/Midway')
+    await goTo(page, 'Settings')
+    await page.getByLabel('Timezone').selectOption('Pacific/Midway')
     await page.goto(feed)
 
     await expect(page.locator('main').getByText('20:15')).toBeVisible()
     await expect(page.locator('main')).not.toContainText('07:15')
   })
 
-  test('pages whole days up to fifty items, and Show more goes on from the next day', async ({
+  test('pages whole days up to fifty Feed Items, and Show older days goes on from the next day', async ({
     page,
     installation,
   }) => {
-    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await openLongDigest(page, installation)
 
-    await expect(page.locator('main .feed-day')).toHaveCount(50)
-    const more = page.getByRole('button', { name: 'Show more' })
-    await expect(more).toBeVisible()
-
+    const days = page.locator('main .x-day')
+    await expect(days).toHaveCount(50)
+    const more = page.getByRole('button', { name: 'Show older days' })
     await more.click()
-    await expect(page.locator('main .feed-day')).toHaveCount(55)
+    await expect(days).toHaveCount(55)
     await expect(more).toBeHidden()
   })
 
-  test('comes back from an article to the same entry and place, announced', async ({ page, installation }) => {
-    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
-    const deep = page.getByRole('link', { name: 'Meadow note 30', exact: true })
-    await deep.scrollIntoViewIfNeeded()
-    const left = await page.evaluate(() => window.scrollY)
+  test('comes back from a Feed Item to the same entry and place, announced', async ({ page, installation }) => {
+    await openLongDigest(page, installation)
+    const deep = title(page, 'Meadow note 30')
+    await deep.evaluate((link) => link.scrollIntoView({ block: 'center' }))
+    const left = await scrolled(page)
     expect(left).toBeGreaterThan(0)
 
+    await page.route('**/api/digest/days', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      await route.continue()
+    })
     await deep.click()
     await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 30' })).toBeFocused()
     await expect(page).toHaveTitle('Meadow note 30 — simple')
     const entries = await page.evaluate(() => history.length)
-    await page.getByRole('link', { name: 'Back to Digest' }).click()
+    await page.locator('.x-back').click()
 
     await expect(page).toHaveURL(/\/digest$/)
     await expect(page).toHaveTitle('Digest — simple')
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    await page.waitForResponse('**/api/digest/days')
+    await expect(page.getByRole('button', { name: /^\w+day \d+ \w+$/ })).toBeVisible()
+    await expect.poll(() => scrolled(page)).toBe(left)
     expect(await page.evaluate(() => history.length)).toBe(entries)
 
     await page.goBack()
     await expect(page).not.toHaveURL(/\/reader\//)
   })
 
-  test('comes back to an article Show more brought, with every day read above it', async ({ page, installation }) => {
-    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
-    await page.getByRole('button', { name: 'Show more' }).click()
-    const older = page.getByRole('link', { name: 'Meadow note 53', exact: true })
-    await older.scrollIntoViewIfNeeded()
-    const left = await page.evaluate(() => window.scrollY)
+  test('comes back to a Feed Item older days brought, with every day above it', async ({ page, installation }) => {
+    await openLongDigest(page, installation)
+    await page.getByRole('button', { name: 'Show older days' }).click()
+    const older = title(page, 'Meadow note 53')
+    await older.evaluate((link) => link.scrollIntoView({ block: 'center' }))
+    const left = await scrolled(page)
 
     await older.click()
     await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 53' })).toBeFocused()
-    await page.getByRole('link', { name: 'Back to Digest' }).click()
+    await page.locator('.x-back').click()
 
-    await expect(page.locator('main .feed-day')).toHaveCount(55)
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    await expect(page.locator('main .x-day')).toHaveCount(55)
+    await expect.poll(() => scrolled(page)).toBe(left)
     await expect(older).toBeInViewport()
   })
 
-  test('comes back past every next in the digest to the place it left', async ({ page, installation }) => {
-    await claimAndSubscribe(page, installation, installation.longFeedUrl, 'Long Meadow')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
-    await page.getByRole('button', { name: 'Show more' }).click()
-    const older = page.getByRole('link', { name: 'Meadow note 52', exact: true })
-    await older.scrollIntoViewIfNeeded()
-    const left = await page.evaluate(() => window.scrollY)
+  test('comes back past every Next to the place it left', async ({ page, installation }) => {
+    await openLongDigest(page, installation)
+    await page.getByRole('button', { name: 'Show older days' }).click()
+    const older = title(page, 'Meadow note 52')
+    await older.evaluate((link) => link.scrollIntoView({ block: 'center' }))
+    const left = await scrolled(page)
 
     await older.click()
     await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 52' })).toBeFocused()
     const entries = await page.evaluate(() => history.length)
-    await page.getByRole('link', { name: 'Meadow note 53' }).click()
+    await page.locator('.x-reader-next').click()
     await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 53' })).toBeVisible()
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+    await expect.poll(() => scrolled(page)).toBe(0)
     expect(await page.evaluate(() => history.length)).toBe(entries)
-    await page.getByRole('link', { name: 'Back to Digest' }).click()
+    await page.locator('.x-back').click()
 
-    await expect(page.locator('main .feed-day')).toHaveCount(55)
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(left)
+    await expect(page.locator('main .x-day')).toHaveCount(55)
+    await expect.poll(() => scrolled(page)).toBe(left)
     expect(await page.evaluate(() => history.length)).toBe(entries)
   })
 
   test('names a network loss plainly and recovers on Retry', async ({ page, installation }) => {
-    await subscribe(page, installation)
+    await claimAndSubscribe(page, installation, installation.feedUrl, 'Field Notes')
 
     await page.context().setOffline(true)
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
-    await expect(page.getByText('The digest can’t be reached.')).toBeVisible()
+    await goTo(page, 'Digest')
+    await expect(page.getByText(/The Digest can’t be reached\./)).toBeVisible()
 
     await page.context().setOffline(false)
     await page.getByRole('button', { name: 'Retry' }).click()
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await expect(today(page)).toBeVisible()
   })
-})
 
-test.describe('the Digest from a day', () => {
-  test.use({ viewport: { width: 1280, height: 800 } })
-
-  test('starts from a day in the address, and goes back to today', async ({ page, installation }) => {
+  test('starts from a day in the address, and goes back to today from the calendar', async ({ page, installation }) => {
     await openDigest(page, installation)
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await expect(today(page)).toBeVisible()
 
     await page.goto(`${installation.url}/digest?from=${daysAgo(1)}`)
     await expect(page.getByText('Nothing on or before this day.')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Today', exact: true }).click()
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await page.getByRole('button', { name: /^\w+day \d+ \w+$/ }).click()
+    await page.getByRole('group', { name: 'Days' }).locator('[data-today]').click()
+    await expect(today(page)).toBeVisible()
     await expect(page).toHaveURL(/\/digest$/)
   })
 })
 
-async function sharedTitle(row: Locator) {
-  return row.evaluate((item) => {
-    const title = item.querySelector('.feed-day-title')
-    const link = title?.querySelector('a')
-    if (!title || !link) return null
-    const box = title.getBoundingClientRect()
-    const visible = [...link.getClientRects()].filter((rect) => {
-      const overlap = Math.min(rect.bottom, box.bottom) - Math.max(rect.top, box.top)
-      return overlap > rect.height / 2
-    })
-    const rows = [...new Map(visible.map((rect) => [Math.round(rect.top), rect])).values()]
-    return {
-      lines: rows.length,
-      fits: rows.every((rect) => rect.width <= box.width + 1),
-      titleClamped: title.scrollHeight > title.clientHeight + 1,
-    }
-  })
-}
-
-function ledgerDay(page: Page, { quietDays }: { quietDays?: number } = {}) {
-  return page.route(
+async function asFirehose(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === '/api/feeds',
+    async (route) => {
+      const response = await route.fetch()
+      const list = await response.json()
+      for (const feed of list.subscriptions) feed.cadence = feed.cadence.map(() => 5)
+      await route.fulfill({ response, json: list })
+    },
+  )
+  await page.route(
     (url) => url.pathname === '/api/digest',
     async (route) => {
       const response = await route.fetch()
       const digest = await response.json()
       const [group] = digest.groups
-      if (group) {
-        const [item] = group.items
+      const [item] = group?.items ?? []
+      if (group && item) {
         group.items = Array.from({ length: 40 }, (_, index) => ({
           ...item,
           feedItemId: item.feedItemId + index,
           title: `Ledger entry ${index + 1}`,
         }))
-        if (quietDays) group.returns = [{ feedId: item.feedId, quietDays }]
       }
       await route.fulfill({ response, json: digest })
     },
   )
 }
 
-test.describe('a Feed\u2019s day', () => {
-  test('folds from where it unfolded, moving no title, with the control in reach down the list', async ({
+test.describe('a Firehose Feed’s day', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('folds into one row, unfolds, and comes back from a Feed Item still unfolded', async ({
     page,
     installation,
   }) => {
-    await ledgerDay(page)
+    await asFirehose(page)
     await openDigest(page, installation)
 
-    const title = page.getByRole('heading', { name: 'Ledger entry 1', exact: true })
-    const more = page.getByRole('button', { name: 'Show all' })
-    const unfoldedFrom = await more.boundingBox()
-    const titleAt = await title.boundingBox()
-    const titleLooks = await title.screenshot()
-    await more.click()
+    const fold = page.getByRole('button', { name: '40 Feed Items from Field Notes' })
+    await expect(title(page, 'Ledger entry 2')).toHaveCount(0)
+    await fold.click()
+    await expect(title(page, 'Ledger entry 40')).toBeVisible()
 
-    const less = page.getByRole('button', { name: 'Show less' })
-    expect(await less.boundingBox()).toEqual(unfoldedFrom)
-    expect(await title.boundingBox()).toEqual(titleAt)
-    expect((await title.screenshot()).equals(titleLooks)).toBe(true)
-
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2))
-    await expect(less).toBeInViewport()
-    await less.click()
-
-    await expect(title).toBeInViewport()
-    await expect(page.getByRole('heading', { name: 'Ledger entry 4', exact: true })).toHaveCount(0)
-  })
-
-  test('brings a title reached by Shift+Tab out from under the stuck header, Quiet Spell included', async ({
-    page,
-    installation,
-  }) => {
-    await ledgerDay(page, { quietDays: 30 })
-    await openDigest(page, installation)
-    await page.getByRole('button', { name: 'Show all' }).click()
-    const head = page.locator('.feed-day-head')
-    await expect(head.getByText('First in 30 days')).toBeVisible()
-    await page.waitForFunction(() => document.getAnimations().length === 0)
-
-    const title = page.getByRole('link', { name: 'Ledger entry 20', exact: true })
-    await title.evaluate((link) => window.scrollBy(0, link.getBoundingClientRect().top))
-    const stuckBottom = await head.evaluate((header) => header.getBoundingClientRect().bottom)
-    await title.evaluate(
-      (link, bottom) => window.scrollBy(0, link.getBoundingClientRect().top - bottom + 8),
-      stuckBottom,
-    )
-    await page.getByRole('link', { name: 'Ledger entry 21', exact: true }).focus()
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
-
-    await expect(title).toBeFocused()
-    const [titleTop, headBottom] = await title.evaluate((link) => [
-      link.closest('h3')?.getBoundingClientRect().top ?? 0,
-      link.closest('.feed-day')?.querySelector('.feed-day-head')?.getBoundingClientRect().bottom ?? 0,
-    ])
-    expect(Math.abs(titleTop - headBottom)).toBeLessThan(1)
-  })
-
-  test('comes back from an article to its box still unfolded', async ({ page, installation }) => {
-    await ledgerDay(page)
-    await openDigest(page, installation)
-    await page.getByRole('button', { name: 'Show all' }).click()
-
-    await page.getByRole('link', { name: 'Ledger entry 1', exact: true }).click()
+    await title(page, 'Ledger entry 1').click()
     await expect(page.getByRole('heading', { level: 1, name: 'First light' })).toBeFocused()
-    await page.getByRole('link', { name: 'Back to Digest' }).click()
+    await page.locator('.x-back').click()
 
-    await expect(page.getByRole('button', { name: 'Show less' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Ledger entry 40', exact: true })).toBeVisible()
-  })
-
-  test('opens the Reader from anywhere in a lone box', async ({ page, installation }) => {
-    await openDigest(page, installation)
-
-    const box = page.locator('.feed-day')
-    const { width } = (await box.boundingBox()) ?? { width: 0 }
-    await box.click({ position: { x: width - 40, y: 12 } })
-
-    await expect(page).toHaveURL(/\/reader\//)
+    await expect(page.getByRole('button', { name: 'Fold 40 Feed Items from Field Notes' })).toBeVisible()
+    await expect(title(page, 'Ledger entry 40')).toBeVisible()
   })
 })
 
-test.describe('the Digest at phone width', () => {
-  test.use({ viewport: { width: 390, height: 760 } })
+test.describe('the Digest on a phone', () => {
+  test.use({ viewport: { width: 390, height: 760 }, isMobile: true, hasTouch: true })
 
-  test('keeps the counted structure without overflowing the screen', async ({ page, installation }) => {
+  test('keeps its rows inside the screen', async ({ page, installation }) => {
     await openDigest(page, installation)
 
-    await expect(page.getByRole('heading', { name: TODAY_ONE })).toBeVisible()
+    await expect(today(page)).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })
 
-  test('leaves saving to the Reader, so the title has the box', async ({ page, installation }) => {
+  test('focuses the search line at a size iOS does not zoom', async ({ page, installation }) => {
     await openDigest(page, installation)
 
-    await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Save First light' })).toBeHidden()
-  })
-
-  test('wraps a shared title and names it saved after a save from the Reader', async ({ page, installation }) => {
-    await claimAndSubscribe(page, installation, installation.ledgerFeedUrl, 'Valley Ledger')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
-
-    await expect(page.getByText('2 items')).toBeVisible()
-
-    const row = page.locator('.feed-day-item', { hasText: LEDGER_LONG_TITLE })
-    const short = page.locator('.feed-day-item', { hasText: 'Dry again' })
-    expect(await sharedTitle(row)).toEqual({ lines: 3, fits: true, titleClamped: true })
-    expect(await sharedTitle(short)).toEqual({ lines: 1, fits: true, titleClamped: false })
-
-    await page.getByRole('link', { name: LEDGER_LONG_TITLE }).click()
-    await page.getByRole('button', { name: `Save ${LEDGER_LONG_TITLE}` }).click()
-    await expect(page.getByRole('button', { name: `Saved ${LEDGER_LONG_TITLE}` })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    await page.goBack()
-
-    await expect(row.getByRole('heading', { name: `Saved: ${LEDGER_LONG_TITLE}` })).toBeVisible()
-    expect(await sharedTitle(row)).toMatchObject({ lines: 3, fits: true })
-  })
-
-  test('focuses search at a size iOS does not zoom', async ({ page, installation }) => {
-    await openDigest(page, installation)
-
-    await page.getByRole('button', { name: 'Search', exact: true }).click()
     const search = page.getByRole('searchbox', { name: 'Search your reading' })
+    await search.tap()
     await expect(search).toBeFocused()
     expect(
       await search.evaluate((input) => Number.parseFloat(getComputedStyle(input).fontSize)),
     ).toBeGreaterThanOrEqual(16)
   })
 
-  test('reads from a picked date without overflowing the screen', async ({ page, installation }) => {
-    await subscribe(page, installation)
-    await addFeed(page, installation.longFeedUrl)
-    await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+  test('reads from an earlier day without overflowing the screen', async ({ page, installation }) => {
+    await openLongDigest(page, installation)
 
-    await expect(page.getByRole('heading', { name: /^Today .+ \(2\)$/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Long Meadow 1' })).toBeVisible()
-    await expect(page.locator('.digest-calendar')).toBeHidden()
-    await expectNoHorizontalOverflow(page)
-
-    await page.getByLabel('Start from a day').fill(daysAgo(1))
-    await expect(page).toHaveURL(new RegExp(`\\?from=${daysAgo(1)}$`))
-    await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeVisible()
+    await page.goto(`${installation.url}/digest?from=${daysAgo(1)}`)
+    await expect(
+      page
+        .getByRole('main')
+        .getByRole('link', { name: /^Meadow note/ })
+        .first(),
+    ).toBeVisible()
     await expectNoHorizontalOverflow(page)
   })
 })
 
-test.describe('an unbroken title on a phone', () => {
+test.describe('an unbroken title on the narrowest phone', () => {
   test.use({ viewport: { width: 320, height: 700 } })
 
   test('wraps inside the screen on the Digest and the Feed', async ({ page, installation }) => {
     await claimAndSubscribe(page, installation, installation.addressFeedUrl, 'Address Ledger')
-    await page.getByRole('link', { name: 'Digest', exact: true }).click()
+    await goTo(page, 'Digest')
 
-    await expect(page.locator('.feed-day-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
+    await expect(title(page, UNBROKEN_TITLE)).toBeVisible()
     await expectNoBoxPastTheSideEdge(page)
 
-    await page.getByRole('link', { name: 'Address Ledger' }).click()
-    await expect(page.getByRole('heading', { name: 'Address Ledger' })).toBeVisible()
-    await expect(page.locator('.item-title').getByRole('link', { name: UNBROKEN_TITLE })).toBeVisible()
+    await page.getByRole('main').getByRole('link', { name: 'Address Ledger' }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Address Ledger' })).toBeVisible()
+    await expect(title(page, UNBROKEN_TITLE)).toBeVisible()
     await expectNoBoxPastTheSideEdge(page)
   })
 })

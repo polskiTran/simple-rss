@@ -28,7 +28,7 @@ describe('an installation nobody has claimed', () => {
     renderApp()
 
     expect(await screen.findByLabelText('Setup secret')).toBeDefined()
-    expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Places' })).toBeNull()
   })
 
   it('names the screen, so it is not an unlabelled group of password boxes', async () => {
@@ -57,7 +57,7 @@ describe('an installation nobody has claimed', () => {
       password: 'a-calm-reading-password',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     })
-    expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeDefined()
+    expect(await screen.findByRole('navigation', { name: 'Places' })).toBeDefined()
   })
 
   it('refuses to send two passwords that do not match', async () => {
@@ -169,7 +169,7 @@ describe('coming back to a claimed installation', () => {
 
     expect(await screen.findByLabelText('Password')).toBeDefined()
     expect(screen.queryByLabelText('Setup secret')).toBeNull()
-    expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Places' })).toBeNull()
   })
 
   it('leaves the mark as a mark, not a way into a reader that would refuse', async () => {
@@ -205,7 +205,7 @@ describe('coming back to a claimed installation', () => {
     await fill('Password', 'a-calm-reading-password')
     await press('Sign in')
 
-    expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeDefined()
+    expect(await screen.findByRole('navigation', { name: 'Places' })).toBeDefined()
   })
 
   it('says only that the password was wrong', async () => {
@@ -321,7 +321,7 @@ describe('leaving the reader', () => {
   it('signs out and returns to the sign-in screen', async () => {
     const api = stubApi().on('DELETE /api/auth/session', { status: 204 })
     renderApp('/settings')
-    await screen.findByRole('navigation', { name: 'Sections' })
+    await screen.findByRole('navigation', { name: 'Places' })
 
     await press('Sign out')
 
@@ -335,25 +335,27 @@ describe('leaving the reader', () => {
       body: { error: { code: 'unavailable', message: 'Unavailable' } },
     })
     renderApp('/settings')
-    await screen.findByRole('navigation', { name: 'Sections' })
+    await screen.findByRole('navigation', { name: 'Places' })
 
     await press('Sign out')
 
     expect(await screen.findByText('Couldn’t sign out. Try again in a moment.')).toBeDefined()
-    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeDefined()
+    expect(screen.getByRole('navigation', { name: 'Places' })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull()
   })
 
   it('changes the password and says every device must sign in again', async () => {
     const api = stubApi().on('POST /api/auth/password', { body: { claimed: true, authenticated: false } })
     renderApp('/settings')
-    await screen.findByRole('navigation', { name: 'Sections' })
+    await screen.findByRole('navigation', { name: 'Places' })
 
     await press('Change password')
     await fill('Current password', 'a-calm-reading-password')
     await fill('New password', 'a-replacement-password')
     await fill('Confirm new password', 'a-replacement-password')
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change password' }))
+    await userEvent.click(
+      within(screen.getByRole('form', { name: 'Change password' })).getByRole('button', { name: 'Change password' }),
+    )
 
     expect(api.requestsTo('POST /api/auth/password')[0]?.body).toEqual({
       currentPassword: 'a-calm-reading-password',
@@ -365,7 +367,7 @@ describe('leaving the reader', () => {
   it('warns before the change that it signs out every device', async () => {
     stubApi()
     renderApp('/settings')
-    await screen.findByRole('navigation', { name: 'Sections' })
+    await screen.findByRole('navigation', { name: 'Places' })
 
     await press('Change password')
 
@@ -378,16 +380,18 @@ describe('leaving the reader', () => {
       body: { error: { code: 'invalid_credentials', message: 'Invalid credentials' } },
     })
     renderApp('/settings')
-    await screen.findByRole('navigation', { name: 'Sections' })
+    await screen.findByRole('navigation', { name: 'Places' })
 
     await press('Change password')
     await fill('Current password', 'not-the-current-one')
     await fill('New password', 'a-replacement-password')
     await fill('Confirm new password', 'a-replacement-password')
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change password' }))
+    await userEvent.click(
+      within(screen.getByRole('form', { name: 'Change password' })).getByRole('button', { name: 'Change password' }),
+    )
 
     expect(await screen.findByText(/That password isn’t right/)).toBeDefined()
-    expect(screen.getByRole('dialog', { name: 'Change password' })).toBeDefined()
+    expect(screen.getByRole('form', { name: 'Change password' })).toBeDefined()
     expect(window.location.pathname).toBe('/settings')
   })
 

@@ -5,21 +5,22 @@ import { App } from '../../src/client/app.js'
 import { ROUTE_LABELS, ROUTES } from '../../src/client/routing.js'
 import { stubApi } from './stub-api.js'
 
+const PLACES = ['Digest', 'Library', 'Feeds']
+
 async function renderAt(path: string) {
   window.history.replaceState(null, '', path)
   const result = render(<App />)
-  await screen.findByRole('navigation', { name: 'Sections' })
+  await screen.findByRole('navigation', { name: 'Places' })
   return result
 }
 
-function tabNames() {
-  const sections = screen.getByRole('navigation', { name: 'Sections' })
-  return within(sections)
+function placeNames() {
+  return within(screen.getByRole('navigation', { name: 'Places' }))
     .getAllByRole('link')
-    .map((tab) => tab.textContent)
+    .map((place) => place.textContent)
 }
 
-function activeTab() {
+function current() {
   return screen.getByRole('link', { current: 'page' }).textContent
 }
 
@@ -32,62 +33,47 @@ afterEach(() => {
 })
 
 describe('the application shell', () => {
-  it('shows the four sections in their fixed order', async () => {
+  it('shows the places in their fixed order, and Settings beside them', async () => {
     await renderAt('/digest')
 
-    expect(tabNames()).toEqual(ROUTES.map((route) => ROUTE_LABELS[route]))
+    expect(placeNames()).toEqual(PLACES)
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeDefined()
   })
 
-  it('shows the same four sections on every screen', async () => {
+  it('shows the same places on every screen', async () => {
     await renderAt('/digest')
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('link', { name: 'Settings' }))
 
-    expect(tabNames()).toEqual(ROUTES.map((route) => ROUTE_LABELS[route]))
-  })
-
-  it('shows the wordmark', async () => {
-    await renderAt('/digest')
-
-    expect(screen.getByText('simple')).toBeDefined()
-  })
-
-  it('returns to the digest when the mark is pressed', async () => {
-    await renderAt('/saved')
-    const user = userEvent.setup()
-
-    await user.click(screen.getByRole('link', { name: 'simple' }))
-
-    expect(activeTab()).toBe('Digest')
-    expect(window.location.pathname).toBe('/digest')
+    expect(placeNames()).toEqual(PLACES)
   })
 
   it.each([...ROUTES])('marks %s as the current section when its path is open', async (route) => {
     await renderAt(`/${route}`)
 
-    expect(activeTab()).toBe(ROUTE_LABELS[route])
+    expect(current()).toBe(ROUTE_LABELS[route])
   })
 
   it('opens the digest at the root', async () => {
     await renderAt('/')
 
-    expect(activeTab()).toBe('Digest')
+    expect(current()).toBe('Digest')
   })
 
   it('opens the digest for a path it does not recognise', async () => {
     await renderAt('/something-else')
 
-    expect(activeTab()).toBe('Digest')
+    expect(current()).toBe('Digest')
   })
 
   it('changes section without a page load and updates the address', async () => {
     await renderAt('/digest')
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('link', { name: 'Saved' }))
+    await user.click(screen.getByRole('link', { name: 'Library' }))
 
-    expect(activeTab()).toBe('Saved')
+    expect(current()).toBe('Library')
     expect(window.location.pathname).toBe('/saved')
   })
 
@@ -98,7 +84,7 @@ describe('the application shell', () => {
 
     window.history.back()
 
-    await waitFor(() => expect(activeTab()).toBe('Digest'))
+    await waitFor(() => expect(current()).toBe('Digest'))
   })
 
   it('leaves modified clicks to the browser so a tab can be opened', async () => {

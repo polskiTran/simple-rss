@@ -30,12 +30,12 @@ const TARGETS = {
 }
 
 const SCREENS = {
-  digest: { path: '/', ready: '.feed-day' },
-  feeds: { path: '/feeds', ready: '.feed-row' },
-  saved: { path: '/saved', ready: '.item' },
-  feed: { path: '/feeds/1', ready: '.item' },
-  settings: { path: '/settings', ready: '.page-title' },
-  search: { path: '/search?q=hi', ready: '.search-feeds' },
+  digest: { path: '/', ready: '.x-day' },
+  feeds: { path: '/feeds', ready: '.x-day' },
+  saved: { path: '/saved', ready: '.x-day' },
+  feed: { path: '/feeds/1', ready: '.x-day' },
+  settings: { path: '/settings', ready: '.x-ledger-row' },
+  search: { path: '/search?q=hi', ready: '.x-day' },
 }
 
 const SAME_LINE = {
@@ -154,13 +154,13 @@ function probe() {
     }
     return false
   }
-  const pastEdge = [...document.querySelectorAll('.chrome *, .page *')]
+  const pastEdge = [...document.querySelectorAll('.x-page *')]
     .filter((element) => element.getBoundingClientRect().right > edge + 0.5 && !clipped(element))
     .filter((element) => !element.closest('.visually-hidden'))
     .map((element) => `${element.tagName.toLowerCase()}.${element.getAttribute('class') ?? ''}`)
 
   const brokenWords = []
-  const read = '.page-title, .group-heading, .feed-row-name, .feed-day-title, .item-title, .item-feed-name, .feed-host'
+  const read = '.x-top, .x-ledger-row, .x-day-label, .x-t, .x-f, .x-card, .x-reader-title'
   for (const block of document.querySelectorAll(read)) {
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -179,16 +179,12 @@ function probe() {
     }
   }
 
-  const title = [...document.querySelectorAll('.page-title')].find((element) => !element.closest('.visually-hidden'))
-  const words =
-    title && [...title.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+  const bar = document.querySelector('.x-top')
   let line = null
-  if (words) {
-    const range = document.createRange()
-    range.selectNode(words)
-    const { fontSize, fontWeight, letterSpacing } = getComputedStyle(title)
-    const { top, left } = range.getBoundingClientRect()
-    line = { top, left, fontSize, fontWeight, letterSpacing }
+  if (bar) {
+    const { top, left, height } = bar.getBoundingClientRect()
+    const { fontSize, fontWeight, letterSpacing } = getComputedStyle(bar)
+    line = { top, left, height, fontSize, fontWeight, letterSpacing }
   }
   return {
     overflow: document.documentElement.scrollWidth - edge,

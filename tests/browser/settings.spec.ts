@@ -1,31 +1,21 @@
 import type { Page } from '@playwright/test'
-import {
-  expect,
-  expectNoHorizontalOverflow,
-  SETUP_SECRET,
-  test,
-  USER_PASSWORD,
-  type Installation,
-} from './installation.js'
+import { claim, expect, expectNoHorizontalOverflow, goTo, test, type Installation } from './installation.js'
 
 async function expectTimezoneInsideThePage(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'Claim installation' }).click()
-
-  await page.getByRole('link', { name: 'Settings', exact: true }).click()
-  const select = page.getByLabel('Installation timezone')
+  await claim(page, installation.url)
+  await goTo(page, 'Settings')
+  const select = page.getByLabel('Timezone')
   await expect(select).toBeVisible()
 
-  const edges = await page.evaluate(() => {
-    const app = document.querySelector('.app') as HTMLElement
-    const box = (document.querySelector('.select-control') as HTMLElement).getBoundingClientRect()
-    const padding = Number.parseFloat(getComputedStyle(app).paddingRight)
-    return { right: Math.round(box.right), contentRight: Math.round(app.clientWidth - padding) }
+  const edges = await select.evaluate((element) => {
+    const page = document.querySelector<HTMLElement>('.x-page')
+    const padding = page ? Number.parseFloat(getComputedStyle(page).paddingRight) : 0
+    return {
+      right: Math.round(element.getBoundingClientRect().right),
+      pageRight: Math.round(document.documentElement.clientWidth - padding + 10),
+    }
   })
-  expect(edges.right).toBeLessThanOrEqual(edges.contentRight)
+  expect(edges.right).toBeLessThanOrEqual(edges.pageRight)
 
   await expectNoHorizontalOverflow(page)
 }

@@ -10,6 +10,8 @@ import {
   type Library,
   type LibraryItem,
   type MarkedText,
+  type ReaderArticle,
+  type ReaderItem,
   MAX_FEED_TITLE_LENGTH,
   SEARCH_RESULT_LIMIT,
   SEARCH_SUBSCRIPTION_LIMIT,
@@ -58,6 +60,8 @@ function chosenDataset(): Dataset {
 const quietCadence = Array.from({ length: 30 }, () => 0)
 const busyCadence = Array.from({ length: 30 }, (_, day) => (day % 3 === 0 ? 1_284 : day % 2))
 const sparseCadence = Array.from({ length: 30 }, (_, day) => (day === 29 ? 1 : 0))
+const dailyCadence = Array.from({ length: 30 }, (_, day) => (day % 3 === 2 ? 0 : 2))
+const weeklyCadence = Array.from({ length: 30 }, (_, day) => (day % 6 === 0 ? 1 : 0))
 
 interface FeedSeed {
   readonly title: string
@@ -84,7 +88,7 @@ const WORST_FEEDS: readonly FeedSeed[] = [
       'Długie eseje o infrastrukturze, zespołach i kompromisach. Publikowane nieregularnie, zwykle w niedzielę wieczorem, czasem trzy naraz.',
     domain: 'aleksandra.wisniewska-kowalczyk.example.com',
     homePageUrl: 'https://aleksandra.wisniewska-kowalczyk.example.com/notatki/',
-    cadence: busyCadence,
+    cadence: dailyCadence,
   },
   {
     title: 'northwind-industries-holdings.example.com',
@@ -96,7 +100,7 @@ const WORST_FEEDS: readonly FeedSeed[] = [
     title: '王秀英的技术博客',
     domain: 'wang.example.cn',
     homePageUrl: 'https://wang.example.cn/',
-    cadence: busyCadence,
+    cadence: weeklyCadence,
   },
   {
     title: 'نور الهدى عبد الرحمن — مدونة التصميم',
@@ -203,10 +207,16 @@ interface ItemSeed {
   readonly summary?: string
   readonly saved?: boolean
   readonly link?: string | null
+  readonly image?: string
+}
+
+function picture(width: number, height: number, hue: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="oklch(0.78 0.05 ${hue})"/></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
 const WORST_TODAY: readonly ItemSeed[] = [
-  { feed: 1, title: LONG_TITLE, time: '23:59', summary: LONG_SUMMARY, saved: true },
+  { feed: 1, title: LONG_TITLE, time: '23:59', summary: LONG_SUMMARY, saved: true, image: picture(1600, 900, 250) },
   {
     feed: 2,
     title:
@@ -214,9 +224,14 @@ const WORST_TODAY: readonly ItemSeed[] = [
     time: '22:10',
   },
   { feed: 3, title: 'J', time: '21:00', link: null },
-  { feed: 4, title: '分布式系统中的一致性问题：从理论到实践的完整指南（第三部分）', time: '20:45' },
-  { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
-  { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
+  {
+    feed: 4,
+    title: '分布式系统中的一致性问题：从理论到实践的完整指南（第三部分）',
+    time: '20:45',
+    image: picture(600, 1400, 150),
+  },
+  { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30', image: picture(3000, 500, 35) },
+  { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00', image: picture(1000, 1000, 82) },
   { feed: 6, title: POST_TITLE, time: '17:45' },
   ...['17:40', '17:35', '17:30', '17:25'].map((time, index) => ({
     feed: 6,
@@ -229,6 +244,7 @@ const WORST_TODAY: readonly ItemSeed[] = [
     title: '<b>Release</b> &amp; notes — **v2.0** is out',
     time: '16:00',
     summary: '<script>alert(1)</script>',
+    image: '/api/items/0/image',
   },
   ...Array.from({ length: 1_284 }, (_, index) => ({
     feed: 2,
@@ -256,7 +272,7 @@ function digestItem(seed: ItemSeed, date: string, feeds: readonly SubscriptionSu
     link: seed.link === undefined ? `https://example.com/items/${nextItemId}` : seed.link,
     publishedAt: at,
     displayTime: seed.time,
-    imageUrl: null,
+    imageUrl: seed.image ?? null,
     summary: seed.summary ?? null,
     firstSeenAt: at,
     saved: seed.saved ?? false,
@@ -391,7 +407,10 @@ function feedDetailOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedDe
     customDescription: null,
     schedule: { pollingIntervalMinutes: 1440, nextPollAt: `${TODAY}T23:00:00Z` },
     subscribedDate: day(feed.subscribedAt.slice(0, 10)),
-    cadence: calendarOf(dataset).days,
+    cadence: calendarOf(dataset).days.map((observed, index, days) => {
+      const recent = feed.cadence[index - (days.length - feed.cadence.length)]
+      return recent === undefined ? observed : { ...observed, count: recent }
+    }),
   }
 }
 
@@ -414,6 +433,54 @@ function feedItemsOf(dataset: Exclude<Dataset, 'demo'>, feedId: number): FeedIte
     ),
     nextFrom: null,
   }
+}
+
+const ARTICLE = [
+  'The scheduler dropped roughly one job in ten thousand under load, and for a long time nobody could say why.',
+  '## What we measured',
+  'Every job carried a trace from enqueue to completion. The gaps clustered around leader elections, where a job acknowledged by the old leader never reached the new one.',
+  '- Enqueue latency stayed flat\n- Completion latency doubled during elections\n- Lost jobs were always acknowledged',
+  '## What we changed',
+  'We moved acknowledgement after replication, which made enqueue slower and loss impossible.',
+  '> A job is not accepted until two machines know about it.',
+  '```ts\nawait replicate(job)\nacknowledge(job)\n```',
+  '### The cost',
+  'Enqueue latency rose by four milliseconds at the median and twelve at the tail.',
+  '## What we would do again',
+  'Measure the gap before choosing a fix, and keep the fix small enough to delete.',
+].join('\n\n')
+
+function readerItemOf(dataset: Exclude<Dataset, 'demo'>, feedItemId: number): ReaderItem | undefined {
+  const { today, groups } = digestOf(dataset)
+  const listed = groups.flatMap((group) => group.items.map((item) => ({ item, date: group.date })))
+  const at = listed.findIndex(({ item }) => item.feedItemId === feedItemId)
+  const found = listed[at]
+  if (!found) return undefined
+  const next = listed[at + 1]?.item
+  const { item, date } = found
+  return {
+    feedItemId,
+    title: item.title,
+    feedId: item.feedId,
+    feedTitle: item.feedTitle,
+    link: item.link,
+    discussionUrl: item.link === null ? null : 'https://news.example.com/item?id=1',
+    publishedAt: item.publishedAt,
+    firstSeenAt: item.firstSeenAt,
+    date,
+    today,
+    summary: item.summary,
+    saved: item.saved,
+    readingSource: 'feed-content',
+    nextInDigest: next
+      ? { feedItemId: next.feedItemId, title: next.title, feedTitle: next.feedTitle, displayTime: next.displayTime }
+      : null,
+    feedContent: { markdown: ARTICLE, truncated: false, readingTimeMinutes: 2 },
+  }
+}
+
+function readerArticleOf(feedItemId: number): ReaderArticle {
+  return { feedItemId, markdown: `${ARTICLE}\n\nRead on the Original webpage.`, readingTimeMinutes: 3 }
 }
 
 function markedIn(text: string, line: string): MarkedText {
@@ -507,6 +574,10 @@ function answer(dataset: Exclude<Dataset, 'demo'>, method: string, path: string,
     const saved = method === 'PUT'
     return { feedItemId: Number(library[1]), saved, savedAt: saved ? new Date().toISOString() : null }
   }
+  const article = path.match(/^\/api\/items\/(\d+)\/reader$/)
+  if (article) return readerArticleOf(Number(article[1]))
+  const reader = path.match(/^\/api\/items\/(\d+)$/)
+  if (reader) return readerItemOf(dataset, Number(reader[1]))
   const items = path.match(/^\/api\/feeds\/(\d+)\/items$/)
   if (items) return feedItemsOf(dataset, Number(items[1]))
   const detail = path.match(/^\/api\/feeds\/(\d+)$/)

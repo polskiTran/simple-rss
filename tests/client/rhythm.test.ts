@@ -15,7 +15,13 @@ describe('Rhythm', () => {
     expect(rhythmOf(days(active))).toBe(rhythm)
   })
 
-  it('counts days with items, not items — one busy day is not a daily habit', () => {
+  it('counts days with items below the Firehose, not items — one busy day is not a daily habit', () => {
     expect(rhythmOf(days(1, 40))).toBe('monthly')
+  })
+
+  it('reads 90 Feed Items in 30 days as a Firehose before it counts days', () => {
+    expect(rhythmOf(days(30, 3))).toBe('firehose')
+    expect(rhythmOf(days(1, 90))).toBe('firehose')
+    expect(rhythmOf(days(1, 89))).toBe('monthly')
   })
 })

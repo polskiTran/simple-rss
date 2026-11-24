@@ -1,18 +1,17 @@
 import { Toggle } from '@base-ui/react/toggle'
 import { use, useOptimistic, useTransition } from 'react'
 import { saveToLibrary, unsaveFromLibrary } from '../api.js'
-import { Icon } from './icon.js'
 import { ReportSaveFailure } from './save-failure.js'
 
 interface SaveToggleProps {
   readonly feedItemId: number
   readonly title: string
   readonly saved: boolean
-  readonly labelled?: boolean
+  readonly className: string
   onSaved(saved: boolean): void
 }
 
-export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved }: SaveToggleProps) {
+export function SaveToggle({ feedItemId, title, saved, className, onSaved }: SaveToggleProps) {
   const [pending, startToggle] = useTransition()
   const [shown, show] = useOptimistic(saved)
   const report = use(ReportSaveFailure)
@@ -33,20 +32,8 @@ export function SaveToggle({ feedItemId, title, saved, labelled = false, onSaved
 
   const word = shown ? 'Saved' : 'Save'
   return (
-    <Toggle
-      className={labelled ? 'button save-toggle-labelled' : 'save-word'}
-      pressed={shown}
-      aria-label={`${word} ${title}`}
-      onPressedChange={toggle}
-    >
-      {labelled ? (
-        <>
-          <Icon name="bookmark" filled={shown} />
-          <span className="wide-only">{word}</span>
-        </>
-      ) : (
-        word
-      )}
+    <Toggle className={className} pressed={shown} aria-label={`${word} ${title}`} onPressedChange={toggle}>
+      {word}
     </Toggle>
   )
 }

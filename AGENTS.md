@@ -76,7 +76,7 @@ Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CON
 
 <important if="you are building or restyling UI">
 
-`docs/DESIGN.md` is the design system, with the drawn screens in `docs/design/v2/` — greyscale interface with colour only in data, one hard-edged shape for every control, Literata to read and Instrument Sans to operate.
+`docs/DESIGN.md` is the design system (ADR 0033), styled by `src/client/screens/screens.css` — one ledger on a twelve-column grid, Geist at 13px, greyscale with colour only in data, no borders, radii or shadows. The prototype it came from is `docs/design/prototype/index.html`.
 </important>
 
 <important if="you need to see the client in a browser, screenshot it, or check how a screen renders">

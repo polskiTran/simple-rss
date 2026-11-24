@@ -9,7 +9,7 @@ async function claim(page: Page, installation: Installation, password = USER_PAS
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByLabel('Confirm password').fill(password)
   await page.getByRole('button', { name: 'Claim installation' }).click()
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Places' })).toBeVisible()
 }
 
 async function signIn(page: Page, installation: Installation, password = USER_PASSWORD): Promise<void> {
@@ -25,8 +25,8 @@ test.describe('claiming an installation in a browser', () => {
     await expect(page.getByRole('form', { name: 'Claim this installation' })).toBeVisible()
     await claim(page, installation)
 
-    await expect(page.getByText('No feeds yet.')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Add feed' })).toBeVisible()
+    await expect(page.getByText(/No Feeds yet\./)).toBeVisible()
+    await expect(page.getByRole('main').getByRole('link', { name: 'Add a Feed' })).toBeVisible()
   })
 
   test('never offers setup again, even to a browser that has never been here', async ({
@@ -68,7 +68,7 @@ test.describe('the session cookie', () => {
 
     await page.reload()
 
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Places' })).toBeVisible()
   })
 })
 
@@ -80,7 +80,7 @@ test.describe('signing back in', () => {
     await signIn(stranger, installation, 'the-wrong-password')
 
     await expect(stranger.getByText('That password isn’t right. Passwords are case-sensitive.')).toBeVisible()
-    await expect(stranger.getByRole('navigation', { name: 'Sections' })).toHaveCount(0)
+    await expect(stranger.getByRole('navigation', { name: 'Places' })).toHaveCount(0)
   })
 })
 
@@ -104,7 +104,7 @@ test.describe('a page on another origin', () => {
 
     await expect(page.locator('body')).toContainText('forbidden_origin')
     await page.goto(installation.url)
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Places' })).toBeVisible()
   })
 
   test('cannot read the API with a credentialed fetch', async ({ page, installation, foreign }) => {
