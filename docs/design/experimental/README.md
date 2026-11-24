@@ -1,8 +1,9 @@
 # Experimental interface
 
 The experimental interface is chosen per device in Settings under Interface
-(ADR 0032). It draws the Digest, Feeds, a Feed, the Library, the Reader View,
-Search results and Settings. `index.html` is the prototype
+(ADR 0032). It draws every screen: sign-in and setup, the Digest, Feeds, a
+Feed, the Library, the Reader View, Search results and Settings. `index.html`
+is the prototype
 it was ported from, opened from disk with data exported by
 `export-dev-data.mjs` into `.data/`. The stylesheet is
 `src/client/experimental/experimental.css`; this file records what it does.
@@ -28,6 +29,16 @@ it was ported from, opened from disk with data exported by
   lightness capped at 0.62 on light paper so Daily stays legible. Saved is the
   pink: a saved row sits on a pink wash and shows the word Saved beside its
   time, and selected text takes the same pink. Dark follows Appearance through `light-dark()`.
+
+## Sign-in and setup
+
+Before the access gate opens there is no top bar, only a ledger under the name
+simple: Sign in, with a Password line; or Set up simple, with Setup secret,
+Password and Confirm password lines and the reason it is needed. Each line has
+a grey Show beside it. A refused line says why under itself and takes focus;
+anything else is said beside the submit word. While simple is opening the
+ledger says so, and when its server does not answer it says which way, with
+Retry.
 
 ## Top bar
 

@@ -1039,6 +1039,37 @@
   row-gap: 2px;
 }
 
+.x-gate {
+  & h1 {
+    font-weight: 500;
+  }
+
+  & .x-ledger-row {
+    padding-block: 6px;
+  }
+}
+
+.x-gate-control {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--x-unit) * 2);
+  max-width: 400px;
+
+  & .x-field {
+    flex: 1;
+    min-width: 0;
+    margin-block: -3px;
+  }
+}
+
+.x-gate-control .x-more {
+  color: var(--x-grey);
+}
+
+.x-gate-reason {
+  margin-top: 6px;
+}
+
 @media (max-width: 760px) {
   .x :is(.x-c-label, .x-c-main, .x-c-side, .x-c-end, .x-day-label, .x-rows) {
     grid-column: 1 / -1;

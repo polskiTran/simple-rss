@@ -57,6 +57,25 @@ test.describe('the experimental interface', () => {
     ).toBeVisible()
   })
 
+  test('signing out leads to its own sign-in screen, which refuses a wrong password', async ({
+    page,
+    installation,
+  }) => {
+    await claim(page, installation.url)
+    await chooseExperimental(page)
+
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    const form = page.getByRole('form', { name: 'Sign in' })
+    await expect(form.getByLabel('Password', { exact: true })).toBeFocused()
+    await page.keyboard.insertText('not the password')
+    await form.getByRole('button', { name: 'Sign in' }).click()
+    await expect(form.getByText('That password isn’t right. Passwords are case-sensitive.')).toBeVisible()
+
+    await form.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
+    await form.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page.getByRole('navigation', { name: 'Places' })).toBeVisible()
+  })
+
   test('the empty Digest leads to Add a Feed, and the Feed screen renames and unsubscribes it', async ({
     page,
     installation,

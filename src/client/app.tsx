@@ -9,6 +9,7 @@ import { LoadingNote } from './components/loading-note.js'
 import { ReportSaveFailure, SaveFailureLine } from './components/save-failure.js'
 import { SectionNav } from './components/section-nav.js'
 import { Wordmark } from './components/wordmark.js'
+import { GateScreen } from './experimental/gate-screens.js'
 import { ExperimentalShell } from './experimental/shell.js'
 import { INTERFACE } from './interface.js'
 import { locationAt, originOf, scopeOf, searchHomeOf, sectionOf, useNavigation, type Navigation } from './routing.js'
@@ -27,8 +28,12 @@ export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
   const chosen = useStoredChoice(INTERFACE)
-  if (chosen === 'experimental' && gate.access.kind === 'open') {
-    return <ExperimentalShell navigation={navigation} onAccessChanged={gate.adopt} />
+  if (chosen === 'experimental') {
+    return gate.access.kind === 'open' ? (
+      <ExperimentalShell navigation={navigation} onAccessChanged={gate.adopt} />
+    ) : (
+      <GateScreen gate={gate} />
+    )
   }
   return <V2Shell navigation={navigation} gate={gate} />
 }
