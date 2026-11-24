@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { use, useEffect } from 'react'
+import { use, useEffect, useState } from 'react'
 import { z } from 'zod'
 import {
   type DateKey,
@@ -11,15 +11,15 @@ import {
 } from '../../shared/api.js'
 import { useScreenTitle } from '../arrival.js'
 import { fetchDigest, fetchDigestCalendar } from '../api.js'
+import { RoutedLink } from '../components/routed-link.js'
 import { withSaved } from '../components/save-toggle.js'
 import { counted, dayTitle, longDay } from '../day-names.js'
-import { useKept } from '../routing.js'
+import { sectionPath, useKept } from '../routing.js'
 import { useStoredChoice } from '../stored-choice.js'
 import { usePagedResource, useResource, valueInView } from '../use-resource.js'
-import { ArmContent } from './bloom.js'
-import { digestCounts, FIREHOSE_TREATMENT, type FirehoseTreatment, splitDay, timeSpan } from './firehose.js'
+import { DIGEST_LAYOUT, type DigestLayout, LAYOUT_LABELS, Pictures, type RowActions } from './digest-layouts.js'
+import { FIREHOSE_TREATMENT, foldKey, type FirehoseTreatment, splitDay, timeSpan } from './firehose.js'
 import {
-  ArmHeading,
   DayCalendar,
   FeedLink,
   ItemRow,
@@ -28,7 +28,6 @@ import {
   Options,
   SaveWord,
   SubscriptionsContext,
-  TierKey,
   TitleLink,
   useRhythmOf,
 } from './parts.js'
@@ -39,12 +38,6 @@ interface DigestScreenProps {
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
   onAddFeed(): void
-}
-
-interface RowActions {
-  onOpenItem(feedItemId: number): void
-  onOpenFeed(feedId: number): void
-  onSaved(feedItemId: number, saved: boolean): void
 }
 
 export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed }: DigestScreenProps) {
@@ -62,6 +55,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
   }, [oldestShown, keepThrough])
 
   const treatment = useStoredChoice(FIREHOSE_TREATMENT)
+  const layout = useStoredChoice(DIGEST_LAYOUT)
   const { rhythms } = use(SubscriptionsContext)
   const rhythmOf = useRhythmOf()
   const isFirehose = (feedId: number) => rhythmOf(feedId) === 'firehose'
@@ -78,37 +72,79 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
       })),
   }
 
+  const [picking, setPicking] = useState(false)
   const ready = digest !== undefined && rhythms !== undefined
   const failed = state.kind === 'unavailable' || state.kind === 'unreachable'
+
+  const empty = ready && digest.groups.every((group) => group.items.length === 0)
+  const notice =
+    days?.subscriptions === 0 ? (
+      <>
+        No Feeds yet.{' '}
+        <RoutedLink className="x-more" href={sectionPath('feeds')} onNavigate={onAddFeed}>
+          Add a Feed
+        </RoutedLink>
+      </>
+    ) : empty ? (
+      start.from === undefined ? (
+        'Nothing yet.'
+      ) : (
+        'Nothing on or before this day.'
+      )
+    ) : ready ? null : failed ? (
+      <>
+        The Digest didn’t load.{' '}
+        <Button className="x-more" onClick={retry}>
+          Retry
+        </Button>
+      </>
+    ) : (
+      <span className="x-grey">Loading the Digest</span>
+    )
 
   return (
     <div className="x-screen">
       <header className="x-ledger">
-        <LedgerRow
-          label={<h1 className="x-heading">Digest</h1>}
-          side={<TierKey />}
-          end={today ? longDay(start.from ?? today) : undefined}
-        >
-          {days?.subscriptions === 0 ? (
-            <>
-              No Feeds yet.{' '}
-              <Button className="x-more" onClick={onAddFeed}>
-                Add a Feed
-              </Button>
-            </>
-          ) : ready ? (
-            summary(digest.groups, isFirehose, start.from !== undefined)
-          ) : failed ? (
-            <>
-              The Digest didn’t load.{' '}
-              <Button className="x-more" onClick={retry}>
-                Retry
-              </Button>
-            </>
-          ) : (
-            <span className="x-grey">Loading the Digest</span>
-          )}
+        <h1 className="visually-hidden">Digest</h1>
+        {notice ? <LedgerRow label="">{notice}</LedgerRow> : null}
+        <LedgerRow label="Layout">
+          <Options
+            label="Layout"
+            options={DIGEST_LAYOUT.options.map((option) => ({ value: option, label: LAYOUT_LABELS[option] }))}
+            value={layout}
+            onChange={DIGEST_LAYOUT.choose}
+          />
         </LedgerRow>
+        <LedgerRow label="Firehose">
+          <Options
+            label="Firehose"
+            options={[
+              { value: 'fold', label: 'Fold' },
+              { value: 'lane', label: 'Lane' },
+            ]}
+            value={treatment}
+            onChange={FIREHOSE_TREATMENT.choose}
+          />
+        </LedgerRow>
+        {days && today ? (
+          <LedgerRow label="Day">
+            <Button className="x-more" aria-expanded={picking} onClick={() => setPicking((shown) => !shown)}>
+              {longDay(start.from ?? today)}
+            </Button>
+            {picking ? (
+              <DayCalendar
+                label="Days"
+                today={today}
+                days={days.days}
+                current={start.from ?? today}
+                onPick={(date) => {
+                  setPicking(false)
+                  onStart({ from: date === days.today ? undefined : date })
+                }}
+              />
+            ) : null}
+          </LedgerRow>
+        ) : null}
       </header>
 
       {ready ? (
@@ -119,6 +155,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
               group={group}
               today={digest.today}
               treatment={treatment}
+              layout={layout}
               isFirehose={isFirehose}
               actions={actions}
             />
@@ -127,52 +164,23 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
         </div>
       ) : null}
 
-      <Legend treatment={treatment} />
-
-      {days && today ? (
-        <ArmContent side="s">
-          <DayCalendar
-            heading="Days"
-            today={today}
-            days={days.days}
-            current={start.from ?? today}
-            onPick={(date) => onStart({ from: date === days.today ? undefined : date })}
-          />
-        </ArmContent>
-      ) : null}
-      <ArmContent side="w">
-        <ArmHeading>Firehose</ArmHeading>
-        <Options
-          label="Firehose"
-          options={[
-            { value: 'fold', label: 'Fold' },
-            { value: 'lane', label: 'Lane' },
-          ]}
-          value={treatment}
-          onChange={FIREHOSE_TREATMENT.choose}
-        />
-      </ArmContent>
+      {layout === 'index' ? <Legend treatment={treatment} /> : null}
     </div>
   )
-}
-
-function summary(groups: readonly DigestGroup[], isFirehose: (feedId: number) => boolean, picked: boolean): string {
-  const counts = digestCounts(groups, isFirehose)
-  if (counts.items + counts.firehose === 0) return picked ? 'Nothing on or before this day.' : 'Nothing yet.'
-  const calm = `${counted(counts.items, 'Feed Item')} from ${counted(counts.subscriptions, 'Subscription')}`
-  return counts.firehose === 0 ? calm : `${calm}, and ${counts.firehose.toLocaleString('en-GB')} from Firehose Feeds`
 }
 
 function Day({
   group,
   today,
   treatment,
+  layout,
   isFirehose,
   actions,
 }: {
   readonly group: DigestGroup
   readonly today: DateKey
   readonly treatment: FirehoseTreatment
+  readonly layout: DigestLayout
   readonly isFirehose: (feedId: number) => boolean
   readonly actions: RowActions
 }) {
@@ -187,29 +195,25 @@ function Day({
       <h2 className="x-day-label" id={heading}>
         {dayTitle(group.date, today)}
       </h2>
-      <div className="x-rows">
-        {group.returns.map(({ feedId, quietDays }) => (
-          <div key={feedId} className="x-row x-note">
-            <span className="x-t">
-              {group.items.find((item) => item.feedId === feedId)?.feedTitle ?? 'A Feed'} is back after{' '}
-              {quietDays < 60 ? `${quietDays} quiet days` : `${Math.round(quietDays / 30)} quiet months`}
-            </span>
-          </div>
-        ))}
-        {rows.map((row) =>
-          row.kind === 'item' ? (
-            <ItemRow
-              key={row.item.feedItemId}
-              item={row.item}
-              feed={feedOf(row.item)}
-              onOpen={actions.onOpenItem}
-              onSaved={actions.onSaved}
-            />
-          ) : (
-            <Fold key={`fold ${row.feedId}`} date={group.date} items={row.items} actions={actions} />
-          ),
-        )}
-      </div>
+      {layout !== 'index' ? (
+        <Pictures layout={layout} date={group.date} rows={rows} actions={actions} />
+      ) : (
+        <div className="x-rows">
+          {rows.map((row) =>
+            row.kind === 'item' ? (
+              <ItemRow
+                key={row.item.feedItemId}
+                item={row.item}
+                feed={feedOf(row.item)}
+                onOpen={actions.onOpenItem}
+                onSaved={actions.onSaved}
+              />
+            ) : (
+              <Fold key={`fold ${row.feedId}`} date={group.date} items={row.items} actions={actions} />
+            ),
+          )}
+        </div>
+      )}
       {lane.length > 0 ? (
         <aside className="x-lane" aria-label={`Firehose, ${dayTitle(group.date, today)}`}>
           <p className="x-lane-head">Firehose, {counted(lane.length, 'Feed Item')}</p>
@@ -240,7 +244,7 @@ function Fold({
 }) {
   const rhythmOf = useRhythmOf()
   const [latest] = items
-  const [open = false, keepOpen] = useKept(`fold ${date} ${latest?.feedId}`, z.boolean())
+  const [open = false, keepOpen] = useKept(foldKey(date, latest?.feedId), z.boolean())
   if (!latest) return null
   const count = counted(items.length, 'Feed Item')
   return (

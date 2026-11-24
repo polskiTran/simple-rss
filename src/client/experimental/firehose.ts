@@ -1,4 +1,4 @@
-import type { DigestGroup, DigestItem } from '../../shared/api.js'
+import type { DateKey, DigestGroup, DigestItem } from '../../shared/api.js'
 import { storedChoice } from '../stored-choice.js'
 
 export const FIREHOSE_TREATMENT = storedChoice('experimental:firehose', ['fold', 'lane'])
@@ -48,27 +48,15 @@ function lone(row: DayRow): DayRow {
   return only && rest.length === 0 ? { kind: 'item', item: only } : row
 }
 
+export function foldKey(date: DateKey, feedId: number | undefined): string {
+  return `fold ${date} ${feedId}`
+}
+
 export function timeSpan(items: readonly DigestItem[]): string {
   const latest = items[0]?.displayTime ?? null
   const oldest = items.at(-1)?.displayTime ?? null
   if (latest === null) return ''
   return oldest !== null && oldest !== latest ? `${oldest}–${latest}` : latest
-}
-
-export interface DigestCounts {
-  readonly items: number
-  readonly subscriptions: number
-  readonly firehose: number
-}
-
-export function digestCounts(groups: readonly DigestGroup[], isFirehose: (feedId: number) => boolean): DigestCounts {
-  const items = groups.flatMap((group) => group.items)
-  const calm = items.filter((item) => !isFirehose(item.feedId))
-  return {
-    items: calm.length,
-    subscriptions: new Set(calm.map((item) => item.feedId)).size,
-    firehose: items.length - calm.length,
-  }
 }
 
 export interface ReadingQueue {

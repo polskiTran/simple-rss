@@ -1,26 +1,10 @@
 import { Button } from '@base-ui/react/button'
 import { Radio } from '@base-ui/react/radio'
 import { RadioGroup } from '@base-ui/react/radio-group'
-import {
-  useEffect,
-  useEffectEvent,
-  useId,
-  useRef,
-  useState,
-  useTransition,
-  type FormEvent,
-  type KeyboardEvent,
-} from 'react'
-import type {
-  ApiErrorCode,
-  CreateSubscriptionResponse,
-  FeedPreview,
-  FeedPreviewResponse,
-  OpmlImportReport,
-} from '../../shared/api.js'
-import { hasOwn } from '../../shared/record.js'
+import { useId, useState, useTransition, type FormEvent, type KeyboardEvent } from 'react'
+import type { CreateSubscriptionResponse, FeedPreview, OpmlImportReport } from '../../shared/api.js'
 import { RHYTHM_LABELS, rhythmOf } from '../../shared/rhythm.js'
-import { ApiError, importOpml, previewFeed, subscribeToFeed } from '../api.js'
+import { importOpml } from '../api.js'
 import { ActionDialog, DialogCancel } from '../components/action-dialog.js'
 import { CadenceStrip } from '../components/cadence-strip.js'
 import { Choice } from '../components/choice.js'
@@ -28,28 +12,11 @@ import { Field } from '../components/field.js'
 import { Icon } from '../components/icon.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { ago, daysBefore, relativeDay, shortDate } from '../day-names.js'
-import { addFailure, feedAddressOf, NOT_AN_ADDRESS } from './feed-language.js'
+import { importFailure, useFeedLookup } from './feed-lookup.js'
 
 type Way = 'address' | 'opml'
 
-const LOOKUP_PAUSE_MS = 800
-
 const SILENT_AFTER_DAYS = 90
-
-interface Answer {
-  readonly host: string
-  readonly feeds: readonly FeedPreview[]
-  readonly chosen: FeedPreview
-}
-
-type Lookup =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'reading'; readonly host: string }
-  | (Answer & { readonly kind: 'found'; readonly refused: string | undefined })
-  | (Answer & { readonly kind: 'subscribing' })
-  | { readonly kind: 'failed'; readonly reason: string; readonly retry: boolean }
-
-const IDLE: Lookup = { kind: 'idle' }
 
 interface AddFeedDialogProps {
   onSubscribed(created: CreateSubscriptionResponse): void
@@ -59,82 +26,24 @@ interface AddFeedDialogProps {
 export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) {
   const [open, setOpen] = useState(false)
   const [way, setWay] = useState<Way>('address')
-  const [address, setAddress] = useState('')
-  const [lookup, setLookup] = useState<Lookup>(IDLE)
   const [file, setFile] = useState<File | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [importing, startImporting] = useTransition()
-  const inFlight = useRef<AbortController | undefined>(undefined)
-
-  function settle(next: Lookup) {
-    inFlight.current?.abort()
-    inFlight.current = undefined
-    setLookup(next)
-  }
-
-  async function lookUp(line: string) {
-    const url = feedAddressOf(line)
-    if (!url) {
-      settle({ kind: 'failed', reason: NOT_AN_ADDRESS, retry: false })
-      return
-    }
-    const host = new URL(url).host
-    settle({ kind: 'reading', host })
-    const lookingUp = new AbortController()
-    inFlight.current = lookingUp
-    try {
-      const preview = await previewFeed(url, lookingUp.signal)
-      if (!lookingUp.signal.aborted) setLookup(found(preview, host))
-    } catch (cause) {
-      if (!lookingUp.signal.aborted) setLookup({ kind: 'failed', ...addFailure(cause, host) })
-    }
-  }
-
-  const lookUpPaused = useEffectEvent((line: string) => void lookUp(line))
-  useEffect(() => {
-    if (!open || way !== 'address' || lookup.kind !== 'idle' || address.trim() === '') return
-    const timer = window.setTimeout(() => lookUpPaused(address), LOOKUP_PAUSE_MS)
-    return () => window.clearTimeout(timer)
-  }, [open, way, address, lookup.kind])
+  const adding = useFeedLookup({
+    active: open && way === 'address',
+    onSubscribed(created) {
+      onSubscribed(created)
+      setOpen(false)
+    },
+  })
 
   function openChanged(next: boolean) {
     if (importing) return
     setOpen(next)
-    settle(IDLE)
+    adding.reset()
     if (next) {
-      setAddress('')
       setFile(undefined)
       setError(undefined)
-    }
-  }
-
-  function addressChanged(next: string) {
-    const pasted = next.length - address.length > 1
-    setAddress(next)
-    if (pasted && feedAddressOf(next)) void lookUp(next)
-    else settle(IDLE)
-  }
-
-  async function subscribe({ host, feeds, chosen }: Answer) {
-    settle({ kind: 'subscribing', host, feeds, chosen })
-    const subscribing = new AbortController()
-    inFlight.current = subscribing
-    try {
-      const created = await subscribeToFeed(chosen.feedUrl, subscribing.signal)
-      onSubscribed(created)
-      setOpen(false)
-    } catch (cause) {
-      if (subscribing.signal.aborted) return
-      const { reason } = addFailure(cause, new URL(chosen.feedUrl).host)
-      setLookup({ kind: 'found', host, feeds, chosen, refused: reason })
-    }
-  }
-
-  function proceed() {
-    if (lookup.kind === 'found') {
-      if (!lookup.chosen.subscribed) void subscribe(lookup)
-    } else if (lookup.kind !== 'reading' && lookup.kind !== 'subscribing') {
-      void lookUp(address)
     }
   }
 
@@ -142,13 +51,13 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     if (way !== 'address' || event.key !== 'Enter' || event.nativeEvent.isComposing) return
     if (!(event.target instanceof HTMLInputElement)) return
     event.preventDefault()
-    proceed()
+    adding.proceed()
   }
 
   function submit(event: FormEvent) {
     event.preventDefault()
     if (way === 'address') {
-      proceed()
+      adding.proceed()
       return
     }
 
@@ -166,10 +75,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
     })
   }
 
-  const answer = lookup.kind === 'found' || lookup.kind === 'subscribing' ? lookup : undefined
-  const subscribing = lookup.kind === 'subscribing'
-  const failure = lookup.kind === 'failed' ? lookup : undefined
-  const fieldError = failure?.reason ?? (lookup.kind === 'found' ? lookup.refused : undefined)
+  const { lookup, answer, subscribing, failure } = adding
   return (
     <ActionDialog
       open={open}
@@ -195,7 +101,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
           onChange={(next) => {
             setWay(next)
             setError(undefined)
-            settle(IDLE)
+            adding.stop()
           }}
         />
         {way === 'address' ? (
@@ -203,13 +109,13 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
             <Field
               label="URL"
               type="url"
-              value={address}
+              value={adding.address}
               placeholder="https://"
               autoComplete="off"
               autoFocus
               readOnly={subscribing}
-              error={fieldError}
-              onChange={addressChanged}
+              error={adding.refusal}
+              onChange={adding.changeAddress}
             />
             <div className="add-feed-result" aria-live="polite">
               {lookup.kind === 'reading' ? <LoadingNote>{`Reading ${lookup.host}`}</LoadingNote> : null}
@@ -219,9 +125,7 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
                   feeds={answer.feeds}
                   chosen={answer.chosen}
                   readOnly={subscribing}
-                  onChoose={(feed) => {
-                    if (lookup.kind === 'found') setLookup({ ...lookup, chosen: feed, refused: undefined })
-                  }}
+                  onChoose={adding.choose}
                 />
               ) : null}
             </div>
@@ -280,17 +184,6 @@ export function AddFeedDialog({ onSubscribed, onImported }: AddFeedDialogProps) 
       </form>
     </ActionDialog>
   )
-}
-
-function found(preview: FeedPreviewResponse, host: string): Lookup {
-  if (preview.kind === 'feed') {
-    return { kind: 'found', host, feeds: [preview.feed], chosen: preview.feed, refused: undefined }
-  }
-  const [first] = preview.feeds
-  if (!first) {
-    return { kind: 'failed', reason: `${preview.host} doesn’t name a feed. Try the feed’s own address.`, retry: false }
-  }
-  return { kind: 'found', host: preview.host, feeds: preview.feeds, chosen: first, refused: undefined }
 }
 
 function FoundFeeds({
@@ -394,17 +287,4 @@ function FeedDetail({ feed: { items, today, feedUrl } }: { feed: FeedPreview }) 
       <p className="feed-preview-url">{feedUrl.replace(/^https:\/\//, '')}</p>
     </div>
   )
-}
-
-const IMPORT_FAILURE_COPY = {
-  malformed_opml: 'That file is malformed XML.',
-  unsupported_opml: 'That file isn’t an OPML subscription list.',
-  too_many_feeds: 'That file lists more feeds than one import can take.',
-  invalid_request: 'That file is too large to import.',
-} as const satisfies Partial<Record<ApiErrorCode, string>>
-
-function importFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'The reader is unavailable.'
-  const code = cause.code
-  return hasOwn(IMPORT_FAILURE_COPY, code) ? IMPORT_FAILURE_COPY[code] : 'That file couldn’t be imported.'
 }

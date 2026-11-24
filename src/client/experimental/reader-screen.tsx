@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { lazy, Suspense, use, useEffect, useEffectEvent, useState, useTransition } from 'react'
+import { lazy, Suspense, useEffect, useEffectEvent, useState } from 'react'
 import {
   type DigestStart,
   type FeedContent,
@@ -10,10 +10,9 @@ import {
   utcDayKey,
 } from '../../shared/api.js'
 import { useScreenTitle } from '../arrival.js'
-import { fetchDigest, fetchReaderItem, saveToLibrary, unsaveFromLibrary } from '../api.js'
+import { fetchDigest, fetchReaderItem } from '../api.js'
 import { editable } from '../components/global-search.js'
 import { RoutedLink } from '../components/routed-link.js'
-import { ReportSaveFailure } from '../components/save-failure.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { dayTitle } from '../day-names.js'
 import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS } from '../reading-source.js'
@@ -21,9 +20,8 @@ import { type Origin, readerPath } from '../routing.js'
 import { storedChoice, useStoredChoice } from '../stored-choice.js'
 import { useResource, valueInView } from '../use-resource.js'
 import { fetchArticleThroughDeadlines, resolvedReadingSource, STAGE_NOTES } from '../views/reader-view.js'
-import { ArmContent, BloomState } from './bloom.js'
 import { queueAround } from './firehose.js'
-import { ArmButton, ArmHeading, ArmLink, ArmOutLink, FeedLink, Options, useRhythmOf } from './parts.js'
+import { FeedLink, Options, useRhythmOf } from './parts.js'
 
 const ArticleMarkdown = lazy(async () => ({
   default: (await import('../components/article-markdown.js')).ArticleMarkdown,
@@ -107,7 +105,6 @@ function OpenReader({
   onSaved,
 }: Omit<ReaderScreenProps, 'feedItemId'> & { readonly item: ReaderItem; onSaved(saved: boolean): void }) {
   const rhythmOf = useRhythmOf()
-  const bloom = use(BloomState)
   const textSize = useStoredChoice(TEXT_SIZE)
   const [chosen, setChosen] = useState<ReadingSource>(item.readingSource)
   const source = resolvedReadingSource(chosen, item)
@@ -140,7 +137,7 @@ function OpenReader({
   const [article, setArticle] = useState<HTMLElement | null>(null)
 
   const key = useEffectEvent((event: KeyboardEvent) => {
-    if (bloom.open || event.altKey || event.ctrlKey || event.metaKey || editable(event.target)) return
+    if (event.altKey || event.ctrlKey || event.metaKey || editable(event.target)) return
     if (event.key === 'j' && following) onStep(following.feedItemId)
     else if (event.key === 'k' && previous) onStep(previous.feedItemId)
     else if (event.key === 'Escape') onBack(origin)
@@ -168,20 +165,7 @@ function OpenReader({
             {shown.source === 'feed-content' && shown.content.truncated ? ', shortened' : ''}
           </div>
         ) : null}
-        {shown ? (
-          <div className="x-grey">
-            {READING_SOURCE_LABELS[shown.source]}
-            {shown.source !== source ? ' for now' : ''}
-          </div>
-        ) : null}
-        {item.discussionUrl ? (
-          <div>
-            <a className="x-grey x-link" href={item.discussionUrl} target="_blank" rel="noopener noreferrer">
-              Discussion
-            </a>
-          </div>
-        ) : null}
-        <div>
+        <div className="x-reader-gap">
           <SaveToggle
             className="x-save x-save-shown"
             feedItemId={item.feedItemId}
@@ -190,6 +174,40 @@ function OpenReader({
             onSaved={onSaved}
           />
         </div>
+        {item.discussionUrl ? (
+          <div>
+            <a className="x-grey x-link" href={item.discussionUrl} target="_blank" rel="noopener noreferrer">
+              Discussion
+            </a>
+          </div>
+        ) : null}
+        {item.link ? (
+          <div>
+            <a className="x-grey x-link" href={item.link} target="_blank" rel="noopener noreferrer">
+              Open the Original webpage
+            </a>
+          </div>
+        ) : null}
+        {item.link ? <CopyLink link={item.link} /> : null}
+        <Options
+          label="Reading Source"
+          className="x-reader-gap"
+          options={READING_SOURCE_OPTIONS.map((option) => ({
+            ...option,
+            disabled: option.value === 'feed-content' ? !item.feedContent : !item.link,
+          }))}
+          value={source}
+          onChange={setChosen}
+        />
+        {shown && shown.source !== source ? (
+          <div className="x-grey">{READING_SOURCE_LABELS[shown.source]} for now</div>
+        ) : null}
+        <Options
+          label="Text size"
+          options={TEXT_SIZES.map((size) => ({ value: size, label: TEXT_SIZE_LABELS[size] }))}
+          value={textSize}
+          onChange={TEXT_SIZE.choose}
+        />
         <ReadProgress />
       </div>
 
@@ -241,48 +259,6 @@ function OpenReader({
           <span className="x-c-end">{following.displayTime}</span>
         </RoutedLink>
       ) : null}
-
-      <ArmContent side="e">
-        <LibraryAction item={item} onSaved={onSaved} />
-        {item.link ? <ArmOutLink href={item.link}>Open the Original webpage</ArmOutLink> : null}
-        {item.discussionUrl ? <ArmOutLink href={item.discussionUrl}>Open the Discussion</ArmOutLink> : null}
-        {item.link ? <CopyLink link={item.link} /> : null}
-      </ArmContent>
-      <ArmContent side="s">
-        <ArmHeading>Next in the Digest</ArmHeading>
-        {next.length > 0 ? (
-          next.map((entry) => (
-            <ArmLink
-              key={entry.feedItemId}
-              href={readerPath(entry.feedItemId)}
-              onNavigate={() => onStep(entry.feedItemId)}
-            >
-              {entry.title}
-            </ArmLink>
-          ))
-        ) : (
-          <p className="x-arm-note">Nothing after this</p>
-        )}
-      </ArmContent>
-      <ArmContent side="w">
-        <ArmHeading>Text</ArmHeading>
-        <Options
-          label="Text size"
-          options={TEXT_SIZES.map((size) => ({ value: size, label: TEXT_SIZE_LABELS[size] }))}
-          value={textSize}
-          onChange={TEXT_SIZE.choose}
-        />
-        <ArmHeading>Reading Source</ArmHeading>
-        <Options
-          label="Reading Source"
-          options={READING_SOURCE_OPTIONS.map((option) => ({
-            ...option,
-            disabled: option.value === 'feed-content' ? !item.feedContent : !item.link,
-          }))}
-          value={source}
-          onChange={setChosen}
-        />
-      </ArmContent>
     </article>
   )
 }
@@ -304,45 +280,19 @@ function BackLink({ origin, onBack }: { readonly origin: Origin; onBack(origin: 
   )
 }
 
-function LibraryAction({ item, onSaved }: { readonly item: ReaderItem; onSaved(saved: boolean): void }) {
-  const [pending, start] = useTransition()
-  const report = use(ReportSaveFailure)
-  return (
-    <ArmButton
-      busy={pending}
-      onClick={() =>
-        start(async () => {
-          report(undefined)
-          try {
-            const membership = item.saved
-              ? await unsaveFromLibrary(item.feedItemId)
-              : await saveToLibrary(item.feedItemId)
-            onSaved(membership.saved)
-          } catch {
-            report(
-              item.saved
-                ? `“${item.title}” is still saved. Try once more.`
-                : `“${item.title}” couldn’t be saved. Try once more.`,
-            )
-          }
-        })
-      }
-    >
-      {item.saved ? 'Remove from Library' : 'Save to Library'}
-    </ArmButton>
-  )
-}
-
 function CopyLink({ link }: { readonly link: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <ArmButton
-      onClick={() => {
-        void navigator.clipboard?.writeText(link).then(() => setCopied(true))
-      }}
-    >
-      {copied ? 'Copied' : 'Copy link'}
-    </ArmButton>
+    <div>
+      <Button
+        className="x-grey x-link"
+        onClick={() => {
+          void navigator.clipboard?.writeText(link).then(() => setCopied(true))
+        }}
+      >
+        {copied ? 'Copied' : 'Copy link'}
+      </Button>
+    </div>
   )
 }
 

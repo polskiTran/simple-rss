@@ -27,11 +27,10 @@ export function App() {
   const navigation = useNavigation()
   const gate = useAccess()
   const chosen = useStoredChoice(INTERFACE)
-  const v2 = <V2Shell navigation={navigation} gate={gate} />
   if (chosen === 'experimental' && gate.access.kind === 'open') {
-    return <ExperimentalShell navigation={navigation} fallback={v2} />
+    return <ExperimentalShell navigation={navigation} onAccessChanged={gate.adopt} />
   }
-  return v2
+  return <V2Shell navigation={navigation} gate={gate} />
 }
 
 function V2Shell({ navigation, gate }: { readonly navigation: Navigation; readonly gate: Gate }) {

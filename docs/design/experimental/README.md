@@ -1,8 +1,8 @@
 # Experimental interface
 
 The experimental interface is chosen per device in Settings under Interface
-(ADR 0032). It draws the Digest, a Feed and the Reader View; every other screen
-is the v2 view, reached from the bloom's Go arm. `index.html` is the prototype
+(ADR 0032). It draws the Digest, Feeds, a Feed, the Library, the Reader View,
+Search results and Settings. `index.html` is the prototype
 it was ported from, opened from disk with data exported by
 `export-dev-data.mjs` into `.data/`. The stylesheet is
 `src/client/experimental/experimental.css`; this file records what it does.
@@ -16,6 +16,9 @@ it was ported from, opened from disk with data exported by
 - **Grid.** Twelve flush columns with a 12px gutter and a 12px page inset, no
   maximum width. A row is label (columns 1–2), main (3–8), side (9–10) and end
   (11–12). Below 760px every column spans the page.
+- **Controls.** Choices are words in a row, the chosen one in ink and the rest
+  grey; actions are ink words 24px apart; fields sit on the page tone. A
+  screen's options and actions are rows of its own ledger, never a menu.
 - **Surfaces.** No hairlines, borders, radii or shadows. Separation is space
   and tone: `--x-tone` under a hovered or focused row, and an unfolded fold.
 - **Colour.** OKLCH, greyscale paper and ink, warm hue 95. Colour appears only
@@ -23,19 +26,46 @@ it was ported from, opened from disk with data exported by
   `oklch(0.63 0.19 35)`, Daily `oklch(0.78 0.14 82)`, Weekly
   `oklch(0.62 0.12 150)`, Monthly `oklch(0.52 0.08 250)`, Inactive grey — with
   lightness capped at 0.62 on light paper so Daily stays legible. Saved is the
-  bloom's pink: a saved row sits on a pink wash and shows the word Saved beside
-  its time. Dark follows Appearance through `light-dark()`.
+  pink: a saved row sits on a pink wash and shows the word Saved beside its
+  time, and selected text takes the same pink. Dark follows Appearance through `light-dark()`.
+
+## Top bar
+
+One row at the top of every screen: the places (Digest, Library, Feeds) in the
+label columns, the current one in weight 500; the search line in the main
+columns; and Settings at the end. The search line's prompt names its Search
+Scope and it submits to Search results; `/` focuses it. Below 760px the
+places and Settings share the first line and the search line follows.
 
 ## Digest
 
-The ledger row names the Digest, counts its Feed Items and Subscriptions, keys
-the Rhythm colours and dates the day shown. Days follow as rows: title, Feed,
-time, with Save revealed on hover or keyboard focus. A Quiet Spell's end is a
-grey line at the top of its day. A sticky legend at the bottom names the
+The ledger is three rows: Layout, Index, Columns or Wall (kept per device);
+Firehose, Fold or Lane; and Day, the day shown, which opens a 5-week calendar
+to pick another. Above them a line appears only when there is nothing to show:
+no Feeds yet, with Add a Feed; nothing on or before the day; or the Digest
+failing to load, with Retry.
+
+In the Index layout, days follow as rows: title, Feed, time, with Save
+revealed on hover or keyboard focus. The end of a Quiet Spell, which v2 notes
+at the top of its day, is not shown. A sticky legend at the bottom names the
 columns. Show older days pages by whole days (ADR 0011).
 
-A Firehose Feed is treated one of two ways, chosen in the View arm and kept per
-device:
+The two other layouts set each day's Feed Items as cards: the Feed Item's
+image when it has one (proxied, ADR 0018; capped in height and cropped), the
+title, the Feed and time with Save, and up to four lines of summary. A saved
+card sits on the pink wash. A Firehose fold is a card too: the count, the Feed
+and span of times, and the latest title, or every title once unfolded.
+
+- **Columns.** Cards flow down up to four columns, at least 200px wide.
+- **Wall.** Cards hang from a shared bottom line on twelve columns, placed in
+  a cycle of four row patterns that starts at the day of the month, so
+  neighbouring days start on different patterns. Images are capped at 72% of the window height.
+
+Below 760px both become one column. Under Lane, the cards narrow to make room
+for the Lane as the rows do. The legend shows only for Index.
+
+A Firehose Feed is treated one of two ways, chosen in the Firehose row and kept
+per device:
 
 - **Fold** (default). Each Firehose Feed's Feed Items for the day become one
   row where its latest stands: the count, the latest title in grey, the Feed,
@@ -56,10 +86,39 @@ subscribed, and 26 weeks of Cadence as hard 9px squares, each day with items a
 button that brings that day into view. Its Feed Items follow by day without a
 Feed column.
 
+Under the Feed's name, a row of actions: Refresh now, Edit name and
+description, Unsubscribe. Edit replaces the row with a Name line and a
+Description field on the page tone; an empty line falls back to what the Feed
+reports, shown as the placeholder. Save changes stays grey until something
+changed; Escape or Cancel leaves the form. Unsubscribe adds a line saying what
+it does and a second press, which unsubscribes and returns to Feeds.
+
+## Feeds
+
+The ledger counts the Subscriptions, then Add a Feed and Import. Add a Feed is
+an address line: a pasted address is read at once, a typed one after a pause;
+a site naming several Feeds lists them to choose from; the chosen Feed shows
+its Rhythm, its last Feed Item and its newest titles above Subscribe, which
+opens the new Feed. Import an OPML file reports what it added. With no Feeds
+yet, the address line takes focus; the empty Digest's Add a Feed leads here.
+The Feeds follow grouped by Rhythm, each row the name, the site and its Feed
+Items over the last 30 days.
+
+## Library
+
+The ledger row names the Library, counts the saved Feed Items and names the
+order. Rows group by the month saved, or by Feed when ordered By Feed (chosen
+in the Order row, kept on the history entry). A row gives the title, the
+Feed in its Rhythm colour (grey with a tooltip once unsubscribed) and the day
+saved. Nothing carries the pink wash, since everything here is saved: Saved
+shows on hover or focus, and pressing it greys the row and leaves Save showing
+so the change can be undone.
+
 ## Reader View
 
 The wall label on the left: the way back, the Feed, the day and time, reading
-time, the Reading Source shown, the Discussion, Save, and how far read. The
+time; then Save, the Discussion, Open the Original webpage and Copy link; then
+the Reading Source and Text size as choices; and how far read. The
 title and body in the main columns, at most 66ch. With three or more headings,
 an outline on the right follows the reading position. Next is pinned to the
 bottom edge in the Digest's columns. Next and `j` follow the Digest's folding:
@@ -67,30 +126,33 @@ from a quiet Feed they skip the Firehose, from a Firehose Feed they stay inside
 it; `k` steps back and Escape returns. Below 760px the label wraps above the
 title and the outline is hidden.
 
-## The bloom
+## Search results
 
-The one menu: a pink shape in the bottom-right corner, opened by pressing it or
-`.`, and by `/` straight into search. Its four lobes merge through an SVG goo
-filter and grow into four arms around the centre of the screen while the page
-dims:
+The ledger quotes the search and counts what matched, then In, when the search
+has a Search Scope to leave (the scope's name or Everywhere), and Order, Best
+match or Newest (not for a search of Feeds). A Feed gone from the
+Subscriptions says so and offers Search everywhere.
 
-| Arm | Digest | Feed | Reader View |
-| --- | --- | --- | --- |
-| Go (north) | Digest, Feeds, Library, Settings, then every Feed by Rhythm | same | same |
-| Search (east) | Search line | Search line, Refresh now, Open the home page | Search line, Save to Library, Open the Original webpage, Open the Discussion, Copy link |
-| Time (south) | Days, a 5-week calendar | Cadence, a 5-week calendar | Next in the Digest |
-| View (west) | Firehose: Fold or Lane; Theme | Theme | Text size, Reading Source, Theme |
+Feeds whose names match come first, as the Feeds screen's rows. Matching Feed
+Items follow grouped by Feed, the groups in the order their best result
+ranks: the label column names the Feed in its Rhythm colour, counts its
+matches and, in a search of everything, offers Search only here, which
+narrows the search to that Feed.
+Each row gives the title and up to two lines of snippet, with matched words on
+the deeper tone, and the day and time, with Save revealed on hover or focus.
+A three-way choice of layouts (a ledger in the Digest's columns, this one, and
+a concordance aligned on the matched word) was prototyped and this one kept.
 
-Arrow keys from the core move into an arm. Below 700px the bloom opens as four
-labelled lobes; the one chosen grows into its arm while the opposite folds
-away. Under `prefers-reduced-motion` it opens and closes without motion.
+## Settings
+
+One ledger: Theme, Interface (v2 or Experimental, which switches at once),
+Timezone, Export (OPML or everything as JSON), Account (Change password, which
+opens its three lines in the row, and Sign out) and the version.
 
 ## Not built from the prototype
 
-- **Columns and Wall layouts, and the Images choice.** Only the Index layout is
-  ported; the Digest serves no image the other layouts were drawn around.
-- **Live filtering from the search line.** The line submits to the v2 Search
+- **The Images choice.** Columns and Wall always show a Feed Item's image
+  when it has one.
+- **Live filtering from the search line.** The line submits to Search
   results, which search the whole installation by Search Scope.
-- **The prototype's disabled actions** — Add a Feed, Import and Export OPML,
-  Check all Feeds, editing a Feed, Unsubscribe. They stay on the v2 Feeds and
-  Feed screens.
+- **Check all Feeds.** Only the v2 Feeds screen has it.

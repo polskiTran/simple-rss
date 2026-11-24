@@ -207,10 +207,16 @@ interface ItemSeed {
   readonly summary?: string
   readonly saved?: boolean
   readonly link?: string | null
+  readonly image?: string
+}
+
+function picture(width: number, height: number, hue: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="oklch(0.78 0.05 ${hue})"/></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
 const WORST_TODAY: readonly ItemSeed[] = [
-  { feed: 1, title: LONG_TITLE, time: '23:59', summary: LONG_SUMMARY, saved: true },
+  { feed: 1, title: LONG_TITLE, time: '23:59', summary: LONG_SUMMARY, saved: true, image: picture(1600, 900, 250) },
   {
     feed: 2,
     title:
@@ -218,9 +224,14 @@ const WORST_TODAY: readonly ItemSeed[] = [
     time: '22:10',
   },
   { feed: 3, title: 'J', time: '21:00', link: null },
-  { feed: 4, title: '分布式系统中的一致性问题：从理论到实践的完整指南（第三部分）', time: '20:45' },
-  { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30' },
-  { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00' },
+  {
+    feed: 4,
+    title: '分布式系统中的一致性问题：从理论到实践的完整指南（第三部分）',
+    time: '20:45',
+    image: picture(600, 1400, 150),
+  },
+  { feed: 5, title: 'لماذا نعيد تصميم كل شيء من الصفر؟', time: '19:30', image: picture(3000, 500, 35) },
+  { feed: 6, title: '🦊🦊🦊 Shipping notes, week 42 👩🏽‍💻', time: '18:00', image: picture(1000, 1000, 82) },
   { feed: 6, title: POST_TITLE, time: '17:45' },
   ...['17:40', '17:35', '17:30', '17:25'].map((time, index) => ({
     feed: 6,
@@ -233,6 +244,7 @@ const WORST_TODAY: readonly ItemSeed[] = [
     title: '<b>Release</b> &amp; notes — **v2.0** is out',
     time: '16:00',
     summary: '<script>alert(1)</script>',
+    image: '/api/items/0/image',
   },
   ...Array.from({ length: 1_284 }, (_, index) => ({
     feed: 2,
@@ -260,7 +272,7 @@ function digestItem(seed: ItemSeed, date: string, feeds: readonly SubscriptionSu
     link: seed.link === undefined ? `https://example.com/items/${nextItemId}` : seed.link,
     publishedAt: at,
     displayTime: seed.time,
-    imageUrl: null,
+    imageUrl: seed.image ?? null,
     summary: seed.summary ?? null,
     firstSeenAt: at,
     saved: seed.saved ?? false,

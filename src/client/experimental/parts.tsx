@@ -3,10 +3,10 @@ import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
 import { createContext, type ReactNode, use } from 'react'
 import { type CadenceObservation, type DateKey, type SubscriptionSummary, utcDayKey } from '../../shared/api.js'
-import { RHYTHMS, RHYTHM_LABELS, type Rhythm } from '../../shared/rhythm.js'
+import { type Rhythm, rhythmOf } from '../../shared/rhythm.js'
 import { RoutedLink } from '../components/routed-link.js'
 import { SaveToggle } from '../components/save-toggle.js'
-import { counted, fullDate, monthName } from '../day-names.js'
+import { counted, fullDate } from '../day-names.js'
 import { feedPath, readerPath } from '../routing.js'
 import type { OlderState } from '../use-resource.js'
 
@@ -43,18 +43,6 @@ export function LedgerRow({
   )
 }
 
-export function TierKey() {
-  return (
-    <span className="x-tier-key">
-      {RHYTHMS.filter((rhythm) => rhythm !== 'inactive').map((rhythm) => (
-        <span key={rhythm} data-rhythm={rhythm}>
-          {RHYTHM_LABELS[rhythm]}
-        </span>
-      ))}
-    </span>
-  )
-}
-
 export function FeedLink({
   feedId,
   title,
@@ -70,6 +58,24 @@ export function FeedLink({
     <RoutedLink className="x-feed" data-rhythm={rhythm} href={feedPath(feedId)} onNavigate={() => onOpen(feedId)}>
       {title}
     </RoutedLink>
+  )
+}
+
+export function FeedRow({
+  feed,
+  onOpen,
+}: {
+  readonly feed: Pick<SubscriptionSummary, 'feedId' | 'title' | 'domain' | 'cadence'>
+  onOpen(feedId: number): void
+}) {
+  return (
+    <div className="x-row">
+      <span className="x-t">
+        <FeedLink feedId={feed.feedId} title={feed.title} rhythm={rhythmOf(feed.cadence)} onOpen={onOpen} />
+      </span>
+      <span className="x-f x-grey">{feed.domain}</span>
+      <span className="x-d">{feed.cadence.reduce((sum, count) => sum + count, 0).toLocaleString('en-GB')}</span>
+    </div>
   )
 }
 
@@ -92,10 +98,18 @@ export function SaveWord({ item, onSaved }: { readonly item: ListedItem; onSaved
   )
 }
 
-export function TitleLink({ item, onOpen }: { readonly item: ListedItem; onOpen(feedItemId: number): void }) {
+export function TitleLink({
+  item,
+  onOpen,
+  children = item.title,
+}: {
+  readonly item: ListedItem
+  onOpen(feedItemId: number): void
+  readonly children?: ReactNode
+}) {
   return (
     <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpen(item.feedItemId)}>
-      {item.title}
+      {children}
     </RoutedLink>
   )
 }
@@ -125,14 +139,16 @@ export function ItemRow({
   )
 }
 
-export function OlderDays({
+export function OlderDays<Cursor extends string>({
   nextFrom,
   older,
+  noun = 'days',
   onMore,
 }: {
-  readonly nextFrom: DateKey | null
+  readonly nextFrom: Cursor | null
   readonly older: OlderState
-  onMore(from: DateKey): void
+  readonly noun?: string
+  onMore(from: Cursor): void
 }) {
   if (nextFrom === null) return null
   return (
@@ -145,12 +161,16 @@ export function OlderDays({
           aria-busy={older === 'loading'}
           onClick={() => onMore(nextFrom)}
         >
-          {older === 'loading' ? 'Loading older days' : older === 'failed' ? 'Retry older days' : 'Show older days'}
+          {older === 'loading'
+            ? `Loading older ${noun}`
+            : older === 'failed'
+              ? `Retry older ${noun}`
+              : `Show older ${noun}`}
         </Button>
         {older === 'failed' ? (
           <span className="x-grey" role="status">
             {' '}
-            Older days are out of reach.
+            Older {noun} are out of reach.
           </span>
         ) : null}
       </div>
@@ -168,7 +188,7 @@ export function Options<const Value extends string>({
   label,
   options,
   value,
-  className = 'x-options',
+  className,
   onChange,
 }: {
   readonly label: string
@@ -179,7 +199,7 @@ export function Options<const Value extends string>({
 }) {
   return (
     <ToggleGroup
-      className={className}
+      className={className ? `x-words ${className}` : 'x-words'}
       aria-label={label}
       value={[value]}
       onValueChange={(chosen) => {
@@ -195,68 +215,10 @@ export function Options<const Value extends string>({
           disabled={option.disabled ?? false}
           aria-disabled={option.disabled ? true : undefined}
         >
-          <i className="x-mark" />
           {option.label}
         </Toggle>
       ))}
     </ToggleGroup>
-  )
-}
-
-export function ArmHeading({ children, end }: { readonly children: ReactNode; readonly end?: ReactNode }) {
-  return (
-    <h2 className="x-arm-heading">
-      {children}
-      {end === undefined ? null : <span className="x-arm-heading-end">{end}</span>}
-    </h2>
-  )
-}
-
-export function ArmLink({
-  href,
-  current = false,
-  end,
-  onNavigate,
-  children,
-}: {
-  readonly href: string
-  readonly current?: boolean
-  readonly end?: ReactNode
-  onNavigate(): void
-  readonly children: ReactNode
-}) {
-  return (
-    <RoutedLink className="x-opt" href={href} aria-current={current ? 'page' : undefined} onNavigate={onNavigate}>
-      <i className="x-mark" />
-      <span className="x-opt-label">{children}</span>
-      {end === undefined ? null : <span className="x-opt-end">{end}</span>}
-    </RoutedLink>
-  )
-}
-
-export function ArmButton({
-  busy = false,
-  onClick,
-  children,
-}: {
-  readonly busy?: boolean
-  onClick(): void
-  readonly children: ReactNode
-}) {
-  return (
-    <Button className="x-opt" focusableWhenDisabled disabled={busy} aria-busy={busy} onClick={onClick}>
-      <i className="x-mark" />
-      <span className="x-opt-label">{children}</span>
-    </Button>
-  )
-}
-
-export function ArmOutLink({ href, children }: { readonly href: string; readonly children: ReactNode }) {
-  return (
-    <a className="x-opt" href={href} target="_blank" rel="noopener noreferrer">
-      <i className="x-mark" />
-      <span className="x-opt-label">{children}</span>
-    </a>
   )
 }
 
@@ -265,13 +227,13 @@ const CALENDAR_DAYS = 35
 const DAY_MS = 86_400_000
 
 export function DayCalendar({
-  heading,
+  label,
   today,
   days,
   current,
   onPick,
 }: {
-  readonly heading: string
+  readonly label: string
   readonly today: DateKey
   readonly days: readonly CadenceObservation[]
   readonly current?: DateKey | undefined
@@ -284,35 +246,32 @@ export function DayCalendar({
   const first = noon - (weekday + 28) * DAY_MS
   const cells = Array.from({ length: CALENDAR_DAYS }, (_, index) => utcDayKey(first + index * DAY_MS))
   return (
-    <div className="x-calendar">
-      <ArmHeading end={monthName(today.slice(0, 7), today)}>{heading}</ArmHeading>
-      <div className="x-calendar-grid" role="group" aria-label={heading}>
-        {WEEKDAYS.map((day) => (
-          <span key={day} aria-hidden="true">
-            {day.charAt(0)}
-          </span>
-        ))}
-        {cells.map((date) => {
-          if (date > today) return <span key={date} aria-hidden="true" />
-          const count = counts.get(date) ?? 0
-          const label = `${counted(count, 'Feed Item')} on ${fullDate(date)}`
-          return (
-            <button
-              key={date}
-              type="button"
-              disabled={count === 0}
-              data-today={date === today ? '' : undefined}
-              aria-current={date === current ? 'date' : undefined}
-              aria-label={label}
-              title={label}
-              style={count > 0 ? { '--strength': `${Math.round(35 + (65 * count) / peak)}%` } : undefined}
-              onClick={() => onPick(date)}
-            >
-              {Number(date.slice(8))}
-            </button>
-          )
-        })}
-      </div>
+    <div className="x-calendar" role="group" aria-label={label}>
+      {WEEKDAYS.map((day) => (
+        <span key={day} aria-hidden="true">
+          {day.charAt(0)}
+        </span>
+      ))}
+      {cells.map((date) => {
+        if (date > today) return <span key={date} aria-hidden="true" />
+        const count = counts.get(date) ?? 0
+        const described = `${counted(count, 'Feed Item')} on ${fullDate(date)}`
+        return (
+          <button
+            key={date}
+            type="button"
+            disabled={count === 0}
+            data-today={date === today ? '' : undefined}
+            aria-current={date === current ? 'date' : undefined}
+            aria-label={described}
+            title={described}
+            style={count > 0 ? { '--strength': `${Math.round(35 + (65 * count) / peak)}%` } : undefined}
+            onClick={() => onPick(date)}
+          >
+            {Number(date.slice(8))}
+          </button>
+        )
+      })}
     </div>
   )
 }

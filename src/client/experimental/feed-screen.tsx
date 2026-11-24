@@ -1,11 +1,13 @@
 import { Button } from '@base-ui/react/button'
-import { use, useEffect, useState, useTransition } from 'react'
+import { useEffect, useId, useState, useTransition } from 'react'
 import {
   CADENCE_STRIP_DAYS,
   type DateKey,
   type DigestStart,
   type FeedAvailability,
   type FeedDetail,
+  MAX_FEED_DESCRIPTION_LENGTH,
+  MAX_FEED_TITLE_LENGTH,
   POLLING_INTERVAL_MINUTES,
   type PollingIntervalMinutes,
   type ReadingSource,
@@ -17,6 +19,8 @@ import {
   fetchFeedDetail,
   fetchFeedItems,
   refreshFeed,
+  unsubscribeFromFeed,
+  updateFeedDetails,
   updatePollingInterval,
   updateReadingSource,
 } from '../api.js'
@@ -27,15 +31,16 @@ import { READING_SOURCE_OPTIONS } from '../reading-source.js'
 import { usePagedResource, useResource, valueInView } from '../use-resource.js'
 import { unavailableNote, retryFailure } from '../views/feed-language.js'
 import { ago, INTERVALS } from '../views/feed-view.js'
-import { ArmContent, BloomState } from './bloom.js'
-import { ArmButton, ArmOutLink, DayCalendar, ItemRow, LedgerRow, OlderDays, Options } from './parts.js'
+import { ItemRow, LedgerRow, OlderDays, Options } from './parts.js'
 
 interface FeedScreenProps {
   readonly feedId: number
   onOpenItem(feedItemId: number, feedTitle: string): void
+  onRenamed(): void
+  onUnsubscribed(): void
 }
 
-export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
+export function FeedScreen({ feedId, onOpenItem, onRenamed, onUnsubscribed }: FeedScreenProps) {
   const [state, { retry, set }] = useResource(String(feedId), (signal) => fetchFeedDetail(feedId, signal), {
     dropOnNewKey: true,
   })
@@ -52,7 +57,9 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
   const [refreshing, startRefresh] = useTransition()
   const [changing, startChange] = useTransition()
   const [wanted, setWanted] = useState<DateKey>()
-  const { close } = use(BloomState)
+  const [editing, setEditing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [unsubscribing, startUnsubscribing] = useTransition()
 
   useEffect(() => {
     if (wanted === undefined || pages.older === 'loading' || pages.older === 'failed') return
@@ -88,7 +95,6 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
   }
 
   const showDay = (date: DateKey) => {
-    close()
     if (document.getElementById(dayAnchor(date)) || !items?.nextFrom) {
       document.getElementById(dayAnchor(date))?.scrollIntoView({ block: 'start' })
       return
@@ -125,6 +131,19 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
     })
   }
 
+  const unsubscribe = () => {
+    if (unsubscribing) return
+    startUnsubscribing(async () => {
+      try {
+        await unsubscribeFromFeed(feedId)
+        onUnsubscribed()
+      } catch {
+        setConfirming(false)
+        setNotice('The Feed couldn’t be unsubscribed.')
+      }
+    })
+  }
+
   const recent = detail.cadence.slice(-CADENCE_STRIP_DAYS).map(({ count }) => count)
   const rhythm = rhythmOf(recent)
   const grid = cadenceGrid(detail.cadence)
@@ -144,6 +163,50 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
         >
           <h1 className="x-heading x-tinted">{detail.title}</h1>
         </LedgerRow>
+        {editing ? (
+          <DetailsForm
+            detail={detail}
+            onSaved={(details) => {
+              set((current) => ({ ...current, ...details }))
+              onRenamed()
+            }}
+            onDone={() => setEditing(false)}
+          />
+        ) : (
+          <LedgerRow label="">
+            <span className="x-actions">
+              <Button
+                className="x-more"
+                focusableWhenDisabled
+                disabled={refreshing}
+                aria-busy={refreshing}
+                onClick={refresh}
+              >
+                {refreshing ? 'Refreshing' : 'Refresh now'}
+              </Button>
+              <Button className="x-more" onClick={() => setEditing(true)}>
+                Edit name and description
+              </Button>
+              <Button className="x-more" aria-expanded={confirming} onClick={() => setConfirming((shown) => !shown)}>
+                Unsubscribe
+              </Button>
+            </span>
+            {confirming ? (
+              <p>
+                <span className="x-grey">Its Feed Items leave the Digest. Saved ones stay in the Library.</span>{' '}
+                <Button
+                  className="x-more"
+                  focusableWhenDisabled
+                  disabled={unsubscribing}
+                  aria-busy={unsubscribing}
+                  onClick={unsubscribe}
+                >
+                  {unsubscribing ? 'Unsubscribing' : `Unsubscribe from ${detail.title}`}
+                </Button>
+              </p>
+            ) : null}
+          </LedgerRow>
+        )}
         {detail.homePageUrl ? (
           <LedgerRow label="Home page">
             <a className="x-link" href={detail.homePageUrl} target="_blank" rel="noopener noreferrer">
@@ -151,7 +214,7 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
             </a>
           </LedgerRow>
         ) : null}
-        {detail.description ? <LedgerRow label="Description">{detail.description}</LedgerRow> : null}
+        {detail.description && !editing ? <LedgerRow label="Description">{detail.description}</LedgerRow> : null}
         <LedgerRow
           label="Rhythm"
           end={`${counted(
@@ -165,7 +228,6 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
         <LedgerRow label="Polling interval">
           <Options
             label="Polling interval"
-            className="x-words"
             options={POLLING_INTERVAL_MINUTES.map((minutes) => ({ value: String(minutes), label: INTERVALS[minutes] }))}
             value={String(detail.schedule.pollingIntervalMinutes)}
             onChange={(chosen) => {
@@ -177,7 +239,6 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
         <LedgerRow label="Reading Source">
           <Options
             label="Reading Source"
-            className="x-words"
             options={READING_SOURCE_OPTIONS}
             value={detail.readingSource}
             onChange={(source: ReadingSource) =>
@@ -255,18 +316,96 @@ export function FeedScreen({ feedId, onOpenItem }: FeedScreenProps) {
         <span className="x-legend-title">Title</span>
         <span className="x-legend-time">Time</span>
       </div>
-
-      <ArmContent side="e">
-        <ArmButton busy={refreshing} onClick={refresh}>
-          {refreshing ? 'Refreshing' : 'Refresh now'}
-        </ArmButton>
-        {detail.homePageUrl ? <ArmOutLink href={detail.homePageUrl}>Open the home page</ArmOutLink> : null}
-      </ArmContent>
-      <ArmContent side="s">
-        <DayCalendar heading="Cadence" today={today} days={detail.cadence} onPick={showDay} />
-      </ArmContent>
     </div>
   )
+}
+
+function DetailsForm({
+  detail,
+  onSaved,
+  onDone,
+}: {
+  readonly detail: FeedDetail
+  onSaved(details: Partial<FeedDetail>): void
+  onDone(): void
+}) {
+  const id = useId()
+  const [title, setTitle] = useState(detail.customTitle ?? '')
+  const [description, setDescription] = useState(detail.customDescription ?? '')
+  const [saving, startSaving] = useTransition()
+  const [failure, setFailure] = useState('')
+  const changed = overrideOf(title) !== detail.customTitle || overrideOf(description) !== detail.customDescription
+
+  const save = () => {
+    if (saving) return
+    setFailure('')
+    startSaving(async () => {
+      try {
+        onSaved(
+          await updateFeedDetails(detail.feedId, {
+            customTitle: overrideOf(title),
+            customDescription: overrideOf(description),
+          }),
+        )
+        onDone()
+      } catch {
+        setFailure('The changes couldn’t be saved.')
+      }
+    })
+  }
+
+  return (
+    <form
+      aria-label="Edit name and description"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (changed) save()
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !saving) onDone()
+      }}
+    >
+      <LedgerRow label={<label htmlFor={`${id}-name`}>Name</label>}>
+        <input
+          id={`${id}-name`}
+          className="x-field"
+          value={title}
+          placeholder={detail.reportedTitle}
+          maxLength={MAX_FEED_TITLE_LENGTH}
+          autoComplete="off"
+          // biome-ignore lint/a11y/noAutofocus: the form appears because Edit was chosen, and its first field is the place to type.
+          autoFocus
+          onChange={(event) => setTitle(event.target.value)}
+        />
+      </LedgerRow>
+      <LedgerRow label={<label htmlFor={`${id}-description`}>Description</label>}>
+        <textarea
+          id={`${id}-description`}
+          className="x-field"
+          rows={3}
+          value={description}
+          placeholder={detail.reportedDescription ?? undefined}
+          maxLength={MAX_FEED_DESCRIPTION_LENGTH}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </LedgerRow>
+      <LedgerRow label="">
+        <Button className="x-more" type="submit" focusableWhenDisabled disabled={!changed || saving} aria-busy={saving}>
+          {saving ? 'Saving' : 'Save changes'}
+        </Button>
+        {'\u2003'}
+        <Button className="x-more" disabled={saving} onClick={onDone}>
+          Cancel
+        </Button>
+        <span role="status"> {failure}</span>
+      </LedgerRow>
+    </form>
+  )
+}
+
+function overrideOf(draft: string): string | null {
+  const trimmed = draft.trim()
+  return trimmed === '' ? null : trimmed
 }
 
 function availabilityOf(availability: FeedAvailability): string {

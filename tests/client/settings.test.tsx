@@ -151,12 +151,12 @@ describe('the Settings interface', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Experimental' }))
 
-    expect(await screen.findByRole('button', { name: 'Open the menu' })).toBeDefined()
+    expect(await screen.findByRole('navigation', { name: 'Places' })).toBeDefined()
     expect(localStorage.getItem('interface')).toBe('experimental')
 
     await user.click(screen.getByRole('button', { name: 'v2' }))
 
-    expect(screen.queryByRole('button', { name: 'Open the menu' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Places' })).toBeNull()
     expect(localStorage.getItem('interface')).toBeNull()
     expect(api.requests.filter(({ method }) => method !== 'GET')).toEqual([])
   })

@@ -9,8 +9,8 @@ comes from Base UI (ADR 0008); why this system replaced the first one is ADR
 The project is young and this document moves with it: it records what the
 stylesheet does today, and a change that improves the product changes it.
 
-Settings also offers an experimental interface, per device, for the Digest, a
-Feed and the Reader View. It keeps its own system, described in
+Settings also offers an experimental interface, per device, for every screen
+past sign-in. It keeps its own system, described in
 `docs/design/experimental/README.md` (ADR 0032); everything here is v2.
 
 ## 1. Principles
