@@ -5,7 +5,7 @@ import { ApiError, claimInstallation, signIn } from '../api.js'
 import { useScreenTitle } from '../arrival.js'
 import type { Gate } from '../authentication.js'
 import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../password-failure.js'
-import { LedgerRow } from './parts.js'
+import { LedgerRow } from '../components/ledger.js'
 
 export function GateScreen({ gate }: { readonly gate: Gate }) {
   return (
@@ -55,7 +55,7 @@ function Unanswered({ kind, onRetry }: { readonly kind: 'unreachable' | 'unavail
       </LedgerRow>
       <LedgerRow label="">
         <Button
-          className="x-more"
+          className="x-action"
           focusableWhenDisabled
           disabled={retrying}
           aria-busy={retrying}
@@ -241,7 +241,7 @@ function GateField({
           aria-describedby={reason ? `${id}-reason` : undefined}
           onChange={(event) => onChange(event.target.value)}
         />
-        <Button className="x-more x-grey" onClick={() => setRevealed((shown) => !shown)}>
+        <Button className="x-action x-grey" onClick={() => setRevealed((shown) => !shown)}>
           {revealed ? 'Hide' : 'Show'}
           <span className="visually-hidden"> {label.toLowerCase()}</span>
         </Button>
@@ -266,7 +266,7 @@ function Submit({
 }) {
   return (
     <LedgerRow label="">
-      <Button className="x-more" type="submit" focusableWhenDisabled disabled={busy} aria-busy={busy}>
+      <Button className="x-action" type="submit" focusableWhenDisabled disabled={busy} aria-busy={busy}>
         {children}
       </Button>
       <p role="status">{note}</p>

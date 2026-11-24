@@ -21,7 +21,7 @@ import { storedChoice, useStoredChoice } from '../stored-choice.js'
 import { useResource, valueInView } from '../use-resource.js'
 import { articleFailure, fetchArticleThroughDeadlines, STAGE_NOTES } from '../reader-article.js'
 import { queueAround } from './firehose.js'
-import { BackLink, FeedLink, LoadFailure, Options, useRhythmOf } from './parts.js'
+import { BackLink, FeedLink, LoadFailure, Options, useRhythmOf } from '../components/ledger.js'
 
 const loadArticleMarkdown = () => import('../components/article-markdown.js')
 const ArticleMarkdown = lazy(async () => ({
@@ -55,7 +55,7 @@ export function ReaderScreen({ feedItemId, origin, onBack, onStep, onOpenFeed }:
 
   if (state.kind !== 'loaded') {
     return (
-      <div className="x-screen x-reader x-grid">
+      <div className="x-reader x-grid">
         <div className="x-reader-label">
           <div>
             <div>
@@ -154,7 +154,7 @@ function OpenReader({
 
   const time = queue?.reading.displayTime
   return (
-    <article className="x-screen x-reader x-grid" data-text={textSize}>
+    <article className="x-reader x-grid" data-text={textSize}>
       <div className="x-reader-label">
         <BackLink origin={origin} onBack={onBack} />
         <div>
@@ -218,7 +218,7 @@ function OpenReader({
 
       <div className="x-reader-main">
         <h1 className="x-reader-title">{item.title}</h1>
-        <div ref={setArticle} className="x-prose">
+        <div ref={setArticle}>
           {shown ? (
             <Suspense fallback={null}>
               <ArticleMarkdown key={shown.source} markdown={shown.content.markdown} />
@@ -234,7 +234,7 @@ function OpenReader({
           item.link ? (
             <p className="x-reader-failed" role="status">
               {articleFailure(sourceState.error)}{' '}
-              <Button className="x-more" onClick={retrySource}>
+              <Button className="x-action" onClick={retrySource}>
                 Retry
               </Button>{' '}
               <a className="x-link" href={item.link} target="_blank" rel="noopener noreferrer">

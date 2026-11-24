@@ -6,7 +6,16 @@ import { fetchLibrary } from '../api.js'
 import { counted, monthName, relativeDay, shortDate } from '../day-names.js'
 import { useKept } from '../routing.js'
 import { usePagedResource, valueInView } from '../use-resource.js'
-import { FeedLink, LedgerRow, LoadFailure, OlderDays, Options, SaveWord, TitleLink, useRhythmOf } from './parts.js'
+import {
+  FeedLink,
+  LedgerRow,
+  LoadFailure,
+  OlderDays,
+  Options,
+  SaveWord,
+  TitleLink,
+  useRhythmOf,
+} from '../components/ledger.js'
 
 const ORDERS = [
   { value: 'newest', label: 'Newest saved' },
@@ -68,7 +77,7 @@ export function LibraryScreen({ onOpenItem, onOpenFeed }: LibraryScreenProps) {
     : []
 
   return (
-    <div className="x-screen x-library">
+    <div className="x-library">
       <header className="x-ledger">
         <LedgerRow label={<h1 className="visually-hidden">Library</h1>}>
           {library ? (

@@ -6,4 +6,4 @@ A screen reads the server through `use-resource.ts` `useResource`, which reads a
 
 Saving to the Library shows before the server answers. `components/save-toggle.tsx` `SaveToggle` shows the new state on the press through `useOptimistic`; a failure returns it to the state it had and reports through the App's save failure line (`docs/DESIGN.md` §5 Notices), since a row or toolbar has no room for a sentence and the toggle may have left the screen by the time the failure arrives.
 
-**Amended by ADR 0033.** The gate's screen is `screens/gate-screens.tsx` `Unanswered`, and every screen's failure line is `screens/parts.tsx` `LoadFailure`: "can't be reached" or "didn't load", with Retry. Add a Feed on the Feeds screen applies the same rule to blame through `feed-language.ts` `addFailure`.
+**Amended by ADR 0033.** The gate's screen is `screens/gate-screens.tsx` `Unanswered`, and every screen's failure line is `components/ledger.tsx` `LoadFailure`: "can't be reached" or "didn't load", with Retry. Add a Feed on the Feeds screen applies the same rule to blame through `feed-language.ts` `addFailure`.

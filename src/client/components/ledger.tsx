@@ -1,11 +1,11 @@
 import { Button } from '@base-ui/react/button'
 import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
-import { createContext, type ReactNode, use } from 'react'
+import { type ComponentProps, createContext, type ReactNode, use } from 'react'
 import { type CadenceObservation, type DateKey, type SubscriptionSummary, utcDayKey } from '../../shared/api.js'
 import { type Rhythm, rhythmOf } from '../../shared/rhythm.js'
-import { RoutedLink } from '../components/routed-link.js'
-import { SaveToggle } from '../components/save-toggle.js'
+import { RoutedLink } from './routed-link.js'
+import { SaveToggle } from './save-toggle.js'
 import { counted, fullDate } from '../day-names.js'
 import { feedPath, type Origin, readerPath } from '../routing.js'
 import type { OlderState } from '../use-resource.js'
@@ -40,6 +40,19 @@ export function LedgerRow({
       {side === undefined ? null : <div className="x-c-side">{side}</div>}
       {end === undefined ? null : <div className="x-c-end">{end}</div>}
     </div>
+  )
+}
+
+export function Notice({
+  grey = false,
+  className,
+  children,
+  ...line
+}: ComponentProps<'p'> & { readonly grey?: boolean }) {
+  return (
+    <p {...line} className={className ? `x-grid x-notice ${className}` : 'x-grid x-notice'}>
+      <span className={grey ? 'x-c-main x-grey' : 'x-c-main'}>{children}</span>
+    </p>
   )
 }
 
@@ -158,7 +171,7 @@ export function OlderDays<Cursor extends string>({
     <div className="x-grid x-older">
       <div className="x-c-main">
         <Button
-          className="x-more"
+          className="x-action"
           focusableWhenDisabled
           disabled={older === 'loading'}
           aria-busy={older === 'loading'}
@@ -201,7 +214,7 @@ export function LoadFailure({
   return (
     <>
       {subject} {kind === 'unreachable' ? 'can’t be reached.' : 'didn’t load.'}{' '}
-      <Button className="x-more" onClick={onRetry}>
+      <Button className="x-action" onClick={onRetry}>
         Retry
       </Button>
     </>

@@ -38,7 +38,7 @@ import {
   TitleLink,
   useRhythmOf,
   LoadFailure,
-} from './parts.js'
+} from '../components/ledger.js'
 
 interface DigestScreenProps {
   readonly start: DigestStart
@@ -101,7 +101,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
     days?.subscriptions === 0 ? (
       <>
         No Feeds yet.{' '}
-        <RoutedLink className="x-more" href={sectionPath('feeds')} onNavigate={onAddFeed}>
+        <RoutedLink className="x-action" href={sectionPath('feeds')} onNavigate={onAddFeed}>
           Add a Feed
         </RoutedLink>
       </>
@@ -118,7 +118,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
     )
 
   return (
-    <div className="x-screen">
+    <div>
       <header className="x-ledger">
         <h1 className="visually-hidden">Digest</h1>
         {notice ? <LedgerRow label="">{notice}</LedgerRow> : null}
@@ -143,7 +143,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
         </LedgerRow>
         {today ? (
           <LedgerRow label="Day">
-            <Button className="x-more" aria-expanded={picking} onClick={() => setPicking((shown) => !shown)}>
+            <Button className="x-action" aria-expanded={picking} onClick={() => setPicking((shown) => !shown)}>
               {longDay(start.from ?? today)}
             </Button>
             {picking && days ? (
@@ -267,7 +267,7 @@ function Fold({
       <div className="x-row x-fold-head">
         <span className="x-t">
           <Button
-            className="x-more"
+            className="x-action"
             aria-expanded={open}
             aria-label={`${open ? `Fold ${count}` : count} from ${latest.feedTitle}`}
             onClick={() => void toggle()}

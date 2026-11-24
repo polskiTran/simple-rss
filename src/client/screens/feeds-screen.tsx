@@ -7,7 +7,7 @@ import { useScreenTitle } from '../arrival.js'
 import { counted } from '../day-names.js'
 import { retryFailure, unavailableNote } from '../feed-language.js'
 import { AddFeedRows } from './add-feed.js'
-import { FeedRow, LedgerRow, SubscriptionsContext } from './parts.js'
+import { FeedRow, LedgerRow, Notice, SubscriptionsContext } from '../components/ledger.js'
 
 const POLL_INTERVAL_MS = 2_000
 const POLL_ROUNDS = 30
@@ -56,7 +56,7 @@ export function FeedsScreen({
   })
 
   return (
-    <div className="x-screen">
+    <div>
       <header className="x-ledger">
         <LedgerRow label={<h1 className="visually-hidden">Feeds</h1>}>
           {list === undefined ? (
@@ -75,9 +75,7 @@ export function FeedsScreen({
             onReload()
           }}
         />
-        <p className="x-grid x-notice" aria-live="polite">
-          <span className="x-c-main">{notice}</span>
-        </p>
+        <Notice aria-live="polite">{notice}</Notice>
       </header>
 
       {tiers.map(({ rhythm, members }) => (
@@ -122,7 +120,7 @@ function Availability({
     <span className="x-feed-status">
       <span className="x-grey">{unavailableNote(availability)}</span>{' '}
       <Button
-        className="x-more"
+        className="x-action"
         focusableWhenDisabled
         disabled={retrying}
         aria-busy={retrying}

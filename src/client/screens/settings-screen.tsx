@@ -8,7 +8,7 @@ import { useResource } from '../use-resource.js'
 import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../password-failure.js'
 import { timezoneFailure, timezoneOptions } from '../timezone.js'
 import { VersionNote } from '../components/version-note.js'
-import { LedgerRow, LoadFailure, Options } from './parts.js'
+import { LedgerRow, LoadFailure, Options } from '../components/ledger.js'
 
 const APPEARANCE_LABELS = { system: 'System', light: 'Light', dark: 'Dark' } as const satisfies Record<
   Appearance,
@@ -36,7 +36,7 @@ export function SettingsScreen({ onAccessChanged }: { onAccessChanged(status: Au
   }
 
   return (
-    <div className="x-screen">
+    <div>
       <header className="x-ledger">
         <h1 className="visually-hidden">Settings</h1>
         <LedgerRow label="Theme">
@@ -53,20 +53,20 @@ export function SettingsScreen({ onAccessChanged }: { onAccessChanged(status: Au
         <Timezone />
         <LedgerRow label="Export">
           <span className="x-actions">
-            <a className="x-more" href="/api/subscriptions/export" download="subscriptions.opml">
+            <a className="x-action" href="/api/subscriptions/export" download="subscriptions.opml">
               OPML
             </a>
-            <a className="x-more" href="/api/export" download="simple-rss-export.json">
+            <a className="x-action" href="/api/export" download="simple-rss-export.json">
               Everything
             </a>
           </span>
         </LedgerRow>
         <LedgerRow label="Account">
           <span className="x-actions">
-            <Button className="x-more" aria-expanded={changing} onClick={() => setChanging((shown) => !shown)}>
+            <Button className="x-action" aria-expanded={changing} onClick={() => setChanging((shown) => !shown)}>
               Change password
             </Button>
-            <Button className="x-more" focusableWhenDisabled disabled={leaving} aria-busy={leaving} onClick={leave}>
+            <Button className="x-action" focusableWhenDisabled disabled={leaving} aria-busy={leaving} onClick={leave}>
               {leaving ? 'Signing out' : 'Sign out'}
             </Button>
           </span>
@@ -201,7 +201,7 @@ function PasswordForm({ onChanged }: { onChanged(status: AuthStatus): void }) {
       {field('confirmation', 'Confirm new password', 'new-password')}
       <p role="status">{noteOf(feedback)}</p>
       <Button
-        className="x-more"
+        className="x-action"
         type="submit"
         focusableWhenDisabled
         disabled={!ready || saving}

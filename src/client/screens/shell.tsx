@@ -22,7 +22,7 @@ import { DigestScreen } from './digest-screen.js'
 import { FeedScreen } from './feed-screen.js'
 import { FeedsScreen } from './feeds-screen.js'
 import { LibraryScreen } from './library-screen.js'
-import { SubscriptionsContext } from './parts.js'
+import { Notice, SubscriptionsContext } from '../components/ledger.js'
 import { ReaderScreen } from './reader-screen.js'
 import { SearchScreen } from './search-screen.js'
 import { SettingsScreen } from './settings-screen.js'
@@ -54,14 +54,12 @@ export function Shell({ navigation, onAccessChanged }: ShellProps) {
           <TopBar navigation={navigation} />
           <main ref={page}>
             {saveFailure ? (
-              <p className="x-grid x-notice x-save-failure" role="status">
-                <span className="x-c-main">
-                  {saveFailure}{' '}
-                  <button type="button" className="x-more" onClick={() => setSaveFailure(undefined)}>
-                    Dismiss
-                  </button>
-                </span>
-              </p>
+              <Notice className="x-save-failure" role="status">
+                {saveFailure}{' '}
+                <button type="button" className="x-action" onClick={() => setSaveFailure(undefined)}>
+                  Dismiss
+                </button>
+              </Notice>
             ) : null}
             {screen}
           </main>

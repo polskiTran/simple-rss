@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
@@ -92,6 +92,23 @@ describe('contrast', () => {
   })
 })
 
+describe('scale', () => {
+  it('spaces and sets type only through the tokens', () => {
+    const scaled = [
+      'padding[\\w-]*',
+      'margin[\\w-]*',
+      '(?:row-|column-)?gap',
+      'inset',
+      'font-size',
+      'line-height',
+      'font',
+    ]
+    for (const property of scaled) {
+      for (const value of declarations(property)) expect(value, property).not.toMatch(/\d+px/)
+    }
+  })
+})
+
 describe('shape', () => {
   it('has no rounded corners', () => {
     for (const value of declarations('border-radius')) expect(value).toBe('0')
@@ -151,5 +168,26 @@ describe('type', () => {
     const uses = [...code.matchAll(/font-family:[^;]*monospace/g)]
     expect(uses.length).toBeGreaterThan(0)
     for (const use of uses) expect(enclosing(code, use.index).join(' ')).toMatch(/article-body/)
+  })
+})
+
+describe('classes', () => {
+  it('styles every x- class the client writes, apart from the test hooks', async () => {
+    const testHooks = new Set(['x-back'])
+    const root = resolve(process.cwd(), 'src/client')
+    const sources = (await readdir(root, { recursive: true })).filter((file) => /\.tsx?$/.test(file))
+    const written = new Set<string>()
+    for (const file of sources) {
+      for (const [name] of (await readFile(resolve(root, file), 'utf8')).matchAll(
+        /(?<=[\s'"`])x-[a-z][\w-]*(?![\w$-])/g,
+      )) {
+        written.add(name)
+      }
+    }
+    expect(written.size).toBeGreaterThan(0)
+    const unstyled = [...written].filter(
+      (name) => !testHooks.has(name) && !new RegExp(`\\.${name}(?![\\w-])`).test(css),
+    )
+    expect(unstyled).toEqual([])
   })
 })

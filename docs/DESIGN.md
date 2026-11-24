@@ -1,7 +1,8 @@
 # Design
 
 The client's interface is one ledger on a twelve-column grid (ADR 0033). This
-file records what its stylesheet, `src/client/screens/screens.css`, does;
+file records what its stylesheet, `src/client/screens/screens.css`, does, and
+the screens assemble it from the parts in `src/client/components/ledger.tsx`;
 `src/client/styles.css` adds only the fonts, the Tailwind base Streamdown's
 code blocks need, and the Appearance switch. The screens were ported from the
 prototype at `docs/design/prototype/index.html`, opened from disk with data
@@ -19,8 +20,11 @@ change that improves the product changes both.
 - **Grid.** Twelve flush columns with a 12px gutter and a 12px page inset, no
   maximum width. A row is label (columns 1–2), main (3–8), side (9–10) and end
   (11–12). Below 760px every column spans the page.
+- **Space.** Every gap is a step of the 12px unit: a quarter (3px), a half
+  (6px), three quarters (9px) or whole units. A toned surface, whether a row,
+  a fold, a field or a Lane card, bleeds half a unit past its text on each side.
 - **Controls.** Choices are words in a row, the chosen one in ink and the rest
-  grey; actions are ink words 24px apart; fields sit on the page tone. A
+  grey; actions are ink words (`x-action`) 24px apart; fields sit on the page tone. A
   screen's options and actions are rows of its own ledger, never a menu.
 - **Surfaces.** No hairlines, borders, radii or shadows. Separation is space
   and tone: `--x-tone` under a hovered or focused row, and an unfolded fold.

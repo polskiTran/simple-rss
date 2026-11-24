@@ -5,7 +5,7 @@ import { RHYTHM_LABELS, rhythmOf } from '../../shared/rhythm.js'
 import { importOpml } from '../api.js'
 import { ago, counted } from '../day-names.js'
 import { importFailure, useFeedLookup } from '../feed-lookup.js'
-import { LedgerRow, Options } from './parts.js'
+import { LedgerRow, Options } from '../components/ledger.js'
 
 const PREVIEW_TITLES = 4
 
@@ -68,7 +68,7 @@ export function AddFeedRows({
           {lookup.kind === 'reading' ? <p className="x-grey">Reading {lookup.host}</p> : null}
           {adding.refusal ? <p>{adding.refusal}</p> : null}
           {failure?.retry ? (
-            <Button className="x-more" onClick={adding.proceed}>
+            <Button className="x-action" onClick={adding.proceed}>
               Retry
             </Button>
           ) : null}
@@ -88,7 +88,7 @@ export function AddFeedRows({
               ) : null}
               <Preview feed={answer.chosen} named={answer.feeds.length === 1} />
               <Button
-                className="x-more"
+                className="x-action"
                 focusableWhenDisabled
                 disabled={adding.subscribing || answer.chosen.subscribed}
                 aria-busy={adding.subscribing}
@@ -105,7 +105,7 @@ export function AddFeedRows({
         </div>
       </LedgerRow>
       <LedgerRow label="Import">
-        <label className="x-more x-file" aria-busy={importing}>
+        <label className="x-action x-file" aria-busy={importing}>
           {importing ? 'Importing' : 'Import an OPML file'}
           <input
             className="visually-hidden"

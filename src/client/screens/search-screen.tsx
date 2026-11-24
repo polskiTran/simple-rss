@@ -14,7 +14,16 @@ import { withSaved } from '../components/save-toggle.js'
 import { counted, dayAndTime } from '../day-names.js'
 import { SEARCH_SCOPE_COPY } from '../search-scope.js'
 import { useResource, valueInView } from '../use-resource.js'
-import { FeedLink, FeedRow, LedgerRow, LoadFailure, Options, SaveWord, TitleLink, useRhythmOf } from './parts.js'
+import {
+  FeedLink,
+  FeedRow,
+  LedgerRow,
+  LoadFailure,
+  Options,
+  SaveWord,
+  TitleLink,
+  useRhythmOf,
+} from '../components/ledger.js'
 
 const SCOPE_LABELS = {
   everywhere: 'Everywhere',
@@ -70,7 +79,7 @@ export function SearchScreen({
     )
 
   return (
-    <div className="x-screen">
+    <div>
       <header className="x-ledger">
         <LedgerRow label="Search">
           <h1 className="x-search-query">“{line}”</h1>{' '}
@@ -110,7 +119,7 @@ export function SearchScreen({
         {gone ? (
           <LedgerRow label="">
             That Feed isn’t among your Subscriptions.{' '}
-            <Button className="x-more" onClick={() => onScope({ kind: 'everywhere' })}>
+            <Button className="x-action" onClick={() => onScope({ kind: 'everywhere' })}>
               Search everywhere
             </Button>
           </LedgerRow>
@@ -199,7 +208,7 @@ function FeedMatches({
         </h2>
         <span className="x-grey">{counted(matches.length, 'Feed Item')}</span>
         {narrowed ? null : (
-          <Button className="x-more" onClick={onNarrow}>
+          <Button className="x-action" onClick={onNarrow}>
             Search only here
           </Button>
         )}

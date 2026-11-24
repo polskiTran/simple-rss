@@ -77,6 +77,8 @@ Use `CONTEXT.md` terms verbatim — each entry lists the synonyms to avoid. `CON
 <important if="you are building or restyling UI">
 
 `docs/DESIGN.md` is the design system (ADR 0033), styled by `src/client/screens/screens.css` — one ledger on a twelve-column grid, Geist at 13px, greyscale with colour only in data, no borders, radii or shadows. The prototype it came from is `docs/design/prototype/index.html`.
+
+Build screens from the parts in `src/client/components/ledger.tsx` (`LedgerRow`, `Notice`, `Options`, `ItemRow`, `LoadFailure`, …) and the `x-action` class for an action word. Space and size type through the tokens at the top of `screens.css`; a new `x-` class means a new rule there. `tests/client/design-foundation.test.ts` fails on a px literal in spacing or type, and on an `x-` class with no rule.
 </important>
 
 <important if="you need to see the client in a browser, screenshot it, or check how a screen renders">

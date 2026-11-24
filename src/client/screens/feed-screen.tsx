@@ -31,7 +31,7 @@ import { counted, dayOfYear, dayTitle, instantAgo } from '../day-names.js'
 import { READING_SOURCE_OPTIONS } from '../reading-source.js'
 import { usePagedResource, useResource, valueInView } from '../use-resource.js'
 import { INTERVALS, retryFailure, unavailableNote } from '../feed-language.js'
-import { BackLink, ItemRow, LedgerRow, LoadFailure, OlderDays, Options } from './parts.js'
+import { BackLink, ItemRow, LedgerRow, LoadFailure, Notice, OlderDays, Options } from '../components/ledger.js'
 
 interface FeedScreenProps {
   readonly feedId: number
@@ -75,7 +75,7 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
       state.error instanceof ApiError &&
       state.error.status === 404
     return (
-      <div className="x-screen">
+      <div>
         <header className="x-ledger">
           <LedgerRow label={<BackLink origin={origin} onBack={onBack} />}>
             <h1 className="visually-hidden">Feed</h1>{' '}
@@ -149,7 +149,7 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
   const days = items ? Map.groupBy(items.items, (item) => item.date) : undefined
 
   return (
-    <div className="x-screen" data-rhythm={rhythm}>
+    <div data-rhythm={rhythm}>
       <header className="x-ledger">
         <LedgerRow
           label={<BackLink origin={origin} onBack={onBack} />}
@@ -159,7 +159,7 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
               : 'Not checked yet'
           }
         >
-          <h1 className="x-heading x-tinted">{detail.title}</h1>
+          <h1 className="x-tinted">{detail.title}</h1>
         </LedgerRow>
         {editing ? (
           <DetailsForm
@@ -174,7 +174,7 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
           <LedgerRow label="">
             <span className="x-actions">
               <Button
-                className="x-more"
+                className="x-action"
                 focusableWhenDisabled
                 disabled={refreshing}
                 aria-busy={refreshing}
@@ -182,10 +182,10 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
               >
                 {refreshing ? 'Refreshing' : 'Refresh now'}
               </Button>
-              <Button className="x-more" onClick={() => setEditing(true)}>
+              <Button className="x-action" onClick={() => setEditing(true)}>
                 Edit name and description
               </Button>
-              <Button className="x-more" aria-expanded={confirming} onClick={() => setConfirming((shown) => !shown)}>
+              <Button className="x-action" aria-expanded={confirming} onClick={() => setConfirming((shown) => !shown)}>
                 Unsubscribe
               </Button>
             </span>
@@ -193,7 +193,7 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
               <p>
                 <span className="x-grey">Its Feed Items leave the Digest. Saved ones stay in the Library.</span>{' '}
                 <Button
-                  className="x-more"
+                  className="x-action"
                   focusableWhenDisabled
                   disabled={unsubscribing}
                   aria-busy={unsubscribing}
@@ -265,25 +265,19 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
             )}
           </div>
         </LedgerRow>
-        <p className="x-grid x-notice" aria-live="polite">
-          <span className="x-c-main">{notice}</span>
-        </p>
+        <Notice aria-live="polite">{notice}</Notice>
       </header>
 
       {days === undefined ? (
-        <p className="x-grid x-notice">
-          <span className="x-c-main x-grey">
-            {itemsState.kind === 'loading' ? (
-              'Loading the Feed Items'
-            ) : itemsState.kind === 'loaded' ? null : (
-              <LoadFailure subject="The Feed Items" kind={itemsState.kind} onRetry={pages.retry} />
-            )}
-          </span>
-        </p>
+        <Notice grey>
+          {itemsState.kind === 'loading' ? (
+            'Loading the Feed Items'
+          ) : itemsState.kind === 'loaded' ? null : (
+            <LoadFailure subject="The Feed Items" kind={itemsState.kind} onRetry={pages.retry} />
+          )}
+        </Notice>
       ) : days.size === 0 ? (
-        <p className="x-grid x-notice">
-          <span className="x-c-main x-grey">Nothing retained from this Feed yet.</span>
-        </p>
+        <Notice grey>Nothing retained from this Feed yet.</Notice>
       ) : (
         <div className="x-plain">
           {[...days].map(([date, dayItems]) => (
@@ -392,11 +386,17 @@ function DetailsForm({
         />
       </LedgerRow>
       <LedgerRow label="">
-        <Button className="x-more" type="submit" focusableWhenDisabled disabled={!changed || saving} aria-busy={saving}>
+        <Button
+          className="x-action"
+          type="submit"
+          focusableWhenDisabled
+          disabled={!changed || saving}
+          aria-busy={saving}
+        >
           {saving ? 'Saving' : 'Save changes'}
         </Button>
         {'\u2003'}
-        <Button className="x-more" disabled={saving} onClick={onDone}>
+        <Button className="x-action" disabled={saving} onClick={onDone}>
           Cancel
         </Button>
         <span role="status"> {failure}</span>

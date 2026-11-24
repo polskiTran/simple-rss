@@ -8,7 +8,7 @@ import { playFold, playUnfold } from '../motion.js'
 import { useKept } from '../routing.js'
 import { storedChoice } from '../stored-choice.js'
 import { type DayRow, foldKey, timeSpan } from './firehose.js'
-import { FeedLink, SaveWord, TitleLink, useRhythmOf } from './parts.js'
+import { FeedLink, SaveWord, TitleLink, useRhythmOf } from '../components/ledger.js'
 
 export const DIGEST_LAYOUT = storedChoice('digest-layout', ['index', 'columns', 'wall'])
 export type DigestLayout = (typeof DIGEST_LAYOUT.options)[number]
@@ -140,7 +140,7 @@ function FoldCard({
   return (
     <article ref={box} className="x-card" style={style} data-open={open ? '' : undefined}>
       <Button
-        className="x-more"
+        className="x-action"
         aria-expanded={open}
         aria-label={`${open ? `Fold ${count}` : count} from ${latest.feedTitle}`}
         onClick={() => void toggle()}
