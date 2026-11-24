@@ -39,11 +39,11 @@ import { NativeSelect } from '../components/native-select.js'
 import { OlderItems } from '../components/older-items.js'
 import { Row } from '../components/row.js'
 import { withSaved } from '../components/save-toggle.js'
-import { counted, dayOfYear, dayTitle } from '../day-names.js'
+import { counted, dayOfYear, dayTitle, instantAgo } from '../day-names.js'
 import { READING_SOURCE_OPTIONS } from '../reading-source.js'
 import type { Origin } from '../routing.js'
 import { type OlderState, usePagedResource, useResource, valueInView, type Resource } from '../use-resource.js'
-import { retryFailure, unavailableNote } from './feed-language.js'
+import { INTERVALS, retryFailure, unavailableNote } from '../feed-language.js'
 
 interface FeedViewProps {
   readonly feedId: number
@@ -206,7 +206,7 @@ export function FeedView({ feedId, origin, onBack, onUnsubscribed, onOpenItem }:
             />
             <Row
               label="Last checked"
-              value={detail.availability.lastCheckedAt ? ago(detail.availability.lastCheckedAt) : 'Not yet'}
+              value={detail.availability.lastCheckedAt ? instantAgo(detail.availability.lastCheckedAt) : 'Not yet'}
             />
           </dl>
         </Group>
@@ -468,27 +468,3 @@ function overrideOf(draft: string): string | null {
   const trimmed = draft.trim()
   return trimmed === '' ? null : trimmed
 }
-
-export function ago(iso: string): string {
-  const seconds = (Date.parse(iso) - Date.now()) / 1000
-  const format = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' })
-  const [unit, size] = AGO_UNITS.find(([, span]) => Math.abs(seconds) >= span) ?? ['second', 1]
-  const phrase = format.format(Math.round(seconds / size), unit)
-  return phrase.charAt(0).toUpperCase() + phrase.slice(1)
-}
-
-const AGO_UNITS = [
-  ['day', 86_400],
-  ['hour', 3_600],
-  ['minute', 60],
-  ['second', 1],
-] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]
-
-export const INTERVALS = {
-  30: '30 minutes',
-  60: '1 hour',
-  120: '2 hours',
-  360: '6 hours',
-  720: '12 hours',
-  1440: '1 day',
-} as const satisfies Readonly<Record<PollingIntervalMinutes, string>>

@@ -2,6 +2,7 @@ import { Field as BaseField } from '@base-ui/react/field'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { MAX_SEARCH_QUERY_LENGTH, type SearchScope } from '../../shared/api.js'
 import { SEARCH_SCOPE_COPY } from '../search-scope.js'
+import { editable } from '../editable.js'
 import { Icon } from './icon.js'
 
 interface GlobalSearchProps {
@@ -113,14 +114,5 @@ export function GlobalSearch({ query, scope, onQueryChange }: GlobalSearchProps)
         )}
       </BaseField.Root>
     </form>
-  )
-}
-
-export function editable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
   )
 }

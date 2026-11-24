@@ -1,7 +1,8 @@
 import { useState, useTransition } from 'react'
-import { ApiError, fetchInstallationPreferences, updateInstallationTimezone } from '../../api.js'
+import { fetchInstallationPreferences, updateInstallationTimezone } from '../../api.js'
 import { LoadFailure } from '../../components/load-failure.js'
 import { NativeSelect } from '../../components/native-select.js'
+import { timezoneFailure, timezoneOptions } from '../../timezone.js'
 import { useResource } from '../../use-resource.js'
 
 export function TimezoneChoice() {
@@ -44,14 +45,4 @@ export function TimezoneChoice() {
       </p>
     </div>
   )
-}
-
-export function timezoneFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'The reader is unavailable. Try again in a moment.'
-  return cause.code === 'unknown_timezone' ? 'That timezone isn’t recognized.' : 'The timezone couldn’t be changed.'
-}
-
-export function timezoneOptions(current: string): string[] {
-  const known = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
-  return known.includes(current) ? [...known] : [current, ...known]
 }

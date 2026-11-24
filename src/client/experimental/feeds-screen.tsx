@@ -5,7 +5,7 @@ import { RHYTHM_LABELS, RHYTHMS, rhythmOf } from '../../shared/rhythm.js'
 import { refreshFeed } from '../api.js'
 import { useScreenTitle } from '../arrival.js'
 import { counted } from '../day-names.js'
-import { retryFailure, unavailableNote } from '../views/feed-language.js'
+import { retryFailure, unavailableNote } from '../feed-language.js'
 import { AddFeedRows } from './add-feed.js'
 import { FeedRow, LedgerRow, SubscriptionsContext } from './parts.js'
 

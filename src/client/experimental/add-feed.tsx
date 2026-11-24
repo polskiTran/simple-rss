@@ -4,7 +4,7 @@ import type { CreateSubscriptionResponse, FeedPreview, OpmlImportReport } from '
 import { RHYTHM_LABELS, rhythmOf } from '../../shared/rhythm.js'
 import { importOpml } from '../api.js'
 import { ago, counted } from '../day-names.js'
-import { importFailure, useFeedLookup } from '../views/feed-lookup.js'
+import { importFailure, useFeedLookup } from '../feed-lookup.js'
 import { LedgerRow, Options } from './parts.js'
 
 const PREVIEW_TITLES = 4

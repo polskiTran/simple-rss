@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import type { ApiErrorCode, CreateSubscriptionResponse, FeedPreview, FeedPreviewResponse } from '../../shared/api.js'
-import { hasOwn } from '../../shared/record.js'
-import { ApiError, previewFeed, subscribeToFeed } from '../api.js'
+import type { ApiErrorCode, CreateSubscriptionResponse, FeedPreview, FeedPreviewResponse } from '../shared/api.js'
+import { hasOwn } from '../shared/record.js'
+import { ApiError, previewFeed, subscribeToFeed } from './api.js'
 import { addFailure, feedAddressOf, NOT_AN_ADDRESS } from './feed-language.js'
 
 const LOOKUP_PAUSE_MS = 800

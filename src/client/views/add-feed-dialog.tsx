@@ -12,7 +12,7 @@ import { Field } from '../components/field.js'
 import { Icon } from '../components/icon.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { ago, daysBefore, relativeDay, shortDate } from '../day-names.js'
-import { importFailure, useFeedLookup } from './feed-lookup.js'
+import { importFailure, useFeedLookup } from '../feed-lookup.js'
 
 type Way = 'address' | 'opml'
 

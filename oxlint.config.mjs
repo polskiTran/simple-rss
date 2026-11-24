@@ -63,7 +63,7 @@ export default defineConfig({
     // These adapters validate values supplied by JavaScript or third-party APIs
     // at the point where those values enter owned code.
     {
-      files: ['src/client/components/article-markdown.tsx', 'src/client/views/settings/timezone-choice.tsx'],
+      files: ['src/client/components/article-markdown.tsx', 'src/client/timezone.ts'],
       rules: {
         'anti-slop/no-runtime-typeof': 'off',
       },

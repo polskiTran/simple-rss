@@ -1,6 +1,6 @@
-import { MIN_PASSWORD_LENGTH, newPasswordSchema, type ApiErrorCode } from '../../shared/api.js'
-import { hasOwn } from '../../shared/record.js'
-import { ApiError } from '../api.js'
+import { MIN_PASSWORD_LENGTH, newPasswordSchema, type ApiErrorCode } from '../shared/api.js'
+import { hasOwn } from '../shared/record.js'
+import { ApiError } from './api.js'
 
 const TOO_SHORT = `A password needs at least ${MIN_PASSWORD_LENGTH} characters.`
 

@@ -4,7 +4,7 @@ import type { AuthStatus } from '../../../shared/api.js'
 import { ApiError, changePassword } from '../../api.js'
 import { ActionDialog, DialogCancel } from '../../components/action-dialog.js'
 import { Field } from '../../components/field.js'
-import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedback } from '../password-failure.js'
+import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedback } from '../../password-failure.js'
 
 type PasswordField = 'current' | 'password' | 'confirmation'
 

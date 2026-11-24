@@ -9,7 +9,7 @@ import { AppearanceChoice } from './settings/appearance-choice.js'
 import { InterfaceChoice } from './settings/interface-choice.js'
 import { PasswordChange } from './settings/password-change.js'
 import { TimezoneChoice } from './settings/timezone-choice.js'
-import { VersionNote } from './settings/version-note.js'
+import { VersionNote } from '../components/version-note.js'
 
 interface SettingsViewProps {
   onAccessChanged(status: AuthStatus): void

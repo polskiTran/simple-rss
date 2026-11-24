@@ -3,11 +3,12 @@ import {
   type ApiErrorCode,
   type FeedAvailability,
   type FeedAvailabilityCategory,
+  type PollingIntervalMinutes,
   utcDayKey,
-} from '../../shared/api.js'
-import { hasOwn } from '../../shared/record.js'
-import { ApiError } from '../api.js'
-import { shortDate } from '../day-names.js'
+} from '../shared/api.js'
+import { hasOwn } from '../shared/record.js'
+import { ApiError } from './api.js'
+import { shortDate } from './day-names.js'
 
 const AVAILABILITY_COPY = {
   unreachable: 'The feed can’t be reached',
@@ -79,3 +80,12 @@ export function feedAddressOf(line: string): string | undefined {
   if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(address)) return `https://${address}`
   return undefined
 }
+
+export const INTERVALS = {
+  30: '30 minutes',
+  60: '1 hour',
+  120: '2 hours',
+  360: '6 hours',
+  720: '12 hours',
+  1440: '1 day',
+} as const satisfies Readonly<Record<PollingIntervalMinutes, string>>

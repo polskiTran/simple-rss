@@ -3,7 +3,7 @@ import { Collapsible } from '@base-ui/react/collapsible'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import type { FeedContent, ReaderArticle, ReaderDeadlineStage, ReaderItem, ReadingSource } from '../../shared/api.js'
 import { useScreenTitle } from '../arrival.js'
-import { ApiError, fetchReaderArticle, fetchReaderItem } from '../api.js'
+import { ApiError, fetchReaderItem } from '../api.js'
 import { BackButton } from '../components/back-button.js'
 import { Choice } from '../components/choice.js'
 import { ChromeToolbar } from '../components/chrome-toolbar.js'
@@ -12,9 +12,10 @@ import { RoutedLink } from '../components/routed-link.js'
 import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { namedDay } from '../day-names.js'
-import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS } from '../reading-source.js'
+import { READING_SOURCE_LABELS, READING_SOURCE_OPTIONS, resolvedReadingSource } from '../reading-source.js'
 import { SaveToggle } from '../components/save-toggle.js'
 import { feedPath, readerPath, type Origin } from '../routing.js'
+import { deadlineStage, fetchArticleThroughDeadlines, STAGE_NOTES } from '../reader-article.js'
 import { useResource } from '../use-resource.js'
 
 const preloadArticleMarkdown = () => import('../components/article-markdown.js')
@@ -35,14 +36,6 @@ function MarkdownCommitted() {
   }, [])
   return null
 }
-
-const DEADLINE_REFETCH_DELAY_MS = 2_000
-const DEADLINE_REFETCH_ATTEMPTS = 2
-
-export const STAGE_NOTES = {
-  publisher: 'Waiting on the publisher',
-  parsing: 'Still reading the original webpage',
-} as const satisfies Record<ReaderDeadlineStage, string>
 
 interface ReaderViewProps {
   readonly feedItemId: number
@@ -99,14 +92,6 @@ export function ReaderView({ feedItemId, origin, onBack, onOpenItem, onOpenFeed 
 type SourceResult =
   | { readonly source: 'feed-content'; readonly content: FeedContent }
   | { readonly source: 'original-webpage'; readonly content: ReaderArticle }
-
-export function resolvedReadingSource(
-  chosen: ReadingSource,
-  item: Pick<ReaderItem, 'feedContent' | 'link'>,
-): ReadingSource {
-  if (chosen === 'feed-content') return item.feedContent ? 'feed-content' : 'original-webpage'
-  return item.link || !item.feedContent ? 'original-webpage' : 'feed-content'
-}
 
 function OpenReader({
   item,
@@ -305,42 +290,6 @@ function waitSecondsOf(cause: unknown): number | undefined {
   return cause instanceof ApiError && cause.status === 429
     ? (cause.retryAfterSeconds ?? DEFAULT_WAIT_SECONDS)
     : undefined
-}
-
-function deadlineStage(cause: unknown): ReaderDeadlineStage | undefined {
-  return cause instanceof ApiError && cause.failure.code === 'article_deadline_exceeded'
-    ? cause.failure.stage
-    : undefined
-}
-
-export async function fetchArticleThroughDeadlines(
-  feedItemId: number,
-  signal: AbortSignal,
-  onWaiting: (stage: ReaderDeadlineStage) => void,
-): Promise<ReaderArticle> {
-  for (let refetch = 0; ; refetch += 1) {
-    try {
-      return await fetchReaderArticle(feedItemId, signal)
-    } catch (cause) {
-      const stage = deadlineStage(cause)
-      if (stage === undefined || refetch >= DEADLINE_REFETCH_ATTEMPTS) throw cause
-      onWaiting(stage)
-      await pause(DEADLINE_REFETCH_DELAY_MS, signal)
-      if (signal.aborted) throw cause
-    }
-  }
-}
-
-function pause(milliseconds: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const finish = () => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', finish)
-      resolve()
-    }
-    const timer = setTimeout(finish, milliseconds)
-    signal.addEventListener('abort', finish, { once: true })
-  })
 }
 
 const STAGE_FALLBACKS = {

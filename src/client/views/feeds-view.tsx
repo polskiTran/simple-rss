@@ -12,7 +12,7 @@ import { LoadFailure } from '../components/load-failure.js'
 import { LoadingNote } from '../components/loading-note.js'
 import { useResource } from '../use-resource.js'
 import { AddFeedDialog } from './add-feed-dialog.js'
-import { retryFailure, unavailableNote } from './feed-language.js'
+import { retryFailure, unavailableNote } from '../feed-language.js'
 
 const POLL_INTERVAL_MS = 2_000
 const POLL_ROUNDS = 30

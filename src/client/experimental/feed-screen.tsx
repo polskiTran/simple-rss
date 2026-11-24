@@ -26,11 +26,10 @@ import {
 } from '../api.js'
 import { cadenceDayLabel, cadenceGrid } from '../cadence.js'
 import { withSaved } from '../components/save-toggle.js'
-import { counted, dayOfYear, dayTitle } from '../day-names.js'
+import { counted, dayOfYear, dayTitle, instantAgo } from '../day-names.js'
 import { READING_SOURCE_OPTIONS } from '../reading-source.js'
 import { usePagedResource, useResource, valueInView } from '../use-resource.js'
-import { unavailableNote, retryFailure } from '../views/feed-language.js'
-import { ago, INTERVALS } from '../views/feed-view.js'
+import { INTERVALS, retryFailure, unavailableNote } from '../feed-language.js'
 import { ItemRow, LedgerRow, OlderDays, Options } from './parts.js'
 
 interface FeedScreenProps {
@@ -157,7 +156,7 @@ export function FeedScreen({ feedId, onOpenItem, onRenamed, onUnsubscribed }: Fe
           label="Feed"
           end={
             detail.availability.lastCheckedAt
-              ? `Checked ${ago(detail.availability.lastCheckedAt).toLowerCase()}`
+              ? `Checked ${instantAgo(detail.availability.lastCheckedAt).toLowerCase()}`
               : 'Not checked yet'
           }
         >

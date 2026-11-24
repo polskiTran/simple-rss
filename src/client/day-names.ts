@@ -101,3 +101,18 @@ export function counted(count: number, noun: string): string {
 function sameYear(dateKey: DateKey, today: DateKey): boolean {
   return dateKey.slice(0, 4) === today.slice(0, 4)
 }
+
+export function instantAgo(iso: string): string {
+  const seconds = (Date.parse(iso) - Date.now()) / 1000
+  const format = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' })
+  const [unit, size] = AGO_UNITS.find(([, span]) => Math.abs(seconds) >= span) ?? ['second', 1]
+  const phrase = format.format(Math.round(seconds / size), unit)
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1)
+}
+
+const AGO_UNITS = [
+  ['day', 86_400],
+  ['hour', 3_600],
+  ['minute', 60],
+  ['second', 1],
+] as const satisfies readonly (readonly [Intl.RelativeTimeFormatUnit, number])[]

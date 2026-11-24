@@ -4,7 +4,7 @@ import { type AuthStatus, MIN_SETUP_SECRET_LENGTH } from '../../shared/api.js'
 import { ApiError, claimInstallation, signIn } from '../api.js'
 import { useScreenTitle } from '../arrival.js'
 import type { Gate } from '../authentication.js'
-import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../views/password-failure.js'
+import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../password-failure.js'
 import { LedgerRow } from './parts.js'
 
 export function GateScreen({ gate }: { readonly gate: Gate }) {

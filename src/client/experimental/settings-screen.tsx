@@ -7,9 +7,9 @@ import { ApiError, changePassword, fetchInstallationPreferences, signOut, update
 import { INTERFACE, INTERFACE_LABELS } from '../interface.js'
 import { useStoredChoice } from '../stored-choice.js'
 import { useResource } from '../use-resource.js'
-import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../views/password-failure.js'
-import { timezoneFailure, timezoneOptions } from '../views/settings/timezone-choice.js'
-import { VersionNote } from '../views/settings/version-note.js'
+import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../password-failure.js'
+import { timezoneFailure, timezoneOptions } from '../timezone.js'
+import { VersionNote } from '../components/version-note.js'
 import { LedgerRow, Options } from './parts.js'
 
 const APPEARANCE_LABELS = { system: 'System', light: 'Light', dark: 'Dark' } as const satisfies Record<

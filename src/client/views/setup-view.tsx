@@ -4,7 +4,7 @@ import { useScreenTitle } from '../arrival.js'
 import { MIN_SETUP_SECRET_LENGTH, type AuthStatus } from '../../shared/api.js'
 import { ApiError, claimInstallation } from '../api.js'
 import { Field } from '../components/field.js'
-import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedback } from './password-failure.js'
+import { afterEdit, describeFailure, noteOf, reasonOn, reasonToHold, type Feedback } from '../password-failure.js'
 
 interface SetupViewProps {
   onClaimed(status: AuthStatus): void
