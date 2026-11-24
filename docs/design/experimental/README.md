@@ -75,6 +75,14 @@ and span of times, and the latest title, or every title once unfolded.
 Below 760px both become one column. Under Lane, the cards narrow to make room
 for the Lane as the rows do. The legend shows only for Index.
 
+The Digest moves in three places, as v2's does (ADR 0026, `motion.ts`):
+another day keeps the one on show until it answers, then fades in over 240ms,
+rising 12px when going back in time and falling 12px when coming forward; the
+days Show older days adds fade in 60ms apart; and a fold, as a row or a card,
+opens over 240ms and closes over 180ms by its height, the titles it reveals
+fading in. Under reduced motion the height changes at once and only the fades
+remain.
+
 A Firehose Feed is treated one of two ways, chosen in the Firehose row and kept
 per device:
 
@@ -113,7 +121,11 @@ its Rhythm, its last Feed Item and its newest titles above Subscribe, which
 opens the new Feed. Import an OPML file reports what it added. With no Feeds
 yet, the address line takes focus; the empty Digest's Add a Feed leads here.
 The Feeds follow grouped by Rhythm, each row the name, the site and its Feed
-Items over the last 30 days.
+Items over the last 30 days. A Feed not yet checked says Waiting for first
+check, and the list asks again every two seconds, up to thirty times, until
+none waits; an import starts the count again. A Feed that stopped answering
+says why and since when, with Retry, which checks it at once and says whether
+it answered.
 
 ## Library
 
@@ -166,4 +178,5 @@ opens its three lines in the row, and Sign out) and the version.
   when it has one.
 - **Live filtering from the search line.** The line submits to Search
   results, which search the whole installation by Search Scope.
-- **Check all Feeds.** Only the v2 Feeds screen has it.
+- **Check all Feeds now.** The prototype's Feeds menu offers it; no screen has
+  it, and the API checks one Feed at a time.

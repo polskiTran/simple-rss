@@ -64,14 +64,17 @@ export function FeedLink({
 export function FeedRow({
   feed,
   onOpen,
+  children,
 }: {
   readonly feed: Pick<SubscriptionSummary, 'feedId' | 'title' | 'domain' | 'cadence'>
   onOpen(feedId: number): void
+  readonly children?: ReactNode
 }) {
   return (
     <div className="x-row">
       <span className="x-t">
         <FeedLink feedId={feed.feedId} title={feed.title} rhythm={rhythmOf(feed.cadence)} onOpen={onOpen} />
+        {children}
       </span>
       <span className="x-f x-grey">{feed.domain}</span>
       <span className="x-d">{feed.cadence.reduce((sum, count) => sum + count, 0).toLocaleString('en-GB')}</span>

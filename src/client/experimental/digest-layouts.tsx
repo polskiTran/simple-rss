@@ -1,8 +1,10 @@
 import { Button } from '@base-ui/react/button'
-import { type CSSProperties, type ReactNode, useState } from 'react'
+import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { z } from 'zod'
 import type { DateKey, DigestItem } from '../../shared/api.js'
 import { counted } from '../day-names.js'
+import { playFold, playUnfold } from '../motion.js'
 import { useKept } from '../routing.js'
 import { storedChoice } from '../stored-choice.js'
 import { type DayRow, foldKey, timeSpan } from './firehose.js'
@@ -14,6 +16,30 @@ export const LAYOUT_LABELS = { index: 'Index', columns: 'Columns', wall: 'Wall' 
   DigestLayout,
   string
 >
+
+export function useFold<Box extends HTMLElement>(date: DateKey, feedId: number | undefined, kept: number) {
+  const [open = false, keepOpen] = useKept(foldKey(date, feedId), z.boolean())
+  const box = useRef<Box>(null)
+  const folding = useRef(false)
+  const toggle = async () => {
+    const element = box.current
+    if (folding.current) return
+    if (!element) {
+      keepOpen(open ? undefined : true)
+      return
+    }
+    if (!open) {
+      const heightBefore = element.offsetHeight
+      flushSync(() => keepOpen(true))
+      playUnfold(element, heightBefore, kept)
+      return
+    }
+    folding.current = true
+    await playFold(element, kept, () => flushSync(() => keepOpen(undefined)))
+    folding.current = false
+  }
+  return { open, box, toggle }
+}
 
 export interface RowActions {
   onOpenItem(feedItemId: number): void
@@ -108,16 +134,16 @@ function FoldCard({
   readonly actions: RowActions
 }) {
   const [latest] = items
-  const [open = false, keepOpen] = useKept(foldKey(date, latest?.feedId), z.boolean())
+  const { open, box, toggle } = useFold<HTMLElement>(date, latest?.feedId, 2)
   if (!latest) return null
   const count = counted(items.length, 'Feed Item')
   return (
-    <article className="x-card" style={style} data-open={open ? '' : undefined}>
+    <article ref={box} className="x-card" style={style} data-open={open ? '' : undefined}>
       <Button
         className="x-more"
         aria-expanded={open}
         aria-label={`${open ? `Fold ${count}` : count} from ${latest.feedTitle}`}
-        onClick={() => keepOpen(open ? undefined : true)}
+        onClick={() => void toggle()}
       >
         {open ? `Fold ${count}` : count}
       </Button>

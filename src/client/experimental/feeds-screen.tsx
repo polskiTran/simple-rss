@@ -1,21 +1,53 @@
-import { use } from 'react'
+import { Button } from '@base-ui/react/button'
+import { use, useEffect, useEffectEvent, useState, useTransition } from 'react'
+import type { SubscriptionSummary } from '../../shared/api.js'
 import { RHYTHM_LABELS, RHYTHMS, rhythmOf } from '../../shared/rhythm.js'
+import { refreshFeed } from '../api.js'
 import { useScreenTitle } from '../arrival.js'
 import { counted } from '../day-names.js'
+import { retryFailure, unavailableNote } from '../views/feed-language.js'
 import { AddFeedRows } from './add-feed.js'
 import { FeedRow, LedgerRow, SubscriptionsContext } from './parts.js'
+
+const POLL_INTERVAL_MS = 2_000
+const POLL_ROUNDS = 30
 
 export function FeedsScreen({
   onOpenFeed,
   onSubscribed,
-  onImported,
+  onReload,
 }: {
   onOpenFeed(feedId: number): void
   onSubscribed(feedId: number): void
-  onImported(): void
+  onReload(): void
 }) {
   useScreenTitle('Feeds')
   const { list } = use(SubscriptionsContext)
+  const [round, setRound] = useState(0)
+  const [notice, setNotice] = useState('')
+  const waiting = list?.some((feed) => feed.availability.state === 'unchecked') ?? false
+  const poll = useEffectEvent(() => {
+    setRound((done) => done + 1)
+    onReload()
+  })
+
+  useEffect(() => {
+    if (!waiting || round >= POLL_ROUNDS) return
+    const timer = window.setTimeout(poll, POLL_INTERVAL_MS)
+    return () => window.clearTimeout(timer)
+  }, [waiting, round, list])
+
+  const retry = async (feedId: number) => {
+    setNotice('')
+    try {
+      await refreshFeed(feedId)
+      setNotice('The Feed answered. Checking works again.')
+    } catch (error) {
+      setNotice(retryFailure(error))
+    }
+    onReload()
+  }
+
   const tiers = RHYTHMS.flatMap((rhythm) => {
     const members = (list ?? [])
       .filter((feed) => rhythmOf(feed.cadence) === rhythm)
@@ -38,8 +70,14 @@ export function FeedsScreen({
         <AddFeedRows
           focused={list?.length === 0}
           onSubscribed={({ subscription }) => onSubscribed(subscription.feedId)}
-          onImported={onImported}
+          onImported={() => {
+            setRound(0)
+            onReload()
+          }}
         />
+        <p className="x-grid x-notice" aria-live="polite">
+          <span className="x-c-main">{notice}</span>
+        </p>
       </header>
 
       {tiers.map(({ rhythm, members }) => (
@@ -49,7 +87,9 @@ export function FeedsScreen({
           </h2>
           <div className="x-rows">
             {members.map((feed) => (
-              <FeedRow key={feed.feedId} feed={feed} onOpen={onOpenFeed} />
+              <FeedRow key={feed.feedId} feed={feed} onOpen={onOpenFeed}>
+                <Availability feed={feed} onRetry={retry} />
+              </FeedRow>
             ))}
           </div>
         </section>
@@ -64,5 +104,35 @@ export function FeedsScreen({
         </div>
       ) : null}
     </div>
+  )
+}
+
+function Availability({
+  feed,
+  onRetry,
+}: {
+  readonly feed: SubscriptionSummary
+  onRetry(feedId: number): Promise<void>
+}) {
+  const [retrying, startRetry] = useTransition()
+  const { availability } = feed
+  if (availability.state === 'unchecked') return <span className="x-feed-status x-grey">Waiting for first check</span>
+  if (availability.state !== 'unavailable') return null
+  return (
+    <span className="x-feed-status">
+      <span className="x-grey">{unavailableNote(availability)}</span>{' '}
+      <Button
+        className="x-more"
+        focusableWhenDisabled
+        disabled={retrying}
+        aria-busy={retrying}
+        aria-label={`Retry ${feed.title}`}
+        onClick={() => {
+          if (!retrying) startRetry(() => onRetry(feed.feedId))
+        }}
+      >
+        {retrying ? 'Retrying' : 'Retry'}
+      </Button>
+    </span>
   )
 }

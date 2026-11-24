@@ -1,6 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { use, useEffect, useState } from 'react'
-import { z } from 'zod'
+import { use, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   type DateKey,
   dateKeySchema,
@@ -12,13 +11,21 @@ import {
 import { useScreenTitle } from '../arrival.js'
 import { fetchDigest, fetchDigestCalendar } from '../api.js'
 import { RoutedLink } from '../components/routed-link.js'
+import { playArrivals, playDayChange } from '../motion.js'
 import { withSaved } from '../components/save-toggle.js'
 import { counted, dayTitle, longDay } from '../day-names.js'
 import { sectionPath, useKept } from '../routing.js'
 import { useStoredChoice } from '../stored-choice.js'
 import { usePagedResource, useResource, valueInView } from '../use-resource.js'
-import { DIGEST_LAYOUT, type DigestLayout, LAYOUT_LABELS, Pictures, type RowActions } from './digest-layouts.js'
-import { FIREHOSE_TREATMENT, foldKey, type FirehoseTreatment, splitDay, timeSpan } from './firehose.js'
+import {
+  DIGEST_LAYOUT,
+  type DigestLayout,
+  LAYOUT_LABELS,
+  Pictures,
+  type RowActions,
+  useFold,
+} from './digest-layouts.js'
+import { FIREHOSE_TREATMENT, type FirehoseTreatment, splitDay, timeSpan } from './firehose.js'
 import {
   DayCalendar,
   FeedLink,
@@ -73,6 +80,18 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
   }
 
   const [picking, setPicking] = useState(false)
+  const list = useRef<HTMLDivElement>(null)
+  const shownDays = useRef<{ readonly first: string; readonly count: number }>(undefined)
+  const firstDay = digest?.groups[0]?.date
+  const dayCount = digest?.groups.length ?? 0
+  useLayoutEffect(() => {
+    const before = shownDays.current
+    shownDays.current = firstDay === undefined ? undefined : { first: firstDay, count: dayCount }
+    if (!before || !list.current || firstDay === undefined) return
+    if (firstDay !== before.first) playDayChange(list.current, firstDay < before.first ? 'older' : 'newer')
+    else if (dayCount > before.count)
+      playArrivals([...list.current.querySelectorAll(':scope > .x-day')].slice(before.count))
+  }, [firstDay, dayCount])
   const ready = digest !== undefined && rhythms !== undefined
   const failed = state.kind === 'unavailable' || state.kind === 'unreachable'
 
@@ -148,7 +167,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
       </header>
 
       {ready ? (
-        <div aria-busy={state.kind === 'loading'}>
+        <div ref={list} aria-busy={state.kind === 'loading'}>
           {digest.groups.map((group) => (
             <Day
               key={group.date}
@@ -244,18 +263,18 @@ function Fold({
 }) {
   const rhythmOf = useRhythmOf()
   const [latest] = items
-  const [open = false, keepOpen] = useKept(foldKey(date, latest?.feedId), z.boolean())
+  const { open, box, toggle } = useFold<HTMLDivElement>(date, latest?.feedId, 1)
   if (!latest) return null
   const count = counted(items.length, 'Feed Item')
   return (
-    <div className="x-fold" data-open={open ? '' : undefined}>
+    <div ref={box} className="x-fold" data-open={open ? '' : undefined}>
       <div className="x-row x-fold-head">
         <span className="x-t">
           <Button
             className="x-more"
             aria-expanded={open}
             aria-label={`${open ? `Fold ${count}` : count} from ${latest.feedTitle}`}
-            onClick={() => keepOpen(open ? undefined : true)}
+            onClick={() => void toggle()}
           >
             {open ? 'Fold' : count}
           </Button>

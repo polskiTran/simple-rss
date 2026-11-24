@@ -96,7 +96,7 @@ function screenFor(navigation: Navigation, actions: ShellActions): ReactNode {
             actions.onSubscriptionsChanged()
             navigation.openFeed(feedId, here)
           }}
-          onImported={actions.onSubscriptionsChanged}
+          onReload={actions.onSubscriptionsChanged}
         />
       )
     case 'feed':

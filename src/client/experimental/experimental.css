@@ -9,6 +9,9 @@
   --x-wash: light-dark(oklch(0.945 0.03 355), oklch(0.3 0.045 355));
   --x-pink: light-dark(oklch(0.84 0.085 355), oklch(0.8 0.095 355));
   --x-pink-ink: oklch(0.27 0.06 355);
+  --duration-sheet-enter: 240ms;
+  --duration-sheet-exit: 180ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 :root:has(.x-page),
@@ -1068,6 +1071,10 @@
 
 .x-gate-reason {
   margin-top: 6px;
+}
+
+.x-feed-status {
+  display: block;
 }
 
 @media (max-width: 760px) {
