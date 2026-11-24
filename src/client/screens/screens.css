@@ -19,6 +19,7 @@
   --x-ink: light-dark(oklch(0.21 0.004 95), oklch(0.93 0.004 95));
   --x-grey: light-dark(oklch(0.55 0.004 95), oklch(0.62 0.004 95));
   --x-wash: light-dark(oklch(0.945 0.03 355), oklch(0.3 0.045 355));
+  --x-wash-deep: light-dark(oklch(0.915 0.04 355), oklch(0.345 0.05 355));
   --x-pink: light-dark(oklch(0.84 0.085 355), oklch(0.8 0.095 355));
   --x-pink-ink: oklch(0.27 0.06 355);
   --duration-sheet-enter: 240ms;
@@ -237,15 +238,12 @@
 .x-row {
   padding: var(--x-quarter) 0;
 
-  &::before {
+  &::before,
+  &::after {
     content: '';
     position: absolute;
     inset: 0 calc(-1 * var(--x-bleed));
     z-index: -1;
-  }
-
-  &[data-saved]::before {
-    background: var(--x-wash);
   }
 
   &:has(:focus-visible)::before {
@@ -329,6 +327,43 @@
     & .x-row:hover .x-save {
       opacity: 1;
     }
+  }
+}
+
+:is(.x-row, .x-lane-item, .x-card)::after {
+  background: var(--x-wash);
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path var(--duration-sheet-exit) var(--ease-drawer);
+}
+
+:is(.x-row, .x-lane-item, .x-card):has(.x-save[aria-pressed='true'])::after {
+  clip-path: inset(0);
+  transition-duration: var(--duration-sheet-enter);
+}
+
+:is(.x-row, .x-card):has(:focus-visible)::after {
+  background: var(--x-wash-deep);
+}
+
+@media (hover: hover) {
+  :is(.x-row, .x-card):hover::after {
+    background: var(--x-wash-deep);
+  }
+}
+
+.x-library .x-row::after {
+  content: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.x-row, .x-lane-item, .x-card)::after {
+    clip-path: none;
+    opacity: 0;
+    transition-property: opacity;
+  }
+
+  :is(.x-row, .x-lane-item, .x-card):has(.x-save[aria-pressed='true'])::after {
+    opacity: 1;
   }
 }
 
@@ -438,9 +473,13 @@
   margin: 0 calc(-1 * var(--x-bleed)) var(--x-half);
   padding: var(--x-quarter) var(--x-bleed);
   overflow-wrap: anywhere;
+  isolation: isolate;
 
-  &[data-saved] {
-    background: var(--x-wash);
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
   }
 
   & .x-save {
@@ -1026,19 +1065,17 @@
     align-self: start;
   }
 
-  &::before {
+  &::before,
+  &::after {
     content: '';
     position: absolute;
     inset: calc(-1 * var(--x-half)) calc(-1 * var(--x-bleed)) calc(var(--x-unit) * 2.5 - var(--x-half));
     z-index: -1;
   }
 
-  .x-wall &::before {
+  .x-wall &::before,
+  .x-wall &::after {
     bottom: calc(-1 * var(--x-half));
-  }
-
-  &[data-saved]::before {
-    background: var(--x-wash);
   }
 
   &[data-open]::before {

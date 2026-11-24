@@ -142,7 +142,7 @@ export function ItemRow({
   onSaved(feedItemId: number, saved: boolean): void
 }) {
   return (
-    <div className="x-row" data-saved={item.saved ? '' : undefined}>
+    <div className="x-row">
       <span className="x-t">
         <TitleLink item={item} onOpen={onOpen} />
       </span>

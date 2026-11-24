@@ -34,7 +34,13 @@ change that improves the product changes both.
   `oklch(0.62 0.12 150)`, Monthly `oklch(0.52 0.08 250)`, Inactive grey — with
   lightness capped at 0.62 on light paper so Daily stays legible. Saved is the
   pink: a saved row sits on a pink wash and shows the word Saved beside its
-  time, and selected text takes the same pink. Dark follows Appearance through `light-dark()`.
+  time, and selected text takes the same pink. The wash lies over the hover
+  tone, deepening to `--x-wash-deep` under a hovered or focused row. Choosing
+  Save sweeps it in from the left over 240ms and Unsave draws it back to the
+  left over 180ms, both on `--ease-drawer` (a `clip-path` transition, so a
+  second click reverses it from where it stands); it follows the Save word's
+  pressed state, so it moves before the Library answers and draws back if the
+  save fails. Under reduced motion it fades instead. Dark follows Appearance through `light-dark()`.
 
 ## Sign-in and setup
 

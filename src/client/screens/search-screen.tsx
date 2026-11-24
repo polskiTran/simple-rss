@@ -222,7 +222,7 @@ function FeedMatches({
             displayTime: result.displayTime,
           }
           return (
-            <div key={result.feedItemId} className="x-row" data-saved={result.saved ? '' : undefined}>
+            <div key={result.feedItemId} className="x-row">
               <span className="x-t">
                 <TitleLink item={item} onOpen={onOpenItem}>
                   {marked(result.title)}

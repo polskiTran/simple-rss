@@ -234,7 +234,7 @@ function Day({
         <aside className="x-lane" aria-label={`Firehose, ${dayTitle(group.date, today)}`}>
           <p className="x-lane-head">Firehose, {counted(lane.length, 'Feed Item')}</p>
           {lane.map((item) => (
-            <div key={item.feedItemId} className="x-lane-item" data-saved={item.saved ? '' : undefined}>
+            <div key={item.feedItemId} className="x-lane-item">
               <TitleLink item={item} onOpen={actions.onOpenItem} />
               <div className="x-lane-meta">
                 {feedOf(item)}

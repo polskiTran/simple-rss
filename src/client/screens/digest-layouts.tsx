@@ -174,7 +174,7 @@ function Card({
   readonly actions: RowActions
 }) {
   return (
-    <article className="x-card" style={style} data-saved={item.saved ? '' : undefined}>
+    <article className="x-card" style={style}>
       <Picture src={item.imageUrl} />
       <TitleLink item={item} onOpen={actions.onOpenItem} />
       <Meta item={item} actions={actions}>
