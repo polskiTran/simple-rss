@@ -15,26 +15,29 @@ function reduced(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-export function playUnfold(list: HTMLElement, heightBefore: number, shownBefore: number) {
+export function playUnfold(box: HTMLElement, kept: Element | null, heightBefore: number) {
   const timing = { duration: duration('--duration-sheet-enter'), easing: token('--ease-out') }
   if (!reduced()) {
-    const to = Math.min(list.offsetHeight, Math.max(heightBefore, heightOnScreen(list)))
-    list.animate([clipped(heightBefore), clipped(to)], timing)
+    const to = Math.min(box.offsetHeight, Math.max(heightBefore, heightOnScreen(box)))
+    const tone = toneOf(box)
+    box.animate([clipped(heightBefore, tone), clipped(to, tone)], { ...timing, easing: token('--ease-drawer') })
   }
-  for (const title of [...list.children].slice(shownBefore, shownBefore + FADED_TITLES)) {
-    title.animate([{ opacity: 0 }, { opacity: 1 }], timing)
-  }
+  for (const title of following(kept)) title.animate([{ opacity: 0 }, { opacity: 1 }], timing)
 }
 
-export async function playFold(list: HTMLElement, keep: number, cut: () => void) {
-  const last = list.children[keep - 1]
-  if (!last || reduced()) return cut()
-  const top = list.getBoundingClientRect().top
-  const to = last.getBoundingClientRect().bottom - top + Number.parseFloat(getComputedStyle(list).paddingBottom)
-  const from = Math.min(list.offsetHeight, Math.max(to, heightOnScreen(list)))
-  const closing = list.animate([clipped(from), clipped(to)], {
+export async function playFold(box: HTMLElement, kept: Element | null, cut: () => void) {
+  if (!kept || reduced()) return cut()
+  const scrolledPast = kept.parentElement?.scrollTop ?? 0
+  const to =
+    kept.getBoundingClientRect().bottom +
+    scrolledPast -
+    box.getBoundingClientRect().top +
+    Number.parseFloat(getComputedStyle(box).paddingBottom)
+  const from = Math.min(box.offsetHeight, Math.max(to, heightOnScreen(box)))
+  const tone = toneOf(box)
+  const closing = box.animate([clipped(from, tone), clipped(to, tone)], {
     duration: duration('--duration-sheet-exit'),
-    easing: token('--ease-out'),
+    easing: token('--ease-drawer'),
     fill: 'forwards',
   })
   await closing.finished
@@ -44,12 +47,40 @@ export async function playFold(list: HTMLElement, keep: number, cut: () => void)
 
 const PAST_EDGE = 32
 
-function heightOnScreen(list: HTMLElement): number {
-  return window.innerHeight - list.getBoundingClientRect().top + PAST_EDGE
+function heightOnScreen(box: HTMLElement): number {
+  return window.innerHeight - box.getBoundingClientRect().top + PAST_EDGE
 }
 
-function clipped(height: number): Keyframe {
-  return { height: `${height}px`, overflow: 'clip', alignContent: 'start' }
+function following(kept: Element | null): Element[] {
+  const titles: Element[] = []
+  for (let next = kept?.nextElementSibling; next && titles.length < FADED_TITLES; next = next.nextElementSibling) {
+    titles.push(next)
+  }
+  return titles
+}
+
+interface Tone {
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+  readonly left: number
+}
+
+function toneOf(box: HTMLElement): Tone {
+  const tone = getComputedStyle(box, '::before')
+  const inset = (side: string) => Number.parseFloat(side) || 0
+  return { top: inset(tone.top), right: inset(tone.right), bottom: inset(tone.bottom), left: inset(tone.left) }
+}
+
+function clipped(height: number, tone: Tone): Keyframe {
+  const bleed = Math.max(0, -tone.top, -tone.right, -tone.left)
+  return {
+    height: `${height}px`,
+    overflow: 'clip',
+    overflowClipMargin: `${bleed}px`,
+    clipPath: `inset(${tone.top}px ${tone.right}px ${tone.bottom}px ${tone.left}px)`,
+    alignContent: 'start',
+  }
 }
 
 export function playDayChange(list: HTMLElement, direction: 'older' | 'newer') {

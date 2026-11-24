@@ -72,12 +72,18 @@ The two other layouts set each day's Feed Items as cards: the Feed Item's
 image when it has one (proxied, ADR 0018; capped in height and cropped), the
 title, the Feed and time with Save, and up to four lines of summary. A saved
 card sits on the pink wash. A Firehose fold is a card too: the count, the Feed
-and span of times, and the latest title, or every title once unfolded.
+and span of times, and the latest title with its time; unfolded, the same
+list goes on to every title, scrolled inside the card past the height an image
+is capped at, so a busy Feed never stretches the day.
 
-- **Columns.** Cards flow down up to four columns, at least 200px wide.
+- **Columns.** Cards are dealt in turn into up to four stacks, at least 200px
+  wide, so the newest run across the top. A card that grows pushes only the
+  cards below it in its own stack.
 - **Wall.** Cards hang from a shared bottom line on twelve columns, placed in
   a cycle of four row patterns that starts at the day of the month, so
   neighbouring days start on different patterns. Images are capped at 72% of the window height.
+  A fold card hangs from the top of its row instead, so it unfolds downward
+  from where it stands.
 
 Below 760px both become one column. Under Lane, the cards narrow to make room
 for the Lane as the rows do. The legend shows only for Index.
@@ -86,8 +92,9 @@ The Digest moves in three places (ADR 0026, `motion.ts`):
 another day keeps the one on show until it answers, then fades in over 240ms,
 rising 12px when going back in time and falling 12px when coming forward; the
 days Show older days adds fade in 60ms apart; and a fold, as a row or a card,
-opens over 240ms and closes over 180ms by its height, the titles it reveals
-fading in. Under reduced motion the height changes at once and only the fades
+opens over 240ms and closes over 180ms by its height on `--ease-drawer`, the
+titles it reveals fading in. Its head keeps one line and one place in both
+states, so only the rows below it move. Under reduced motion the height changes at once and only the fades
 remain.
 
 A Firehose Feed is treated one of two ways, chosen in the Firehose row and kept
@@ -96,8 +103,10 @@ per device:
 - **Fold** (default). Each Firehose Feed's Feed Items for the day become one
   row where its latest stands: the count, the latest title in grey, the Feed,
   and the span of times. A Firehose Feed with one Feed Item that day stays a
-  plain row. Unfolded, the fold is one toned drawer: its head says Fold and the
-  count, and its rows give title and time, never the Feed again. Which folds
+  plain row; the latest title is cut to one line. The whole title cell
+  unfolds it. Unfolded, the fold is one toned drawer grown down from its head,
+  flush with the row above: the head keeps the count and says Fold where the
+  latest title stood, and its rows give title and time, never the Feed again. Which folds
   stand open is kept on the history entry (ADR 0028).
 - **Lane.** The day's Firehose Feed Items move to the last three columns, as
   tall as the day's own rows and scrolled inside it; the rows narrow to make

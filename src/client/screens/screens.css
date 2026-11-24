@@ -24,6 +24,7 @@
   --duration-sheet-enter: 240ms;
   --duration-sheet-exit: 180ms;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.2, 0, 0, 1);
 }
 
 :root:has(.x-page),
@@ -331,28 +332,66 @@
   }
 }
 
-.x-fold[data-open] {
-  margin: var(--x-half) 0;
-  padding: var(--x-quarter) 0;
+.x-fold-toggle {
+  display: flex;
+  column-gap: var(--x-half);
+  width: 100%;
+  min-width: 0;
+}
 
+.x-fold-hint {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--x-grey);
+  transition: opacity var(--duration-sheet-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.x-fold-word {
+  flex: none;
+  color: var(--x-ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.x-fold-toggle:focus-visible .x-fold-word {
+  text-decoration-line: underline;
+}
+
+@media (hover: hover) {
+  .x-fold-toggle:hover .x-fold-word {
+    text-decoration-line: underline;
+  }
+}
+
+.x-fold-body {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  padding: var(--x-half) 0 var(--x-quarter);
+  margin-bottom: var(--x-half);
+}
+
+.x-fold[data-open] {
   &::before {
     content: '';
     position: absolute;
-    inset: 0 calc(-1 * var(--x-bleed));
+    inset: 0 calc(-1 * var(--x-bleed)) var(--x-half);
     z-index: -1;
     background: var(--x-tone);
   }
 
-  & .x-fold-head {
-    margin-bottom: var(--x-half);
-  }
-
-  & .x-row:has(:focus-visible)::before {
+  & .x-fold-body .x-row:has(:focus-visible)::before {
     background: var(--x-tone-deep);
   }
 
   @media (hover: hover) {
-    & .x-row:hover::before {
+    & .x-fold-body .x-row:hover::before {
       background: var(--x-tone-deep);
     }
   }
@@ -949,9 +988,14 @@
 }
 
 .x-cols {
+  --x-stack-narrowest: 200px;
+  --x-stack-most: 4;
   grid-column: 3 / 13;
-  columns: 4 200px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   column-gap: var(--x-unit);
+  align-items: start;
 }
 
 .x-wall {
@@ -970,13 +1014,16 @@
 .x-card {
   position: relative;
   isolation: isolate;
-  break-inside: avoid;
   padding-bottom: calc(var(--x-unit) * 2.5);
   overflow-wrap: anywhere;
 
   .x-wall & {
     grid-column: var(--from) / var(--to);
     padding-bottom: 0;
+  }
+
+  .x-wall &.x-fold-card {
+    align-self: start;
   }
 
   &::before {
@@ -1056,11 +1103,21 @@
   padding: 0;
   list-style: none;
 
+  [data-open] > & {
+    max-height: min(60vh, 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   & > * {
     display: flex;
     justify-content: space-between;
     gap: var(--x-unit);
     padding: var(--x-quarter) 0;
+  }
+
+  & .x-num {
+    flex: none;
   }
 }
 

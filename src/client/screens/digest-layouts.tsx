@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { z } from 'zod'
 import type { DateKey, DigestItem } from '../../shared/api.js'
@@ -17,9 +17,10 @@ export const LAYOUT_LABELS = { index: 'Index', columns: 'Columns', wall: 'Wall' 
   string
 >
 
-export function useFold<Box extends HTMLElement>(date: DateKey, feedId: number | undefined, kept: number) {
+export function useFold<Box extends HTMLElement, Kept extends HTMLElement>(date: DateKey, feedId: number | undefined) {
   const [open = false, keepOpen] = useKept(foldKey(date, feedId), z.boolean())
   const box = useRef<Box>(null)
+  const kept = useRef<Kept>(null)
   const folding = useRef(false)
   const toggle = async () => {
     const element = box.current
@@ -31,14 +32,48 @@ export function useFold<Box extends HTMLElement>(date: DateKey, feedId: number |
     if (!open) {
       const heightBefore = element.offsetHeight
       flushSync(() => keepOpen(true))
-      playUnfold(element, heightBefore, kept)
+      playUnfold(element, kept.current, heightBefore)
       return
     }
     folding.current = true
-    await playFold(element, kept, () => flushSync(() => keepOpen(undefined)))
+    await playFold(element, kept.current, () => flushSync(() => keepOpen(undefined)))
     folding.current = false
   }
-  return { open, box, toggle }
+  return { open, box, kept, toggle }
+}
+
+export function FoldToggle({
+  open,
+  count,
+  feedTitle,
+  latest,
+  onToggle,
+}: {
+  readonly open: boolean
+  readonly count: string
+  readonly feedTitle: string
+  readonly latest?: string
+  onToggle(): void
+}) {
+  return (
+    <Button
+      className="x-fold-toggle"
+      aria-expanded={open}
+      aria-label={`${open ? `Fold ${count}` : count} from ${feedTitle}`}
+      onClick={onToggle}
+    >
+      <span className={open ? undefined : 'x-fold-word'}>{count}</span>
+      {open ? (
+        <span key="fold" className="x-fold-hint x-fold-word">
+          Fold
+        </span>
+      ) : latest === undefined ? null : (
+        <span key="latest" className="x-fold-hint">
+          {latest}
+        </span>
+      )}
+    </Button>
+  )
 }
 
 export interface RowActions {
@@ -86,19 +121,47 @@ export function Pictures({
   readonly actions: RowActions
 }) {
   const spans = layout === 'wall' ? wallSpans(rows.length, Number(date.slice(8))) : []
+  const cards = rows.map((row, index) => {
+    const span = spans[index]
+    const style = span ? { '--from': span[0], '--to': span[1] } : undefined
+    return row.kind === 'item' ? (
+      <Card key={row.item.feedItemId} item={row.item} style={style} actions={actions} />
+    ) : (
+      <FoldCard key={`fold ${row.feedId}`} date={date} items={row.items} style={style} actions={actions} />
+    )
+  })
+  return layout === 'wall' ? <div className="x-wall">{cards}</div> : <Stacks cards={cards} />
+}
+
+function Stacks({ cards }: { readonly cards: readonly ReactNode[] }) {
+  const columns = useRef<HTMLDivElement>(null)
+  const [count, setCount] = useState(1)
+  useLayoutEffect(() => {
+    const element = columns.current
+    if (!element) return
+    const measure = () => setCount(stackCount(element))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   return (
-    <div className={layout === 'wall' ? 'x-wall' : 'x-cols'}>
-      {rows.map((row, index) => {
-        const span = spans[index]
-        const style = span ? { '--from': span[0], '--to': span[1] } : undefined
-        return row.kind === 'item' ? (
-          <Card key={row.item.feedItemId} item={row.item} style={style} actions={actions} />
-        ) : (
-          <FoldCard key={`fold ${row.feedId}`} date={date} items={row.items} style={style} actions={actions} />
-        )
-      })}
+    <div ref={columns} className="x-cols">
+      {Array.from({ length: count }, (_, stack) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a stack is its position; the cards in it keep their own keys
+        <div key={stack}>{cards.filter((_, index) => index % count === stack)}</div>
+      ))}
     </div>
   )
+}
+
+function stackCount(columns: HTMLElement): number {
+  const style = getComputedStyle(columns)
+  const gap = Number.parseFloat(style.columnGap) || 0
+  const narrowest = Number.parseFloat(style.getPropertyValue('--x-stack-narrowest'))
+  const most = Number.parseFloat(style.getPropertyValue('--x-stack-most'))
+  const fitting = Math.floor((columns.clientWidth + gap) / (narrowest + gap))
+  return Number.isFinite(fitting) && Number.isFinite(most) ? Math.max(1, Math.min(most, fitting)) : 1
 }
 
 function Card({
@@ -134,32 +197,25 @@ function FoldCard({
   readonly actions: RowActions
 }) {
   const [latest] = items
-  const { open, box, toggle } = useFold<HTMLElement>(date, latest?.feedId, 2)
+  const { open, box, kept, toggle } = useFold<HTMLElement, HTMLLIElement>(date, latest?.feedId)
   if (!latest) return null
-  const count = counted(items.length, 'Feed Item')
   return (
-    <article ref={box} className="x-card" style={style} data-open={open ? '' : undefined}>
-      <Button
-        className="x-action"
-        aria-expanded={open}
-        aria-label={`${open ? `Fold ${count}` : count} from ${latest.feedTitle}`}
-        onClick={() => void toggle()}
-      >
-        {open ? `Fold ${count}` : count}
-      </Button>
+    <article ref={box} className="x-card x-fold-card" style={style} data-open={open ? '' : undefined}>
+      <FoldToggle
+        open={open}
+        count={counted(items.length, 'Feed Item')}
+        feedTitle={latest.feedTitle}
+        onToggle={() => void toggle()}
+      />
       <Meta item={{ ...latest, displayTime: timeSpan(items) }} actions={actions} />
-      {open ? (
-        <ol className="x-card-list">
-          {items.map((item) => (
-            <li key={item.feedItemId}>
-              <TitleLink item={item} onOpen={actions.onOpenItem} />
-              <span className="x-grey x-num">{item.displayTime}</span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="x-card-summary">Latest: {latest.title}</p>
-      )}
+      <ol className="x-card-list">
+        {(open ? items : [latest]).map((item) => (
+          <li key={item.feedItemId} ref={item === latest ? kept : undefined}>
+            <TitleLink item={item} onOpen={actions.onOpenItem} />
+            <span className="x-grey x-num">{item.displayTime}</span>
+          </li>
+        ))}
+      </ol>
     </article>
   )
 }

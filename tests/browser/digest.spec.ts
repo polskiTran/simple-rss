@@ -251,6 +251,65 @@ test.describe('a Firehose Feed’s day', () => {
     await expect(page.getByRole('button', { name: 'Fold 40 Feed Items from Field Notes' })).toBeVisible()
     await expect(title(page, 'Ledger entry 40')).toBeVisible()
   })
+
+  test('unfolds and folds without moving its head or the rows past it', async ({ page, installation }) => {
+    await asFirehose(page)
+    await openDigest(page, installation)
+    const fold = page.locator('.x-fold')
+    const place = () =>
+      fold.evaluate(async (box) => {
+        await Promise.all(document.getAnimations().map((animation) => animation.finished))
+        const head = box.firstElementChild?.getBoundingClientRect()
+        return { head: head?.top, headHeight: head?.height, next: box.nextElementSibling?.getBoundingClientRect().top }
+      })
+
+    const folded = await place()
+    await page.getByRole('button', { name: '40 Feed Items from Field Notes' }).click()
+    const unfolded = await place()
+    await page.getByRole('button', { name: 'Fold 40 Feed Items from Field Notes' }).click()
+    await expect(title(page, 'Ledger entry 40')).toHaveCount(0)
+
+    expect({ head: unfolded.head, headHeight: unfolded.headHeight }).toEqual({
+      head: folded.head,
+      headHeight: folded.headHeight,
+    })
+    expect(await place()).toEqual(folded)
+  })
+
+  for (const layout of ['columns', 'wall']) {
+    test(`unfolds and folds a ${layout} card in place, frame by frame`, async ({ page, installation }) => {
+      await page.addInitScript((chosen) => localStorage.setItem('digest-layout', chosen), layout)
+      await asFirehose(page)
+      await openDigest(page, installation)
+      const toggle = page.getByRole('button', { name: /40 Feed Items from Field Notes/ })
+      const card = page.locator('.x-card', { has: toggle })
+      const toggleAt = (progress: number) =>
+        card.evaluate(async (box, at) => {
+          box.querySelector('button')?.click()
+          const playing = document.getAnimations()
+          for (const animation of playing) {
+            animation.pause()
+            animation.currentTime = Number(animation.effect?.getTiming().duration) * at
+          }
+          const { left, top, height } = box.getBoundingClientRect()
+          for (const animation of playing) animation.play()
+          await Promise.all(playing.map((animation) => animation.finished))
+          return { left, top, height }
+        }, progress)
+      const folded = await card.evaluate((box) => {
+        const { left, top, height } = box.getBoundingClientRect()
+        return { left, top, height }
+      })
+
+      const unfolding = await toggleAt(0.5)
+      await expect(page.getByRole('button', { name: 'Fold 40 Feed Items from Field Notes' })).toBeVisible()
+      const folding = await toggleAt(0.999)
+      await expect(title(page, 'Ledger entry 40')).toHaveCount(0)
+
+      expect({ left: unfolding.left, top: unfolding.top }).toEqual({ left: folded.left, top: folded.top })
+      expect(folding.height).toBeCloseTo(folded.height, 0)
+    })
+  }
 })
 
 test.describe('the Digest on a phone', () => {

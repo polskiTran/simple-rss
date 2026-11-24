@@ -23,6 +23,7 @@ import {
   LAYOUT_LABELS,
   Pictures,
   type RowActions,
+  FoldToggle,
   useFold,
 } from './digest-layouts.js'
 import { FIREHOSE_TREATMENT, type FirehoseTreatment, splitDay, timeSpan } from './firehose.js'
@@ -259,22 +260,19 @@ function Fold({
 }) {
   const rhythmOf = useRhythmOf()
   const [latest] = items
-  const { open, box, toggle } = useFold<HTMLDivElement>(date, latest?.feedId, 1)
+  const { open, box, kept, toggle } = useFold<HTMLDivElement, HTMLDivElement>(date, latest?.feedId)
   if (!latest) return null
-  const count = counted(items.length, 'Feed Item')
   return (
     <div ref={box} className="x-fold" data-open={open ? '' : undefined}>
-      <div className="x-row x-fold-head">
+      <div ref={kept} className="x-row x-fold-head">
         <span className="x-t">
-          <Button
-            className="x-action"
-            aria-expanded={open}
-            aria-label={`${open ? `Fold ${count}` : count} from ${latest.feedTitle}`}
-            onClick={() => void toggle()}
-          >
-            {open ? 'Fold' : count}
-          </Button>
-          <span className="x-grey">{open ? `, ${count}` : `\u2002${latest.title}`}</span>
+          <FoldToggle
+            open={open}
+            count={counted(items.length, 'Feed Item')}
+            feedTitle={latest.feedTitle}
+            latest={latest.title}
+            onToggle={() => void toggle()}
+          />
         </span>
         <span className="x-f">
           <FeedLink
@@ -286,11 +284,13 @@ function Fold({
         </span>
         <span className="x-d">{timeSpan(items)}</span>
       </div>
-      {open
-        ? items.map((item) => (
+      {open ? (
+        <div className="x-fold-body">
+          {items.map((item) => (
             <ItemRow key={item.feedItemId} item={item} onOpen={actions.onOpenItem} onSaved={actions.onSaved} />
-          ))
-        : null}
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
