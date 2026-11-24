@@ -51,7 +51,7 @@
 
   & :where(a, button) {
     color: inherit;
-    text-align: left;
+    text-align: start;
   }
 
   & :where(a, button, input):focus-visible {
@@ -285,7 +285,7 @@
 }
 
 .x-save {
-  margin-right: var(--x-unit);
+  margin-inline-end: var(--x-unit);
   color: var(--x-grey);
   opacity: 0;
 
@@ -562,12 +562,27 @@
   position: sticky;
   top: var(--x-unit);
   padding-top: var(--x-half);
+  display: grid;
+  row-gap: var(--x-unit);
   min-width: 0;
   overflow-wrap: anywhere;
 
-  & > div {
-    padding: var(--x-quarter) 0;
+  & .x-save {
+    margin-inline-end: 0;
   }
+}
+
+.x-reader-group > :is(div, a) {
+  padding: var(--x-quarter) 0;
+}
+
+.x-reader-group > a {
+  display: block;
+}
+
+.x-reader-choices {
+  display: grid;
+  row-gap: var(--x-half);
 }
 
 .x-reader-main {
@@ -685,7 +700,7 @@
     color: var(--x-grey);
 
     &[data-sub] {
-      padding-left: var(--x-unit);
+      padding-inline-start: var(--x-unit);
     }
 
     &[aria-current],
@@ -1054,10 +1069,6 @@
   }
 }
 
-.x-reader-gap {
-  margin-top: var(--x-unit);
-}
-
 .x-cadence {
   display: grid;
   grid-auto-flow: column;
@@ -1302,6 +1313,14 @@
 }
 
 @media (min-width: 761px) and (max-width: 1024px) {
+  .x-reader-label {
+    grid-column: 1 / 4;
+  }
+
+  .x-reader-main {
+    grid-column: 4 / 10;
+  }
+
   .x .x-top {
     & > .x-places {
       grid-column: 1 / 4;
@@ -1408,11 +1427,15 @@
   .x-reader-label {
     grid-column: 1 / -1;
     position: static;
+    row-gap: var(--x-half);
+    margin-bottom: calc(var(--x-unit) * 2);
+    padding-top: 0;
+  }
+
+  .x-reader-group:not(.x-reader-choices) {
     display: flex;
     flex-wrap: wrap;
     column-gap: var(--x-unit);
-    margin-bottom: calc(var(--x-unit) * 2);
-    padding-top: 0;
   }
 
   .x-reader-main {

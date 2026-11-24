@@ -161,20 +161,23 @@ so the change can be undone.
 
 ## Reader View
 
-The wall label on the left: the way back, the Feed, the day and time, reading
-time; then Save, the Discussion, Open the Original webpage and Copy link; then
-the Reading Source and Text size as choices; and how far read. The reading
-time keeps its line while the body loads, so nothing below it moves when the
-body arrives. The title, the summary as an excerpt in grey (three lines, or
-whole when no body could be read) and the body in the main columns, at most
-66ch. A body that arrives after the screen opens fades in over 240ms, rising
-6px (only the fade under reduced motion); a waiting note shows only after
-400ms. With three or more headings,
-an outline on the right follows the reading position. Next is pinned to the
-bottom edge in the Digest's columns. Next and `j` follow the Digest's folding:
-from a quiet Feed they skip the Firehose, from a Firehose Feed they stay inside
-it; `k` steps back and Escape returns. Below 760px the label wraps above the
-title and the outline is hidden.
+The wall label on the left, in five groups a unit apart: the way back; the
+Feed, the day and time, and reading time; Save, the Discussion, Open the
+Original webpage and Copy link; the Reading Source and Text size, each on its
+own line half a unit apart; and how far read, which updates as the page grows.
+The reading time keeps its line while the body loads, so nothing below it
+moves when the body arrives. The title, the summary as an excerpt in grey
+(three lines, or whole when no body could be read) and the body in the main
+columns, at most 66ch. A body that arrives after the screen opens fades in over
+240ms, rising 6px (only the fade under reduced motion); a waiting note shows
+only after 400ms. With three or more headings, an outline on the right follows
+the reading position. Next is pinned to the bottom edge in the Digest's
+columns. Next and `j` follow the Digest's folding: from a quiet Feed they skip
+the Firehose, from a Firehose Feed they stay inside it; `k` steps back and
+Escape returns. From 761px to 1024px the label takes three columns and the
+body moves over by one. Below 760px the label sits above the title, each group
+a wrapping row and the two choices on lines of their own, and the outline is
+hidden.
 
 ## Search results
 

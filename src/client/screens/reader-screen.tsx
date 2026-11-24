@@ -57,10 +57,8 @@ export function ReaderScreen({ feedItemId, origin, onBack, onStep, onOpenFeed }:
     return (
       <div className="x-reader x-grid">
         <div className="x-reader-label">
-          <div>
-            <div>
-              <BackLink origin={origin} onBack={onBack} />
-            </div>
+          <div className="x-reader-group">
+            <BackLink origin={origin} onBack={onBack} />
           </div>
         </div>
         <div className="x-reader-main">
@@ -158,66 +156,75 @@ function OpenReader({
   return (
     <article className="x-reader x-grid" data-text={textSize}>
       <div className="x-reader-label">
-        <BackLink origin={origin} onBack={onBack} />
-        <div>
-          <FeedLink feedId={item.feedId} title={item.feedTitle} rhythm={rhythmOf(item.feedId)} onOpen={onOpenFeed} />
+        <div className="x-reader-group">
+          <BackLink origin={origin} onBack={onBack} />
         </div>
-        <div className="x-grey">
-          {dayTitle(item.date, item.today)}
-          {time ? `, ${time}` : ''}
+        <div className="x-reader-group">
+          <div>
+            <FeedLink feedId={item.feedId} title={item.feedTitle} rhythm={rhythmOf(item.feedId)} onOpen={onOpenFeed} />
+          </div>
+          <div className="x-grey">
+            {dayTitle(item.date, item.today)}
+            {time ? `, ${time}` : ''}
+          </div>
+          <div className="x-grey x-reader-held">
+            {shown ? (
+              <span className="x-reader-settle">
+                {shown.content.readingTimeMinutes} min read
+                {shown.source === 'feed-content' && shown.content.truncated ? ', shortened' : ''}
+              </span>
+            ) : null}
+          </div>
         </div>
-        <div className="x-grey x-reader-held">
-          {shown ? (
-            <span className="x-reader-settle">
-              {shown.content.readingTimeMinutes} min read
-              {shown.source === 'feed-content' && shown.content.truncated ? ', shortened' : ''}
-            </span>
+        <div className="x-reader-group">
+          <div>
+            <SaveToggle
+              className="x-save x-save-shown"
+              feedItemId={item.feedItemId}
+              title={item.title}
+              saved={item.saved}
+              onSaved={onSaved}
+            />
+          </div>
+          {item.discussionUrl ? (
+            <div>
+              <a className="x-grey x-link" href={item.discussionUrl} target="_blank" rel="noopener noreferrer">
+                Discussion
+              </a>
+            </div>
           ) : null}
+          {item.link ? (
+            <div>
+              <a className="x-grey x-link" href={item.link} target="_blank" rel="noopener noreferrer">
+                Open the Original webpage
+              </a>
+            </div>
+          ) : null}
+          {item.link ? <CopyLink link={item.link} /> : null}
         </div>
-        <div className="x-reader-gap">
-          <SaveToggle
-            className="x-save x-save-shown"
-            feedItemId={item.feedItemId}
-            title={item.title}
-            saved={item.saved}
-            onSaved={onSaved}
+        <div className="x-reader-group x-reader-choices">
+          <Options
+            label="Reading Source"
+            options={READING_SOURCE_OPTIONS.map((option) => ({
+              ...option,
+              disabled: option.value === 'feed-content' ? !item.feedContent : !item.link,
+            }))}
+            value={source}
+            onChange={setChosen}
+          />
+          {shown && shown.source !== source ? (
+            <div className="x-grey x-reader-settle">{READING_SOURCE_LABELS[shown.source]} for now</div>
+          ) : null}
+          <Options
+            label="Text size"
+            options={TEXT_SIZES.map((size) => ({ value: size, label: TEXT_SIZE_LABELS[size] }))}
+            value={textSize}
+            onChange={TEXT_SIZE.choose}
           />
         </div>
-        {item.discussionUrl ? (
-          <div>
-            <a className="x-grey x-link" href={item.discussionUrl} target="_blank" rel="noopener noreferrer">
-              Discussion
-            </a>
-          </div>
-        ) : null}
-        {item.link ? (
-          <div>
-            <a className="x-grey x-link" href={item.link} target="_blank" rel="noopener noreferrer">
-              Open the Original webpage
-            </a>
-          </div>
-        ) : null}
-        {item.link ? <CopyLink link={item.link} /> : null}
-        <Options
-          label="Reading Source"
-          className="x-reader-gap"
-          options={READING_SOURCE_OPTIONS.map((option) => ({
-            ...option,
-            disabled: option.value === 'feed-content' ? !item.feedContent : !item.link,
-          }))}
-          value={source}
-          onChange={setChosen}
-        />
-        {shown && shown.source !== source ? (
-          <div className="x-grey x-reader-settle">{READING_SOURCE_LABELS[shown.source]} for now</div>
-        ) : null}
-        <Options
-          label="Text size"
-          options={TEXT_SIZES.map((size) => ({ value: size, label: TEXT_SIZE_LABELS[size] }))}
-          value={textSize}
-          onChange={TEXT_SIZE.choose}
-        />
-        <ReadProgress />
+        <div className="x-reader-group">
+          <ReadProgress />
+        </div>
       </div>
 
       <div className="x-reader-main">
@@ -316,10 +323,13 @@ function ReadProgress() {
       })
     }
     measure()
+    const grown = new ResizeObserver(measure)
+    grown.observe(document.body)
     window.addEventListener('scroll', measure, { passive: true })
     window.addEventListener('resize', measure)
     return () => {
       cancelAnimationFrame(frame)
+      grown.disconnect()
       window.removeEventListener('scroll', measure)
       window.removeEventListener('resize', measure)
     }
