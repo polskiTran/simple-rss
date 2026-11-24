@@ -9,7 +9,22 @@ export const STAGE_NOTES = {
   parsing: 'Still reading the original webpage',
 } as const satisfies Record<ReaderDeadlineStage, string>
 
-export function deadlineStage(cause: unknown): ReaderDeadlineStage | undefined {
+const DEFAULT_WAIT_SECONDS = 30
+
+const STAGE_FAILURES = {
+  publisher: 'The publisher didn’t answer in time.',
+  parsing: 'Reading the original webpage took too long.',
+} as const satisfies Record<ReaderDeadlineStage, string>
+
+export function articleFailure(cause: unknown): string {
+  const stage = deadlineStage(cause)
+  if (stage) return STAGE_FAILURES[stage]
+  if (cause instanceof ApiError && cause.status === 429)
+    return `The Original webpage couldn’t be read yet. Wait ${cause.retryAfterSeconds ?? DEFAULT_WAIT_SECONDS} seconds, then retry.`
+  return 'The Original webpage couldn’t be read.'
+}
+
+function deadlineStage(cause: unknown): ReaderDeadlineStage | undefined {
   return cause instanceof ApiError && cause.failure.code === 'article_deadline_exceeded'
     ? cause.failure.stage
     : undefined

@@ -1,0 +1,11 @@
+# Replace v2 with the ledger interface
+
+The client has one interface: the ledger the experimental interface grew into (ADR 0032), described in `docs/DESIGN.md`. v2 and the per-device Interface choice are gone. `app.tsx` `App` renders `screens/gate-screens.tsx` `GateScreen` until the access gate opens and `screens/shell.tsx` `Shell` after; there is no other shell. The screens live in `src/client/screens/`, styled by `screens/screens.css` under the `x-` prefix; `styles.css` keeps only the fonts (Geist and Geist Mono), the Tailwind base Streamdown's code blocks rely on, and the Appearance switch.
+
+The experiment earned its place by the measure ADR 0032 set: every screen was designed, including sign-in and setup, and every v2 behaviour the User relies on was carried over before v2 went — the Feeds screen's first-check polling and Retry, the Digest's motion (ADR 0026), the Reader View's deadline refetches and stage-specific failures, the way back on a Feed and the Reader View (ADR 0028), and a failure that says whether the server answered (ADR 0030). Some v2 behaviour was dropped on purpose: the Reader View's Summary box (the stored summary now shows only while there is no article to read), the Digest's per-Feed chips and month calendar (a 5-week Day calendar replaces the calendar), Quiet Spell notes, the Feeds screen's sort orders and Rhythm jumps, live filtering from the search line (it submits on Enter), and the Cadence statistics on a Feed.
+
+The tests moved with the behaviour, not the markup. Unit tests and browser specs assert what a User reads and can operate; tests that pinned only v2 layout were deleted rather than translated. `tests/client/design-foundation.test.ts` now reads `screens.css` and holds its promises: OKLCH only, each surface token bound once for both schemes, the contrast pairs the ledger uses, no radii, no capitals, hover gated on a pointer that can hover, and monospace only inside an article.
+
+What this accepts: one design system instead of two, at the cost of the dropped behaviour above, which a later decision can bring back on the ledger's terms. The stored choices `digest-layout`, `firehose` and `text-size` replace their `experimental:` keys, so a device that chose them before forgets them once.
+
+This supersedes ADR 0010 and ADR 0032.

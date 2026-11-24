@@ -68,7 +68,7 @@ Some sandboxes resolve every hostname to `198.18.0.1`. Set `ALLOW_RESERVED_FETCH
 - [ADR 0007: Record Subscriptions before their first retrieval](docs/adr/0007-record-subscriptions-before-their-first-retrieval.md) (narrowed to OPML Import by 0012)
 - [ADR 0008: Interactive behavior from Base UI](docs/adr/0008-interactive-behavior-from-base-ui.md)
 - [ADR 0009: Rank Search by match quality blended with recency](docs/adr/0009-rank-search-by-match-quality-blended-with-recency.md)
-- [ADR 0010: The v2 design system](docs/adr/0010-v2-design-system.md)
+- [ADR 0033: One ledger interface replaces v2](docs/adr/0033-one-ledger-interface-replaces-v2.md)
 - [ADR 0011: Page the Digest by whole days over a stored chronology](docs/adr/0011-page-the-digest-by-whole-days-over-a-stored-chronology.md)
 - [ADR 0012: Check a Subscription before recording it](docs/adr/0012-check-a-subscription-before-recording-it.md)
 - [ADR 0013: Back up with VACUUM INTO, and restore only into an empty data directory through a verified staging copy](docs/adr/0013-backup-and-restore.md)

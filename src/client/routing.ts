@@ -16,7 +16,7 @@ export type Route = (typeof ROUTES)[number]
 export const ROUTE_LABELS = {
   digest: 'Digest',
   feeds: 'Feeds',
-  saved: 'Saved',
+  saved: 'Library',
   settings: 'Settings',
 } as const satisfies Record<Route, string>
 
@@ -124,7 +124,7 @@ export function originOf(location: ScreenLocation, feedTitle = 'Feed'): Origin {
   }
 }
 
-export function searchHomeOf(location: ScreenLocation): string {
+function searchHomeOf(location: ScreenLocation): string {
   if (location.screen !== 'search') return originOf(location).path
   return location.origin?.path ?? sectionPath('digest')
 }

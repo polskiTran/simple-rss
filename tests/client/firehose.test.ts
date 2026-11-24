@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { queueAround, splitDay } from '../../src/client/experimental/firehose.js'
+import { queueAround, splitDay } from '../../src/client/screens/firehose.js'
 import { digestGroup, digestItem } from './fixtures.js'
 
 const LOUD = 9

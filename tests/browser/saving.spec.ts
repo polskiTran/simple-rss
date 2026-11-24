@@ -1,17 +1,11 @@
 import type { Page } from '@playwright/test'
-import { addFeed, expect, USER_PASSWORD, SETUP_SECRET, test, type Installation } from './installation.js'
+import { addFeed, claim, expect, goTo, test, type Installation } from './installation.js'
 
 async function openPost(page: Page, installation: Installation) {
-  await page.goto(installation.url)
-  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'Claim installation' }).click()
-  await page.getByRole('link', { name: 'Feeds', exact: true }).click()
+  await claim(page, installation.url)
   await addFeed(page, installation.feedUrl)
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
-  await page.getByRole('link', { name: 'Digest', exact: true }).click()
-  await page.getByRole('link', { name: 'First light' }).first().click()
+  await goTo(page, 'Digest')
+  await page.getByRole('main').getByRole('link', { name: 'First light' }).first().click()
   await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
 }
 
@@ -20,7 +14,7 @@ const failedLine = (page: Page) => page.getByRole('status').filter({ hasText: 'c
 test.describe('saving on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('turns the bookmark on at the tap, before the server answers', async ({ page, installation }) => {
+  test('turns Save to Saved at the tap, before the server answers', async ({ page, installation }) => {
     await openPost(page, installation)
     await page.route('**/api/library/*', () => {})
 
@@ -29,7 +23,7 @@ test.describe('saving on a phone', () => {
     await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('puts the bookmark back and shows the failure until it is dismissed', async ({ page, installation }) => {
+  test('puts Save back and shows the failure until it is dismissed', async ({ page, installation }) => {
     await openPost(page, installation)
     await page.route('**/api/library/*', (route) => route.fulfill({ status: 503, json: {} }))
 
@@ -55,8 +49,8 @@ test.describe('saving on a phone', () => {
     })
 
     await page.getByRole('button', { name: 'Save First light' }).click()
-    await page.getByRole('link', { name: 'Back to Digest' }).first().click()
-    await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
+    await page.locator('.x-back').click()
+    await expect(page.getByRole('heading', { level: 2, name: 'Today' })).toBeVisible()
     answer()
 
     await expect(failedLine(page)).toBeVisible()

@@ -1,82 +1,59 @@
 import type { Page } from '@playwright/test'
-import {
-  addFeed,
-  expect,
-  expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
-  test,
-  type Installation,
-} from './installation.js'
-
-async function claimToFeeds(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'Claim installation' }).click()
-  await page.getByRole('link', { name: 'Feeds', exact: true }).click()
-}
+import { addFeed, claim, expect, expectNoHorizontalOverflow, goTo, test, type Installation } from './installation.js'
 
 async function subscribe(page: Page, installation: Installation): Promise<void> {
-  await claimToFeeds(page, installation)
+  await claim(page, installation.url)
   await addFeed(page, installation.feedUrl)
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Field Notes' })).toBeVisible()
 }
 
 async function subscribeFromSite(page: Page, installation: Installation): Promise<void> {
-  await claimToFeeds(page, installation)
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Add feed' })
-  await dialog.getByRole('textbox', { name: 'URL' }).fill(installation.siteUrl)
+  await claim(page, installation.url)
+  await goTo(page, 'Feeds')
+  await page.getByRole('textbox', { name: 'Site or Feed address' }).fill(installation.siteUrl)
 
-  await expect(dialog.getByRole('radiogroup', { name: 'publisher.example names 2 feeds' })).toBeVisible()
-  await expect(dialog.getByRole('radio', { name: 'Field Notes' })).toBeChecked()
-  await expect(dialog.getByText('First light')).toBeVisible()
-  await dialog.getByRole('radio', { name: 'Long Meadow' }).click()
-  await expect(dialog.getByText('Meadow note 0', { exact: true })).toBeVisible()
-  await expect(dialog.getByText('First light')).toHaveCount(0)
-  const overflow = await dialog.evaluate((panel) => panel.scrollWidth - panel.clientWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
+  const choices = page.getByRole('group', { name: 'Feeds named by publisher.example' })
+  await expect(choices.getByRole('button', { name: 'Field Notes' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('First light')).toBeVisible()
+  await choices.getByRole('button', { name: 'Long Meadow' }).click()
+  await expect(page.getByText('Meadow note 0', { exact: true })).toBeVisible()
+  await expect(page.getByText('First light')).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
 
-  await dialog.getByRole('button', { name: 'Subscribe', exact: true }).click()
-  await expect(dialog).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Long Meadow' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Subscribe to Long Meadow' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Long Meadow' })).toBeVisible()
+  await goTo(page, 'Feeds')
+  await expect(page.getByRole('main').getByRole('link', { name: 'Long Meadow' })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('link', { name: 'Field Notes' })).toHaveCount(0)
 }
 
-function narrow(page: Page): boolean {
-  return (page.viewportSize()?.width ?? 0) <= 1024
+async function openFeed(page: Page, title = 'Field Notes'): Promise<void> {
+  await goTo(page, 'Feeds')
+  await page.getByRole('main').getByRole('link', { name: title }).click()
+  await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
 }
 
 async function expectFeedAndDigest(page: Page, installation: Installation): Promise<void> {
   await subscribe(page, installation)
-  await expect(page.getByText('publisher.example')).toBeVisible()
-  const visibleCadenceDays = await page
-    .locator('.cadence-day')
-    .evaluateAll((days) => days.filter((day) => getComputedStyle(day).display !== 'none').length)
-  expect(visibleCadenceDays).toBe(narrow(page) ? 14 : 30)
+  await goTo(page, 'Feeds')
+  await expect(page.getByRole('main').getByText('publisher.example')).toBeVisible()
 
-  await page.getByRole('link', { name: 'Digest', exact: true }).click()
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
-  const item = page.locator('main .feed-day', { hasText: 'First light' })
-  await expect(item.getByRole('link', { name: 'Field Notes' })).toBeVisible()
-  const save = item.getByRole('button', { name: 'Save First light' })
-  if (narrow(page)) await expect(save).toBeHidden()
-  else await expect(save).toHaveAttribute('aria-pressed', 'false')
+  await goTo(page, 'Digest')
+  const today = page.getByRole('region', { name: 'Today' })
+  await expect(today.getByRole('link', { name: 'First light' })).toBeVisible()
+  await expect(today.getByRole('link', { name: 'Field Notes' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('main')).not.toContainText(/unread/i)
   await expectNoHorizontalOverflow(page)
 }
 
 async function expectOpenFeed(page: Page): Promise<void> {
-  await page.getByRole('link', { name: 'Field Notes' }).click()
-  await expect(page.getByRole('group', { name: '26 weeks of Cadence for Field Notes' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Back to Feeds' })).toBeVisible()
-  await expect(page.getByText('publisher.example')).toBeVisible()
+  await openFeed(page)
+  const grid = page.getByRole('group', { name: '26 weeks of Cadence for Field Notes' })
+  await expect(grid).toBeVisible()
+  await expect(page.locator('.x-back')).toHaveText('Feeds')
 
-  expect(await page.locator('.cadence-grid .cadence-cell').count()).toBeGreaterThanOrEqual(176)
-  expect(await page.locator('.cadence-month').count()).toBeGreaterThanOrEqual(3)
-  const offScreen = await page.locator('.cadence-grid .cadence-cell').evaluateAll(
+  const offScreen = await grid.locator('> *').evaluateAll(
     (cells) =>
       cells.filter((cell) => {
         const box = cell.getBoundingClientRect()
@@ -85,37 +62,32 @@ async function expectOpenFeed(page: Page): Promise<void> {
   )
   expect(offScreen).toBe(0)
 
-  const day = page.locator('button.cadence-cell')
+  const day = grid.getByRole('button')
   await expect(day).toHaveCount(1)
   await day.press('Enter')
-  expect(await page.evaluate(() => document.activeElement?.textContent)).toContain('First light')
-  await expect(page.locator('main article.item').getByText('07:15')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('region', { name: 'Today' })).toBeFocused()
+  await expect(page.getByRole('region', { name: 'Today' }).getByText('07:15')).toBeVisible()
   await expectNoHorizontalOverflow(page)
 
-  const interval = page.getByRole('combobox', { name: 'Check every' })
-  await expect(interval).toHaveValue('120')
-  await interval.selectOption({ label: '6 hours' })
-  await expect(interval).toHaveValue('360')
+  const interval = page.getByRole('group', { name: 'Polling interval' })
+  await expect(interval.getByRole('button', { name: '2 hours', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await interval.getByRole('button', { name: '6 hours', exact: true }).click()
+  await expect(interval.getByRole('button', { name: '6 hours', exact: true })).toHaveAttribute('aria-pressed', 'true')
+
   const refresh = page.getByRole('button', { name: 'Refresh now' })
   await refresh.click()
-  await expect(page.getByText('Refreshed. The feed shows 1 item.')).toBeVisible()
-  await refresh.click()
+  await expect(page.getByText('Refreshed. The Feed shows 1 Feed Item.')).toBeVisible()
+  await page.getByRole('button', { name: 'Refresh now' }).click()
   await expect(page.getByText('Checked a moment ago. Wait a little before retrying.')).toBeVisible()
 
-  await page.getByRole('link', { name: 'Back to Feeds' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: /^Feeds/ })).toBeVisible()
+  await page.locator('.x-back').click()
+  await expect(page).toHaveURL(/\/feeds$/)
 }
 
-async function openFeed(page: Page, title = 'Field Notes'): Promise<void> {
-  await page.getByRole('link', { name: title }).click()
-  await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
-}
-
-test.describe('desktop Feed and Digest rendering', () => {
+test.describe('desktop Feeds and Feed', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('lists the Feed with its Cadence and shows its item in the Digest', async ({ page, installation }) => {
+  test('lists the Feed with its site and shows its Feed Item in the Digest', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
   })
 
@@ -123,156 +95,105 @@ test.describe('desktop Feed and Digest rendering', () => {
     await subscribeFromSite(page, installation)
   })
 
-  test('opens one Feed into its Cadence grid and manages it there', async ({ page, installation }) => {
+  test('opens one Feed into its Cadence and manages it there', async ({ page, installation }) => {
     await subscribe(page, installation)
     await expectOpenFeed(page)
   })
 
-  test('centres the Feed’s actions on the first line of its title', async ({ page, installation }) => {
-    await subscribe(page, installation)
-    await page.getByRole('link', { name: 'Field Notes' }).click()
-    const title = page.getByRole('heading', { level: 1, name: 'Field Notes' })
-    const edit = page.getByRole('button', { name: 'Edit', exact: true })
-    await expect(edit).toBeVisible()
-
-    const firstLineCentre = await title.evaluate(
-      (heading) => heading.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(heading).lineHeight) / 2,
-    )
-    const editCentre = await edit.evaluate((button) => {
-      const { top, height } = button.getBoundingClientRect()
-      return top + height / 2
-    })
-    expect(editCentre).toBeCloseTo(firstLineCentre, 0)
-  })
-
-  test('keeps a busy control’s label in its own colours while it works', async ({ page, installation }) => {
-    await subscribe(page, installation)
-    await page.getByRole('link', { name: 'Field Notes' }).click()
-    await page.route('**/api/feeds/*/refresh', () => {})
-    await page.getByRole('button', { name: 'Refresh now' }).click()
-
-    const busy = page.getByRole('button', { name: 'Refreshing…' })
-    await expect(busy).toHaveAttribute('aria-busy', 'true')
-    const colour = (name: string) =>
-      page.getByRole('button', { name, exact: true }).evaluate((button) => getComputedStyle(button).color)
-    expect(await colour('Refreshing…')).toBe(await colour('Edit'))
-  })
-
-  test('changes the reading source by keyboard and keeps the server choice when the Feed is reopened', async ({
+  test('changes the Reading Source by keyboard and keeps the server’s choice when the Feed is reopened', async ({
     page,
     installation,
   }) => {
     await subscribe(page, installation)
     await openFeed(page)
 
-    const original = page.getByRole('button', { name: 'Original webpage' })
-    const feedContent = page.getByRole('button', { name: 'Feed content' })
+    const choice = page.getByRole('group', { name: 'Reading Source' })
+    const original = choice.getByRole('button', { name: 'Original webpage' })
     await expect(original).toHaveAttribute('aria-pressed', 'true')
     await original.focus()
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('Space')
 
-    await expect(feedContent).toHaveAttribute('aria-pressed', 'true')
-    await page.getByRole('link', { name: 'Back to Feeds' }).click()
+    await expect(choice.getByRole('button', { name: 'Feed content' })).toHaveAttribute('aria-pressed', 'true')
     await openFeed(page)
-    await expect(page.getByRole('button', { name: 'Feed content' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      page.getByRole('group', { name: 'Reading Source' }).getByRole('button', { name: 'Feed content' }),
+    ).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('sets a custom name and description in the Edit feed dialog, and clearing them restores the reported values', async ({
+  test('sets a custom name and description, and clearing them restores the reported values', async ({
     page,
     installation,
   }) => {
     await subscribe(page, installation)
     await openFeed(page)
-    await expect(page.locator('.feed-description')).toHaveText('Notes from the field.')
-    await page.getByRole('button', { name: 'Edit' }).click()
+    await expect(page.getByText('Notes from the field.')).toBeVisible()
+    await page.getByRole('button', { name: 'Edit name and description' }).click()
 
-    const dialog = page.getByRole('dialog', { name: 'Edit feed' })
-    const name = dialog.getByRole('textbox', { name: 'Name' })
-    const description = dialog.getByRole('textbox', { name: 'Description' })
+    const name = page.getByRole('textbox', { name: 'Name' })
+    const description = page.getByRole('textbox', { name: 'Description' })
     await expect(name).toHaveAttribute('placeholder', 'Field Notes')
     await expect(description).toHaveAttribute('placeholder', 'Notes from the field.')
     await expect(name).toHaveAttribute('maxlength', '512')
     await expect(description).toHaveAttribute('maxlength', '1024')
     await name.fill('Tech tabloid')
     await description.fill('read weekly')
-    await dialog.getByRole('button', { name: 'Save changes' }).click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Tech tabloid' })).toBeVisible()
-    await expect(page.locator('.feed-description')).toHaveText('read weekly')
-    await page.getByRole('link', { name: 'Back to Feeds' }).click()
+    await expect(page.getByText('read weekly')).toBeVisible()
     await openFeed(page, 'Tech tabloid')
 
-    await page.getByRole('button', { name: 'Edit' }).click()
+    await page.getByRole('button', { name: 'Edit name and description' }).click()
     await expect(name).toHaveValue('Tech tabloid')
     await expect(description).toHaveValue('read weekly')
     await name.fill('')
     await description.fill('')
-    await dialog.getByRole('button', { name: 'Save changes' }).click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Field Notes' })).toBeVisible()
-    await expect(page.locator('.feed-description')).toHaveText('Notes from the field.')
+    await expect(page.getByText('Notes from the field.')).toBeVisible()
   })
 
   test('asks before unsubscribing, then leaves for an empty Feeds list', async ({ page, installation }) => {
     await subscribe(page, installation)
     await openFeed(page)
-    await page.getByRole('button', { name: 'Unsubscribe' }).click()
+    await page.getByRole('button', { name: 'Unsubscribe', exact: true }).click()
 
-    const dialog = page.getByRole('dialog', { name: 'Unsubscribe from Field Notes?' })
-    await expect(dialog.getByText('Its items leave your digest. Saved items stay in Saved.')).toBeVisible()
-    await dialog.getByRole('button', { name: 'Unsubscribe' }).click()
+    await expect(page.getByText('Its Feed Items leave the Digest. Saved ones stay in the Library.')).toBeVisible()
+    await page.getByRole('button', { name: 'Unsubscribe from Field Notes' }).click()
 
     await expect(page).toHaveURL(/\/feeds$/)
-    await expect(page.getByText(/^No feeds yet\./)).toBeVisible()
+    await expect(page.getByText('No Feeds yet.')).toBeVisible()
   })
 })
 
-test.describe('phone Feed and Digest rendering', () => {
+test.describe('phone Feeds and Feed', () => {
   test.use({ viewport: { width: 390, height: 760 } })
 
-  test('keeps the same structure on the phone screen, sections in the top bar', async ({ page, installation }) => {
+  test('keeps the same structure on the phone screen, Settings in the top bar', async ({ page, installation }) => {
     await expectFeedAndDigest(page, installation)
     const settings = await page.getByRole('link', { name: 'Settings', exact: true }).boundingBox()
     expect(settings?.y).toBeLessThan(60)
   })
 
-  test('subscribes to the Feed chosen from those a site declares, inside the sheet', async ({ page, installation }) => {
+  test('subscribes to the Feed chosen from those a site declares', async ({ page, installation }) => {
     await subscribeFromSite(page, installation)
   })
 
-  test('keeps the whole Cadence grid selectable on the phone screen', async ({ page, installation }) => {
+  test('keeps the whole Cadence selectable on the phone screen', async ({ page, installation }) => {
     await subscribe(page, installation)
     await expectOpenFeed(page)
-  })
-})
-
-test.describe('the Add feed sheet on a short phone', () => {
-  test.use({ viewport: { width: 375, height: 420 } })
-
-  test('scrolls back to its title when it is taller than the screen', async ({ page, installation }) => {
-    await claimToFeeds(page, installation)
-    await page.getByRole('button', { name: 'Add feed' }).click()
-    const dialog = page.getByRole('dialog', { name: 'Add feed' })
-    await dialog.getByRole('textbox', { name: 'URL' }).fill(installation.siteUrl)
-    await expect(dialog.getByText('First light')).toBeVisible()
-
-    const sheet = page.locator('.dialog-viewport')
-    expect(await sheet.evaluate((viewport) => viewport.scrollHeight > viewport.clientHeight)).toBe(true)
-    await sheet.evaluate((viewport) => viewport.scrollTo(0, 0))
-    await expect(dialog.getByRole('heading', { name: 'Add feed' })).toBeInViewport({ ratio: 1 })
-    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeInViewport({ ratio: 1 })
   })
 })
 
 test.describe('an opened Feed on the narrowest phone', () => {
   test.use({ viewport: { width: 320, height: 640 } })
 
-  test('fits its actions and its Cadence grid inside the screen', async ({ page, installation }) => {
+  test('fits its actions and its Cadence inside the screen', async ({ page, installation }) => {
     await subscribe(page, installation)
-    await page.getByRole('link', { name: 'Field Notes' }).click()
     await expect(page.getByRole('group', { name: '26 weeks of Cadence for Field Notes' })).toBeVisible()
 
-    await expect(page.getByRole('button', { name: 'Unsubscribe' })).toBeInViewport({ ratio: 1 })
+    await expect(page.getByRole('button', { name: 'Unsubscribe', exact: true })).toBeInViewport({ ratio: 1 })
     await expectNoHorizontalOverflow(page)
   })
 })

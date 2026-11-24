@@ -1,519 +1,191 @@
-# simple — design system
-
-Screens are drawn in `docs/design/v2/`: `desktop/`, `phone/`, `dialogs/` and
-`dark/`. This document is what the stylesheet follows when a drawing and the
-text disagree. Interactive behavior — focus, keyboard, trapping, dismissal —
-comes from Base UI (ADR 0008); why this system replaced the first one is ADR
-0010.
-
-The project is young and this document moves with it: it records what the
-stylesheet does today, and a change that improves the product changes it.
-
-Settings also offers an experimental interface, per device, for every screen.
-It keeps its own system, described in
-`docs/design/experimental/README.md` (ADR 0032); everything here is v2.
-
-## 1. Principles
-
-1. **Colour comes from the content.** The interface is greyscale. Colour
-   appears only in data — Cadence, saved state, search matches and a Feed's
-   return — on a Feed's host, the one link that leaves for the publisher, and
-   on the Feed name an item box links to. It is blue in light mode and yellow
-   in dark; search matches and a Feed's return swap them, so neither reads as
-   saved.
-2. **One shape means you can press it.** Every control is a hard-edged block of
-   the same height. Grey fill is an ordinary action, ink fill is the single
-   primary action on a screen. Counts and status are plain grey text with no
-   box. The only text that acts on its own is a link, and links are underlined —
-   except a Feed's host and an item's Feed name, which are coloured instead.
-3. **Hierarchy from size and weight.** No cards, shadows, tinted bars or
-   coloured headers. Hairlines separate groups; thin-edged boxes hold items and
-   Feeds.
-4. **Say what happens.** Labels are sentence case and name the result: Add
-   feed, Export OPML, Show 16 more, Retry, Unsubscribe.
-5. **Type split by job.** Literata for what you read, Instrument Sans for what
-   you operate.
-
-Never: rounded corners, coloured menu bars, cream paper, mono small caps, ALL
-CAPS, decoration without a source in the data.
-
-## 2. Colour
-
-Tokens are OKLCH. Ink rules are the ink at an alpha, so they sit correctly on
-any ground.
-
-`ink-2` is the quietest grey for small text — meta, counts, placeholders — and
-clears 4.5:1 on `control` as well as `ground`, so a placeholder in a field stays
-readable. A grey control darkens under the pointer and when pressed, past where
-`ink-2` holds, so text that stays grey inside a control — a chip's or a jump
-button's count, an unselected segment — is `ink-off`, which clears 4.5:1 on
-every control fill: `control`, `control-hover`, `toggle-off` and a selected
-segment. On `ground`, `ink-3` clears only 3:1, so it is text only where that is enough:
-the page title's companion value, a Digest day's count, disabled controls and
-separator dots. On a
-selected filter's `ink` fill it clears 4.5:1 and carries that filter's count.
-The lowest step with items, `ramp-2`, is 3:1 against `ground`, so a day with
-one item never reads as empty. A day's number on the Digest month clears 4.5:1 on its
-fill: `ink` up to `ramp-2`, `ground` from `ramp-3`, in both modes. Days of the
-months either side are plain `ink-3` numbers, as a day with nothing is — they
-are picked in their own month. `tests/client/design-foundation.test.ts` holds
-every ratio this section promises against the tokens.
-
-Under forced colours the fills and rings that mark a choice drop out, so a
-selected segment, the current section and a pressed chip take the system's
-`Highlight` instead, and a focused field its outline.
-
-### Light
-
-| Token | Value | Use |
-| --- | --- | --- |
-| `ground` | `oklch(100% 0 0)` | page, dialog panel, selected segment |
-| `ink` | `oklch(17.8% 0 0)` | text, primary button fill |
-| `ink-2` | `oklch(52.5% 0 0)` | meta, secondary text, counts, placeholders |
-| `ink-3` | `oklch(62% 0 0)` | title companion values, a Digest day's count, disabled text, separators |
-| `ink-off` | `oklch(47.5% 0 0)` | grey text inside a control: unselected segments, chip and button counts |
-| `control` | `oklch(95.2% 0 0)` | grey buttons, fields, switch tracks |
-| `control-hover` | `oklch(91.9% 0 0)` | |
-| `primary-hover` | `oklch(32% 0 0)` | primary button under the pointer |
-| `row-hover` | `oklch(97.6% 0 0)` | list rows, undo line |
-| `toggle-off` | `oklch(87.6% 0 0)` | toggle track when off, a grey control pressed |
-| `rule` | ink at `.14` | under group headings |
-| `rule-soft` | ink at `.07` | between rows |
-| `edge` / `edge-hover` | ink at `.12` / `.5` | item boxes |
-| `danger` / `danger-fill` | `oklch(50% 0.182 29.5)` / `oklch(94.8% 0.02 25.2)` | Unsubscribe, errors |
-| `ramp-1…5` | `oklch(95.7% 0.015 277.9)` · `oklch(67.2% 0.11 277.5)` · `oklch(57% 0.153 274.2)` · `oklch(51.4% 0.197 270.9)` · `oklch(43.3% 0.24 267.6)` | Cadence, low to high |
-| `saved` | `ramp-5` | the saved icon in the Reader |
-| `away` | `ramp-5` | a Feed's host, wherever it is shown |
-| `feed-name` | `ramp-4` | the Feed name an item box links to |
-| `saved-tint` | `oklch(91.4% 0.032 277.9)` | the highlight on a saved title |
-| `match` | `oklch(92% 0.1 97)` | search matches, selected text and the tag on a Feed back from a Quiet Spell, under `ink` |
-| `scrim` | ink at `.24` | behind a dialog |
-
-### Dark
-
-| Token | Value |
-| --- | --- |
-| `ground` | `oklch(18.2% 0 0)` |
-| `ink` | `oklch(94.6% 0 0)`; a primary button's text is `ground` |
-| `ink-2` / `ink-3` | `oklch(68.6% 0 0)` / `oklch(53% 0 0)` |
-| `ink-off` | `oklch(72% 0 0)` |
-| `control` / `control-hover` | `oklch(26.9% 0 0)` / `oklch(30.9% 0 0)` |
-| selected segment | `oklch(34.8% 0 0)` |
-| `row-hover` | `oklch(22.6% 0 0)` |
-| `primary-hover` | `oklch(84% 0 0)` |
-| `scrim` | black at `.5` |
-| rules and edges | `ink` at the light alphas |
-| reader body | `oklch(88.8% 0 0)` |
-| `danger` | `oklch(73.2% 0.164 27.1)` |
-| `ramp-1…5` | `oklch(23.9% 0.023 96.7)` · `oklch(49% 0.08 97)` · `oklch(61.3% 0.106 96.1)` · `oklch(73.5% 0.132 95.2)` · `oklch(85.8% 0.158 94.4)` |
-| `saved` | `ramp-5` |
-| `saved-tint` | `oklch(37.5% 0.063 97.7)` |
-| `away` | `ramp-5` |
-| `feed-name` | `ramp-4` |
-| `match` | `oklch(38% 0.075 275)` |
-
-Appearance follows the system unless the User picks Light or Dark in Settings;
-the choice is per device.
-
-## 3. Type
-
-| Role | Face | Size / line-height | Weight |
-| --- | --- | --- | --- |
-| Page title, and each Digest day | Instrument Sans | 48/1.08 desktop, 36/1.08 phone, −0.025em | 500; companion value in `ink-3` at 400; an unbroken name wraps anywhere; a day's distance above it at 17/1.2 400 in `ink-2` (16 on a phone) |
-| Group heading | Instrument Sans | 17/1 desktop, 16/1 phone; 20/1.2 for the sections of Feeds and Saved | 500; count beside it in `ink-2` at 400 |
-| Control label | Instrument Sans | 14/1 (13.5 in switches) | 500 |
-| Meta, captions, notes | Instrument Sans | 13/1.45 | 400, `ink-2` |
-| Item title in a list | Literata | 19/1.4 desktop, 17/1.38 phone | 400; three lines, then an ellipsis |
-| Feed name | Literata | 19/1.2 | 400 |
-| Feed Description | Literata | 17/1.5 | 400 |
-| Reader title | Literata | 44/1.16 desktop, 30/1.18 phone | 400, `text-wrap: balance` |
-| Reader body | Literata | 19/1.7 desktop, 17/1.65 phone | 400, reader-body colour |
-| Wordmark | Literata italic | 21 desktop, 19 phone | 400 |
-
-Numbers in counts and meta use tabular figures, except a Digest day's count,
-which takes the proportional figures of the date beside it.
-
-## 4. Space and size
-
-- Desktop pages are 40px from the sides with content no wider than 1280px;
-  content starts 56px below the header (32px on an opened Feed, which leads
-  with a back button). The Reader's toolbar sits 32px below the header and its
-  title 64px below that.
-- Control height is 36px on desktop and 44px on a phone (48px for fields and
-  sheet buttons). Small inline controls are 30px.
-- Item boxes are 8px apart; groups 56px; Digest days 64px, 48px on a phone; the
-  title row and its toolbar 28px.
-- The reading column is 680px, centred.
-- On desktop a 300px column beside a list — the Digest's month, a Feed filter —
-  stands 64px from it, holds 24px from the top as the list scrolls, and scrolls
-  itself when taller than the window. Without one, a list runs the page's full
-  width.
-- One breakpoint: `max-width: 1024px` is the phone layout. It spans the
-  screen, 20px from the sides on a phone and widening with the screen to 32px
-  on a tablet, so its top bar and lists reach the same edges at every width.
-  Below 375px the phone's top bar drops its mark to keep every square whole.
-- A row that scrolls sideways fades over its trailing 32px, so what is past
-  the edge reads as there: a day's Feed chips at every width, and on a phone
-  the jump buttons and a Feed filter's chips.
-
-## 5. Components
-
-**Header (desktop, 68px).** Mark and wordmark; Digest / Feeds as a switch of
-links; on the right, the search field (340px), then Saved and Settings as grey
-buttons with their icons. Saved or Settings shows it is the current screen
-with a 1px ink ring instead of a fill. Focus moves through it in the order it
-shows: mark, switch, search, Saved, Settings. The header scrolls with the page.
-
-**Phone chrome.** One 60px top bar that scrolls with the page, and nothing
-fixed to the bottom edge: the mark without its wordmark, the Digest / Feeds
-switch, then 44px squares for search, Saved and Settings, the current one
-ringed in ink. Narrower than 375px the mark gives way — the Digest segment
-goes home as well — and no square shrinks or slides under another. An opened Feed swaps the mark and the switch for a back square.
-The Reader keeps only the back square, the search square and its toolbar —
-Open original and Save, and Discussion when the Feed declares one, where Saved
-and Settings stand — so one row holds it
-whole and is focused in the order it is drawn; a search hides the sections
-too. Pressing the search square turns the bar into the search field
-with a back square.
-
-**Section.** Exactly one section is current, including in the Reader: it
-borrows the section it was opened from — Saved for a save, Feeds for an item of
-an opened Feed, the Digest otherwise and when opened by address. An opened Feed
-is always Feeds. A search reads under its scope's section.
-
-**Back button.** A grey button with a leading arrow, named after the screen it
-returns to: Digest, Feeds, Saved, Article, Search, or the Feed's name. It is
-the browser's Back when the screen was opened from there, so it lands on the
-same entry, scrolled where it was left, and the browser's Back never reopens
-what was just closed. A screen opened by address walks forward to its own
-section instead.
-
-**Arriving.** Every screen names itself in the tab — `Digest — simple`, the
-Feed's name, the Feed Item's title — and on each navigation its heading takes
-focus, so the change is announced; the first load leaves focus alone.
-
-**Search field.** Grey, a magnifier before the words and a `/` key hint after
-them; `/` anywhere outside a field focuses it. The placeholder names the Search
-Scope taken from the screen: "Search your reading", "Search your saves",
-"Search your feeds", "Search this feed". With words in it, the field turns
-ground-coloured with a 1px ink ring and a clear button. Focused, it carries
-the 2px focus outline every control does.
-
-**Buttons.** Grey: `control`, ink text, 14/500, 14px side padding, an icon
-before the label (after it for chevrons and the ↗ of a link that leaves).
-Icons are Lucide's, at 16px from its 24px grid at a 2 stroke, with square caps
-and mitred joins.
-Primary: ink fill, ground text; one per screen. Destructive: grey fill, danger
-text. Disabled: `control` fill with `ink-3` text. A control that is busy
-keeps focus (`focusableWhenDisabled`), says what it is doing — Refreshing…,
-Saving… — and keeps its own colours (`aria-busy`), since that label must stay
-readable; only a control with nothing to do greys out. Icon-only: square, same height, with an accessible name. A select is
-a grey button with a trailing chevron, as wide as its chosen value. Pressed, a
-grey control fills with `toggle-off`, a destructive one with `danger-fill`, and
-the primary one steps a further 12% from ink toward `ground`; nothing moves.
-
-**Switch.** A grey track with 3px padding and 2px gaps; the selected segment
-is `ground` with a hairline ring, the rest are `ink-off` and darken on hover.
-Used for sections, views and settings with two or three values. Arrow keys
-move within it. On a phone a screen's switch spans the column, its segments
-sharing the width, padded 4px at least so three fit the narrowest screen.
-
-**Toggle.** 40×22 track with a 16px square knob; ink when on, `toggle-off`
-when off.
-
-**Checkbox.** 14px square (16px on a phone), 1px border; checked is ink with a
-ground tick. The whole row is the hit target.
-
-**Field.** Grey fill, no border, 40px (48px phone), label above in 14/500,
-note below in meta. Focus: ground fill and a 1px ink ring. Error: ground fill,
-a 1px danger ring, and the reason under it in danger.
-
-**Item box.** A thin-edged box with 20px vertical padding. Desktop is a grid:
-a 180px meta column (Feed name in 500, time or date under it in `ink-2`), then
-the title; in a Feed's own list, which names no Feed, the meta column narrows to
-56px for the time. The meta column sits on the title's first baseline. A title
-or snippet holds a measure of 32em — about 66 characters a line — so a box as
-wide as the page keeps its edges with the page's and its lines short enough to
-read. On a phone the Feed name and time share one line above the title. The whole
-box opens the Reader; the Feed name inside it opens the Feed. In search results a
-snippet sits under the title with the matched words marked in `match`.
-
-**Saving in a list.** A saved title is highlighted in `saved-tint`, each line
-filled as a text selection fills it, sweeping across its lines over 420ms as it is saved and reversing from wherever it has
-reached — except on Saved and in a search of it, where every title is saved and
-the highlight would say nothing. On hover or keyboard focus, Save or Saved floats over
-the end of a title's first line, fading what is under it, so saving costs a title no
-width at rest. Where nothing hovers the word stays at the end of the meta line,
-except in the Digest, which saves from the Reader alone. The Reader's toolbar
-keeps its button, with the bookmark in `saved` once saved.
-
-**Feed row.** A thin-edged box with the item box's 24px side padding and 16px
-above and below: Feed name in Literata 19, under it the Feed Home Page host in
-`away`, marked ↗ and underlined on hover — meta text when the Feed names no
-site — and the Cadence strip centred on the right of both. The host looks the
-same wherever a Feed is named; it opens a new tab, and its accessible name says
-so. On a phone the box has 16px padding, the name takes the whole line and the
-strip shares the host's line, or drops under a host too long to share it. Rows
-are 8px apart in two columns wherever each gets 520px, and one column
-otherwise, so a strip never squeezes a name; on a phone they are 12px apart.
-
-**Label and value rows.** Label left in `ink-2`, value right in ink, 40px
-minimum height, `rule-soft` between. Used for a Feed's Info and Settings panels
-and the Settings screen.
-
-**Cadence strip.** 30 days of 5px squares with 2px gaps on desktop, 14 on a
-phone. A day with no items is `ramp-1`; items step up the ramp.
-
-**Cadence grid.** 26 weeks as columns of seven 13px cells with 4px gaps (11px
-and 2px on a phone, the cells narrowing to fill the panel edge to edge where it
-is too narrow for 11), month labels under it and a Fewer → More legend in 10px
-squares — on a phone, squares the size of the cells. A day with items is a
-button that scrolls to that day's items.
-
-**Group.** A group heading with its count in `ink-2`, a `rule` under it on
-panels, then its content. A count is always the whole group's: the Digest's
-come from the server; elsewhere a count appears only once the group is loaded.
-
-**Dialog.** A 560px ground panel with a hairline ring and a soft shadow over
-the `scrim`, 140px from the top. Title 20/500 with a close square; the footer
-is right-aligned Cancel and the primary action, which stays disabled until
-there is something to submit. On a phone it is a hard-edged sheet, still at most
-560px wide and centred, rising from the bottom edge with Cancel and the primary action side by side at 48px;
-a sheet taller than the screen scrolls, and scrolls back to its title. The
-scrim and the desktop panel fade in over 150ms and out over 120ms; the sheet
-rises in over 240ms and sinks out over 180ms, opaque, under the fading scrim.
-While one is open the page's scrollbar gutter takes the scrim's colour too,
-fading with it both ways, so no strip runs down the edge.
-
-**Add feed.** A dialog with a switch of Site or feed URL and Import OPML. The
-address field stays put and what the address answers arrives under it: a paste
-or Enter looks it up at once, typing once it pauses, and "Reading
-publisher.example" is the wait. A lone Feed stands under a rule, not in a box:
-its name and Cadence strip, a meta line — Last item 3 days ago · Weekly — its
-five newest titles in Literata 16, two lines at most, each with its day in
-meta, then the Feed's address. A page naming several says so — "publisher.example
-names 3 feeds" — and gives each a box with its name, strip and
-meta line. The first is chosen, ringed in ink with no radio mark, and only the
-chosen box opens to its titles; arrow keys move the choice. A Feed with no item
-in 90 days says Last item 2 years ago in ink at 500. One already followed says You follow
-this, and the primary action reads Already subscribed, disabled. A page that
-names no Feed, or an address that doesn't answer, is a field error with its
-reason; the second ends "Nothing was added." and turns the primary action to
-Retry. Subscribe is the one primary action, and its new row simply arrives in
-the list. No field carries a note: the switch names both kinds of address, and
-the Import tab's only line under its file is a refusal.
-
-**Undo line.** Removing something from a list leaves a `row-hover` line in
-its place saying what happened, with an outlined Undo button. The line is at
-least as tall as what it replaces, so the list does not jump.
-
-**Digest.** The date heading is the page's title, so the word Digest is kept for
-screen readers and shown only before the first Subscription. One list, newest
-day first, each day headed by its full date in the page title's style with the
-count as its companion in parentheses — `Thursday 12 November (202)` — so the
-count never reads as the date's year, and how far back it is on a line above.
-On a phone the date shortens to `Thu 12 Nov (202)`, while screen readers still
-hear it in full. On desktop the
-first day's line rises into the page's padding, so the date sits where every
-other screen's title does. Under the heading the day's Feeds
-stand as chips with their counts, in one row that scrolls sideways at every width; a pressed chip, ringed in ink, shows that Feed's box
-alone, and pressing it again shows them all. Each Feed that published that day
-gets one thin-edged box, the most recent first. Its first line says who: the
-Feed's name, ending in an ellipsis when it runs long so nothing beside it moves,
-then its count when there is more than one item. Under it each title runs across
-the whole box, two lines at most, with no time; the Reader has it. A lone item's
-box opens the Reader from anywhere in it. Past 5 items the box shows the newest
-3, with Show all and a chevron at the end of the first line, which turns to Show
-less once pressed. The titles already on show never move when it does (see
-Motion), and while unfolded the first line
-sticks to the top of the screen, fading the titles that pass under it, so the
-control is in reach however far down the list. A Feed back after a week or more
-without items says so beside its name, First in 12 days, as a tag filled in
-`match`; beside Show all it takes its own line under the name. Saved titles are
-marked as in any list. The list starts today, or from a
-day picked on the month — that day and everything before it — and the address
-keeps the day, so the way back from an article returns to it. Beside the list, a
-month of the whole Digest: its name with turns to the months before and after,
-and Today before the turns while a past day is on show,
-the days Monday first, each shaded by its count against the calendar's other
-days and those of the months either side plain, the day on show ringed, then the legend. Any day
-with items starts the list there. The Digest reads one way only: what a single
-Feed has published lately is that Feed's own screen. On a phone a calendar
-button at the end of the first date's distance line opens the platform's own date picker, in
-place of the month, with Today before it while a past day is on show; that line is as tall as
-the button whether Today is there or not, and a day's chips run past the screen's edge. The phone Digest saves
-from the Reader alone, and a title runs three lines at most. Pages are whole days,
-as many as reach fifty items, so Show more continues from the next day and
-names no number; Saved ends the same way. Before the first Subscription, the
-Digest is "No feeds yet." and Add feed as the primary action, with no chips and no
-month; with Subscriptions but nothing yet, it is "Nothing yet." The drawn Stream / By source switch is left out.
-
-**Feeds list.** Subscriptions grouped by Rhythm under panel headings, six
-rows to a group, then Show N more; opened,
-Show fewer folds it back. With no Subscriptions there is nothing to export,
-so Export OPML gives way to Add feed alone. Jump buttons
-with each Rhythm's count reach the groups; By name lists everything
-alphabetically instead, and Recently added newest Subscription first. A row says when an imported Feed awaits its first check, or why
-checking fails and when it last reached the Feed, with Retry.
-
-**One Feed.** The way back, then the Feed's name, description and host (as in
-a Feed row) with Edit, Refresh now and Unsubscribe beside them on the title's
-first line — under them on a phone, wrapping to fill each line — then three panels: Cadence (the
-grid), Info (subscribed, items in 26 weeks, busiest day, longest quiet
-stretch, last checked) and Settings (Check every, Open items with). Cadence and Settings
-keep their own widths and Info takes the rest; where the three do not fit on one line,
-Settings wraps under Cadence. Items follow, grouped by
-day with whole counts.
-
-**Reader.** A toolbar — the way back on the left, Open original ↗, Discussion and
-Save on the right — over a 680px column: the title, a meta line of the Feed (a
-link), the day and the minutes to read, the Reading Source switch
-(spanning the column on a phone), then the article.
-While the reading is the Original webpage, the item's summary sits above the
-article in a thin-edged box headed Summary, open on arrival. The Original
-webpage loads under it and nothing replaces it, so the summary is never taken
-from the User mid-sentence; pressing the header folds the box to that line and
-opens it again. Feed Content stands in only once the Original webpage fails.
-The Discussion appears only when the Feed declares one. It is a grey button in
-that toolbar, labelled Discussion beside a chat bubble, and on a phone the same
-square as Open original and Save, the bubble alone, named Discussion. It opens
-in a new tab because it leaves for another site.
-The meta line names the reading only when it is not the one chosen: "Feed
-content for now" once the Original webpage fails, or the one reading
-an item has when the chosen one is missing. Article links are ink and
-underlined; they all leave, so none carries ↗. Next in the digest closes the
-article as an item box.
-
-The reading is set by the stylesheet, not the renderer: headings in Literata at
-1.42em, 1.2em and 1em (600), each with room above it; list markers hanging
-outside the column; a quote behind a 1px ink rule; tables in Instrument Sans
-14/1.45 between hairlines; code squared in a thin-edged box with no controls;
-images inside a faint 1px inset line. Waiting and retrying say what is read —
-"Reading the original webpage", then plain Retry.
-
-**Saved.** The count of saves as the title's companion, then a switch of
-Newest saved, Oldest saved and By feed. The save orders group by the month
-of the save; By feed groups the same list under each Feed's name. Each item's
-meta says when it was saved — Saved today, Saved yesterday, Saved 27 August —
-and, for a save that outlived its Subscription, No longer subscribed.
-
-**Search results.** The words as the title, the count as its companion — and
-the Feed's name when scoped to one. A search begun in a scope (a Feed, Saved,
-Feeds) shows a switch of that scope and Everywhere, moving both ways; Best
-match and Newest sit at the other end wherever items answer. Matching
-Subscriptions lead as Feed rows, a lone one spanning the list, so beside Narrow
-by feed they stack in one column with their strips aligned; items follow
-with what the index matched marked in `match`. Beside them, Narrow by feed lists the
-Feeds the results came from, with counts, and narrows the list to those ticked —
-a checkbox list on desktop, a row of chips on a phone.
-
-**Gate.** Setup and Sign in are the screens before the reader. Their submit
-is never disabled before it is pressed: a reason that belongs to one field —
-empty, wrong, too short, not the same — is that field's error and takes focus.
-Before either, while nothing has said whether this device may read, the page
-says why — Can't reach simple, or simple isn't available — with Retry, and asks
-again on its own when the connection or the tab comes back and on a wait that
-doubles up to a minute.
-
-**Notices.** A result the User waits on outside a dialog — an import, a
-refresh — is one line of meta text in an `aria-live` region under the control
-that started it. Errors give a reason, in danger text, never an apology. A
-failed save is the exception: rows and toolbars have no room and the toggle may
-have left the screen, so one dismissible line sticks to the top of the page.
-
-**Mark.** A 4×4 tile of 4px squares with 2px gaps drawn in the Cadence ramp,
-then the wordmark. The same tile, glinting, stands before every waiting line.
-
-## 6. Words
-
-Screen copy uses the terms in `CONTEXT.md`. Where the drawings say otherwise,
-the shipped words are:
-
-| Drawn | Shipped |
-| --- | --- |
-| Sources | Feeds |
-| post, posts | item, items |
-| Full article / Feed text | Original webpage / Feed content |
-| Open posts as | Open items with |
-| Activity | Cadence |
-| Edit source | Edit feed |
-| Search saved posts | Search your saves |
-| By source | By feed |
-
-Rhythm is shown as **Firehose** (90 or more items in 30 days), **Daily**,
-**Weekly**, **Monthly** and **Inactive** (no items in 30 days). Say what
-happened: "The feed can't be reached. Last reached 7 Sep." Errors give a
-reason: "That password isn't right. Passwords are case-sensitive."
-
-No taglines, helper notes or secondary labels. A heading, a value or a button
-names itself; a sentence that explains a control, repeats a value shown
-elsewhere on the screen, or tells the User to press the button beside it is
-cut, and if the screen does not make sense without it, its layout changes
-instead. What stays is a reason (an error), a consequence the User cannot see
-before acting (a dialog's description: Change password signs out every device;
-Unsubscribe keeps saves), or a state the screen cannot show otherwise ("Feed
-content for now", "Shortened by simple."). A control that changed shows its
-new value itself; no notice repeats it. The gate keeps its own words: Setup and
-Sign in their tagline, Can't reach simple its note, and Settings a note under
-each preference.
-
-## 7. Motion
-
-Screens and lists are instant, but for the Digest's three changes of length
-and the Reader's Summary box below. What the User presses or opens — a control, a
-switch, a screen with its title and toolbar, a hover, a jump within a page —
-changes in the same frame, and nothing moves: a pressed control steps its fill,
-never its size. The lists read many times a day — item boxes, Feed rows and
-cards, group headings, a title's companion value, a Feed's panels — appear
-without a fade.
-An item box steps to `row-hover` while pressed. Hover styles apply only where a
-pointer can hover, so a tap never leaves one behind.
-A saved title's highlight sweeps in as it is saved, the one thing a list moves:
-it answers the press, and with reduced motion it appears at once.
-What answers an action — what an address answers in Add feed, the undo line an
-unsave leaves, the notice or error an action answers with — fades in over 150ms
-as it mounts, opacity only. An article arrives block by block instead: its
-first six blocks fade in over 280ms and rise 8px over 320ms, 0, 40, 75, 105,
-130 and 150ms apart, the next six together at 165ms, and the rest are already
-there. Opacity takes a plain `ease`, since the strong ease-out shows a large
-block almost whole in its first frame. The Original webpage arriving over Feed
-Content is a new article that arrives this way, never text rewritten in place.
-A wait shorter than 400ms shows nothing; after that the waiting line fades in.
-Stepping to another day keeps the one on show until the next answers, so the
-screen changes once rather than emptying first. The new list then fades in over
-240ms, moving 12px: up from below when the User went back in time, down from
-above when they came forward, as the list runs newest first. The days Show more
-adds fade in, 60ms apart, and move nothing.
-
-A Feed's day unfolds over 240ms and folds over 180ms. The list changes height so
-what sits below slides rather than jumps, the titles it reveals fade in
-together, and the titles already on show never move. Folding closes the list
-over its titles before they are cut. A list that runs past the screen travels
-only as far as the screen's bottom edge. Folded from far down, the page returns
-to the box's start in the frame of the press, and the header stays where it was
-stuck.
-
-The Reader's Summary box folds the same way: it opens over 240ms and closes over
-180ms, its text fading with the height so the article below slides rather than
-jumps. Its chevron turns in the frame of the press.
-
-A change of Appearance crossfades the screen over 200ms, the one press that is
-not answered in the same frame.
-
-On Sign in and Setup the mark assembles along its diagonal, once, without
-holding up the form.
-
-On a touch phone the search field opens out of its square over 200ms and closes
-at once.
-
-A dialog is the one thing with an exit (see Dialog). Under
-`prefers-reduced-motion` there is less motion, not none: fades stay, nothing
-moves — the sheet fades in place instead of rising, the search field fades
-instead of opening, a Feed's day and the Summary box change height at once, another day and an
-article's blocks only fade in, and the waiting tile and the mark hold still.
-
-## 8. Not yet designed
-
-Drawn but waiting on the API: Show in digest and a Feed's editable URL. Not drawn: empty states beyond the Digest's
-first run, confirmations after adding or importing, the reader fallback, offline, and the
-dark versions of most screens — these follow the components above.
+# Design
+
+The client's interface is one ledger on a twelve-column grid (ADR 0033). This
+file records what its stylesheet, `src/client/screens/screens.css`, does;
+`src/client/styles.css` adds only the fonts, the Tailwind base Streamdown's
+code blocks need, and the Appearance switch. The screens were ported from the
+prototype at `docs/design/prototype/index.html`, opened from disk with data
+exported by `docs/design/prototype/export-dev-data.mjs` into `.data/`; the
+prototype is a design reference, never served and outside the build. When
+this file and the stylesheet disagree, the stylesheet is what ships, and a
+change that improves the product changes both.
+
+## System
+
+- **Type.** Geist at 13px on an 18px line, everywhere but the Reader View's
+  title and body, which set 17px on 28px (15/25 and 19/31 under Text size).
+  Weight 500 marks the current place and the Reader View's title; nothing is
+  set in capitals. Code is Geist Mono.
+- **Grid.** Twelve flush columns with a 12px gutter and a 12px page inset, no
+  maximum width. A row is label (columns 1–2), main (3–8), side (9–10) and end
+  (11–12). Below 760px every column spans the page.
+- **Controls.** Choices are words in a row, the chosen one in ink and the rest
+  grey; actions are ink words 24px apart; fields sit on the page tone. A
+  screen's options and actions are rows of its own ledger, never a menu.
+- **Surfaces.** No hairlines, borders, radii or shadows. Separation is space
+  and tone: `--x-tone` under a hovered or focused row, and an unfolded fold.
+- **Colour.** OKLCH, greyscale paper and ink, warm hue 95. Colour appears only
+  in data: a Feed's name and Cadence take its Rhythm's colour — Firehose
+  `oklch(0.63 0.19 35)`, Daily `oklch(0.78 0.14 82)`, Weekly
+  `oklch(0.62 0.12 150)`, Monthly `oklch(0.52 0.08 250)`, Inactive grey — with
+  lightness capped at 0.62 on light paper so Daily stays legible. Saved is the
+  pink: a saved row sits on a pink wash and shows the word Saved beside its
+  time, and selected text takes the same pink. Dark follows Appearance through `light-dark()`.
+
+## Sign-in and setup
+
+Before the access gate opens there is no top bar, only a ledger under the name
+simple: Sign in, with a Password line; or Set up simple, with Setup secret,
+Password and Confirm password lines and the reason it is needed. Each line has
+a grey Show beside it. A refused line says why under itself and takes focus;
+anything else is said beside the submit word. While simple is opening the
+ledger says so, and when its server does not answer it says which way, with
+Retry.
+
+## Top bar
+
+One row at the top of every screen: the places (Digest, Library, Feeds) in the
+label columns, the current one in weight 500; the search line in the main
+columns; and Settings at the end. The search line's prompt names its Search
+Scope and it submits to Search results; `/` focuses it, except while another
+field has focus. Below 760px the
+places and Settings share the first line and the search line follows.
+
+## Digest
+
+The ledger is three rows: Layout, Index, Columns or Wall (kept per device);
+Firehose, Fold or Lane; and Day, the day shown, which opens a 5-week calendar
+to pick another. Above them a line appears only when there is nothing to show:
+no Feeds yet, with Add a Feed; nothing on or before the day; or the Digest
+failing to load, with Retry.
+
+In the Index layout, days follow as rows: title, Feed, time, with Save
+revealed on hover or keyboard focus (it fades, so it stays in the tab order).
+The end of a Quiet Spell is not shown. A sticky legend at the bottom names the
+columns. Show older days pages by whole days (ADR 0011).
+
+The two other layouts set each day's Feed Items as cards: the Feed Item's
+image when it has one (proxied, ADR 0018; capped in height and cropped), the
+title, the Feed and time with Save, and up to four lines of summary. A saved
+card sits on the pink wash. A Firehose fold is a card too: the count, the Feed
+and span of times, and the latest title, or every title once unfolded.
+
+- **Columns.** Cards flow down up to four columns, at least 200px wide.
+- **Wall.** Cards hang from a shared bottom line on twelve columns, placed in
+  a cycle of four row patterns that starts at the day of the month, so
+  neighbouring days start on different patterns. Images are capped at 72% of the window height.
+
+Below 760px both become one column. Under Lane, the cards narrow to make room
+for the Lane as the rows do. The legend shows only for Index.
+
+The Digest moves in three places (ADR 0026, `motion.ts`):
+another day keeps the one on show until it answers, then fades in over 240ms,
+rising 12px when going back in time and falling 12px when coming forward; the
+days Show older days adds fade in 60ms apart; and a fold, as a row or a card,
+opens over 240ms and closes over 180ms by its height, the titles it reveals
+fading in. Under reduced motion the height changes at once and only the fades
+remain.
+
+A Firehose Feed is treated one of two ways, chosen in the Firehose row and kept
+per device:
+
+- **Fold** (default). Each Firehose Feed's Feed Items for the day become one
+  row where its latest stands: the count, the latest title in grey, the Feed,
+  and the span of times. A Firehose Feed with one Feed Item that day stays a
+  plain row. Unfolded, the fold is one toned drawer: its head says Fold and the
+  count, and its rows give title and time, never the Feed again. Which folds
+  stand open is kept on the history entry (ADR 0028).
+- **Lane.** The day's Firehose Feed Items move to the last three columns, as
+  tall as the day's own rows and scrolled inside it; the rows narrow to make
+  room. On a phone the Lane follows the day's rows.
+
+## Feed
+
+A ledger: the Feed's name in its Rhythm colour and when it was last checked,
+home page, description, Rhythm with its count over the last 30 days,
+availability, Polling Interval and Reading Source as words, the date
+subscribed, and 26 weeks of Cadence as hard 9px squares, each day with items a
+button that brings that day into view. Its Feed Items follow by day without a
+Feed column.
+
+Under the Feed's name, a row of actions: Refresh now, Edit name and
+description, Unsubscribe. Edit replaces the row with a Name line and a
+Description field on the page tone; an empty line falls back to what the Feed
+reports, shown as the placeholder. Save changes stays grey until something
+changed; Escape or Cancel leaves the form. Unsubscribe adds a line saying what
+it does and a second press, which unsubscribes and returns to Feeds.
+
+## Feeds
+
+The ledger counts the Subscriptions, then Add a Feed and Import. Add a Feed is
+an address line: a pasted address is read at once, a typed one after a pause;
+a site naming several Feeds lists them to choose from; the chosen Feed shows
+its Rhythm, its last Feed Item and its newest titles above Subscribe, which
+opens the new Feed. Import an OPML file reports what it added. With no Feeds
+yet, the address line takes focus; the empty Digest's Add a Feed leads here.
+The Feeds follow grouped by Rhythm, each row the name, the site and its Feed
+Items over the last 30 days. A Feed not yet checked says Waiting for first
+check, and the list asks again every two seconds, up to thirty times, until
+none waits; an import starts the count again. A Feed that stopped answering
+says why and since when, with Retry, which checks it at once and says whether
+it answered.
+
+## Library
+
+The ledger row names the Library, counts the saved Feed Items and names the
+order. Rows group by the month saved, or by Feed when ordered By Feed (chosen
+in the Order row, kept on the history entry). A row gives the title, the
+Feed in its Rhythm colour (grey with a tooltip once unsubscribed) and the day
+saved. Nothing carries the pink wash, since everything here is saved: Saved
+shows on hover or focus, and pressing it greys the row and leaves Save showing
+so the change can be undone.
+
+## Reader View
+
+The wall label on the left: the way back, the Feed, the day and time, reading
+time; then Save, the Discussion, Open the Original webpage and Copy link; then
+the Reading Source and Text size as choices; and how far read. The
+title and body in the main columns, at most 66ch. With three or more headings,
+an outline on the right follows the reading position. Next is pinned to the
+bottom edge in the Digest's columns. Next and `j` follow the Digest's folding:
+from a quiet Feed they skip the Firehose, from a Firehose Feed they stay inside
+it; `k` steps back and Escape returns. Below 760px the label wraps above the
+title and the outline is hidden.
+
+## Search results
+
+The ledger quotes the search and counts what matched, then In, when the search
+has a Search Scope to leave (the scope's name or Everywhere), and Order, Best
+match or Newest (not for a search of Feeds). A Feed gone from the
+Subscriptions says so and offers Search everywhere.
+
+Feeds whose names match come first, as the Feeds screen's rows. Matching Feed
+Items follow grouped by Feed, the groups in the order their best result
+ranks: the label column names the Feed in its Rhythm colour, counts its
+matches and, in a search of everything, offers Search only here, which
+narrows the search to that Feed.
+Each row gives the title and up to two lines of snippet, with matched words on
+the deeper tone, and the day and time, with Save revealed on hover or focus.
+A three-way choice of layouts (a ledger in the Digest's columns, this one, and
+a concordance aligned on the matched word) was prototyped and this one kept.
+
+## Settings
+
+One ledger: Theme (System, Light or Dark, kept on this device), Timezone, Export (OPML or everything as JSON), Account (Change password, which
+opens its three lines in the row, and Sign out) and the version.
+
+## Not built from the prototype
+
+- **The Images choice.** Columns and Wall always show a Feed Item's image
+  when it has one.
+- **Live filtering from the search line.** The line submits to Search
+  results, which search the whole installation by Search Scope.
+- **Check all Feeds now.** The prototype's Feeds menu offers it; no screen has
+  it, and the API checks one Feed at a time.
+
+## Platform
+
+On a phone (below 760px with a coarse pointer) the search line, every field
+and every select set 16px, so iOS does not zoom into a focused field (ADR
+0029). Below 760px the Feed's Cadence squares sit 2px apart instead of 3px, so
+26 weeks fit a 320px screen.

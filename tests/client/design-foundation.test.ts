@@ -5,7 +5,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 let css: string
 
 beforeAll(async () => {
-  css = await readFile(resolve(process.cwd(), 'src/client/styles.css'), 'utf8')
+  const sheets = ['src/client/styles.css', 'src/client/screens/screens.css']
+  css = (await Promise.all(sheets.map((sheet) => readFile(resolve(process.cwd(), sheet), 'utf8')))).join('\n')
 })
 
 function declarations(property: string): string[] {
@@ -22,30 +23,31 @@ describe('colour', () => {
   })
 
   it('binds each colour token once for both schemes', () => {
-    const tokens = css.match(/--color-[\w-]+\s*:\s*[^;]+/g) ?? []
-    expect(tokens.length).toBeGreaterThan(0)
-    for (const token of tokens) expect(token).toMatch(/:\s*(light-dark|var)\(/)
+    const bound = css.match(/--x-(?:paper|tone|tone-deep|ink|grey|wash)\s*:\s*[^;]+/g) ?? []
+    expect(bound.length).toBe(6)
+    for (const token of bound) expect(token).toMatch(/:\s*light-dark\(/)
   })
 })
 
 function tokens(): Map<string, readonly [string, string]> {
   const raw = new Map(
-    [...css.matchAll(/--color-([\w-]+)\s*:\s*([^;]+);/g)].map(([, name = '', value = '']) => [name, value] as const),
+    [...css.matchAll(/--x-([\w-]+)\s*:\s*([^;]+);/g)].map(([, name = '', value = '']) => [name, value.trim()] as const),
   )
   const resolve = (name: string): readonly [string, string] => {
     const value = raw.get(name) ?? ''
-    const alias = value.match(/^var\(--color-([\w-]+)\)$/)
-    if (alias?.[1]) return resolve(alias[1])
     const pair = value.match(/^light-dark\((oklch\([^)]*\)),\s*(oklch\([^)]*\))\)$/)
-    if (!pair?.[1] || !pair[2]) throw new Error(`--color-${name} is not a light-dark() pair`)
-    return [pair[1], pair[2]]
+    if (pair?.[1] && pair[2]) return [pair[1], pair[2]]
+    if (/^oklch\([^)]*\)$/.test(value)) return [value, value]
+    throw new Error(`--x-${name} is not a colour`)
   }
-  return new Map([...raw.keys()].map((name) => [name, resolve(name)]))
+  return new Map(
+    [...raw.keys()].filter((name) => raw.get(name)?.includes('oklch')).map((name) => [name, resolve(name)]),
+  )
 }
 
 function luminance(colour: string): number {
   const [lightness = 0, chroma = 0, hue = 0] = (colour.match(/[\d.]+/g) ?? []).map(Number)
-  const L = lightness / 100
+  const L = lightness > 1 ? lightness / 100 : lightness
   const a = chroma * Math.cos((hue * Math.PI) / 180)
   const b = chroma * Math.sin((hue * Math.PI) / 180)
   const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
@@ -70,25 +72,13 @@ interface ContrastPromise {
 }
 
 const CONTRAST_PROMISES: readonly ContrastPromise[] = [
-  { text: 'ink-2', ground: 'ground', leastRatio: 4.5 },
-  { text: 'ink-2', ground: 'control', leastRatio: 4.5 },
-  { text: 'ink-off', ground: 'control', leastRatio: 4.5 },
-  { text: 'ink-off', ground: 'control-hover', leastRatio: 4.5 },
-  { text: 'ink-off', ground: 'toggle-off', leastRatio: 4.5 },
-  { text: 'ink-off', ground: 'segment', leastRatio: 4.5 },
-  { text: 'ink-3', ground: 'ink', leastRatio: 4.5 },
-  { text: 'ramp-2', ground: 'ground', leastRatio: 3 },
-  { text: 'ink', ground: 'ramp-1', leastRatio: 4.5 },
-  { text: 'ink', ground: 'ramp-2', leastRatio: 4.5 },
-  { text: 'ground', ground: 'ramp-3', leastRatio: 4.5 },
-  { text: 'ground', ground: 'ramp-4', leastRatio: 4.5 },
-  { text: 'ground', ground: 'ramp-5', leastRatio: 4.5 },
-  { text: 'danger', ground: 'ground', leastRatio: 4.5 },
-  { text: 'danger', ground: 'control', leastRatio: 4.5 },
-  { text: 'danger', ground: 'danger-fill', leastRatio: 4.5 },
-  { text: 'feed-name', ground: 'ground', leastRatio: 4.5 },
-  { text: 'away', ground: 'ground', leastRatio: 4.5 },
-  { text: 'ink', ground: 'match', leastRatio: 4.5 },
+  { text: 'ink', ground: 'paper', leastRatio: 7 },
+  { text: 'grey', ground: 'paper', leastRatio: 4.5 },
+  { text: 'grey', ground: 'tone', leastRatio: 4 },
+  { text: 'ink', ground: 'tone', leastRatio: 7 },
+  { text: 'ink', ground: 'tone-deep', leastRatio: 7 },
+  { text: 'ink', ground: 'wash', leastRatio: 7 },
+  { text: 'pink-ink', ground: 'pink', leastRatio: 4.5 },
 ]
 
 describe('contrast', () => {
@@ -143,8 +133,23 @@ describe('pointer', () => {
   })
 })
 
+function enclosing(code: string, at: number): string[] {
+  const open: string[] = []
+  let start = 0
+  for (let index = 0; index < at; index++) {
+    const char = code[index]
+    if (char === '{') open.push(code.slice(start, index).trim())
+    else if (char === '}') open.pop()
+    if (char === '{' || char === '}' || char === ';') start = index + 1
+  }
+  return open
+}
+
 describe('type', () => {
-  it('keeps monospace out of the interface', () => {
-    expect(css).not.toMatch(/monospace|ui-monospace|Menlo/)
+  it('keeps monospace inside articles', () => {
+    const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    const uses = [...code.matchAll(/font-family:[^;]*monospace/g)]
+    expect(uses.length).toBeGreaterThan(0)
+    for (const use of uses) expect(enclosing(code, use.index).join(' ')).toMatch(/article-body/)
   })
 })

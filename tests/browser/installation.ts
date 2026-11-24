@@ -8,7 +8,9 @@ import { createLogger } from '../../src/server/logger.js'
 import { bootService, type BootedService } from '../support/boot-service.js'
 import { UpstreamFixtures } from '../support/upstream-fixtures.js'
 
-export { SETUP_SECRET, USER_PASSWORD } from '../support/boot-service.js'
+import { SETUP_SECRET, USER_PASSWORD } from '../support/boot-service.js'
+
+export { SETUP_SECRET, USER_PASSWORD }
 
 export const READER_DEADLINE_BUDGET_MS = 2_000
 const SLOW_RIDGE_DELAY_MS = 2 * READER_DEADLINE_BUDGET_MS
@@ -289,12 +291,24 @@ export const test = base.extend<InstallationOptions & { installation: Installati
 
 export { expect } from '@playwright/test'
 
+export async function claim(page: Page, url: string): Promise<void> {
+  await page.goto(url)
+  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
+  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
+  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
+  await page.getByRole('button', { name: 'Claim installation' }).click()
+  await expect(page.getByRole('navigation', { name: 'Places' })).toBeVisible()
+}
+
+export async function goTo(page: Page, place: 'Digest' | 'Library' | 'Feeds' | 'Settings'): Promise<void> {
+  await page.getByRole('banner').getByRole('link', { name: place, exact: true }).click()
+}
+
 export async function addFeed(page: Page, url: string): Promise<void> {
-  await page.getByRole('button', { name: 'Add feed' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Add feed' })
-  await dialog.getByRole('textbox', { name: 'URL' }).fill(url)
-  await dialog.getByRole('button', { name: 'Subscribe', exact: true }).click()
-  await expect(dialog).toHaveCount(0)
+  await goTo(page, 'Feeds')
+  await page.getByRole('textbox', { name: 'Site or Feed address' }).fill(url)
+  await page.getByRole('button', { name: /^Subscribe to / }).click()
+  await page.waitForURL(/\/feeds\/\d+$/)
 }
 
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
@@ -306,7 +320,7 @@ export async function expectNoBoxPastTheSideEdge(page: Page): Promise<void> {
   await expectNoHorizontalOverflow(page)
   const wide = await page.evaluate(() => {
     const viewport = document.documentElement.clientWidth
-    const sideways = '.day-feeds, .filter-list, .rhythm-jumps'
+    const sideways = '.x-lane, .x-reader-outline'
     const found: string[] = []
     for (const el of document.body.querySelectorAll('*')) {
       const row = el.closest(sideways)

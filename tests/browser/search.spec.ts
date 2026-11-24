@@ -1,55 +1,43 @@
 import type { Page } from '@playwright/test'
-import {
-  addFeed,
-  expect,
-  expectNoHorizontalOverflow,
-  USER_PASSWORD,
-  SETUP_SECRET,
-  test,
-  type Installation,
-} from './installation.js'
+import { addFeed, claim, expect, expectNoHorizontalOverflow, goTo, test, type Installation } from './installation.js'
 
 async function openDigest(page: Page, installation: Installation): Promise<void> {
-  await page.goto(installation.url)
-  await page.getByLabel('Setup secret').fill(SETUP_SECRET)
-  await page.getByLabel('Password', { exact: true }).fill(USER_PASSWORD)
-  await page.getByLabel('Confirm password').fill(USER_PASSWORD)
-  await page.getByRole('button', { name: 'Claim installation' }).click()
-  await section(page, 'Feeds').click()
+  await claim(page, installation.url)
   await addFeed(page, installation.feedUrl)
-  await expect(page.getByRole('heading', { name: 'Field Notes' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Field Notes' })).toBeVisible()
   await addFeed(page, installation.brokenArticleFeedUrl)
-  await expect(page.getByRole('heading', { name: 'The Quiet Coast' })).toBeVisible()
-  await section(page, 'Digest').click()
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'The Quiet Coast' })).toBeVisible()
+  await goTo(page, 'Digest')
+  await expect(page.getByRole('heading', { level: 2, name: 'Today' })).toBeVisible()
 }
 
-function section(page: Page, name: 'Digest' | 'Feeds' | 'Saved' | 'Settings') {
-  return page.getByRole('link', { name, exact: true })
+async function search(page: Page, words: string, prompt = 'Search your reading'): Promise<void> {
+  const field = page.getByRole('searchbox', { name: prompt })
+  await field.fill(words)
+  await field.press('Enter')
 }
 
-test.describe('the global search line', () => {
+const results = (page: Page) => page.getByRole('region', { name: 'Search results' })
+
+test.describe('the search line', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('stays in the chrome across every section and the Reader, saying what it would answer from', async ({
-    page,
-    installation,
-  }) => {
+  test('stays in the top bar on every screen, saying what it would answer from', async ({ page, installation }) => {
     await openDigest(page, installation)
     const prompts = {
       Digest: 'Search your reading',
       Feeds: 'Search your feeds',
-      Saved: 'Search your saves',
+      Library: 'Search your saves',
       Settings: 'Search your reading',
     } as const
 
-    for (const [name, prompt] of Object.entries(prompts)) {
-      await section(page, name as keyof typeof prompts).click()
+    for (const [place, prompt] of Object.entries(prompts)) {
+      await goTo(page, place as keyof typeof prompts)
       await expect(page.getByRole('searchbox', { name: prompt })).toBeVisible()
     }
 
-    await section(page, 'Digest').click()
-    await page.getByRole('link', { name: 'First light' }).click()
+    await goTo(page, 'Digest')
+    await page.getByRole('main').getByRole('link', { name: 'First light' }).click()
     await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
     await expect(page.getByRole('searchbox', { name: 'Search your reading' })).toBeVisible()
   })
@@ -58,312 +46,143 @@ test.describe('the global search line', () => {
     await openDigest(page, installation)
     const field = page.getByRole('searchbox', { name: 'Search your reading' })
 
-    await section(page, 'Settings').click()
+    await goTo(page, 'Settings')
     await page.keyboard.press('/')
     await expect(field).toBeFocused()
 
-    await section(page, 'Feeds').click()
-    await page.getByRole('button', { name: 'Add feed' }).click()
-    const address = page.getByRole('textbox', { name: 'URL' })
+    await goTo(page, 'Feeds')
+    const address = page.getByRole('textbox', { name: 'Site or Feed address' })
     await address.focus()
     await page.keyboard.press('/')
     await expect(address).toBeFocused()
     await expect(address).toHaveValue('/')
   })
 
-  test('uses one results surface, then restores the screen it replaced', async ({ page, installation }) => {
+  test('answers on its own screen, and Back returns to the screen it was asked from', async ({
+    page,
+    installation,
+  }) => {
     await openDigest(page, installation)
-    await section(page, 'Settings').click()
+    await goTo(page, 'Settings')
 
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await field.fill('clear morning')
+    await search(page, 'clear morning')
 
     await expect(page).toHaveURL(`${installation.url}/search?q=clear+morning`)
-    const results = page.getByRole('region', { name: 'search results' })
-    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
-    await expect(results).toContainText('Field Notes')
-    await expect(results).toContainText('Today')
+    const fieldNotes = results(page).getByRole('region', { name: 'Field Notes' })
+    await expect(fieldNotes.getByRole('link', { name: 'First light' })).toBeVisible()
+    await expect(fieldNotes).toContainText('Today')
 
-    await field.clear()
+    await page.goBack()
     await expect(page).toHaveURL(`${installation.url}/settings`)
-    await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Theme' })).toBeVisible()
   })
 
   test('a result leads back to the search it came from', async ({ page, installation }) => {
     await openDigest(page, installation)
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await field.fill('clear morning')
-    const results = page.getByRole('region', { name: 'search results' })
-    await results.getByRole('link', { name: 'First light' }).click()
+    await search(page, 'clear morning')
+    await results(page).getByRole('link', { name: 'First light' }).click()
     await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Back to Search' }).click()
-    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
-    await expect(field).toHaveValue('clear morning')
+    await expect(page.locator('.x-back')).toHaveText('Search')
+    await page.locator('.x-back').click()
+    await expect(results(page).getByRole('link', { name: 'First light' })).toBeVisible()
+    await expect(page.getByRole('searchbox', { name: 'Search your reading' })).toHaveValue('clear morning')
   })
 
-  test('clearing a search launched from the Reader restores the article, trail intact', async ({
-    page,
-    installation,
-  }) => {
+  test('saves from the results, and the Library agrees', async ({ page, installation }) => {
     await openDigest(page, installation)
-    await page.getByRole('link', { name: 'First light' }).click()
-    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
+    await search(page, 'clear morning')
 
-    await page.keyboard.press('/')
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await expect(field).toBeFocused()
-    await field.fill('slow')
-    await expect(
-      page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'Slow water' }),
-    ).toBeVisible()
-
-    await field.clear()
-    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
-    await expect(page).toHaveURL(/\/reader\/\d+$/)
-    await expect(page.getByRole('link', { name: 'Back to Digest' })).toBeVisible()
-  })
-
-  test('backs out to the origin and saves from the results', async ({ page, installation }) => {
-    await openDigest(page, installation)
-    await section(page, 'Settings').click()
-
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await field.fill('clear morning')
+    await results(page).getByRole('link', { name: 'First light' }).hover()
     await page.getByRole('button', { name: 'Save First light' }).click()
     await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
 
-    await page.goBack()
-    await expect(page).toHaveURL(`${installation.url}/settings`)
-    await expect(field).toHaveValue('')
-    await section(page, 'Saved').click()
-    await expect(page.getByRole('heading', { name: 'First light' })).toBeVisible()
+    await goTo(page, 'Library')
+    await expect(page.getByRole('main').getByRole('link', { name: 'First light' })).toBeVisible()
   })
 
-  test('scopes itself to the opened Feed, and steps out to everywhere', async ({ page, installation }) => {
+  test('scopes itself to the opened Feed, and steps out to everywhere and back', async ({ page, installation }) => {
     await openDigest(page, installation)
-    await section(page, 'Feeds').click()
-    await page.getByRole('link', { name: 'The Quiet Coast' }).click()
+    await goTo(page, 'Feeds')
+    await page.getByRole('main').getByRole('link', { name: 'The Quiet Coast' }).click()
     await expect(page).toHaveURL(`${installation.url}/feeds/2`)
 
-    await page.getByRole('searchbox', { name: 'Search this feed' }).fill('notes')
-    const results = page.getByRole('region', { name: 'search results' })
+    await search(page, 'notes', 'Search this feed')
     const scopes = page.getByRole('group', { name: 'Search in' })
     await expect(page).toHaveURL(`${installation.url}/search?q=notes&feed=2`)
-    await expect(results.getByRole('link', { name: 'Slow water' })).toBeVisible()
-    await expect(results.getByRole('link', { name: 'First light' })).not.toBeVisible()
-    await expect(results.getByRole('link', { name: 'The Quiet Coast' })).not.toBeVisible()
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('in The Quiet Coast')
-    await expect(scopes.getByRole('button', { name: 'This feed' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(results(page).getByRole('link', { name: 'Slow water' })).toBeVisible()
+    await expect(results(page).getByRole('link', { name: 'First light' })).toHaveCount(0)
+    await expect(scopes.getByRole('button', { name: 'The Quiet Coast' })).toHaveAttribute('aria-pressed', 'true')
 
     await scopes.getByRole('button', { name: 'Everywhere' }).click()
     await expect(page).toHaveURL(`${installation.url}/search?q=notes`)
-    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
-    await expect(page.getByRole('heading', { level: 1 })).not.toContainText('in The Quiet Coast')
-    await expect(page.getByRole('searchbox', { name: 'Search your reading' })).toHaveValue('notes')
+    await expect(results(page).getByRole('link', { name: 'First light' })).toBeVisible()
 
-    await scopes.getByRole('button', { name: 'This feed' }).click()
+    await scopes.getByRole('button', { name: 'This Feed' }).click()
     await expect(page).toHaveURL(`${installation.url}/search?q=notes&feed=2`)
-    await expect(results.getByRole('link', { name: 'First light' })).not.toBeVisible()
-
-    await page.goBack()
-    await expect(page).toHaveURL(`${installation.url}/feeds/2`)
-    await expect(page.getByRole('searchbox', { name: 'Search this feed' })).toHaveValue('')
+    await expect(results(page).getByRole('link', { name: 'First light' })).toHaveCount(0)
   })
 
-  test('shows the matched summary with the words the index matched marked, and no snippet when the title matched', async ({
+  test('narrows a search of everything to one Feed from its group', async ({ page, installation }) => {
+    await openDigest(page, installation)
+    await search(page, 'notes')
+
+    const coast = results(page).getByRole('region', { name: 'The Quiet Coast' })
+    await coast.getByRole('button', { name: 'Search only here' }).click()
+
+    await expect(page).toHaveURL(`${installation.url}/search?q=notes&feed=2`)
+    await expect(results(page).getByRole('link', { name: 'First light' })).toHaveCount(0)
+  })
+
+  test('marks the words the index matched in the snippet, and gives no snippet when the title matched', async ({
     page,
     installation,
   }) => {
     await openDigest(page, installation)
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    const results = page.getByRole('region', { name: 'search results' })
 
-    await field.fill('clear morn')
-    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
-    const snippet = results.locator('.item-snippet')
+    await search(page, 'clear morn')
+    await expect(results(page).getByRole('link', { name: 'First light' })).toBeVisible()
+    const snippet = results(page).locator('.x-search-snippet')
     await expect(snippet).toHaveText('A clear morning.')
-    await expect(snippet.locator('mark.match')).toHaveText(['clear', 'morning'])
+    await expect(snippet.locator('mark')).toHaveText(['clear', 'morning'])
 
-    await field.fill('first light')
-    await expect(results.getByRole('link', { name: 'First light' })).toBeVisible()
-    await expect(results.locator('.item-snippet')).toHaveCount(0)
+    await search(page, 'first light')
+    await expect(results(page).getByRole('link', { name: 'First light' })).toBeVisible()
+    await expect(results(page).locator('.x-search-snippet')).toHaveCount(0)
   })
 
-  test('offers a matching Subscription as a jump into its Feed', async ({ page, installation }) => {
+  test('offers a Subscription whose name matches as a way into its Feed', async ({ page, installation }) => {
     await openDigest(page, installation)
 
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await field.fill('quiet coast')
-    const jumpTo = page.getByRole('navigation', { name: 'matching subscriptions' })
-    await expect(jumpTo.getByRole('link', { name: 'The Quiet Coast' })).toBeVisible()
-    await expect(jumpTo).toContainText('publisher.example')
-    await expect(jumpTo.getByRole('img', { name: /items from The Quiet Coast/ })).toBeVisible()
+    await search(page, 'quiet coast')
+    const feeds = results(page).getByRole('region', { name: 'Feeds' })
+    await expect(feeds).toContainText('publisher.example')
 
-    await jumpTo.getByRole('link', { name: 'The Quiet Coast' }).click()
+    await feeds.getByRole('link', { name: 'The Quiet Coast' }).click()
     await expect(page).toHaveURL(`${installation.url}/feeds/2`)
-    await expect(page.getByRole('link', { name: 'Slow water' })).toBeVisible()
-    await expect(page.getByRole('searchbox', { name: 'Search this feed' })).toHaveValue('')
-  })
-
-  test('gives a matching Feed its name’s width beside the narrowing column and on a small phone', async ({
-    page,
-    installation,
-  }) => {
-    const feed = (feedId: number, title: string) => ({
-      feedId,
-      title,
-      domain: 'publisher.example',
-      homePageUrl: null,
-      cadence: Array.from({ length: 30 }, () => 0),
-    })
-    const result = (feedItemId: number, feedId: number, feedTitle: string) => ({
-      feedItemId,
-      title: { text: `Item ${feedItemId}`, matches: [] },
-      feedId,
-      feedTitle,
-      publishedAt: null,
-      firstSeenAt: '2026-10-21T13:36:00Z',
-      date: '2026-10-21',
-      displayTime: null,
-      saved: false,
-      snippet: null,
-    })
-    await page.route('**/api/search?*', (route) =>
-      route.fulfill({
-        json: {
-          scope: 'everywhere',
-          today: '2026-10-22',
-          subscriptions: [feed(1, 'ChinAI Newsletter'), feed(2, 'Stanford Encyclopedia of Philosophy')],
-          results: [result(1, 1, 'ChinAI Newsletter'), result(2, 2, 'Stanford Encyclopedia of Philosophy')],
-        },
-      }),
-    )
-    await openDigest(page, installation)
-
-    await page.getByRole('searchbox', { name: 'Search your reading' }).fill('newsletter')
-    await expect(page.getByRole('heading', { name: 'Narrow by feed' })).toBeVisible()
-    const jumpTo = page.getByRole('navigation', { name: 'matching subscriptions' })
-    const rows = jumpTo.getByRole('article')
-    await expect(rows).toHaveCount(2)
-    const list = await jumpTo.boundingBox()
-    for (const row of await rows.all()) expect((await row.boundingBox())?.width).toBe(list?.width)
-
-    await page.setViewportSize({ width: 320, height: 640 })
-    const row = await rows.first().boundingBox()
-    const name = await rows.first().getByRole('heading').boundingBox()
-    expect(name?.width).toBe((row?.width ?? 0) - 34)
+    await expect(page.getByRole('main').getByRole('link', { name: 'Slow water' })).toBeVisible()
   })
 
   test('matches a Feed title and says plainly when nothing matches', async ({ page, installation }) => {
     await openDigest(page, installation)
 
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await field.fill('quiet coast')
-    const results = page.getByRole('region', { name: 'search results' })
-    await expect(results.getByRole('link', { name: 'Slow water' })).toBeVisible()
-    await expect(results.getByRole('link', { name: 'First light' })).not.toBeVisible()
+    await search(page, 'quiet coast')
+    await expect(results(page).getByRole('link', { name: 'Slow water' })).toBeVisible()
+    await expect(results(page).getByRole('link', { name: 'First light' })).toHaveCount(0)
 
-    await field.fill('driftwood')
-    await expect(page.getByText('Nothing in your reading matches “driftwood”.')).toBeVisible()
-
-    await field.clear()
-    await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
+    await search(page, 'driftwood')
+    await expect(page.getByText('Nothing in your reading matches.')).toBeVisible()
   })
 })
 
-test.describe('searching at phone width', () => {
-  test.use({ viewport: { width: 390, height: 760 } })
+test.describe('searching on the narrowest phone', () => {
+  test.use({ viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true })
 
-  test('opens the field from its square, and the close square leaves the search', async ({ page, installation }) => {
+  test('answers inside the screen', async ({ page, installation }) => {
     await openDigest(page, installation)
-    const field = page.getByRole('searchbox', { name: 'Search your reading' })
-    await expect(field).not.toBeVisible()
 
-    await page.getByRole('button', { name: 'Search', exact: true }).click()
-    await expect(field).toBeFocused()
-
-    await field.fill('slow')
-    await expect(
-      page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'Slow water' }),
-    ).toBeVisible()
-    for (const name of ['Digest', 'Feeds', 'Saved', 'Settings'] as const) await expect(section(page, name)).toBeHidden()
+    await search(page, 'notes')
+    await expect(results(page).getByRole('link', { name: 'Slow water' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
-
-    await page.getByRole('button', { name: 'Close search' }).click()
-    await expect(page).toHaveURL(`${installation.url}/digest`)
-    await expect(field).not.toBeVisible()
-    await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible()
-  })
-})
-
-test.describe('the search field on a phone', () => {
-  test.use({ viewport: { width: 390, height: 844 } })
-
-  async function openField(page: Page, installation: Installation) {
-    await openDigest(page, installation)
-    await page.getByRole('button', { name: 'Search', exact: true }).click()
-    return page.getByRole('searchbox', { name: 'Search your reading' })
-  }
-
-  async function expectReaderBar(page: Page) {
-    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
-    await expect(page.getByRole('searchbox')).toBeHidden()
-    await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible()
-  }
-
-  test('gives the bar back to the Reader when a result is opened', async ({ page, installation }) => {
-    const field = await openField(page, installation)
-    await field.fill('clear morning')
-    await page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'First light' }).click()
-
-    await expectReaderBar(page)
-  })
-
-  test('gives the bar back to the Reader when a post is opened with the field still empty', async ({
-    page,
-    installation,
-  }) => {
-    await openField(page, installation)
-    await page.getByRole('link', { name: 'First light' }).click()
-
-    await expectReaderBar(page)
-  })
-
-  test('gives the bar back to the Digest when the phone goes back from results', async ({ page, installation }) => {
-    const field = await openField(page, installation)
-    await field.fill('clear morning')
-    await expect(page).toHaveURL(/\/search/)
-
-    await page.goBack()
-
-    await expect(page).toHaveURL(/\/digest/)
-    await expect(field).toBeHidden()
-  })
-
-  test('gives the bar back to the Reader when the post it searched from is the result opened', async ({
-    page,
-    installation,
-  }) => {
-    await openDigest(page, installation)
-    await page.getByRole('link', { name: 'First light' }).click()
-    await expect(page.getByRole('heading', { name: 'First light', level: 1 })).toBeVisible()
-    await page.getByRole('button', { name: 'Search', exact: true }).click()
-    await page.getByRole('searchbox').fill('clear morning')
-    await page.getByRole('region', { name: 'search results' }).getByRole('link', { name: 'First light' }).click()
-
-    await expectReaderBar(page)
-  })
-
-  test('stays open while its words are cleared', async ({ page, installation }) => {
-    const field = await openField(page, installation)
-    await field.fill('clear morning')
-    await expect(page).toHaveURL(/\/search\?q=clear\+morning/)
-
-    await page.getByRole('button', { name: 'Clear search' }).click()
-
-    await expect(page).toHaveURL(/\/digest/)
-    await expect(field).toBeFocused()
   })
 })
