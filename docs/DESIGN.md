@@ -163,8 +163,13 @@ so the change can be undone.
 
 The wall label on the left: the way back, the Feed, the day and time, reading
 time; then Save, the Discussion, Open the Original webpage and Copy link; then
-the Reading Source and Text size as choices; and how far read. The
-title and body in the main columns, at most 66ch. With three or more headings,
+the Reading Source and Text size as choices; and how far read. The reading
+time keeps its line while the body loads, so nothing below it moves when the
+body arrives. The title, the summary as an excerpt in grey (three lines, or
+whole when no body could be read) and the body in the main columns, at most
+66ch. A body that arrives after the screen opens fades in over 240ms, rising
+6px (only the fade under reduced motion); a waiting note shows only after
+400ms. With three or more headings,
 an outline on the right follows the reading position. Next is pinned to the
 bottom edge in the Digest's columns. Next and `j` follow the Digest's folding:
 from a quiet Feed they skip the Firehose, from a Firehose Feed they stay inside

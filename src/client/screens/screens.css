@@ -24,6 +24,7 @@
   --x-pink-ink: oklch(0.27 0.06 355);
   --duration-sheet-enter: 240ms;
   --duration-sheet-exit: 180ms;
+  --delay-waiting: 400ms;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.2, 0, 0, 1);
 }
@@ -585,13 +586,78 @@
     sans-serif;
   text-wrap: balance;
   overflow-wrap: anywhere;
+
+  &:has(+ .x-reader-excerpt) {
+    margin-bottom: calc(var(--x-read-leading) * 0.5);
+  }
 }
 
-.x-reader-summary,
+.x .x-reader-excerpt {
+  display: -webkit-box;
+  max-width: 66ch;
+  margin-bottom: calc(var(--x-read-leading) * 1.5);
+  overflow: hidden;
+  font:
+    400 var(--x-read) / var(--x-read-leading) 'Geist Variable',
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  color: var(--x-grey);
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+
+  &[data-whole] {
+    display: block;
+  }
+}
+
+.x-reader-body[data-arrived] {
+  transition:
+    opacity var(--duration-sheet-enter) var(--ease-out),
+    translate var(--duration-sheet-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 var(--x-half);
+  }
+}
+
 .x-reader-waiting,
 .x-reader-failed {
   max-width: 66ch;
   padding: var(--x-quarter) 0;
+}
+
+.x-reader-waiting {
+  transition: opacity var(--duration-sheet-enter) var(--ease-out) var(--delay-waiting);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.x-reader-held {
+  min-height: calc(var(--x-line) + var(--x-half));
+}
+
+.x-reader-settle {
+  transition: opacity var(--duration-sheet-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .x-reader-body[data-arrived] {
+    transition-property: opacity;
+
+    @starting-style {
+      translate: none;
+    }
+  }
 }
 
 .x-reader-outline {
@@ -604,6 +670,11 @@
   padding-top: var(--x-half);
   overflow-y: auto;
   scrollbar-width: none;
+  transition: opacity var(--duration-sheet-enter) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
 
   & p {
     padding: var(--x-quarter) 0;
@@ -1346,6 +1417,10 @@
 
   .x-reader-main {
     grid-column: 1 / -1;
+  }
+
+  .x-reader-held:empty {
+    display: none;
   }
 
   .x-reader-outline {

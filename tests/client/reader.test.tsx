@@ -209,7 +209,7 @@ describe('Reader View', () => {
     expect(await screen.findByRole('heading', { name: 'Dawn' }, { timeout: 5_000 })).toBeDefined()
   })
 
-  it('holds the summary through a deadline and refetches into the article by itself', async () => {
+  it('keeps the summary as the excerpt through a deadline and refetches the article in under it', async () => {
     vi.useFakeTimers()
     try {
       let calls = 0
@@ -231,6 +231,7 @@ describe('Reader View', () => {
 
       await act(() => vi.advanceTimersByTimeAsync(2_000))
       expect(screen.getByRole('heading', { name: 'Dawn' })).toBeDefined()
+      expect(screen.getByText('A clear morning over the valley.')).toBeDefined()
       expect(api.requestsTo('GET /api/items/3/reader')).toHaveLength(2)
     } finally {
       vi.useRealTimers()

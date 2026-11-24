@@ -65,7 +65,7 @@ export function ReaderScreen({ feedItemId, origin, onBack, onStep, onOpenFeed }:
         </div>
         <div className="x-reader-main">
           {state.kind === 'loading' ? (
-            <p className="x-grey">Opening the Feed Item</p>
+            <p className="x-grey x-reader-waiting">Opening the Feed Item</p>
           ) : (
             <p>
               <LoadFailure subject="The Feed Item" kind={state.kind} onRetry={retry} />
@@ -140,6 +140,8 @@ function OpenReader({
   const shown: Shown | undefined = loaded ?? (fallback ? { source: 'feed-content', content: fallback } : undefined)
   const stage = sourceState.kind === 'loading' ? sourceState.progress : undefined
   const [article, setArticle] = useState<HTMLElement | null>(null)
+  const [contentAtOpen] = useState(shown?.content)
+  const excerptIsAll = failed && !shown
 
   const key = useEffectEvent((event: KeyboardEvent) => {
     if (event.altKey || event.ctrlKey || event.metaKey || editable(event.target)) return
@@ -164,12 +166,14 @@ function OpenReader({
           {dayTitle(item.date, item.today)}
           {time ? `, ${time}` : ''}
         </div>
-        {shown ? (
-          <div className="x-grey">
-            {shown.content.readingTimeMinutes} min read
-            {shown.source === 'feed-content' && shown.content.truncated ? ', shortened' : ''}
-          </div>
-        ) : null}
+        <div className="x-grey x-reader-held">
+          {shown ? (
+            <span className="x-reader-settle">
+              {shown.content.readingTimeMinutes} min read
+              {shown.source === 'feed-content' && shown.content.truncated ? ', shortened' : ''}
+            </span>
+          ) : null}
+        </div>
         <div className="x-reader-gap">
           <SaveToggle
             className="x-save x-save-shown"
@@ -205,7 +209,7 @@ function OpenReader({
           onChange={setChosen}
         />
         {shown && shown.source !== source ? (
-          <div className="x-grey">{READING_SOURCE_LABELS[shown.source]} for now</div>
+          <div className="x-grey x-reader-settle">{READING_SOURCE_LABELS[shown.source]} for now</div>
         ) : null}
         <Options
           label="Text size"
@@ -218,13 +222,22 @@ function OpenReader({
 
       <div className="x-reader-main">
         <h1 className="x-reader-title">{item.title}</h1>
+        {item.summary ? (
+          <p className="x-reader-excerpt" data-whole={excerptIsAll ? '' : undefined}>
+            {item.summary}
+          </p>
+        ) : null}
         <div ref={setArticle}>
           {shown ? (
             <Suspense fallback={null}>
-              <ArticleMarkdown key={shown.source} markdown={shown.content.markdown} />
+              <div
+                key={shown.source}
+                className="x-reader-body"
+                data-arrived={shown.content === contentAtOpen ? undefined : ''}
+              >
+                <ArticleMarkdown markdown={shown.content.markdown} />
+              </div>
             </Suspense>
-          ) : item.summary ? (
-            <p className="x-reader-summary">{item.summary}</p>
           ) : null}
         </div>
         {sourceState.kind === 'loading' && source === 'original-webpage' ? (
