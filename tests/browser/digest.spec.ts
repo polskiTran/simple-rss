@@ -115,6 +115,10 @@ test.describe('the Digest', () => {
     const left = await scrolled(page)
     expect(left).toBeGreaterThan(0)
 
+    await page.route('**/api/digest/days', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      await route.continue()
+    })
     await deep.click()
     await expect(page.getByRole('heading', { level: 1, name: 'Meadow note 30' })).toBeFocused()
     await expect(page).toHaveTitle('Meadow note 30 — simple')
@@ -124,6 +128,8 @@ test.describe('the Digest', () => {
     await expect(page).toHaveURL(/\/digest$/)
     await expect(page).toHaveTitle('Digest — simple')
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
+    await page.waitForResponse('**/api/digest/days')
+    await expect(page.getByRole('button', { name: /^\w+day \d+ \w+$/ })).toBeVisible()
     await expect.poll(() => scrolled(page)).toBe(left)
     expect(await page.evaluate(() => history.length)).toBe(entries)
 

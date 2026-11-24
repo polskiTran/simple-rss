@@ -141,12 +141,12 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
             onChange={FIREHOSE_TREATMENT.choose}
           />
         </LedgerRow>
-        {days && today ? (
+        {today ? (
           <LedgerRow label="Day">
             <Button className="x-more" aria-expanded={picking} onClick={() => setPicking((shown) => !shown)}>
               {longDay(start.from ?? today)}
             </Button>
-            {picking ? (
+            {picking && days ? (
               <DayCalendar
                 label="Days"
                 today={today}
