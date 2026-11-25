@@ -73,12 +73,10 @@ function toneOf(box: HTMLElement): Tone {
 }
 
 function clipped(height: number, tone: Tone): Keyframe {
-  const bleed = Math.max(0, -tone.top, -tone.right, -tone.left)
   return {
     height: `${height}px`,
-    overflow: 'clip',
-    overflowClipMargin: `${bleed}px`,
     clipPath: `inset(${tone.top}px ${tone.right}px ${tone.bottom}px ${tone.left}px)`,
+    overflowAnchor: 'none',
     alignContent: 'start',
   }
 }
