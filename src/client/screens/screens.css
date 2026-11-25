@@ -6,6 +6,7 @@
   --x-three-quarters: calc(var(--x-unit) * 0.75);
   --x-bleed: var(--x-half);
   --x-page-end: 160px;
+  --x-phone-label: 5.5rem;
   --x-cadence-gap: 3px;
   --x-size: 0.8125rem;
   --x-line: 1.125rem;
@@ -1365,9 +1366,36 @@
     display: none;
   }
 
+  .x-ledger {
+    margin-bottom: calc(var(--x-unit) * 3);
+  }
+
+  .x :is(.x-digest, .x-library) .x-ledger-row {
+    grid-template-columns: var(--x-phone-label) minmax(0, 1fr);
+    padding-block: var(--x-half);
+
+    & > .x-c-label {
+      grid-column: 1;
+    }
+
+    & > .x-c-main {
+      grid-column: 2;
+    }
+
+    & > .x-c-label:is(:empty, :has(> .visually-hidden:only-child)) + .x-c-main {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .x :is(.x-opt, .x-place) {
+    margin: calc(-1 * var(--x-half));
+    padding: var(--x-half);
+  }
+
   .x .x-top {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: var(--x-three-quarters);
+    margin-bottom: calc(var(--x-unit) * 2);
 
     & > .x-places {
       grid-column: 1;
@@ -1385,14 +1413,36 @@
     }
   }
 
-  .x-day-label {
-    position: static;
+  .x .x-day {
+    margin-bottom: calc(var(--x-unit) * 2);
+  }
+
+  .x .x-day-label {
+    z-index: 3;
+    margin-inline: calc(-1 * var(--x-bleed));
+    padding: var(--x-half) var(--x-bleed);
+    background: var(--x-paper);
     color: var(--x-grey);
+  }
+
+  .x :is(.x-lane-head, .x-search-feed) {
+    position: static;
   }
 
   .x .x-row {
     grid-template-columns: minmax(0, 1fr) auto;
     column-gap: var(--x-unit);
+    row-gap: var(--x-quarter);
+    padding-block: var(--x-half);
+    -webkit-tap-highlight-color: transparent;
+
+    &:active::before {
+      background: var(--x-tone);
+    }
+
+    &:active::after {
+      background: var(--x-wash-deep);
+    }
 
     & .x-t {
       grid-column: 1 / -1;
@@ -1409,6 +1459,44 @@
 
   .x .x-fold[data-open] .x-row:not(.x-fold-head) .x-t {
     grid-column: 1;
+  }
+
+  .x :is(.x-row, .x-lane-item, .x-card) .x-save {
+    display: none;
+  }
+
+  .x :is(.x-digest, .x-library, .x-feed-items) {
+    & :is(.x-d, .x-time) {
+      display: none;
+    }
+
+    & .x-row .x-f {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .x :is(.x-row, .x-lane-item, .x-card:not(.x-fold-card)) :is(.x-title, .x-fold-toggle)::before {
+    content: '';
+    position: absolute;
+    inset: 0 calc(-1 * var(--x-bleed));
+  }
+
+  .x .x-card .x-title::before {
+    inset: calc(-1 * var(--x-half)) calc(-1 * var(--x-bleed));
+  }
+
+  .x :is(.x-row, .x-lane-item, .x-card) .x-feed {
+    position: relative;
+    z-index: 1;
+  }
+
+  .x :is(.x-lane-item, .x-card) {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .x .x-card:not(.x-fold-card):active::before,
+  .x .x-lane-item:active {
+    background: var(--x-tone);
   }
 
   .x .x-fold {

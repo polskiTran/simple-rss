@@ -124,7 +124,7 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onShowFee
     )
 
   return (
-    <div>
+    <div className="x-digest">
       <header className="x-ledger">
         <h1 className="visually-hidden">Digest</h1>
         {notice ? <LedgerRow label="">{notice}</LedgerRow> : null}
@@ -243,7 +243,7 @@ function Day({
               <TitleLink item={item} onOpen={actions.onOpenItem} />
               <div className="x-lane-meta">
                 {feedOf(item)}
-                {item.displayTime ? <span className="x-grey">, {item.displayTime}</span> : null}
+                {item.displayTime ? <span className="x-grey x-time">, {item.displayTime}</span> : null}
                 <SaveWord item={item} onSaved={(saved) => actions.onSaved(item.feedItemId, saved)} />
               </div>
             </div>

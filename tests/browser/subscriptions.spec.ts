@@ -42,7 +42,10 @@ async function expectFeedAndDigest(page: Page, installation: Installation): Prom
   const today = page.getByRole('region', { name: 'Today' })
   await expect(today.getByRole('link', { name: 'First light' })).toBeVisible()
   await expect(today.getByRole('link', { name: 'Field Notes' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Save First light' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('button', { name: 'Save First light', includeHidden: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
   await expect(page.locator('main')).not.toContainText(/unread/i)
   await expectNoHorizontalOverflow(page)
 }
@@ -66,7 +69,7 @@ async function expectOpenFeed(page: Page): Promise<void> {
   await expect(day).toHaveCount(1)
   await day.press('Enter')
   await expect(page.getByRole('region', { name: 'Today' })).toBeFocused()
-  await expect(page.getByRole('region', { name: 'Today' }).getByText('07:15')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Today' }).getByRole('link', { name: 'First light' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 
   const interval = page.getByRole('group', { name: 'Polling interval' })

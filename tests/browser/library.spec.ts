@@ -148,15 +148,18 @@ test.describe('the Library at phone width', () => {
 test.describe('the Library on a touch screen', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
-  test('shows Save in the Digest and Saved in the Library without hover or focus', async ({ page, installation }) => {
+  test('saves from the Reader View, never from the Digest or Library rows', async ({ page, installation }) => {
     await subscribe(page, installation)
     await goTo(page, 'Digest')
+    await expect(page.getByRole('button', { name: 'Save First light' })).toBeHidden()
 
-    const save = page.getByRole('button', { name: 'Save First light' })
-    await expect(save).toHaveCSS('opacity', '1')
-    await save.tap()
+    await titleIn(page, 'First light').tap()
+    await page.getByRole('button', { name: 'Save First light' }).tap()
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveAttribute('aria-pressed', 'true')
+    await page.locator('.x-back').tap()
 
     await goTo(page, 'Library')
-    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveCSS('opacity', '1')
+    await expect(titleIn(page, 'First light')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toBeHidden()
   })
 })

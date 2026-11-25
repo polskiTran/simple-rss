@@ -212,7 +212,7 @@ function FoldCard({
         {(open ? items : [latest]).map((item) => (
           <li key={item.feedItemId} ref={item === latest ? kept : undefined}>
             <TitleLink item={item} onOpen={actions.onOpenItem} />
-            <span className="x-grey x-num">{item.displayTime}</span>
+            <span className="x-grey x-num x-time">{item.displayTime}</span>
           </li>
         ))}
       </ol>
@@ -239,7 +239,7 @@ function Meta({
           rhythm={rhythmOf(item.feedId)}
           onOpen={actions.onOpenFeed}
         />
-        {item.displayTime ? <span className="x-grey">, {item.displayTime}</span> : null}
+        {item.displayTime ? <span className="x-grey x-time">, {item.displayTime}</span> : null}
       </span>
       {children}
     </div>

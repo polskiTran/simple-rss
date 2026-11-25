@@ -279,7 +279,7 @@ export function FeedScreen({ feedId, origin, onBack, onOpenItem, onRenamed, onUn
       ) : days.size === 0 ? (
         <Notice grey>Nothing retained from this Feed yet.</Notice>
       ) : (
-        <div className="x-plain">
+        <div className="x-plain x-feed-items">
           {[...days].map(([date, dayItems]) => (
             <section key={date} className="x-day x-grid" aria-labelledby={dayAnchor(date)}>
               <h2 className="x-day-label" id={dayAnchor(date)}>

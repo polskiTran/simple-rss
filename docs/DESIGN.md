@@ -30,7 +30,7 @@ change that improves the product changes both.
   screen's options and actions are rows of its own ledger, never a menu. Every
   link and word underlines under keyboard focus, titles and places included.
   Where a row's Save is revealed on hover, it always shows on a screen that
-  cannot hover.
+  cannot hover and is at least 760px wide; below that, see Platform.
 - **Surfaces.** No hairlines, borders, radii or shadows. Separation is space
   and tone: `--x-tone` under a hovered or focused row, and an unfolded fold.
 - **Colour.** OKLCH, greyscale paper and ink, warm hue 95. Colour appears only
@@ -233,3 +233,17 @@ On a phone (below 760px with a coarse pointer) the search line, every field
 and every select set 16px, so iOS does not zoom into a focused field (ADR
 0029). Below 760px the Feed's Cadence squares sit 2px apart instead of 3px, so
 26 weeks fit a 320px screen.
+
+Below 760px the lists keep to the title and the Feed. Save lives only in the
+Reader View: no row, card or Lane item in the Digest, Library, a Feed or Search
+results shows it, and a saved one keeps its pink wash. The Digest, the Library
+and a Feed's Feed Items drop their times as well, leaving the day or month
+label to place them; Search results keep the day, the only date they carry.
+Each row is a half unit above and below, so rows stand a whole unit apart, and
+the whole row opens its Feed Item (a Firehose fold's head unfolds it) while the
+Feed's name stays its own link; the row takes the tone the moment it is
+pressed. The day or month label sticks to the top on the page tone while its
+rows scroll under it. The Digest's and Library's ledger rows set their label in
+a 5.5rem column beside the choice, half a unit above and below, and each
+choice word and place is padded by half a unit so its tap target meets its
+neighbour's.
