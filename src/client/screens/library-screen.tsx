@@ -56,7 +56,7 @@ export function LibraryScreen({ onOpenItem, onOpenFeed }: LibraryScreenProps) {
     item.subscribed ? (
       <FeedLink feedId={item.feedId} title={item.feedTitle} rhythm={rhythmOf(item.feedId)} onOpen={onOpenFeed} />
     ) : (
-      <span className="x-grey" title="No longer subscribed">
+      <span className="x-grey" dir="auto" title="No longer subscribed">
         {item.feedTitle}
       </span>
     )

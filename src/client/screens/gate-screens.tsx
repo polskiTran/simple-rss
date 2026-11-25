@@ -1,11 +1,12 @@
 import { Button } from '@base-ui/react/button'
-import { type FormEvent, type Ref, useId, useRef, useState, useTransition } from 'react'
+import { type FormEvent, useRef, useState, useTransition } from 'react'
 import { type AuthStatus, MIN_SETUP_SECRET_LENGTH } from '../../shared/api.js'
 import { ApiError, claimInstallation, signIn } from '../api.js'
 import { useScreenTitle } from '../arrival.js'
 import type { Gate } from '../authentication.js'
 import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHold } from '../password-failure.js'
 import { LedgerRow } from '../components/ledger.js'
+import { PasswordLine, SubmitLine } from '../components/password-lines.js'
 
 export function GateScreen({ gate }: { readonly gate: Gate }) {
   return (
@@ -104,7 +105,7 @@ function SignIn({ onSignedIn }: { onSignedIn(status: AuthStatus): void }) {
       <LedgerRow label="simple">
         <h1>Sign in</h1>
       </LedgerRow>
-      <GateField
+      <PasswordLine
         ref={input}
         label="Password"
         value={password}
@@ -116,9 +117,9 @@ function SignIn({ onSignedIn }: { onSignedIn(status: AuthStatus): void }) {
           setFeedback(afterEdit)
         }}
       />
-      <Submit busy={signingIn} note={noteOf(feedback)}>
+      <SubmitLine busy={signingIn} note={noteOf(feedback)}>
         {signingIn ? 'Signing in' : 'Sign in'}
-      </Submit>
+      </SubmitLine>
     </form>
   )
 }
@@ -171,7 +172,7 @@ function SetUp({ onClaimed, onAlreadyClaimed }: { onClaimed(status: AuthStatus):
   }
 
   const field = (name: SetupField, label: string, autoComplete: string) => (
-    <GateField
+    <PasswordLine
       ref={inputs[name]}
       label={label}
       value={values[name]}
@@ -198,78 +199,9 @@ function SetUp({ onClaimed, onAlreadyClaimed }: { onClaimed(status: AuthStatus):
       {field('secret', 'Setup secret', 'off')}
       {field('password', 'Password', 'new-password')}
       {field('confirmation', 'Confirm password', 'new-password')}
-      <Submit busy={claiming} note={noteOf(feedback)}>
+      <SubmitLine busy={claiming} note={noteOf(feedback)}>
         {claiming ? 'Claiming' : 'Claim installation'}
-      </Submit>
+      </SubmitLine>
     </form>
-  )
-}
-
-function GateField({
-  label,
-  value,
-  autoComplete,
-  focused,
-  reason,
-  ref,
-  onChange,
-}: {
-  readonly label: string
-  readonly value: string
-  readonly autoComplete: string
-  readonly focused: boolean
-  readonly reason: string | undefined
-  readonly ref: Ref<HTMLInputElement>
-  onChange(value: string): void
-}) {
-  const id = useId()
-  const [revealed, setRevealed] = useState(false)
-  return (
-    <LedgerRow label={<label htmlFor={id}>{label}</label>}>
-      <span className="x-gate-control">
-        <input
-          ref={ref}
-          id={id}
-          className="x-field"
-          type={revealed ? 'text' : 'password'}
-          value={value}
-          autoComplete={autoComplete}
-          spellCheck={false}
-          // biome-ignore lint/a11y/noAutofocus: the first field of a sign-in or setup form is the only thing to do on the screen.
-          autoFocus={focused}
-          aria-invalid={reason ? true : undefined}
-          aria-describedby={reason ? `${id}-reason` : undefined}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <Button className="x-action x-grey" onClick={() => setRevealed((shown) => !shown)}>
-          {revealed ? 'Hide' : 'Show'}
-          <span className="visually-hidden"> {label.toLowerCase()}</span>
-        </Button>
-      </span>
-      {reason ? (
-        <p className="x-gate-reason" id={`${id}-reason`}>
-          {reason}
-        </p>
-      ) : null}
-    </LedgerRow>
-  )
-}
-
-function Submit({
-  busy,
-  note,
-  children,
-}: {
-  readonly busy: boolean
-  readonly note: string
-  readonly children: string
-}) {
-  return (
-    <LedgerRow label="">
-      <Button className="x-action" type="submit" focusableWhenDisabled disabled={busy} aria-busy={busy}>
-        {children}
-      </Button>
-      <p role="status">{note}</p>
-    </LedgerRow>
   )
 }

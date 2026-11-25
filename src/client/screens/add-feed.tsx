@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import type { CreateSubscriptionResponse, FeedPreview, OpmlImportReport } from '../../shared/api.js'
 import { RHYTHM_LABELS, rhythmOf } from '../../shared/rhythm.js'
 import { importOpml } from '../api.js'
@@ -23,6 +23,7 @@ export function AddFeedRows({
   const [importing, startImporting] = useTransition()
   const [imported, setImported] = useState('')
   const field = useRef<HTMLInputElement>(null)
+  const addressId = useId()
   useEffect(() => {
     if (focused) field.current?.focus()
   }, [focused])
@@ -43,7 +44,7 @@ export function AddFeedRows({
 
   return (
     <>
-      <LedgerRow label="Add a Feed">
+      <LedgerRow label={<label htmlFor={addressId}>Add a Feed</label>}>
         <form
           onSubmit={(event) => {
             event.preventDefault()
@@ -52,9 +53,9 @@ export function AddFeedRows({
         >
           <input
             ref={field}
+            id={addressId}
             className="x-search"
             type="url"
-            aria-label="Site or Feed address"
             placeholder="Site or Feed address"
             autoComplete="off"
             spellCheck={false}

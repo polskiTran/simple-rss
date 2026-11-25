@@ -144,3 +144,19 @@ test.describe('the Library at phone width', () => {
     await expectNoHorizontalOverflow(page)
   })
 })
+
+test.describe('the Library on a touch screen', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+
+  test('shows Save in the Digest and Saved in the Library without hover or focus', async ({ page, installation }) => {
+    await subscribe(page, installation)
+    await goTo(page, 'Digest')
+
+    const save = page.getByRole('button', { name: 'Save First light' })
+    await expect(save).toHaveCSS('opacity', '1')
+    await save.tap()
+
+    await goTo(page, 'Library')
+    await expect(page.getByRole('button', { name: 'Saved First light' })).toHaveCSS('opacity', '1')
+  })
+})

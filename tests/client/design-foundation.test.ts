@@ -74,7 +74,10 @@ interface ContrastPromise {
 const CONTRAST_PROMISES: readonly ContrastPromise[] = [
   { text: 'ink', ground: 'paper', leastRatio: 7 },
   { text: 'grey', ground: 'paper', leastRatio: 4.5 },
-  { text: 'grey', ground: 'tone', leastRatio: 4 },
+  { text: 'grey', ground: 'tone', leastRatio: 4.5 },
+  { text: 'grey', ground: 'tone-deep', leastRatio: 4.5 },
+  { text: 'grey', ground: 'wash', leastRatio: 4.5 },
+  { text: 'grey', ground: 'wash-deep', leastRatio: 4.5 },
   { text: 'ink', ground: 'tone', leastRatio: 7 },
   { text: 'ink', ground: 'tone-deep', leastRatio: 7 },
   { text: 'ink', ground: 'wash', leastRatio: 7 },
@@ -90,9 +93,37 @@ describe('contrast', () => {
       expect(ratio, `${text} on ${ground}`).toBeGreaterThanOrEqual(leastRatio)
     }
   })
+
+  it.each(['light', 'dark'] as const)('sets every Rhythm name at 4.5:1 on every ground in %s', (mode) => {
+    const colours = tokens()
+    const side = mode === 'light' ? 0 : 1
+    const bounds = css.match(
+      /oklch\(from var\(--c\) min\(l, ([\d.]+)\) c h\), oklch\(from var\(--c\) max\(l, ([\d.]+)\) c h\)/,
+    )
+    const rhythms = [...css.matchAll(/\[data-rhythm='(\w+)'\]\s*\{\s*--c:\s*oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)/g)]
+    expect(bounds).not.toBeNull()
+    expect(rhythms.length).toBe(5)
+    for (const [, rhythm, lightness = '0', chroma, hue] of rhythms) {
+      const bound = Number(bounds?.[side + 1])
+      const shown = mode === 'light' ? Math.min(Number(lightness), bound) : Math.max(Number(lightness), bound)
+      for (const ground of ['paper', 'tone', 'tone-deep', 'wash', 'wash-deep']) {
+        const ratio = contrast(`oklch(${shown} ${chroma} ${hue})`, colours.get(ground)?.[side] ?? '')
+        expect(ratio, `${rhythm} on ${ground}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
 })
 
 describe('scale', () => {
+  it('sets type in rem so the browser’s text size applies, but for the 16px a phone field needs', () => {
+    const type = [...css.matchAll(/--x-(size|line|code-line|read|read-leading)(?:-[\w]+)?\s*:\s*([^;]+);/g)]
+    expect(type.length).toBeGreaterThan(8)
+    for (const [declaration, , value = ''] of type) {
+      if (/--x-(size|line)-field/.test(declaration)) expect(value, declaration).toMatch(/^\d+px$/)
+      else expect(value, declaration).toMatch(/^[\d.]+rem$/)
+    }
+  })
+
   it('spaces and sets type only through the tokens', () => {
     const scaled = [
       'padding[\\w-]*',

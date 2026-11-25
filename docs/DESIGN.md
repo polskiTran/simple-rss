@@ -16,7 +16,9 @@ change that improves the product changes both.
 - **Type.** Geist at 13px on an 18px line, everywhere but the Reader View's
   title and body, which set 17px on 28px (15/25 and 19/31 under Text size).
   Weight 500 marks the current place and the Reader View's title; nothing is
-  set in capitals. Code is Geist Mono.
+  set in capitals. Code is Geist Mono. Type is set in rem, so these are the
+  sizes at the browser's default text size and they grow with it; spacing
+  stays on the 12px unit, and a phone's fields keep their 16px (ADR 0029).
 - **Grid.** Twelve flush columns with a 12px gutter and a 12px page inset, no
   maximum width. A row is label (columns 1–2), main (3–8), side (9–10) and end
   (11–12). Below 760px every column spans the page.
@@ -25,14 +27,19 @@ change that improves the product changes both.
   a fold, a field or a Lane card, bleeds half a unit past its text on each side.
 - **Controls.** Choices are words in a row, the chosen one in ink and the rest
   grey; actions are ink words (`x-action`) 24px apart; fields sit on the page tone. A
-  screen's options and actions are rows of its own ledger, never a menu.
+  screen's options and actions are rows of its own ledger, never a menu. Every
+  link and word underlines under keyboard focus, titles and places included.
+  Where a row's Save is revealed on hover, it always shows on a screen that
+  cannot hover.
 - **Surfaces.** No hairlines, borders, radii or shadows. Separation is space
   and tone: `--x-tone` under a hovered or focused row, and an unfolded fold.
 - **Colour.** OKLCH, greyscale paper and ink, warm hue 95. Colour appears only
   in data: a Feed's name and Cadence take its Rhythm's colour — Firehose
   `oklch(0.63 0.19 35)`, Daily `oklch(0.78 0.14 82)`, Weekly
   `oklch(0.62 0.12 150)`, Monthly `oklch(0.52 0.08 250)`, Inactive grey — with
-  lightness capped at 0.62 on light paper so Daily stays legible. Saved is the
+  lightness capped at 0.49 on light paper and held at 0.745 or more on dark, so
+  a name reads at 4.5:1 on paper, tone and wash alike. Grey text meets the same
+  4.5:1 on every ground it sits on. Saved is the
   pink: a saved row sits on a pink wash and shows the word Saved beside its
   time, and selected text takes the same pink. The wash lies over the hover
   tone, deepening to `--x-wash-deep` under a hovered or focused row. Choosing
@@ -66,17 +73,21 @@ places and Settings share the first line and the search line follows.
 The ledger is three rows: Layout, Index, Columns or Wall (kept per device);
 Firehose, Fold or Lane; and Day, the day shown, which opens a 5-week calendar
 to pick another. Above them a line appears only when there is nothing to show:
-no Feeds yet, with Add a Feed; nothing on or before the day; or the Digest
+no Feeds yet, with Add a Feed; nothing yet while the Feeds have still to
+publish, with See your Feeds; nothing on or before the day; or the Digest
 failing to load, with Retry.
 
 In the Index layout, days follow as rows: title, Feed, time, with Save
 revealed on hover or keyboard focus (it fades, so it stays in the tab order).
 The end of a Quiet Spell is not shown. A sticky legend at the bottom names the
-columns. Show older days pages by whole days (ADR 0011).
+columns; the page keeps its height clear when scrolling a focused control into
+view, so Tab never leaves one under it. Show older days pages by whole days
+(ADR 0011).
 
 The two other layouts set each day's Feed Items as cards: the Feed Item's
 image when it has one (proxied, ADR 0018; capped in height and cropped), the
-title, the Feed and time with Save, and up to four lines of summary. A saved
+title, the Feed and time with Save (a long Feed name is cut, never the time),
+and up to four lines of summary. A saved
 card sits on the pink wash. A Firehose fold is a card too: the count, the Feed
 and span of times, and the latest title with its time; unfolded, the same
 list goes on to every title, scrolled inside the card past the height an image
@@ -115,7 +126,8 @@ per device:
   latest title stood, and its rows give title and time, never the Feed again. Which folds
   stand open is kept on the history entry (ADR 0028).
 - **Lane.** The day's Firehose Feed Items move to the last three columns, as
-  tall as the day's own rows and scrolled inside it; the rows narrow to make
+  tall as the day's own rows and scrolled inside it, its scrollbar showing
+  where the platform draws one; the rows narrow to make
   room. On a phone the Lane follows the day's rows.
 
 ## Feed
@@ -198,8 +210,13 @@ a concordance aligned on the matched word) was prototyped and this one kept.
 
 ## Settings
 
-One ledger: Theme (System, Light or Dark, kept on this device), Timezone, Export (OPML or everything as JSON), Account (Change password, which
-opens its three lines in the row, and Sign out) and the version.
+One ledger: Theme (System, Light or Dark, kept on this device), Timezone (the
+platform's own select, on the page tone), Export (Subscriptions as OPML, or Everything as JSON),
+Account (Change password and Sign out) and the version. Change password opens
+below the Account row a note that it signs out every device, then the lines
+sign-in and setup use: Current password, New password and Confirm new
+password, each labelled with Show beside it. Its Change password stays
+pressable and refuses an empty or mismatched line on that line.
 
 ## Not built from the prototype
 

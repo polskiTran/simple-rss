@@ -51,7 +51,7 @@ test.describe('the search line', () => {
     await expect(field).toBeFocused()
 
     await goTo(page, 'Feeds')
-    const address = page.getByRole('textbox', { name: 'Site or Feed address' })
+    const address = page.getByRole('textbox', { name: 'Add a Feed' })
     await address.focus()
     await page.keyboard.press('/')
     await expect(address).toBeFocused()

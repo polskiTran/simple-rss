@@ -306,7 +306,7 @@ export async function goTo(page: Page, place: 'Digest' | 'Library' | 'Feeds' | '
 
 export async function addFeed(page: Page, url: string): Promise<void> {
   await goTo(page, 'Feeds')
-  await page.getByRole('textbox', { name: 'Site or Feed address' }).fill(url)
+  await page.getByRole('textbox', { name: 'Add a Feed' }).fill(url)
   await page.getByRole('button', { name: /^Subscribe to / }).click()
   await page.waitForURL(/\/feeds\/\d+$/)
 }

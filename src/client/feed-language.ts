@@ -41,7 +41,7 @@ const UNANSWERED_COPY = {
 export function addFailure(cause: unknown, host: string) {
   const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError'
   if (!(cause instanceof ApiError) && !timedOut) {
-    return { reason: 'The reader is unavailable. Nothing was added.', retry: true }
+    return { reason: 'Can’t reach simple. Nothing was added.', retry: true }
   }
   const code = cause instanceof ApiError ? cause.code : 'feed_timeout'
   if (code === 'invalid_feed_url' || code === 'duplicate_subscription') {

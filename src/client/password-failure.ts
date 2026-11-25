@@ -27,7 +27,7 @@ export function afterEdit<Field extends string>(feedback: Feedback<Field>): Feed
 }
 
 export function describeFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'The reader is unavailable. Try again in a moment.'
+  if (!(cause instanceof ApiError)) return 'Can’t reach simple. Check your connection and try again.'
   if (cause.code === 'too_many_attempts') {
     return `Too many attempts. Try again in ${describeWait(cause.retryAfterSeconds)}.`
   }

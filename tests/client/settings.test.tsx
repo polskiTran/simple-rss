@@ -86,7 +86,7 @@ describe('the Settings timezone', () => {
     const select = await screen.findByLabelText('Timezone')
     await user.selectOptions(select, 'Pacific/Auckland')
 
-    expect(await screen.findByText('That timezone isn’t recognized.')).toBeDefined()
+    expect(await screen.findByText('That timezone isn’t recognized. Choose another.')).toBeDefined()
     expect(select).toHaveProperty('value', 'UTC')
   })
 })
@@ -96,11 +96,11 @@ describe('the Settings export actions', () => {
     stubApi()
     openSettings()
 
-    const opml = await screen.findByRole('link', { name: 'OPML' })
+    const opml = await screen.findByRole('link', { name: 'Subscriptions as OPML' })
     expect(opml.getAttribute('href')).toBe('/api/subscriptions/export')
     expect(opml.getAttribute('download')).toBe('subscriptions.opml')
 
-    const json = screen.getByRole('link', { name: 'Everything' })
+    const json = screen.getByRole('link', { name: 'Everything as JSON' })
     expect(json.getAttribute('href')).toBe('/api/export')
     expect(json.getAttribute('download')).toBe('simple-rss-export.json')
   })

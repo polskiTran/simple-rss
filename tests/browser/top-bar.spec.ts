@@ -26,6 +26,17 @@ test.describe('the top bar', () => {
     const xs = stops.map((stop) => stop.x)
     expect(xs).toEqual([...xs].sort((left, right) => left - right))
   })
+
+  test('underlines the current place when it takes keyboard focus', async ({ page, installation }) => {
+    await claim(page, installation.url)
+    await page.locator('body').click({ position: { x: 1, y: 700 } })
+    await page.keyboard.press('Tab')
+
+    const digest = page.getByRole('banner').getByRole('link', { name: 'Digest', exact: true })
+    await expect(digest).toHaveAttribute('aria-current', 'page')
+    await expect(digest).toBeFocused()
+    await expect(digest).toHaveCSS('text-decoration-line', 'underline')
+  })
 })
 
 test.describe('the top bar on the narrowest phone', () => {

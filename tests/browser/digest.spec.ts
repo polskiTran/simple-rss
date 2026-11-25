@@ -108,6 +108,22 @@ test.describe('the Digest', () => {
     await expect(more).toBeHidden()
   })
 
+  test('never lets Tab hide a focused control under the legend', async ({ page, installation }) => {
+    await openLongDigest(page, installation)
+    await page.setViewportSize({ width: 1280, height: 400 })
+    await today(page).click()
+
+    for (let stop = 0; stop < 30; stop++) {
+      await page.keyboard.press('Tab')
+      const hidden = await page.evaluate(() => {
+        const focused = document.activeElement?.getBoundingClientRect()
+        const legend = document.querySelector('.x-legend')?.getBoundingClientRect()
+        return focused !== undefined && legend !== undefined && focused.top >= legend.top
+      })
+      expect(hidden, `stop ${stop}`).toBe(false)
+    }
+  })
+
   test('comes back from a Feed Item to the same entry and place, announced', async ({ page, installation }) => {
     await openLongDigest(page, installation)
     const deep = title(page, 'Meadow note 30')
@@ -274,6 +290,20 @@ test.describe('a Firehose Feed’s day', () => {
       headHeight: folded.headHeight,
     })
     expect(await place()).toEqual(folded)
+  })
+
+  test('underlines a title in an unfolded card when it takes keyboard focus', async ({ page, installation }) => {
+    await page.addInitScript(() => localStorage.setItem('digest-layout', 'columns'))
+    await asFirehose(page)
+    await openDigest(page, installation)
+    await page.getByRole('button', { name: '40 Feed Items from Field Notes' }).click()
+
+    const entry = title(page, 'Ledger entry 2')
+    await title(page, 'Ledger entry 1').focus()
+    await page.keyboard.press('Tab')
+
+    await expect(entry).toBeFocused()
+    await expect(entry).toHaveCSS('text-decoration-line', 'underline')
   })
 
   for (const layout of ['columns', 'wall']) {

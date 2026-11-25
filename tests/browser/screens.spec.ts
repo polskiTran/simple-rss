@@ -65,7 +65,7 @@ test.describe('the screens and the top bar', () => {
     await page.getByRole('navigation', { name: 'Places' }).getByRole('link', { name: 'Digest' }).click()
 
     await page.getByRole('main').getByRole('link', { name: 'Add a Feed' }).click()
-    await expect(page.getByLabel('Site or Feed address')).toBeFocused()
+    await expect(page.getByLabel('Add a Feed')).toBeFocused()
     await page.keyboard.insertText(installation.feedUrl)
     await page.getByRole('button', { name: 'Subscribe to Field Notes' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Field Notes' })).toBeVisible()

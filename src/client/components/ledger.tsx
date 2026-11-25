@@ -68,7 +68,13 @@ export function FeedLink({
   onOpen(feedId: number): void
 }) {
   return (
-    <RoutedLink className="x-feed" data-rhythm={rhythm} href={feedPath(feedId)} onNavigate={() => onOpen(feedId)}>
+    <RoutedLink
+      className="x-feed"
+      data-rhythm={rhythm}
+      dir="auto"
+      href={feedPath(feedId)}
+      onNavigate={() => onOpen(feedId)}
+    >
       {title}
     </RoutedLink>
   )
@@ -124,7 +130,7 @@ export function TitleLink({
   readonly children?: ReactNode
 }) {
   return (
-    <RoutedLink href={readerPath(item.feedItemId)} onNavigate={() => onOpen(item.feedItemId)}>
+    <RoutedLink className="x-title" href={readerPath(item.feedItemId)} onNavigate={() => onOpen(item.feedItemId)}>
       {children}
     </RoutedLink>
   )

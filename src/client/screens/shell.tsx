@@ -85,7 +85,7 @@ function screenFor(navigation: Navigation, actions: ShellActions): ReactNode {
           onStart={navigation.showDigest}
           onOpenItem={(feedItemId) => navigation.openReader(feedItemId, here)}
           onOpenFeed={(feedId) => navigation.openFeed(feedId, here)}
-          onAddFeed={() => navigation.navigate('feeds')}
+          onShowFeeds={() => navigation.navigate('feeds')}
         />
       )
     case 'saved':

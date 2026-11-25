@@ -9,6 +9,7 @@ import { afterEdit, describeFailure, type Feedback, noteOf, reasonOn, reasonToHo
 import { timezoneFailure, timezoneOptions } from '../timezone.js'
 import { VersionNote } from '../components/version-note.js'
 import { LedgerRow, LoadFailure, Options } from '../components/ledger.js'
+import { PasswordLine, SubmitLine } from '../components/password-lines.js'
 
 const APPEARANCE_LABELS = { system: 'System', light: 'Light', dark: 'Dark' } as const satisfies Record<
   Appearance,
@@ -54,10 +55,10 @@ export function SettingsScreen({ onAccessChanged }: { onAccessChanged(status: Au
         <LedgerRow label="Export">
           <span className="x-actions">
             <a className="x-action" href="/api/subscriptions/export" download="subscriptions.opml">
-              OPML
+              Subscriptions as OPML
             </a>
             <a className="x-action" href="/api/export" download="simple-rss-export.json">
-              Everything
+              Everything as JSON
             </a>
           </span>
         </LedgerRow>
@@ -71,8 +72,8 @@ export function SettingsScreen({ onAccessChanged }: { onAccessChanged(status: Au
             </Button>
           </span>
           {leaveFailure ? <p role="status">{leaveFailure}</p> : null}
-          {changing ? <PasswordForm onChanged={onAccessChanged} /> : null}
         </LedgerRow>
+        {changing ? <PasswordForm onChanged={onAccessChanged} /> : null}
         <LedgerRow label="Version">
           simple <VersionNote />
         </LedgerRow>
@@ -155,6 +156,10 @@ function PasswordForm({ onChanged }: { onChanged(status: AuthStatus): void }) {
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (saving) return
+    if (values.current === '') {
+      refuse('current', 'Enter the password you sign in with now.')
+      return
+    }
     const hold = reasonToHold(values.password, values.confirmation)
     if (hold) {
       refuse(hold.field, hold.reason)
@@ -173,43 +178,31 @@ function PasswordForm({ onChanged }: { onChanged(status: AuthStatus): void }) {
   }
 
   const field = (name: PasswordField, label: string, autoComplete: string) => (
-    <>
-      <input
-        ref={inputs[name]}
-        className="x-search"
-        type="password"
-        aria-label={label}
-        placeholder={label}
-        autoComplete={autoComplete}
-        aria-invalid={reasonOn(feedback, name) ? true : undefined}
-        value={values[name]}
-        onChange={(event) => {
-          setValues((current) => ({ ...current, [name]: event.target.value }))
-          setFeedback(afterEdit)
-        }}
-      />
-      {reasonOn(feedback, name) ? <p>{reasonOn(feedback, name)}</p> : null}
-    </>
+    <PasswordLine
+      ref={inputs[name]}
+      label={label}
+      value={values[name]}
+      autoComplete={autoComplete}
+      focused={name === 'current'}
+      reason={reasonOn(feedback, name)}
+      onChange={(value) => {
+        setValues((current) => ({ ...current, [name]: value }))
+        setFeedback(afterEdit)
+      }}
+    />
   )
 
-  const ready = values.current !== '' && values.password !== '' && values.confirmation !== ''
   return (
-    <form className="x-form" aria-label="Change password" onSubmit={submit}>
-      <p className="x-grey">Changing it signs out every device, including this one.</p>
+    <form aria-label="Change password" noValidate onSubmit={submit}>
+      <LedgerRow label="">
+        <p className="x-grey">Changing it signs out every device, including this one.</p>
+      </LedgerRow>
       {field('current', 'Current password', 'current-password')}
       {field('password', 'New password', 'new-password')}
       {field('confirmation', 'Confirm new password', 'new-password')}
-      <p role="status">{noteOf(feedback)}</p>
-      <Button
-        className="x-action"
-        type="submit"
-        focusableWhenDisabled
-        disabled={!ready || saving}
-        aria-disabled={!ready || saving ? true : undefined}
-        aria-busy={saving}
-      >
+      <SubmitLine busy={saving} note={noteOf(feedback)}>
         {saving ? 'Changing' : 'Change password'}
-      </Button>
+      </SubmitLine>
     </form>
   )
 }

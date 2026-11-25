@@ -144,7 +144,8 @@ describe('the Digest', () => {
     stubApi()
     openDigest()
 
-    expect(await screen.findByText('Nothing yet.')).toBeDefined()
+    expect(await screen.findByText(/Nothing yet\. Feed Items land here as your Feeds publish\./)).toBeDefined()
+    expect(screen.getByRole('link', { name: 'See your Feeds' }).getAttribute('href')).toBe('/feeds')
     expect(screen.queryByRole('link', { name: 'Add a Feed' })).toBeNull()
   })
 

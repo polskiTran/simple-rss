@@ -133,7 +133,9 @@ const IMPORT_FAILURE_COPY = {
 } as const satisfies Partial<Record<ApiErrorCode, string>>
 
 export function importFailure(cause: unknown): string {
-  if (!(cause instanceof ApiError)) return 'The reader is unavailable.'
+  if (!(cause instanceof ApiError)) return 'Can’t reach simple. Check your connection and import the file again.'
   const code = cause.code
-  return hasOwn(IMPORT_FAILURE_COPY, code) ? IMPORT_FAILURE_COPY[code] : 'That file couldn’t be imported.'
+  return hasOwn(IMPORT_FAILURE_COPY, code)
+    ? IMPORT_FAILURE_COPY[code]
+    : 'That file couldn’t be imported. Import it again in a moment.'
 }

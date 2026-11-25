@@ -10,7 +10,7 @@ async function subscribe(page: Page, installation: Installation): Promise<void> 
 async function subscribeFromSite(page: Page, installation: Installation): Promise<void> {
   await claim(page, installation.url)
   await goTo(page, 'Feeds')
-  await page.getByRole('textbox', { name: 'Site or Feed address' }).fill(installation.siteUrl)
+  await page.getByRole('textbox', { name: 'Add a Feed' }).fill(installation.siteUrl)
 
   const choices = page.getByRole('group', { name: 'Feeds named by publisher.example' })
   await expect(choices.getByRole('button', { name: 'Field Notes' })).toHaveAttribute('aria-pressed', 'true')

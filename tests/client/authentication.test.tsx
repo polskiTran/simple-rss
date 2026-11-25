@@ -364,6 +364,27 @@ describe('leaving the reader', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeDefined()
   })
 
+  it('keeps Change password pressable and refuses an empty change on the Current password line', async () => {
+    const api = stubApi()
+    renderApp('/settings')
+    await screen.findByRole('navigation', { name: 'Places' })
+
+    await press('Change password')
+    const submit = within(screen.getByRole('form', { name: 'Change password' })).getByRole('button', {
+      name: 'Change password',
+    })
+    expect(submit.hasAttribute('disabled')).toBe(false)
+    await userEvent.click(submit)
+
+    const current = screen.getByLabelText('Current password')
+    expect(document.activeElement).toBe(current)
+    expect(current.getAttribute('aria-invalid')).toBe('true')
+    expect(current.getAttribute('aria-describedby')).toBe(
+      screen.getByText('Enter the password you sign in with now.').id,
+    )
+    expect(api.requestsTo('POST /api/auth/password')).toHaveLength(0)
+  })
+
   it('warns before the change that it signs out every device', async () => {
     stubApi()
     renderApp('/settings')

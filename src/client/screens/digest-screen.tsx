@@ -46,10 +46,10 @@ interface DigestScreenProps {
   onStart(start: DigestStart): void
   onOpenItem(feedItemId: number): void
   onOpenFeed(feedId: number): void
-  onAddFeed(): void
+  onShowFeeds(): void
 }
 
-export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed }: DigestScreenProps) {
+export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onShowFeeds }: DigestScreenProps) {
   useScreenTitle('Digest')
   const [calendar] = useResource('calendar', fetchDigestCalendar)
   const [through, keepThrough] = useKept('through', dateKeySchema)
@@ -102,13 +102,18 @@ export function DigestScreen({ start, onStart, onOpenItem, onOpenFeed, onAddFeed
     days?.subscriptions === 0 ? (
       <>
         No Feeds yet.{' '}
-        <RoutedLink className="x-action" href={sectionPath('feeds')} onNavigate={onAddFeed}>
+        <RoutedLink className="x-action" href={sectionPath('feeds')} onNavigate={onShowFeeds}>
           Add a Feed
         </RoutedLink>
       </>
     ) : empty ? (
       start.from === undefined ? (
-        'Nothing yet.'
+        <>
+          Nothing yet. Feed Items land here as your Feeds publish.{' '}
+          <RoutedLink className="x-action" href={sectionPath('feeds')} onNavigate={onShowFeeds}>
+            See your Feeds
+          </RoutedLink>
+        </>
       ) : (
         'Nothing on or before this day.'
       )

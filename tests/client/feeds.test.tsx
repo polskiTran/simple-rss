@@ -34,7 +34,7 @@ afterEach(() => {
 
 type User = ReturnType<typeof userEvent.setup>
 
-const address = () => screen.findByRole<HTMLInputElement>('textbox', { name: 'Site or Feed address' })
+const address = () => screen.findByRole<HTMLInputElement>('textbox', { name: 'Add a Feed' })
 
 async function lookUp(user: User, line: string) {
   await user.click(await address())
@@ -269,7 +269,7 @@ describe('Add a Feed', () => {
 
     await lookUp(user, 'journal.example')
 
-    expect(await screen.findByText('The reader is unavailable. Nothing was added.')).toBeDefined()
+    expect(await screen.findByText('Can’t reach simple. Nothing was added.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
   })
 
